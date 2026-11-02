@@ -571,7 +571,7 @@
 		"role": ["anti_heavy"],
 		"retreat": 0.65,
 		"attribute": ["artillery", "ranged"],
-		"ranged": {"target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "move_floor_seconds": 1},
+		"ranged": {"always_fire_at_will": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "move_floor_seconds": 1},
 	},
 	"armmart": {
 		"role": ["artillery"],

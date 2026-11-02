@@ -31,7 +31,7 @@ namespace ThugFireAtWill {
         return name == "corthud" || name == "armham" || name == "legbar" || name == "legmed"
             || name == "leghrk" || name == "leginf" || name == "leglob"
             || name == "corstorm" || name == "armrock" || name == "legbal"
-            || name == "cortrem";   // owner 2026-11-02: Tremor fires at will always
+            || name == "cortrem" || name == "armmanni";   // owner 2026-11-02: Tremor and Starlight fire at will always
     }
 
     final class Hull {
