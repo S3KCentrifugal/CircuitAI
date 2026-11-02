@@ -76,6 +76,9 @@ namespace AirRaids {
             Global::RoleSettings::Air::StrikeRiskScale, Global::RoleSettings::Air::StrikeArmyReserve,
             Global::RoleSettings::Air::StrikeLocalAaReserve, false);
         AirOperations::Configure(wave, true, 2);
+        // T1 raids only (owner 2026-11-02): T2 waves never treat wind grids as override targets.
+        wave.SetWindGridPolicy(Global::RoleSettings::Air::WindGridMinimum, Global::RoleSettings::Air::WindGridDepth,
+            Global::RoleSettings::Air::WindGridLink, Global::RoleSettings::Air::WindGridPriority);
         if (!wave.PickOperationTarget(Global::Map::StartPos, 0.0f)) {
             wave.Abort(); @wave = null; return;
         }

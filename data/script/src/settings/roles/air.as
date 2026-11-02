@@ -189,7 +189,8 @@ namespace Air {
             bool StrikeEarlyAttack = true; // ATTACK before the final approach MOVE
             float StrikeImmediatePriority = 4.0f; // visible local AFUS interrupts a committed raid; 0 disables
             float StrikeImmediateRadius = 1800.0f;
-            // Tight wind grids chain-react under bombs (owner 2026-11-01). A grid is
+            // T1 bomber raids only (owner 2026-11-02; T2 waves rank winds below every tier
+            // target). Tight wind grids chain-react under bombs (owner 2026-11-01). A grid is
             // WindGridMinimum winds linked within WindGridLink elmos (winds touch at
             // 48), at least WindGridDepth winds deep both ways; a double row is an
             // ordinary target, level with mexes. A visible grid inside
