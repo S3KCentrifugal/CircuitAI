@@ -37,7 +37,7 @@ class CJobQueue {
 public:
 	void Register(const Owner& owner) {
 		if (Find(owner) != nullptr) return;
-		owners.push_back(OwnerQueue{owner});
+		owners.push_back(OwnerQueue{owner, {}, {}});
 	}
 	// Drops every queued job of the owner. Returns how many were dropped.
 	std::size_t Unregister(const Owner& owner) {
