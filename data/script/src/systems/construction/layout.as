@@ -1232,8 +1232,11 @@ namespace Layout {
         // Conservative center distance uses this faction's actual nano reach.
         return nano !is null && aiBuilderMgr.GetStaticBuildPowerNear(position,nano.GetBuildDistance())>0.0f;
     }
+    // Round 5: an economy site's first turret is not held back by the turret
+    // cap (played: Carrot Mountains, overflow AFUS sites reserved at 47-49 min
+    // waited for it to min 60); one such order at a time.
     void PrepareEconomySupport(const AIFloat3& in position) {
-        if(nano is null || !nano.IsAvailable(ai.frame) || TurretsCapped()
+        if(nano is null || !nano.IsAvailable(ai.frame)
             || (economySupportTask !is null && !economySupportTask.IsDead())) return;
         int slot=aiTerrainMgr.NextSlotAny(nanoGroup,position);
         if(slot<0 || aiTerrainMgr.GetReservationPos(slot).distance2D(position)>nano.GetBuildDistance())
