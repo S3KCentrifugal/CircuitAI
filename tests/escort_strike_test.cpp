@@ -92,6 +92,18 @@ int main()
 		}
 	}
 	assert(orders == 1);
+	// Lead ahead of the wave: 258 elmos/s = 8.6 per frame, 36 frames -> ~310 elmos ahead.
+	{
+		float x = 0.f, z = 0.f;
+		FollowLead(8.6f, 0.f, 36.f, 400.f, 1.f, &x, &z);
+		assert(x > 309.f && x < 311.f && z == 0.f);
+		FollowLead(0.f, -20.f, 36.f, 400.f, 1.f, &x, &z);        // fast: capped at 400
+		assert(x == 0.f && z < -399.f && z > -401.f);
+		FollowLead(0.5f, 0.5f, 36.f, 400.f, 1.f, &x, &z);        // parked or circling: no lead
+		assert(x == 0.f && z == 0.f);
+		FollowLead(8.6f, 0.f, 0.f, 400.f, 1.f, &x, &z);          // lead off
+		assert(x == 0.f && z == 0.f);
+	}
 	assert(OrderAllowed(0, 15, 15));
 	assert(!OrderAllowed(0, 14, 15));
 

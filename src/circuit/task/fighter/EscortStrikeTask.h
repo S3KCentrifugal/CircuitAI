@@ -6,7 +6,8 @@
  * data/script/src/systems/air/air_liches.as). Every member follows one living
  * escort target (the vip), picked from the unit ids script supplies; when the
  * vip dies the members follow the nearest living one. Following is a MOVE to
- * where the vip really is, given again whenever it has flown on more than
+ * the centre of the wave's bombers, led a little along their heading so the
+ * members keep up (owner 2026-11-02), given again whenever that point has moved more than
  * ESCORT_FOLLOW_SLACK (owner 2026-11-02: the engine's air GUARD trailed the
  * bombers and the Liches fell far behind). A member stays with the vip
  * until an allowed target is in sight within the strike radius of it,
@@ -105,6 +106,7 @@ private:
 	bool TryStrike(CCircuitUnit* unit, int frame);
 	void GuardVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame);  // fighter mode: GUARD; else FollowVip
 	void FollowVip(CCircuitUnit* unit, CCircuitUnit* vip, int frame);
+	springai::AIFloat3 FollowPoint(CCircuitUnit* vip, int frame);  // wave centre, led along its heading
 	void CheckGuards(CCircuitUnit* vip, int frame);
 	bool IsTargetGone(int targetId) const;
 	bool IsSiegeTargetGone(SStrike& strike, int frame) const;
@@ -132,6 +134,9 @@ private:
 	int shotsFired;
 	int targetsDestroyed;
 	int nextGuardCheck;                    // frame of the next engine-attack check on the guards
+	springai::AIFloat3 followPoint;        // FollowPoint's result for followPointFrame / followPointVip
+	int followPointFrame;
+	int followPointVip;
 };
 
 } // namespace circuit

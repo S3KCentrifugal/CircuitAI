@@ -7,6 +7,8 @@
 #ifndef CIRCUIT_ESCORT_STRIKE_RULES_H
 #define CIRCUIT_ESCORT_STRIKE_RULES_H
 
+#include <cmath>
+
 namespace circuit::escort_strike {
 
 // A contact a striker may break off for: an allowed def (priority > 0) within
@@ -84,6 +86,22 @@ inline bool NeedsFollowOrder(int followingId, int vipId, float movedSq, float sl
 {
 	if (vipId < 0 || frame - lastOrderFrame < minGap) return false;
 	return followingId != vipId || movedSq > slack * slack;
+}
+
+// Follow point (owner 2026-11-02 follow-up: MOVEs to the vip's position still
+// left the Liches behind): the centre of the wave's bombers plus a lead along
+// their mean velocity (elmos per frame), leadFrames of their flight, at most
+// maxLead elmos. A wave slower than minSpeed (parked, circling) gets no lead.
+// Returns the offset to add to the centre in *outX / *outZ.
+inline void FollowLead(float velX, float velZ, float leadFrames, float maxLead, float minSpeed, float* outX, float* outZ)
+{
+	*outX = 0.f; *outZ = 0.f;
+	const float sqSpeed = velX * velX + velZ * velZ;
+	if (!(sqSpeed > minSpeed * minSpeed) || leadFrames <= 0.f || maxLead <= 0.f) return;
+	float scale = leadFrames;
+	const float speed = std::sqrt(sqSpeed);
+	if (speed * scale > maxLead) scale = maxLead / speed;
+	*outX = velX * scale; *outZ = velZ * scale;
 }
 
 // No new order of any kind inside minGap frames of the last one.

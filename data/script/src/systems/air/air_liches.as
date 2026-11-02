@@ -27,7 +27,9 @@ team 13: five runs at one anti-nuke, no hit; the run only ordered its ATTACK on
 the last leg of its route). So the Liches no longer fly an operation of their
 own. They join one native CEscortStrikeTask (src/circuit/task/fighter/
 EscortStrikeTask.*, not the bombers' CAirWaveTask) that:
-  - follows one living bomber of the wave with MOVEs to where it really is,
+  - follows the wave with MOVEs to the centre of its bombers, led ~1.2 s of
+    their flight ahead along their heading (at most 400 elmos; owner
+    2026-11-02: MOVEs to the bomber itself still left them behind),
     a new one each time it has flown on 32+ elmos (at most one per Liche per
     half second); owner 2026-11-02: the engine GUARD used before trailed the
     bombers and the Liches fell far behind. The wave's own fighters cover

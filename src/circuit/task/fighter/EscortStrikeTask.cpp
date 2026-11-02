@@ -11,6 +11,7 @@
 #include "unit/CircuitDef.h"
 #include "unit/CircuitWDef.h"
 #include "unit/enemy/EnemyUnit.h"
+#include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
@@ -37,6 +38,14 @@ using namespace springai;
 // Follow: the vip flown this far from the standing MOVE's spot gets a new MOVE
 // (at most every ESCORT_ORDER_GAP: ~130 elmos at a Phoenix's 258 elmos/s).
 #define ESCORT_FOLLOW_SLACK	32.f
+// Follow point: the centre of the wave's bombers within ESCORT_WAVE_RADIUS of the
+// vip, led along their mean velocity by ESCORT_LEAD_FRAMES of flight, at most
+// ESCORT_LEAD_MAX elmos (owner 2026-11-02: slightly ahead of the middle of them,
+// so the Liches keep up). A Phoenix at 258 elmos/s: ~310 elmos ahead.
+#define ESCORT_WAVE_RADIUS	1200.f
+#define ESCORT_LEAD_FRAMES	(FRAMES_PER_SEC * 6 / 5)
+#define ESCORT_LEAD_MAX		400.f
+#define ESCORT_LEAD_MIN_SPEED	1.f
 
 CEscortStrikeTask::CEscortStrikeTask(ITaskModule* mgr)
 		: IFighterTask(mgr, FightType::GUARD, 1.f)
@@ -51,6 +60,8 @@ CEscortStrikeTask::CEscortStrikeTask(ITaskModule* mgr)
 		, shotsFired(0)
 		, targetsDestroyed(0)
 		, nextGuardCheck(0)
+		, followPointFrame(-1)
+		, followPointVip(-1)
 {
 }
 
@@ -202,7 +213,49 @@ void CEscortStrikeTask::GuardVip(CCircuitUnit* unit, CCircuitUnit* vip, int fram
 }
 
 /*
- * Liches: a MOVE to the vip's current position, not a GUARD. The engine's air
+ * Where the Liches fly: the centre of the wave's living bombers near the vip,
+ * led along their mean velocity (escort_strike::FollowLead). Once per frame,
+ * O(candidates) team-unit lookups; members reuse it.
+ */
+AIFloat3 CEscortStrikeTask::FollowPoint(CCircuitUnit* vip, int frame)
+{
+	if (followPointFrame == frame && followPointVip == vip->GetId()) return followPoint;
+	CCircuitAI* circuit = manager->GetCircuit();
+	const AIFloat3& vipPos = vip->GetPos(frame);
+	AIFloat3 centre, vel;
+	int count = 0;
+	for (int candidateId : vipIds) {
+		CCircuitUnit* bomber = circuit->GetTeamUnit(candidateId);
+		if (bomber == nullptr || bomber->IsDead()) continue;
+		const AIFloat3& pos = bomber->GetPos(frame);
+		if (pos.SqDistance2D(vipPos) > ESCORT_WAVE_RADIUS * ESCORT_WAVE_RADIUS) continue;  // stragglers
+		AIFloat3 v;
+		TRY_UNIT(circuit, bomber,
+			v = bomber->GetUnit()->GetVel();
+		)
+		centre += pos; vel += v;
+		++count;
+	}
+	if (count == 0) {  // the vip itself, should its id not be a candidate
+		centre = vipPos;
+		TRY_UNIT(circuit, vip,
+			vel = vip->GetUnit()->GetVel();
+		)
+		count = 1;
+	}
+	centre /= float(count); vel /= float(count);
+	float leadX, leadZ;
+	escort_strike::FollowLead(vel.x, vel.z, float(ESCORT_LEAD_FRAMES), ESCORT_LEAD_MAX, ESCORT_LEAD_MIN_SPEED,
+			&leadX, &leadZ);
+	followPoint = AIFloat3(centre.x + leadX, centre.y, centre.z + leadZ);
+	CTerrainManager::CorrectPosition(followPoint);
+	followPointFrame = frame;
+	followPointVip = vip->GetId();
+	return followPoint;
+}
+
+/*
+ * Liches: a MOVE to the wave's follow point (FollowPoint), not a GUARD. The engine's air
  * GUARD flies to a spot trailing the guarded unit, so a Liche never closed on
  * the bombers and fell far behind them (owner 2026-11-02). A new MOVE when the
  * vip changed or has flown on more than ESCORT_FOLLOW_SLACK, at most one per
@@ -216,7 +269,7 @@ void CEscortStrikeTask::FollowVip(CCircuitUnit* unit, CCircuitUnit* vip, int fra
 	const int lastFrame = (last != lastOrder.end()) ? last->second : INT_MIN / 2;
 	auto follow = guarding.find(id);
 	const int current = (follow != guarding.end()) ? follow->second : -1;
-	const AIFloat3& vipPos = vip->GetPos(frame);
+	const AIFloat3 vipPos = FollowPoint(vip, frame);
 	auto spot = followSpot.find(id);
 	const float movedSq = (spot != followSpot.end()) ? spot->second.SqDistance2D(vipPos) : 0.f;
 	if (!escort_strike::NeedsFollowOrder(current, vip->GetId(), movedSq, ESCORT_FOLLOW_SLACK, lastFrame, frame,
@@ -226,8 +279,9 @@ void CEscortStrikeTask::FollowVip(CCircuitUnit* unit, CCircuitUnit* vip, int fra
 		unit->CmdMoveTo(vipPos);
 	)
 	if (current != vip->GetId()) {
-		circuit->LOG("ESCORT: team=%i follow unit=%i vip=%i at=%.0f,%.0f", circuit->GetTeamId(), id, vip->GetId(),
-				vipPos.x, vipPos.z);
+		const AIFloat3& real = vip->GetPos(frame);
+		circuit->LOG("ESCORT: team=%i follow unit=%i vip=%i at=%.0f,%.0f vip at=%.0f,%.0f", circuit->GetTeamId(), id,
+				vip->GetId(), vipPos.x, vipPos.z, real.x, real.z);
 	}
 	guarding[id] = vip->GetId();
 	followSpot[id] = vipPos;
