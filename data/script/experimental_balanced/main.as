@@ -108,7 +108,7 @@ namespace Main {
         Global::RoleSettings::Front::T2FactoryNanosMax = 14; // owner 2026-10-25: up to 14 as the metal bank nears overflow
         Global::RoleSettings::Front::LabCorridor = true; // owner 2026-10-30: every T2 lab keeps a corridor to the enemy base, mexes only (front_lab_porc.as)
         Global::RoleSettings::Front::LabPorc = true;     // owner 2026-10-30: T2 labs beyond 900 from our start get 2 pop-ups, a heavy plasma and a T2 flak
-        Global::RoleSettings::Front::Agitator = true;    // owner 2026-11-01: forward agitator at a front mex / porc 40%+ toward the enemy after the bank hit 80% (front_agitator.as)
+        Global::RoleSettings::Front::Agitator = true;    // owner 2026-11-01: forward agitator at a front mex / porc 40%+ toward the enemy after the bank hit 50% (front_agitator.as)
         Global::RoleSettings::Front::SpecialPorc = true; // owner 2026-11-01: Rattlesnake / Persecutor / Eviscerator there too while bank > 50%, 10 s min income > 100, a T2 lab stands
         Global::RoleSettings::Front::Recovery = true; // owner 2026-10-19: after losing the base, T1 eco and retake the mexes first (front_recovery.as)
         Global::RoleSettings::Front::TimeTriggerForFirstT2LabMinMetalIncome = 20.0f; // 22-min T2 lab/plant trigger needs +20 metal (AI 11 ordered legavp at +3 after losing its base)

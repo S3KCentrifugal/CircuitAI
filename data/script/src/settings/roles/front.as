@@ -410,7 +410,7 @@ namespace Front {
             // Both off here; experimental_balanced turns them on. Log [FRONT][Agitator], [FRONT][SpecialPorc].
             bool Agitator = false;
             array<string> AgitatorUnits = { "armguard", "corpun", "legcluster" };   // Gauntlet, Agitator, Amputator
-            float AgitatorMetalShare = 0.8f;
+            float AgitatorMetalShare = 0.5f;               // owner 2026-11-02: was 0.8
             int AgitatorMetalWindowSeconds = 120;
             float AgitatorMapShare = 0.4f;
             float AgitatorAdvance = 500.0f;            // a further agitator waits for a spot this much further forward (elmos, lane axis)

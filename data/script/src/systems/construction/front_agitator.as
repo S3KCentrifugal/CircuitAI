@@ -1,14 +1,14 @@
 // FRONT forward area-control artillery (owner, 2026-11-01; Front::Agitator).
 //
 // Owner: "Each FRONT role should build an agitator (or equivalent for its faction) at its front mex or
-// front porc spot if it has hit 80% metal in the last 2 minutes, and that front mex or front porc spot
+// front porc spot if it has hit 50% metal in the last 2 minutes, and that front mex or front porc spot
 // is at 40% map or further towards the enemy."
 //
 // The gun: Agitator corpun (Cortex), Gauntlet armguard (Armada), Amputator legcluster (Legion), the T1
 // "Area Control Plasma Artillery" of each faction (AgitatorUnits). A builder takes its own faction's gun
 // first, then any other it can build (traded constructors).
 //
-// Metal: the bank stood at AgitatorMetalShare (0.8) of storage or more at some sample in the last
+// Metal: the bank stood at AgitatorMetalShare (0.5; was 0.8 until 2026-11-02) of storage or more at some sample in the last
 // AgitatorMetalWindowSeconds (120). Sampled on every economy update and every ask.
 //
 // Spot: our finished mexes (T1 or T2) and finished static land guns ("porc"; any non-mobile unit with a
