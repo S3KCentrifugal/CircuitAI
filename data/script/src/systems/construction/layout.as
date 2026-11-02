@@ -390,8 +390,8 @@ namespace Layout {
                 const float angle = rear + float(step) * 6.2831853f / 32.0f;
                 const float x = cos(angle), z = sin(angle);
                 for (int ring = 0; ring < 4; ++ring) {
-                    const float out = half + 24.0f + float(ring) * (pass == 0 ? 48.0f : reach * 0.33f);
-                    const float scale = AiMax(abs(x) / (hx + out), abs(z) / (hz + out));
+                    const float gap = half + 24.0f + float(ring) * (pass == 0 ? 48.0f : reach * 0.33f);
+                    const float scale = AiMax(abs(x) / (hx + gap), abs(z) / (hz + gap));
                     const AIFloat3 p(centre.x + x / scale, 0.0f, centre.z + z / scale);
                     if (p.x < 64.0f || p.z < 64.0f || p.x >= AiTerrainWidth() - 64.0f || p.z >= AiTerrainHeight() - 64.0f) continue;
                     if (!OutsideEconomyZones(p, half + 8.0f) || aiBattle.IsFriendlyLane(p)
@@ -400,7 +400,7 @@ namespace Layout {
                     if (!aiTerrainMgr.IsAlliedSpaceFree(d, p, facing)) continue;
                     const int id = aiTerrainMgr.ReservePersistentBuilding(d, p, facing);
                     if (id < 0) continue;
-                    GenericHelpers::LogUtil("[TECH][AntiNuke] periphery pad " + int(out) + " outside the economy box, "
+                    GenericHelpers::LogUtil("[TECH][AntiNuke] periphery pad " + int(gap) + " outside the economy box, "
                         + aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, p, reach - half) + " turret slots in reach"
                         + (pass == 0 ? "" : " (no turret-reach site free)"), 1);
                     return id;
