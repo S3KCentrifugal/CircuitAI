@@ -6,6 +6,9 @@
 #include "unit/ally/AllyUnit.h"
 #include "spring/SpringCallback.h"
 #include "map/ThreatMap.h"
+#include "unit/CircuitUnit.h"
+#include "unit/enemy/EnemyManager.h"
+#include "util/Defines.h"
 #include "CircuitAI.h"
 
 #include "Log.h"
@@ -58,10 +61,11 @@ void CEconomyManager::SetMexAllyStart(int team, const AIFloat3& pos, int command
 bool CEconomyManager::CanReachMex(CCircuitUnit* builder, const AIFloat3& pos) {
     auto* terrain = circuit->GetTerrainManager();
     if (!builder || !ValidMexPosition(pos)) return false;
+    if (!IsMexSpotSafe(builder, pos)) return false;  // owner 2026-11-02: every mex selector asks this
     const auto* def = builder->GetCircuitDef();
     const float range = def->GetBuildDistance();
     if (!mexNavigationEnabled) return terrain->CanReachAtSafe(builder, pos, range);
-    if (circuit->GetThreatMap()->GetThreatAt(pos) > THREAT_MIN) return false;
+    if (circuit->GetThreatMap()->GetThreatAt(builder, pos) > THREAT_MIN) return false;  // own layer, not the last one set
     if (def->IsAbleToFly()) return true;
     const auto* data = terrain->GetAreaData();
     const AIFloat3 target(pos.x, data->GetElevationAt(pos.x, pos.z), pos.z);
@@ -92,6 +96,68 @@ bool CEconomyManager::CanReachMex(CCircuitUnit* builder, const AIFloat3& pos) {
             if (mex_navigation::InBuildRange(point.x-target.x, point.y-target.y, point.z-target.z, range)) return true;
         }
     return false;
+}
+
+// Mex safety (owner 2026-11-02): "t1 and t2 cons that are building t1 and t2
+// mexes should validate with the threat map whether the planned mex is safe".
+// Played: constructors walked onto spots under idle enemy armies and scouted
+// porc. Two holes: CanReachMex / CanReachAtSafe read whichever threat layer the
+// last SetThreatType left (script policy runs first, often after an aircraft,
+// whose air layer has no LLT/HLT in it), and script MEXUP orders are NOW
+// priority, which MakeBuilderTask's safety check skips. This check reads the
+// builder's own layer and, independently of the threat map's gradient, every
+// known armed enemy structure: in LOS or radar, or a ghost whose spot has not
+// been seen empty (the map manager sets HIDDEN then).
+void CEconomyManager::RefreshMexPorc() {
+    const int frame = circuit->GetLastFrame();
+    if (frame - mexPorcFrame < FRAMES_PER_SEC) return;
+    mexPorcFrame = frame;
+    mexPorc.clear();
+    for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
+        const CEnemyUnit* e = kv.second;
+        if (e == nullptr) continue;
+        CCircuitDef* edef = e->GetCircuitDef();
+        if (edef == nullptr || edef->IsMobile() || edef->IsAbleToFly() || !edef->HasSurfToLand()) continue;
+        const auto& g = e->GetData();
+        if ((g.losStatus & (SEnemyData::DEAD | SEnemyData::DYING | SEnemyData::NEUTRAL | SEnemyData::HIDDEN))
+            || (e->IsIgnore() && !edef->IsIgnore()) || e->IsBeingBuilt()) continue;
+        const AIFloat3& p = e->GetPos();
+        if (!std::isfinite(p.x) || !std::isfinite(p.z)) continue;
+        const float range = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
+        if (!(range > 0.f) || range > mexSafety.porcMaxRange) continue;
+        const float reach = range + mexSafety.porcMargin;
+        mexPorc.push_back({p, reach * reach});
+    }
+}
+
+bool CEconomyManager::IsMexSpotSafe(CCircuitUnit* builder, const AIFloat3& pos, int* why) {
+    if (why) *why = 0;
+    if (!mexSafety.enabled || builder == nullptr || !ValidMexPosition(pos)) return true;
+    const CCircuitDef* def = builder->GetCircuitDef();
+    if (def->IsRoleComm()) return true;  // commanders fight; their controllers own their safety
+    if (circuit->GetThreatMap()->GetThreatAt(builder, pos) > mexSafety.threat) {
+        if (why) *why = 1;
+        return false;
+    }
+    if (def->IsAbleToFly()) return true;  // ground porc: the air layer above already holds AA
+    RefreshMexPorc();
+    for (const SMexPorc& porc : mexPorc) {
+        if (porc.pos.SqDistance2D(pos) < porc.reachSq) {
+            if (why) *why = 2;
+            return false;
+        }
+    }
+    return true;
+}
+
+void CEconomyManager::LogMexUnsafe(CCircuitUnit* builder, const AIFloat3& pos, int why, const char* where) {
+    ++mexUnsafeCount;
+    const int frame = circuit->GetLastFrame();
+    if (frame - mexUnsafeLogFrame < FRAMES_PER_SEC * 10) return;
+    mexUnsafeLogFrame = frame;
+    circuit->LOG("MEX SAFETY: %s %i %s at (%.0f,%.0f): %s (%i refusals so far)",
+        builder ? builder->GetCircuitDef()->GetDef()->GetName() : "?", builder ? builder->GetId() : -1, where,
+        pos.x, pos.z, why == 2 ? "enemy porc in range" : "threat map", mexUnsafeCount);
 }
 
 float CEconomyManager::MexStartDistance(SMexStart& start, const AIFloat3& pos) {

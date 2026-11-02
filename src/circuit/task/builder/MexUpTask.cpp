@@ -109,6 +109,7 @@ bool CBMexUpTask::Execute(CCircuitUnit* unit)
 		manager->AbortTask(this);
 		return false;
 	}
+	if (DropIfUnsafe(unit, "execute")) return false;
 	executors.insert(unit);
 
 	CCircuitAI* circuit = manager->GetCircuit();

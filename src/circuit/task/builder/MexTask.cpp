@@ -55,6 +55,8 @@ CBMexTask::~CBMexTask()
 bool CBMexTask::CanAssignTo(CCircuitUnit* unit) const
 {
 	auto* economy = manager->GetCircuit()->GetEconomyManager();
+	// Owner 2026-11-02: no constructor commits to a mex under threat or enemy porc
+	if (!economy->IsMexSpotSafe(unit, geom::is_valid(buildPos) ? buildPos : position)) return false;
 	if (economy->IsMexNavigationEnabled() && (!economy->CanReachMex(unit, buildPos)
 			|| (target == nullptr && !economy->IsMexSpotAdmissible(buildPos)))) return false;  // D-387: or captured
 	// can unit build at all
@@ -121,9 +123,10 @@ void CBMexTask::Cancel()
 
 bool CBMexTask::Execute(CCircuitUnit* unit)
 {
+	CCircuitAI* circuit = manager->GetCircuit();
+	if (DropIfUnsafe(unit, "execute")) return false;
 	executors.insert(unit);
 
-	CCircuitAI* circuit = manager->GetCircuit();
 	TRY_UNIT(circuit, unit,
 		unit->CmdPriority(ClampPriority());
 	)
@@ -185,6 +188,7 @@ bool CBMexTask::Execute(CCircuitUnit* unit)
 bool CBMexTask::Reevaluate(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
+	if (DropIfUnsafe(unit, "reevaluate")) return false;
 	// The ally-zone abort below dropped TECH's opening mexes mid-construction
 	// as allies' first structures were marked (D-063 follow-up); a home order
 	// is exempt.

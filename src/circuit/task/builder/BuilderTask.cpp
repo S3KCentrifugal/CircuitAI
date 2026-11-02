@@ -158,6 +158,9 @@ bool IBuilderTask::CanAssignTo(CCircuitUnit* unit) const
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	if (buildType == BuildType::MEXUP && economyMgr->IsMexNavigationEnabled()
 			&& !economyMgr->CanReachMex(unit, position)) return false;
+	// Owner 2026-11-02: mex upgrades (script NOW orders included) only where safe
+	if (buildType == BuildType::MEXUP
+			&& !economyMgr->IsMexSpotSafe(unit, geom::is_valid(buildPos) ? buildPos : position)) return false;
 	if (cost.metal < buildPower.metal * buildDef->GetGoalBuildTime(economyMgr->GetAvgMetalIncome())) {  // upper metal bound
 		return false;
 	}
@@ -879,9 +882,30 @@ bool IBuilderTask::TryEngage(CCircuitUnit* unit)
 	return true;
 }
 
+bool IBuilderTask::DropIfUnsafe(CCircuitUnit* unit, const char* where)
+{
+	// Owner 2026-11-02: a constructor on a mex or mex upgrade leaves it when its
+	// spot comes under the threat map or a known (or ghost) enemy structure's
+	// reach. An unstarted order is dropped (its spot reopens and is offered
+	// again once safe); a started frame is left, the constructor falls back.
+	if ((buildType != BuildType::MEX) && (buildType != BuildType::MEXUP)) return false;
+	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
+	int why = 0;
+	const AIFloat3& spot = geom::is_valid(buildPos) ? buildPos : position;
+	if (economyMgr->IsMexSpotSafe(unit, spot, &why)) return false;
+	economyMgr->LogMexUnsafe(unit, spot, why, where);
+	if (target == nullptr) {
+		manager->AbortTask(this);
+	} else {
+		manager->FallbackTask(unit);
+	}
+	return true;
+}
+
 bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
+	if ((buildType == BuildType::MEXUP) && DropIfUnsafe(unit, "reevaluate")) return false;
 
 	// FIXME: Replace const 1000.0f with build time?
 	CEconomyManager* ecoMgr = circuit->GetEconomyManager();

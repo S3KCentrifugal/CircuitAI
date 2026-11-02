@@ -6398,7 +6398,9 @@ bool CTerrainManager::CanReachAt(CCircuitUnit* unit, const AIFloat3& destination
 bool CTerrainManager::CanReachAtSafe(CCircuitUnit* unit, const AIFloat3& destination, const float range, const float threat)
 {
 	if (unit == nullptr || !ValidReachDestination(destination, range)) return false;
-	if (circuit->GetThreatMap()->GetThreatAt(destination) > threat) {
+	// The unit's own layer: callers (script policy above all) run before or
+	// without SetThreatType, so the shared layer was whoever set it last.
+	if (circuit->GetThreatMap()->GetThreatAt(unit, destination) > threat) {
 		return false;
 	}
 	return CanReachAt(unit, destination, range);

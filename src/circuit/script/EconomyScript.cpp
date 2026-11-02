@@ -101,6 +101,7 @@ static int CEconomyManager_MexCaptureOwner(CEconomyManager* mgr, const AIFloat3&
 static void SetMexOwnership(CEconomyManager* mgr, bool enabled, float seconds) { mgr->SetMexOwnership(enabled, seconds); }
 static void SetMexAllyStart(CEconomyManager* mgr, int team, const AIFloat3& pos, int commander) { mgr->SetMexAllyStart(team, pos, commander); }
 static bool CanReachMex(CEconomyManager* mgr, CCircuitUnit* unit, const AIFloat3& pos) { return mgr->CanReachMex(unit, pos); }
+static bool IsMexSpotSafe(CEconomyManager* mgr, CCircuitUnit* unit, const AIFloat3& pos) { return mgr->IsMexSpotSafe(unit, pos); }  // owner 2026-11-02
 // D-352 mex theatres: policy from the roster (claims, enemy classes, settings), queries for the roles and the widget.
 static void CEconomyManager_SetMexTheatres(CEconomyManager* mgr, bool enabled, float theatreSeconds, float homeRadius) { mgr->SetMexTheatres(enabled, theatreSeconds, homeRadius); }
 static void CEconomyManager_SetMexLaneSettings(CEconomyManager* mgr, float mergeRadius, float mergeShare, float bandRadius) { mgr->SetMexLaneSettings(mergeRadius, mergeShare, bandRadius); }
@@ -219,6 +220,7 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectType("CEconomyManager", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CEconomyManager aiEconomyMgr", manager); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueLocalGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueLocalGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMexSpotSafe(CCircuitUnit@, const AIFloat3& in)", asFUNCTION(IsMexSpotSafe), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMetalMap() const", asMETHOD(CEconomyManager, IsMetalMap), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEffectiveUnitLimit() const", asMETHOD(CEconomyManager, GetEffectiveUnitLimit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetFieldMexCount(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetFieldMexCount), asCALL_THISCALL); ASSERT(r >= 0);

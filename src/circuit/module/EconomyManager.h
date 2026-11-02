@@ -163,6 +163,13 @@ public:
 	void SetMexOwnership(bool enabled, float seconds);
 	void SetMexAllyStart(int team, const springai::AIFloat3& pos, int commander);
 	bool CanReachMex(CCircuitUnit* builder, const springai::AIFloat3& pos);
+	// Mex safety (owner 2026-11-02): a T1/T2 constructor commits to a mex or
+	// mex upgrade only where its own threat layer is clear and no known enemy
+	// armed structure (seen or a ghost not yet seen empty) reaches the spot.
+	// Commanders are exempt. why (optional): 1 threat map, 2 enemy porc.
+	bool IsMexSpotSafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int* why = nullptr);
+	// Log a refusal at most every 10 s per builder kind (diagnostic).
+	void LogMexUnsafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int why, const char* where);
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
 	bool IsMexOwnershipActive() const;
@@ -467,6 +474,18 @@ private:
 	std::vector<int> allyStartTeams;              // D-387: parallel to allyStarts, -1 unknown
 	bool mexCaptureEnabled = false;               // D-387
 	bool mexNavigationEnabled = false;
+	struct SMexSafety {
+		bool enabled = true;
+		float porcMargin = 96.f;     // elmos past an enemy structure's ground range
+		float porcMaxRange = 1800.f; // longer-ranged structures (LRPC) are not counted
+		float threat = 1.f;          // THREAT_MIN; builder's threat layer at the spot above this is unsafe
+	} mexSafety;
+	struct SMexPorc { springai::AIFloat3 pos; float reachSq; };
+	std::vector<SMexPorc> mexPorc;
+	int mexPorcFrame = -1000;
+	int mexUnsafeLogFrame = -1000;
+	int mexUnsafeCount = 0;
+	void RefreshMexPorc();
 	int mexOwnershipUntil = 0;
 	struct SMexStart {
 		springai::AIFloat3 pos;

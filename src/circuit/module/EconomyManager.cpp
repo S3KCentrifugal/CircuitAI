@@ -435,6 +435,13 @@ void CEconomyManager::ReadConfig(float& outMinEInc)
 	ecoFactor = (circuit->GetAllyTeam()->GetSize() - 1.0f) * ecoStep + 1.0f;
 	metalMod = (1.f - econ.get("excess", -1.f).asFloat());
 	numMexUp = econ.get("mex_up", 2).asUInt();
+	{	// Mex safety (owner 2026-11-02): economy.mex_safety {enabled, porc_margin, porc_max_range, threat}
+		const Json::Value& ms = econ["mex_safety"];
+		mexSafety.enabled = ms.get("enabled", true).asBool();
+		mexSafety.porcMargin = std::max(0.f, ms.get("porc_margin", 96.f).asFloat());
+		mexSafety.porcMaxRange = std::max(0.f, ms.get("porc_max_range", 1800.f).asFloat());
+		mexSafety.threat = std::max(0.f, ms.get("threat", THREAT_MIN).asFloat());
+	}
 
 	{
 		const Json::Value& bd = econ["build_delay"];

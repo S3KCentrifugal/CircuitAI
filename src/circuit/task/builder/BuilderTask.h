@@ -150,6 +150,9 @@ protected:
 	CCircuitUnit* GetNextAssignee();
 	void Update(CCircuitUnit* unit);
 	virtual bool Reevaluate(CCircuitUnit* unit);
+	// Owner 2026-11-02: MEX/MEXUP only; true when the spot is unsafe for this
+	// builder and the task was dropped (unstarted) or the builder fell back.
+	bool DropIfUnsafe(CCircuitUnit* unit, const char* where);
 	// Experimental build mode (D-064): the manager's flag; the engine's build
 	// range for this unit and site (reach + buildee radius, x0.9); the command
 	// timeout (none in the mode); engage when inside the range, or inside the

@@ -284,7 +284,9 @@ namespace Economy {
                         if (worker !is null && upgrade !is null
                             && (!aiTerrainMgr.CanUpgradeTerrain(upgrade, myMexes[i].pos)
                                 || !aiTerrainMgr.CanReachAtSafe(worker, myMexes[i].pos,
-                                    worker.circuitDef.GetBuildDistance()))) continue;
+                                    worker.circuitDef.GetBuildDistance())
+                                // owner 2026-11-02: threat map + enemy porc (ghosts too) at the spot
+                                || !aiEconomyMgr.IsMexSpotSafe(worker, myMexes[i].pos))) continue;
 						bestDistSq = d;
 						bestPos = myMexes[i].pos;
 						found = true;
