@@ -20,7 +20,7 @@ public:
     void Start(CCircuitUnit*) override {}
     void Update() override {}
     void Stop(bool done) override;
-    void OnUnitIdle(CCircuitUnit*) override {}
+    void OnUnitIdle(CCircuitUnit* unit) override;
     void OnUnitDamaged(CCircuitUnit*,CEnemyInfo*) override {}
     void OnUnitDestroyed(CCircuitUnit* unit,CEnemyInfo*) override;
     void OnUnitMoveFailed(CCircuitUnit* unit) override;

@@ -3,19 +3,30 @@
  *
  *  Created on: Aug 28, 2014
  *      Author: rlcevg
+ *
+ * D-431: per-AI job timing and completion queue; the process-wide worker
+ * pool lives in scheduler/WorkerPool.h. Every parallel job may carry a name
+ * (telemetry) and a coalescing key (at most one queued per key per AI).
  */
 
 #ifndef SRC_CIRCUIT_UTIL_SCHEDULER_H_
 #define SRC_CIRCUIT_UTIL_SCHEDULER_H_
 
+#include "scheduler/JobQueue.h"
 #include "scheduler/SchedulerJob.h"
 #include "util/MultiQueue.h"
 #include "util/Defines.h"
 
-#include <memory>
+#include <atomic>
+#include <cstdint>
 #include <list>
+#include <map>
+#include <memory>
+#include <vector>
 
 namespace circuit {
+
+class CCircuitAI;
 
 class CScheduler final {
 public:
@@ -28,7 +39,6 @@ public:
 
 private:
 	void Release();
-	void StartThreads();
 
 public:
 	template<typename _Callable, typename... _Args>
@@ -47,7 +57,7 @@ public:
 	template<typename _Callable, typename... _Args>
 	static std::shared_ptr<IThreadJob> PathJob(const std::shared_ptr<IPathQuery>& query, _Callable&& __f, _Args&&... __args) {
 		return _M_make_path_routine(query, std::bind(std::forward<_Callable>(__f),
-				std::placeholders::_1, std::placeholders::_2, std::forward<_Args>(__args)...));
+				std::placeholders::_1, std::placeholders::_2, std::forward<_Callable>(__args)...));
 	}
 
 	/*
@@ -77,17 +87,18 @@ public:
 	void ProcessJobs(int frame);
 
 	/*
-	 * Run concurrent task, finalize on success at main thread
+	 * Run concurrent task, finalize on success at main thread. `name` is a
+	 * string literal for telemetry; a non-zero `key` keeps at most one queued
+	 * job with that key for this AI (the second is dropped, returns false).
 	 */
-	void RunParallelJob(const std::shared_ptr<IThreadJob>& task);
-    // Infrequent strategic analysis yields queue priority to unit pathfinding.
-    // This does not preempt a running job; callers must bound/coalesce requests.
-    void RunBackgroundJob(const std::shared_ptr<IThreadJob>& task);
-
+	bool RunParallelJob(const std::shared_ptr<IThreadJob>& task, const char* name = "job", std::uint64_t key = 0);
+	// Infrequent strategic analysis yields queue priority to unit pathfinding.
+	// This does not preempt a running job; callers must bound/coalesce requests.
+	bool RunBackgroundJob(const std::shared_ptr<IThreadJob>& task, const char* name = "background", std::uint64_t key = 0);
 	/*
-	 * Same as RunParallelTask but pushes task in front of the queue
+	 * Same as RunParallelJob but served before every normal job, newest first
 	 */
-	void RunPriorityJob(const std::shared_ptr<IThreadJob>& task);
+	bool RunPriorityJob(const std::shared_ptr<IThreadJob>& task, const char* name = "priority", std::uint64_t key = 0);
 
 	/*
 	 * Remove scheduled task from queue
@@ -113,7 +124,18 @@ public:
 	 */
 	void RemoveReleaseJob(const std::shared_ptr<IMainJob>& task);
 
-	static int GetMaxWorkThreads()/* const*/ { return gMaxWorkThreads; }
+	static int GetMaxWorkThreads();
+
+	// Worker side (CWorkerPool): a job of this AI finished on a worker.
+	bool IsRunning() const { return isRunning.load(); }
+	void WorkerCompleted(const char* name, double ms, const std::shared_ptr<IMainJob>& onComplete);
+	// Once a minute with CIRCUIT_PERF_PHASES: per-job worker time, the finish
+	// burst high-water mark and the pool's queue depth, as [PerfWorker] lines.
+	void FlushWorkerStats(CCircuitAI* ai);
+	// Completions applied per frame; 0 (default) applies all of them. A bound
+	// delays reactions by a frame under bursts, so it is an explicit choice
+	// (CIRCUIT_FINISH_BUDGET), never a default.
+	void SetFinishBudget(int count) { finishBudget = count; }
 
 private:
 	std::weak_ptr<CScheduler> self;
@@ -146,36 +168,22 @@ private:
 
 	std::vector<std::shared_ptr<IMainJob>> removeTasks;
 
-	struct WorkTask {
-		WorkTask(const std::weak_ptr<CScheduler>& scheduler, const std::shared_ptr<IThreadJob>& task, bool background = false)
-			: scheduler(scheduler), task(task), background(background) {}
-		std::weak_ptr<CScheduler> scheduler;
-		std::shared_ptr<IThreadJob> task;
-        bool background;
-	};
-	static CMultiQueue<WorkTask> gWorkTasks;
-
 	struct FinishTask: public BaseContainer {
 		FinishTask(const std::shared_ptr<IMainJob>& task)
 			: BaseContainer(task) {}
 	};
 	CMultiQueue<FinishTask> finishTasks;  // WorkTask.onComplete
+	int finishBudget = 0;
+	std::size_t finishBurstMax = 0, finishCarried = 0;
+
+	// Worker telemetry, written by workers under its own lock, read on flush.
+	struct WorkerStat { std::uint64_t calls = 0; double total = 0, maximum = 0; };
+	spring::mutex statsMutex;
+	std::map<const char*, WorkerStat> workerStats;
+	std::uint64_t coalesced = 0;
 
 	std::vector<std::shared_ptr<IMainJob>> initTasks;
 	std::vector<std::shared_ptr<IMainJob>> releaseTasks;
-
-	static std::vector<spring::thread> gWorkThreads;
-	static int gMaxWorkThreads;
-	static std::atomic<bool> gIsWorkerRunning;
-	static unsigned int gInstanceCount;
-
-	static std::atomic<int> gWorkerPauseId;
-	static spring::mutex gPauseMutex;
-	static spring::condition_variable_any gPauseCV;
-	static spring::condition_variable_any gProceedCV;
-	static std::size_t gPauseCount;
-
-	static void WorkerThread(int num);
 };
 
 } // namespace circuit

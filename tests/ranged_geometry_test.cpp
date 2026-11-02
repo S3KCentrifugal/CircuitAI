@@ -66,6 +66,12 @@ int main()
            UsefulScore(1000,4000,1000,4000,true,true,true,1));
     assert(UsefulScore(1000,4000,1000,0,true,true,true,1)>
            UsefulScore(1000,4000,1000,0,true,true,false,1));
+    // D-433: threat per HP.
+    assert(ThreatFactor(100.f,50.f,.5f)==2.f);     // twice our DPS at weight .5: x2
+    assert(ThreatFactor(100.f,50.f,0.f)==1.f);     // off
+    assert(ThreatFactor(0.f,50.f,.5f)==1.f);       // an unarmed target
+    assert(ThreatFactor(100.f,0.f,.5f)==1.f);      // no reference
+    assert(ThreatFactor(25.f,50.f,.5f)==1.25f);
     // Spatial lookup has an exact brute-force oracle, including negative
     // coordinates, mutation, reused IDs and clear/rebuild boundaries.
     std::mt19937 rng(207);

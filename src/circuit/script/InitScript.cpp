@@ -295,6 +295,11 @@ static std::string CControllerRegistry_PresetOf(CControllerRegistry* registry, c
 {
 	return (cdef == nullptr) ? std::string() : registry->PresetOf(cdef->GetId());
 }
+// D-430: an order to every line of a formation template ("hold", "advance", "attack", "withdraw", "release").
+static bool CControllerRegistry_Order(CControllerRegistry* registry, const std::string& formation, const std::string& kind, const AIFloat3& pos)
+{
+	return registry->Order(formation, kind, pos);
+}
 
 static CCircuitDef* CCircuitAI_GetCircuitDef(CCircuitAI* circuit, const std::string& name)
 {
@@ -1542,6 +1547,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CControllerRegistry", "bool SetOption(const string& in, const string& in, float)", asMETHOD(CControllerRegistry, SetPresetOption), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CControllerRegistry", "bool Assign(const CCircuitDef@, const string& in)", asFUNCTION(CControllerRegistry_Assign), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CControllerRegistry", "string PresetOf(const CCircuitDef@)", asFUNCTION(CControllerRegistry_PresetOf), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CControllerRegistry", "bool Order(const string& in, const string& in, const AIFloat3& in)", asFUNCTION(CControllerRegistry_Order), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 
 	// D-126: battlefield analysis for TECH's weapon clusters (terrain/BattleAnalysis.h)
 	CBattleAnalysis* battle = circuit->GetBattle();

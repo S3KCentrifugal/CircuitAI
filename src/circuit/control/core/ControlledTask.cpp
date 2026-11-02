@@ -18,6 +18,7 @@ void CControlledTask::AssignTo(CCircuitUnit* unit) {
     restored=false;
     oldFire=unit->GetRequestedFireState(); oldMove=unit->GetRequestedMoveState();
     IUnitTask::AssignTo(unit);
+    if(controller) controller->Leased(unit,this);
 }
 void CControlledTask::Restore(CCircuitUnit* unit) {
     if(restored || unit->IsDead() || unit->IsDestroying()) return;
@@ -42,6 +43,9 @@ bool CControlledTask::ForgetUnit(CCircuitUnit* unit) {
 void CControlledTask::OnUnitDestroyed(CCircuitUnit* unit,CEnemyInfo*) { ForgetUnit(unit); }
 void CControlledTask::OnUnitMoveFailed(CCircuitUnit* unit) {
     if(controller) controller->MoveFailed(unit->GetId());
+}
+void CControlledTask::OnUnitIdle(CCircuitUnit* unit) {
+    if(controller) controller->Idle(unit->GetId());
 }
 void CControlledTask::Resume(CCircuitUnit* unit) {
     performance::Scope measured(manager->GetCircuit(),performance::COMMANDER_HANDOVER);

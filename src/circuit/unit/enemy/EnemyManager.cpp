@@ -235,7 +235,7 @@ void CEnemyManager::EnqueueUpdate()
 //	}
 	isUpdating = true;
 
-	circuit->GetScheduler()->RunPriorityJob(CScheduler::WorkJob(&CEnemyManager::Update, this));
+	circuit->GetScheduler()->RunPriorityJob(CScheduler::WorkJob(&CEnemyManager::Update, this), "enemy", jobs::Key("enemy"));  // D-431: coalesced
 }
 
 bool CEnemyManager::UnitInLOS(CEnemyUnit* data)
@@ -522,9 +522,10 @@ void CEnemyManager::KMeansIteration()
 					}
 				}
 
-				// position i is closest to the mean at closestIndex
+				// position i is closest to the mean at closestIndex; with no
+				// means (newK == 0) there is nothing to count against.
 				unitsClosestMeanID[i++] = closestIndex;
-				numUnitsAssignedToMean[closestIndex]++;
+				if (closestIndex >= 0) numUnitsAssignedToMean[closestIndex]++;
 			}
 		}
 	}

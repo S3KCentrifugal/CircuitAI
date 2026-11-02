@@ -16,6 +16,9 @@
 #include "map/ThreatMap.h"
 #include "module/BuilderManager.h"
 #include "control/core/ControllerRegistry.h"
+#include "control/unit/skirmisher/SkirmisherController.h"
+#include "control/unit/backline/BacklineController.h"
+#include "control/group/LineController.h"
 #include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
 #include "module/EconomyManager.h"
@@ -690,6 +693,9 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     // per-type assignment (after the managers: roles are read by then).
     controllers=std::make_unique<CControllerRegistry>(this);
     commanderController=controllers->Add(std::make_unique<CCommanderController>(this));
+    skirmisherController=controllers->Add(std::make_unique<CSkirmisherController>(this));
+    backlineController=controllers->Add(std::make_unique<CBacklineController>(this));
+    lineController=controllers->AddGroup(std::make_unique<CLineController>(this));
     controllers->ReadConfig(setupManager->GetConfig());
     // D-300: before script init, so AiMain can already publish widget state.
     widgetState=std::make_unique<CWidgetState>(this);
@@ -918,6 +924,7 @@ int CCircuitAI::Update(int frame)
 	FlushDrawQueue();  // D-118
 	if (performance::enabled && frame % (60 * FRAMES_PER_SEC) == 0) {
 		performance::Flush(this);
+		scheduler->FlushWorkerStats(this);  // D-431
 		unsigned current = 0, destroyedObjects = 0, detected = 0;
 		scriptManager->GetEngine()->GetGCStatistics(&current, &destroyedObjects, &detected);
 		performance::Garbage(this, current, destroyedObjects, detected);

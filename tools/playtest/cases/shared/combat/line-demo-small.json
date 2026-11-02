@@ -1,0 +1,169 @@
+{
+  "name": "line-demo-small",
+  "storage_scenario": "line-demo-small",
+  "unit": "corthud",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    4000,
+    4050,
+    950
+  ],
+  "camera_angle": 1.15,
+  "min_spawn_spacing": 64,
+  "enemy_destination": [
+    3900,
+    3300
+  ],
+  "checks": "line-waves",
+  "description": "D-430 demo reel, small line: 4 Thugs and 2 Aggravators against 8 Pawns, then 4 Centurions, then 3 Maces with 2 Rocketeers.",
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3550,
+        4200
+      ]
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4450,
+        4200
+      ]
+    },
+    {
+      "unit": "corthud",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3800,
+        3700
+      ],
+      "columns": 4,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 2,
+      "team": 0,
+      "position": [
+        3870,
+        3480
+      ],
+      "columns": 2,
+      "spacing": 90,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armpw",
+      "count": 8,
+      "team": 1,
+      "position": [
+        3800,
+        5200
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 30
+    },
+    {
+      "unit": "armwar",
+      "count": 4,
+      "team": 1,
+      "position": [
+        3800,
+        5200
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 110
+    },
+    {
+      "unit": "armham",
+      "count": 3,
+      "team": 1,
+      "position": [
+        3800,
+        5200
+      ],
+      "columns": 3,
+      "spacing": 90,
+      "after_seconds": 190
+    },
+    {
+      "unit": "armrock",
+      "count": 2,
+      "team": 1,
+      "position": [
+        3800,
+        5420
+      ],
+      "columns": 2,
+      "spacing": 90,
+      "after_seconds": 190
+    }
+  ],
+  "waves": [
+    {
+      "name": "raiders 8 Pawns",
+      "after_seconds": 30,
+      "units": [
+        "armpw"
+      ]
+    },
+    {
+      "name": "riot 4 Centurions",
+      "after_seconds": 110,
+      "units": [
+        "armwar"
+      ]
+    },
+    {
+      "name": "peers 3 Maces 2 Rocketeers",
+      "after_seconds": 190,
+      "units": [
+        "armham",
+        "armrock"
+      ]
+    }
+  ],
+  "photos": [
+    42,
+    56,
+    70,
+    122,
+    136,
+    150,
+    202,
+    216,
+    230
+  ],
+  "assertions": {
+    "min_shooters": 2,
+    "min_kills": 1,
+    "max_losses": 6,
+    "min_types_assigned": 2,
+    "min_damage": 500
+  }
+}

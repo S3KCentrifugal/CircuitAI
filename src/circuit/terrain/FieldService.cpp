@@ -127,7 +127,7 @@ bool CFieldService::Capture(CCircuitAI* circuit, SInput& out) const
 	out.mapHeight = map->GetHeight() * SQUARE_SIZE;
 	terrain::CTerrainData& td = gameAttribute->GetTerrainData();
 	if (!td.IsInitialized()) return false;
-	const terrain::SAreaData* area = td.pAreaData.load();
+	const terrain::SAreaData* area = td.GetAreaData();
 	out.height = area->heightMap;
 	out.heightStride = std::max(1, area->heightMapXSize);
 	out.heightRows = (int)(out.height.size() / out.heightStride);

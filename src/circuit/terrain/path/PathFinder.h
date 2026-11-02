@@ -12,6 +12,7 @@
 #include "terrain/path/MicroPather.h"
 #include "terrain/path/PathInfo.h"
 
+#include "util/DoubleBuffer.h"
 #include <atomic>
 #include <memory>
 #include <functional>
@@ -41,6 +42,8 @@ public:
 	using PathCallback = std::function<void (const IPathQuery* query)>;
 
 	CPathFinder(terrain::CTerrainData* terrainData, int numThreads);
+	CPathFinder(const CPathFinder&) = delete;  // owns raw move arrays and one pather per worker
+	CPathFinder& operator=(const CPathFinder&) = delete;
 	virtual ~CPathFinder();
 
 	void UpdateAreaUsers(CTerrainManager* terrainMgr);
@@ -88,9 +91,7 @@ public:
 	}
 
 private:
-	SMoveData* GetNextMoveData() {
-		return (pMoveData.load() == &moveData0) ? &moveData1 : &moveData0;
-	}
+	SMoveData* GetNextMoveData() { return moves.BackPtr(); }
 
 	int MakeQueryId() { return queryId++; }
 	enum class MoveType { UNDERWATER, CLOAK, AIR, SWIM, DIVE, SURF };
@@ -115,8 +116,7 @@ private:
 	terrain::SAreaData* areaData;
 
 	std::vector<NSMicroPather::CMicroPather*> micropathers;
-	SMoveData moveData0, moveData1;
-	std::atomic<SMoveData*> pMoveData;
+	CDoubleBuffer<SMoveData> moves;  // D-431
 	float* airMoveArray;
 	struct SBlockCount {
 		int structs;

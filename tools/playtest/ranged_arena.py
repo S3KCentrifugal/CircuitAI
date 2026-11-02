@@ -72,6 +72,8 @@ def prepare(args):
         '--modoption','startenergystorage='+str(case.get('start_energy_storage',1000000)),
         '--extra-widget',str(HERE/'widgets/ranged_arena.lua'),
         '--extra-widget',str(HERE/'widgets/workforce_perf_watch.lua')]
+    if getattr(args,'opponent_dll',None):
+        stage += ['--enemies','prod','--opponent-dll',str(args.opponent_dll),'--opponent-data',str(args.opponent_data or args.data)]
     # Declared per-case mod options (e.g. the Legion faction for legscout).
     for key, value in case.get('modoptions', {}).items():
         stage += ['--modoption', f'{key}={value}']
@@ -395,6 +397,10 @@ def main():
     parser.add_argument('--mode',choices=['fast','visual','performance'],default='fast')
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--stage-only',action='store_true')
+    # D-432: head-to-head. The enemy side plays this pinned build with its own, unpatched data
+    # (its units are under its own controllers, not the fixture's route), staged as BARbBase/base.
+    parser.add_argument('--opponent-dll',type=Path,default=None)
+    parser.add_argument('--opponent-data',type=Path,default=None)
     args=parser.parse_args();directory,command=prepare(args)
     if args.stage_only: return 0
     launch=command+['launch','--dir',str(directory),'--engine','recoil_2026.07.04']
