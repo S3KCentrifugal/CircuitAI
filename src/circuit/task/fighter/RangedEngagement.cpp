@@ -754,7 +754,14 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             scores[count]=cohort::HeightScore(candidate.y,enemyHeight,policy.heightWeight)-k*.001f; ++count;
         }
         if(count>0) {
-            std::sort(order,order+count,[&](int a,int b) { return scores[a]>scores[b]; });
+            // Insertion sort of at most five slots, best score first: cheaper than
+            // std::sort here, and GCC 13 reports -Warray-bounds for introsort's
+            // 16-element insertion threshold on a five-element array.
+            for(int i=1;i<count;++i) {
+                const int key=order[i]; int j=i;
+                while(j>0 && scores[order[j-1]]<scores[key]) { order[j]=order[j-1]; --j; }
+                order[j]=key;
+            }
             for(int i=0;i<count && !placed;++i) placed=Move(unit,candidates[order[i]],true,danger!=nullptr);
         }
         // Spacing is subordinate to survival. A reserved retreat slot must not
