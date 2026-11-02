@@ -101,9 +101,21 @@ namespace Layout {
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
         if (lab !is null) {
             const array<int>@ facings = LabFacings();
-            for (uint i = 0; i < facings.length() && labSlot < 0; ++i)
-                labSlot = aiTerrainMgr.PackNearGroupMost(boxZone, lab, nanoGroup, facings[i],
-                    Global::RoleSettings::Tech::ExpLabBuildPowerReach, Global::RoleSettings::Tech::LayoutLabFlushElmos, 0, HomeCentre());
+            const float reach = Global::RoleSettings::Tech::ExpLabBuildPowerReach;
+            // a site no turret slot reaches is kept only when no facing has one
+            // (played, Forge cortex: the first facing's site had 0 slots in reach,
+            // the lab stood 352 elmos from its nearest turret: INV-016/017/029)
+            for (uint i = 0; i < facings.length(); ++i) {
+                const int id = aiTerrainMgr.PackNearGroupMost(boxZone, lab, nanoGroup, facings[i],
+                    reach, Global::RoleSettings::Tech::LayoutLabFlushElmos, 0, HomeCentre());
+                if (id < 0) continue;
+                if (aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, aiTerrainMgr.GetReservationPos(id), reach) > 0) {
+                    if (labSlot >= 0) aiTerrainMgr.ReleaseReservation(labSlot);
+                    labSlot = id;
+                    break;
+                }
+                if (labSlot < 0) labSlot = id; else aiTerrainMgr.ReleaseReservation(id);
+            }
             aiTerrainMgr.SetLayoutInt(BOX + ".lab_slot", labSlot);
         }
         // The lab gets first choice near opening builders; reserve the fusion
@@ -2576,14 +2588,22 @@ namespace Layout {
         if (builder !is null && HasBox() && labSlot >= 0
             && !aiTerrainMgr.CanReachAtSafe(builder,aiTerrainMgr.GetReservationPos(labSlot),builder.circuitDef.GetBuildDistance())) {
             const array<int>@ faces = LabFacings();
+            // the reachable footprint most turret slots reach; one no slot reaches
+            // only when no facing has better (the lab stays flush to the block)
+            const float reach = Global::RoleSettings::Tech::ExpLabBuildPowerReach;
+            int best = -1, bestSlots = -1;
             for (uint i=0;i<faces.length();++i) {
                 const int replacement=aiTerrainMgr.PackReachable(builder,t2,boxZone,nanoGroup,faces[i],HomeCentre(),16);
                 if(replacement<0) continue;
-                aiTerrainMgr.ReleaseReservation(labSlot);
-                labSlot=replacement; aiTerrainMgr.SetLayoutInt(BOX+".lab_slot",labSlot);
-                return OrderLabOn(t2,labSlot,timeout,false,"on reachable land at",builder);
+                const int n = aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, aiTerrainMgr.GetReservationPos(replacement), reach);
+                if (n <= bestSlots) { aiTerrainMgr.ReleaseReservation(replacement); continue; }
+                if (best >= 0) aiTerrainMgr.ReleaseReservation(best);
+                best = replacement; bestSlots = n;
             }
-            return null;
+            if (best < 0) return null;
+            aiTerrainMgr.ReleaseReservation(labSlot);
+            labSlot=best; aiTerrainMgr.SetLayoutInt(BOX+".lab_slot",labSlot);
+            return OrderLabOn(t2,labSlot,timeout,false,"on reachable land (" + bestSlots + " turret slots within " + int(reach) + ") at",builder);
         }
         // D-121: no planned pair (cramped ground): the nearest footprint to the T1
         // lab, any facing (played: the pair's slot is -1 there and every order aborted)
@@ -2647,6 +2667,18 @@ namespace Layout {
                     aiTerrainMgr.SetLayoutInt(BOX + ".lab_slot", labSlot);
                     break;
                 }
+            }
+        }
+        // the planned footprint no turret slot reaches is given up for the ranked
+        // search below (played, Forge cortex spine lab: 0 slots within reach)
+        if (labSlot >= 0 && nanoGroup > 0) {
+            const AIFloat3 lp = aiTerrainMgr.GetReservationPos(labSlot);
+            if (lp.x >= 0.0f && aiTerrainMgr.CountGroupSlotsWithin(nanoGroup, lp, reach) <= 0) {
+                GenericHelpers::LogUtil("[Layout] advanced lab's planned slot (" + int(lp.x) + ", " + int(lp.z)
+                    + ") has no turret slot within " + int(reach) + ": released for the turret layout", 1);
+                aiTerrainMgr.ReleaseReservation(labSlot);
+                labSlot = -1;
+                aiTerrainMgr.SetLayoutInt(BOX + ".lab_slot", -1);
             }
         }
         if (labSlot >= 0 && aiTerrainMgr.GetReservationPos(labSlot).x >= 0.0f)
