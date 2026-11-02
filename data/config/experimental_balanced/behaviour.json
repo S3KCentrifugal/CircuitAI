@@ -244,7 +244,7 @@
 			// Owner 2026-11-02: these fire on a ghost image (last-seen, out of radar and LOS) of enemy porc, building
 			// radars/jammers or shields already in weapon range when nothing else is to shoot and they have not fired
 			// for ghost_idle_seconds. They never move toward a ghost.
-			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc"],   // Arbiter, Negotiator, Ambassador, Boreas
+			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
 			"ghost_idle_seconds": 10
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
