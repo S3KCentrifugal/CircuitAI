@@ -264,6 +264,14 @@ function widget:GameFrame(f)
             if s.state=="waiting" and count>=4 then
                 s.state="damaged"; s.frame=f; s.maxDepth=depth; s.maxCount=count; s.maxLava=lava; s.maxThor=thorOver
                 echo(string.format("%s damaged frame=%d depth=%.0f points=%d lava=%d thor_blocked=+%d",s.name,f,depth,count,lava,thorOver))
+                if s.name=="path" and cfg.porc and cfg.porc~="" then
+                    -- after the missiles: an enemy turret beside the crater, and an AI camera
+                    -- tower 500 beyond it so the AI knows the turret (no restorer may go in range)
+                    local px=s.x+(cfg.porcDist or 250)
+                    give(cfg.porc,1,px,s.z)
+                    give("armeyes",0,math.min(px+500,Game.mapSizeX-64),s.z)
+                    echo(string.format("porc %s given to the enemy at (%.0f,%.0f), %d from the path site; armeyes for the AI 500 beyond",cfg.porc,px,s.z,cfg.porcDist or 250))
+                end
             elseif s.state=="damaged" then
                 -- a later missile on the same point counts from its own impact
                 s.maxDepth=math.max(s.maxDepth,depth); s.maxCount=math.max(s.maxCount,count)

@@ -50,6 +50,8 @@ def main():
     p.add_argument('--map', default='Forge')
     p.add_argument('--side', default='armada')
     p.add_argument('--role', default='TECH', help='the AI role (FRONT sends the ground army down the lanes)')
+    p.add_argument('--porc', default='', help='path case: give the enemy this turret beside the crater (e.g. armllt)')
+    p.add_argument('--porc-dist', type=int, default=250, help='elmos from the path site to the --porc turret')
     p.add_argument('--seed', type=int, default=31031, help='the AI random_seed option')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
@@ -89,11 +91,11 @@ def main():
     fps = 30
     (d / 'LuaUI/Config/terrain_restore.lua').write_text(
         'return {case=%s, units=%s, give={%s}, bomb=%s, bombFrame=%d, nukeFrame=%d, nukeOffset=%d, radius=%d, endFrame=%d,'
-        ' pathAt=%s, pathNukes=%d, nukeGap=%d, lavaBand=%s, probe=%s, thor="armthor"}\n' % (
+        ' pathAt=%s, pathNukes=%d, nukeGap=%d, lavaBand=%s, probe=%s, porc=%s, porcDist=%d, thor="armthor"}\n' % (
             json.dumps(a.case), json.dumps(a.units), ', '.join(json.dumps(u) for u in give), json.dumps(a.bomb),
             int(a.bomb_minute * 60 * fps), int(a.nuke_minute * 60 * fps), a.nuke_offset, a.radius,
             int((a.minutes - 0.5) * 60 * fps), repr(a.path_at), a.path_nukes, int(a.nuke_gap * fps),
-            repr(a.lava_band), json.dumps(a.probe)))
+            repr(a.lava_band), json.dumps(a.probe), json.dumps(a.porc), a.porc_dist))
     # the unit classes under test
     staged = d / 'AI/Skirmish/BARbTest/test/config/experimental_balanced/behaviour.json'
     s = staged.read_text()
