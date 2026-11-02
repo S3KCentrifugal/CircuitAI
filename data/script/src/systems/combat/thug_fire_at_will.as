@@ -30,7 +30,8 @@ namespace ThugFireAtWill {
         const string name = unit.circuitDef.GetName();
         return name == "corthud" || name == "armham" || name == "legbar" || name == "legmed"
             || name == "leghrk" || name == "leginf" || name == "leglob"
-            || name == "corstorm" || name == "armrock" || name == "legbal";
+            || name == "corstorm" || name == "armrock" || name == "legbal"
+            || name == "cortrem";   // owner 2026-11-02: Tremor fires at will always
     }
 
     final class Hull {

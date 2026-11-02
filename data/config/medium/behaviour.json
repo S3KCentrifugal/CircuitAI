@@ -885,7 +885,7 @@
 	"cortrem": {
 		"role": ["artillery", "heavy"],
 		"attribute": ["ranged"],
-		"ranged": {"target_mode": "bombardment", "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+		"ranged": {"always_fire_at_will": true, "target_mode": "bombardment", "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 	},
 	"corvrad": {
 		"role": ["assault"],
