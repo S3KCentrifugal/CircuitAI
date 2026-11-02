@@ -27,8 +27,15 @@ public:
 	virtual void AssignTo(CCircuitUnit* unit) override;
 	virtual void RemoveAssignee(CCircuitUnit* unit) override;
 
+	// Enemy wall (dragon's teeth) target for rez bots; -1 = positional/feature.
+	void SetEnemyWall(int id) { enemyWallId = id; }
+	int GetEnemyWallId() const { return enemyWallId; }
+
 private:
+	virtual bool Execute(CCircuitUnit* unit) override;
 	virtual bool Reevaluate(CCircuitUnit* unit) override;
+
+	int enemyWallId = -1;
 
 	virtual bool Load(std::istream& is) override;
 };

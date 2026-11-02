@@ -101,8 +101,45 @@ void CBReclaimTask::RemoveAssignee(CCircuitUnit* unit)
     if (recoveryControlled && units.empty() && !IsDead()) manager->AbortTask(this);
 }
 
+bool CBReclaimTask::Execute(CCircuitUnit* unit)
+{
+	if (enemyWallId < 0) {
+		return IReclaimTask::Execute(unit);
+	}
+	CCircuitAI* circuit = manager->GetCircuit();
+	if (!circuit->IsOwnedUnit(unit)) return false;
+	CEnemyInfo* enemy = circuit->GetEnemyInfo(enemyWallId);
+	if (enemy == nullptr || enemy->IsHidden()) {
+		manager->AbortTask(this);
+		return false;
+	}
+	executors.insert(unit);
+	TRY_UNIT(circuit, unit,
+		unit->CmdPriority(ClampPriority());
+	)
+	const int frame = circuit->GetLastFrame();
+	TRY_UNIT(circuit, unit,
+		unit->CmdReclaimEnemy(enemy, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
+	)
+	return true;
+}
+
 bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 {
+	if (enemyWallId >= 0) {
+		// Wall gone, or its spot turned unsafe (porc or army arrived): drop it.
+		CCircuitAI* circuit = manager->GetCircuit();
+		CEnemyInfo* enemy = circuit->GetEnemyInfo(enemyWallId);
+		circuit->GetThreatMap()->SetThreatType(unit);
+		if (enemy == nullptr || enemy->IsHidden()
+			|| circuit->GetThreatMap()->GetThreatAt(position) > THREAT_MIN
+			|| circuit->GetBuilderManager()->IsUnderEnemyShortPorc(position))
+		{
+			manager->AbortTask(this);
+			return false;
+		}
+		return true;
+	}
 	if (recoveryControlled) return true; // Local commander/SEA selector owns target changes.
 	if (!isMetal) {
 		return true;

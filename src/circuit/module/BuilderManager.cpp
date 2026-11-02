@@ -298,6 +298,21 @@ void CBuilderManager::InitHandlers()
 	const float goalBuildMod = root["economy"].get("build_mod", 320.f).asFloat();
 	rezPorcRange = root["economy"].get("rez_porc_range", 1000.f).asFloat();
 	rezPorcMargin = root["economy"].get("rez_porc_margin", 64.f).asFloat();
+	rezWallRadius = root["economy"].get("rez_wall_radius", 1500.f).asFloat();
+	{
+		const Json::Value& walls = root["economy"]["rez_reclaim_walls"];
+		std::vector<std::string> names;
+		if (walls.isArray()) {
+			for (const Json::Value& w : walls) names.push_back(w.asString());
+		} else {
+			names = {"armdrag", "cordrag", "legdrag", "armfort", "corfort", "legforti",
+					 "armfdrag", "corfdrag", "legfdrag"};
+		}
+		for (const std::string& name : names) {
+			CCircuitDef* wallDef = circuit->GetCircuitDef(name.c_str());
+			if (wallDef != nullptr) rezWallDefs.insert(wallDef);
+		}
+	}
 
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	for (CCircuitDef& cdef : circuit->GetCircuitDefs()) {
@@ -2043,6 +2058,56 @@ bool CBuilderManager::IsUnderEnemyShortPorc(const AIFloat3& pos) const
     return false;
 }
 
+IBuilderTask* CBuilderManager::FindEnemyWallReclaim(CCircuitUnit* unit)
+{
+    if (unit == nullptr || rezWallRadius <= 0.f || rezWallDefs.empty()
+        || !unit->GetCircuitDef()->IsAbleToReclaim()) return nullptr;
+    const int frame = circuit->GetLastFrame();
+    const AIFloat3 pos = unit->GetPos(frame);
+    CThreatMap* threatMap = circuit->GetThreatMap();
+    threatMap->SetThreatType(unit);
+    CTerrainManager* terrain = circuit->GetTerrainManager();
+    const float reach = unit->GetCircuitDef()->GetBuildDistance();
+    // Nearest first; threat and porc checks before the reach test (a path query).
+    std::vector<std::pair<float, CEnemyInfo*>> candidates;
+    for (const auto& kv : circuit->GetEnemyInfos()) {
+        CEnemyInfo* enemy = kv.second;
+        CCircuitDef* edef = enemy->GetCircuitDef();
+        if (edef == nullptr || enemy->IsHidden() || rezWallDefs.count(edef) == 0) continue;
+        const float d = pos.SqDistance2D(enemy->GetPos());
+        if (d > SQUARE(rezWallRadius)) continue;
+        candidates.emplace_back(d, enemy);
+    }
+    std::sort(candidates.begin(), candidates.end(),
+        [](const std::pair<float, CEnemyInfo*>& a, const std::pair<float, CEnemyInfo*>& b) {
+            return a.first < b.first || (a.first == b.first && a.second->GetId() < b.second->GetId());
+        });
+    int pathTests = 0;
+    for (const auto& c : candidates) {
+        CEnemyInfo* enemy = c.second;
+        AIFloat3 at = enemy->GetPos();
+        CTerrainManager::CorrectPosition(at);
+        if (threatMap->GetThreatAt(at) > THREAT_MIN) continue;
+        if (++pathTests > 6) break;  // bound porc scans and path queries per call
+        if (IsUnderEnemyShortPorc(at)) continue;
+        // Already claimed by a reclaim task: join it.
+        for (IBuilderTask* t : GetTasks(IBuilderTask::BuildType::RECLAIM)) {
+            CBReclaimTask* rt = static_cast<CBReclaimTask*>(t);
+            if (!rt->IsDead() && rt->GetEnemyWallId() == enemy->GetId()) return rt;
+        }
+        if (!terrain->CanReachAtSafe2(unit, at, reach)) continue;
+        IBuilderTask* task = Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH, at, enemy->GetCost(),
+                                                    FRAMES_PER_SEC * 120, 8.f, false));
+        if (task == nullptr) return nullptr;
+        static_cast<CBReclaimTask*>(task)->SetEnemyWall(enemy->GetId());
+        circuit->LOG("REZ: %s(%i) reclaims enemy wall %s(%i) at (%.0f, %.0f)",
+                unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
+                enemy->GetCircuitDef()->GetDef()->GetName(), enemy->GetId(), at.x, at.z);
+        return task;
+    }
+    return nullptr;
+}
+
 IBuilderTask* CBuilderManager::FindRecoveryTask(CCircuitUnit* unit, int mode, float radius, const CCircuitDef* preferred,
         int groupLimit, bool highestValue, float combatClearance)
 {
@@ -2365,6 +2430,14 @@ IBuilderTask* CBuilderManager::MakeBuilderTask(CCircuitUnit* unit, const CQueryC
 	task = economyMgr->CheckMobileAssistRequired(pos, unit);
 	if (task != nullptr) {
 		return const_cast<IBuilderTask*>(task);
+	}
+	// Owner rule: rez bots clear enemy dragon's teeth whose spot is safe on the
+	// threat map before looking at wrecks.
+	if (unit->GetCircuitDef()->IsAbleToResurrect()) {
+		IBuilderTask* wall = FindEnemyWallReclaim(unit);
+		if (wall != nullptr) {
+			return wall;
+		}
 	}
 
 	// FIXME: MakeEconomyTasks doesn't check CanAssignTo() and may create task irrelevant for unit

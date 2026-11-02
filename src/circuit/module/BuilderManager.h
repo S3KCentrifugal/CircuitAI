@@ -378,9 +378,14 @@ public:
     // enemy short-ranged porc, seen or ghost (last-known). Porc = built,
     // armed static defence whose ground range is at most rezPorcRange.
     bool IsUnderEnemyShortPorc(const springai::AIFloat3& pos) const;
+    // Rez bots reclaim enemy dragon's teeth / fortification walls within
+    // rezWallRadius whose spot is safe on the threat map and reachable safely.
+    IBuilderTask* FindEnemyWallReclaim(CCircuitUnit* unit);
 private:
     float rezPorcRange = 1000.f;
     float rezPorcMargin = 64.f;
+    float rezWallRadius = 1500.f;
+    std::set<CCircuitDef*> rezWallDefs;
     struct SRelayedResurrection { ResurrectionClaim claim; int team; int expires; };
     std::map<int, SRelayedResurrection> relayedResurrections;
     void RefreshRecoveryFeatures();
