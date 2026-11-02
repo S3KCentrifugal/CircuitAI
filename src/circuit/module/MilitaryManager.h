@@ -283,8 +283,9 @@ public:
 		float antinukeDropOrdinary = 0.5f;   // an ordinary shot
 		// value each target by what the blast's falloff does to it (CSuperTask::ChainKill)
 		bool blastKill = true;
-		// blast distance is measured to the target's collision volume: centre distance - def radius x this
-		float volumeFactor = 1.f;
+		// blast distance is measured to the target's collision volume (CollisionVolumes.h); a def missing
+		// from that table: centre distance - def radius x this (0.86: the best single fit, 2026-11-02)
+		float volumeFactor = 0.86f;
 		float antinukeDropOvernuke = 0.15f;  // an overnuke target (the salvo is meant to saturate)
 		float antinukeFloor = 0.05f;
 		float coveredMargin = 64.f;  // added to each coverage radius

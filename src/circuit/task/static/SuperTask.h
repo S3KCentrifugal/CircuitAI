@@ -11,6 +11,8 @@
 #include "task/fighter/FighterTask.h"
 #include "task/static/DebugStrike.h"
 #include "task/static/TierTargeting.h"
+#include "unit/CollisionVolumes.h"
+#include "unit/CoreUnit.h"
 
 #include <algorithm>
 #include <functional>
@@ -88,12 +90,17 @@ private:
 			bool pulseClaims = false, bool nuclearHistory = false, const TAimScale& aimScale = nullptr,
 			const TExtraAims& extraAims = nullptr, const CWeaponDef* blastWeapon = nullptr);
 	// Blast + chain kills of a nuke (SuperTask.cpp, ChainKill).
-	struct SDeathBlast { float damage = 0.f, radius = 0.f, edge = 0.f, volume = 0.f; };
-	struct SChainUnit { springai::AIFloat3 pos; float value; float health; const CCircuitDef* cdef; };
+	// volume: the def's collision volume (CollisionVolumes.h), nullptr = def radius x blast_volume_factor
+	struct SDeathBlast { float damage = 0.f, radius = 0.f, edge = 0.f, volume = 0.f; const CV::SVolume* cv = nullptr; };
+	struct SChainUnit { springai::AIFloat3 pos; float value; float health; const CCircuitDef* cdef; int facing; };
 	static float AreaDamage(float damage, float radius, float edge, float dist);
 	SDeathBlast DeathBlastOf(const CCircuitDef* cdef);
+	// Planar distance from p to the unit's collision volume surface (the engine's area damage distance).
+	static float SurfaceDistance(const SDeathBlast& b, float volumeFactor, const springai::AIFloat3& unitPos, int facing, const springai::AIFloat3& p);
+	int FacingOf(ICoreUnit::Id id, const SDeathBlast& b);
 	float ChainKill(const CWeaponDef* wd, float radius, const springai::AIFloat3& aim, const std::vector<SChainUnit>& units);
 	std::unordered_map<const CCircuitDef*, SDeathBlast> deathBlasts;
+	std::unordered_map<ICoreUnit::Id, int> facings;  // enemy building facing, read once in LOS (buildings never turn)
 	// Known enemy interceptors (position, squared coverage + margin), and how many hold pos.
 	std::vector<std::pair<springai::AIFloat3, float>> KnownInterceptors();
 	static std::vector<springai::AIFloat3> CoverEdgeAims(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,

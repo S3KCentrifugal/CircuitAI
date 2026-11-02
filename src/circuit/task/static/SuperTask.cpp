@@ -423,6 +423,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		float value;
 		float health;
 		const CCircuitDef* cdef;
+		ICoreUnit::Id id;
 	};
 	std::vector<SAreaCand> cands;
 	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
@@ -469,7 +470,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				continue;
 			}
 		}
-		cands.push_back({e.pos, rank, value, ((e.health > 0.f) ? e.health : edef->GetHealth()), edef});
+		cands.push_back({e.pos, rank, value, ((e.health > 0.f) ? e.health : edef->GetHealth()), edef, e.id});
 	}
 	}
 
@@ -521,7 +522,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				const float sqDist = aims[i].SqDistance2D(c.pos);
 				if (sqDist >= sqReach) continue;
 				if (sqDist < sqAoe) { rank = std::min(rank, c.rank); ++count; }
-				nearUnits.push_back({c.pos, c.value, c.health, c.cdef});
+				nearUnits.push_back({c.pos, c.value, c.health, c.cdef, FacingOf(c.id, DeathBlastOf(c.cdef))});
 			}
 			if (count < minTargets) continue;
 			float value = ChainKill(blastWeapon, std::sqrt(sqAoe), aims[i], nearUnits);
@@ -562,9 +563,9 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 	}
 	if (bestIdx < 0) {
 		if ((frame / TARGET_DELAY) % 6 == 0) {
-			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i minTargets=%i bestValue=%.0f minValue=%.0f",
+			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i rejFriendly=%i minTargets=%i bestValue=%.0f minValue=%.0f",
 					tag, cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange(),
-					cands.size(), rejClass, rejRange, rejStale, minTargets, bestValue, minValue);
+					cands.size(), rejClass, rejRange, rejStale, rejFriendly, minTargets, bestValue, minValue);
 		}
 		return false;
 	}
@@ -584,7 +585,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 /*
  * Blast and chain kills (owner 2026-11-02). Engine area damage is
  * damage x (R - d) / (R - d x edge effectiveness), d measured to the unit's
- * collision volume, which the def's radius x volumeFactor approximates. A nuke
+ * collision volume (CollisionVolumes.h, SurfaceDistance). A nuke
  * (15000, R 960, edge 0) kills a full 9400-health Cortex AFUS only within about
  * 360 of the impact, but each AFUS or advanced geo that dies explodes for 10600
  * over 640 (customfusionexplo), fusions and nuke silos for 2650 over 240, so a
@@ -607,6 +608,14 @@ CSuperTask::SDeathBlast CSuperTask::DeathBlastOf(const CCircuitDef* cdef)
 	SDeathBlast b;
 	CCircuitDef* d = const_cast<CCircuitDef*>(cdef);
 	b.volume = d->GetRadius();
+	// the generated table (CollisionVolumes.h), indexed by name once per process
+	static const std::unordered_map<std::string, const CV::SVolume*> table = []() {
+		std::unordered_map<std::string, const CV::SVolume*> t;
+		for (const CV::SVolume& v : CV::volumes) t.emplace(v.name, &v);
+		return t;
+	}();
+	auto cv = table.find(d->GetDef()->GetName());
+	b.cv = (cv != table.end()) ? cv->second : nullptr;
 	const std::unique_ptr<WeaponDef> wd(d->GetDef()->GetDeathExplosion());
 	if (wd != nullptr) {
 		b.radius = wd->GetAreaOfEffect();
@@ -621,12 +630,57 @@ CSuperTask::SDeathBlast CSuperTask::DeathBlastOf(const CCircuitDef* cdef)
 	return b;
 }
 
+/*
+ * The engine's area damage distance is to the collision volume's surface
+ * (headless calibration 2026-11-02: exact to under 1 elmo). Cylinders (Y axis)
+ * and spheres: planar distance minus the radius; boxes and lying cylinders: the
+ * planar distance to the footprint rectangle, half-sizes and offsets turned by
+ * the building facing (0 south, 1 east, 2 north, 3 west). A def without a table
+ * entry: centre distance minus its radius x nuclear.blast_volume_factor.
+ */
+float CSuperTask::SurfaceDistance(const SDeathBlast& b, float volumeFactor, const AIFloat3& unitPos, int facing, const AIFloat3& p)
+{
+	const CV::SVolume* v = b.cv;
+	if (v == nullptr) {
+		return std::max(0.f, std::sqrt(unitPos.SqDistance2D(p)) - b.volume * volumeFactor);
+	}
+	const bool turned = (facing == 1) || (facing == 3);
+	float ox = v->ox, oz = v->oz;
+	switch (facing) {
+		case 1: ox = v->oz; oz = -v->ox; break;
+		case 2: ox = -v->ox; oz = -v->oz; break;
+		case 3: ox = -v->oz; oz = v->ox; break;
+		default: break;
+	}
+	const float dx = p.x - (unitPos.x + ox), dz = p.z - (unitPos.z + oz);
+	switch (v->type) {
+		case CV::CYL_Y:
+		case CV::SPHERE:
+			return std::max(0.f, std::sqrt(dx * dx + dz * dz) - (v->sx + v->sz) * 0.25f);
+		default: {  // BOX, CYL_X, CYL_Z: the planar rectangle
+			const float hx = (turned ? v->sz : v->sx) * 0.5f, hz = (turned ? v->sx : v->sz) * 0.5f;
+			const float ex = std::max(0.f, std::abs(dx) - hx), ez = std::max(0.f, std::abs(dz) - hz);
+			return std::sqrt(ex * ex + ez * ez);
+		}
+	}
+}
+
+int CSuperTask::FacingOf(ICoreUnit::Id id, const SDeathBlast& b)
+{
+	if ((b.cv == nullptr) || (b.cv->type == CV::CYL_Y) || (b.cv->type == CV::SPHERE)) return 0;  // round: facing does not matter
+	auto it = facings.find(id);
+	if (it != facings.end()) return it->second;
+	CEnemyInfo* info = manager->GetCircuit()->GetEnemyInfo(id);
+	if ((info == nullptr) || !info->GetData()->IsInLOS()) return 0;  // facing 0 until seen
+	const int facing = info->GetUnit()->GetBuildingFacing();
+	if ((facing < 0) || (facing > 3)) return 0;
+	facings.emplace(id, facing);
+	return facing;
+}
+
 float CSuperTask::ChainKill(const CWeaponDef* wd, float radius, const AIFloat3& aim, const std::vector<SChainUnit>& units)
 {
 	const float volumeFactor = manager->GetCircuit()->GetMilitaryManager()->GetNuclearInfo().volumeFactor;
-	auto dist = [volumeFactor](const AIFloat3& a, const AIFloat3& b, float volume) {
-		return std::max(0.f, std::sqrt(a.SqDistance2D(b)) - volume * volumeFactor);
-	};
 	const unsigned n = units.size();
 	std::vector<float> hp(n);
 	std::vector<SDeathBlast> blasts(n);
@@ -634,7 +688,7 @@ float CSuperTask::ChainKill(const CWeaponDef* wd, float radius, const AIFloat3& 
 	for (unsigned k = 0; k < n; ++k) {
 		blasts[k] = DeathBlastOf(units[k].cdef);
 		hp[k] = units[k].health - AreaDamage(wd->GetDamage(), radius, wd->GetEdgeEffectiveness(),
-				dist(aim, units[k].pos, blasts[k].volume));
+				SurfaceDistance(blasts[k], volumeFactor, units[k].pos, units[k].facing, aim));
 		if (hp[k] <= 0.f) frontier.push_back(k);
 	}
 	std::vector<bool> dead(n, false);
@@ -649,7 +703,7 @@ float CSuperTask::ChainKill(const CWeaponDef* wd, float radius, const AIFloat3& 
 			if (b.damage <= 0.f) continue;
 			for (unsigned j = 0; j < n; ++j) {
 				if (dead[j] || (hp[j] <= 0.f)) continue;
-				hp[j] -= AreaDamage(b.damage, b.radius, b.edge, dist(units[k].pos, units[j].pos, blasts[j].volume));
+				hp[j] -= AreaDamage(b.damage, b.radius, b.edge, SurfaceDistance(blasts[j], volumeFactor, units[j].pos, units[j].facing, units[k].pos));
 				if (hp[j] <= 0.f) next.push_back(j);
 			}
 		}
