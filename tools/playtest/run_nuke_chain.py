@@ -31,6 +31,12 @@ CALIB = [
     {'x': 10600, 'z': 3300, 'probes': [('armafus', 450), ('armafus', 600), ('armafus', 750)]},
     {'x': 10600, 'z': 8500, 'probes': [('legafus', 450), ('legafus', 600), ('legafus', 750)]},
 ]
+# --calib-set 3: box-shaped defs probed along their diagonals (the box corner faces the blast)
+CALIB3 = [
+    {'x': 8000, 'z': 2500, 'probes': [('legafus', 430, 45), ('legafus', 500, 135), ('legafus', 600, 225), ('legafus', 700, 315)]},
+    {'x': 8000, 'z': 6500, 'probes': [('armafus', 500, 45), ('armafus', 560, 135), ('armafus', 650, 225), ('armafus', 750, 315)]},
+    {'x': 10600, 'z': 4500, 'probes': [('armfus', 700, 45), ('armfus', 760, 135), ('armfus', 850, 225), ('armfus', 950, 315)]},
+]
 # --calib-set 2: the remaining defs, cleaner (fewer silos, 90 s apart)
 CALIB2 = [
     {'x': 8000, 'z': 2000, 'probes': [('legafus', 450), ('legafus', 600), ('legafus', 750)]},
@@ -84,8 +90,8 @@ def main():
     script.write_text(s, encoding='utf-8')
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     if calib:
-        CAL = CALIB2 if a.calib_set == 2 else CALIB
-        shots = ',\n'.join('  {x=%d, z=%d, probes={%s}}' % (c['x'], c['z'], ','.join('{"%s",%d}' % pr for pr in c['probes']))
+        CAL = {2: CALIB2, 3: CALIB3}.get(a.calib_set, CALIB)
+        shots = ',\n'.join('  {x=%d, z=%d, probes={%s}}' % (c['x'], c['z'], ','.join(('{"%s",%d,%d}' if len(pr) == 3 else '{"%s",%d}') % pr for pr in c['probes']))
                            for c in CAL)
         conf = 'return {mode="calib", aiStart={%d,%d}, timeoutMin=%d, silos=%d, siloStaggerSec=%d, stockSec=170, shots={\n%s}}\n' % (AI_START + (int(minutes), len(CAL), a.stagger) + (shots,))
     else:
@@ -93,7 +99,7 @@ def main():
             (a.layout.upper(),) + CENTRE + AI_START + (int(minutes), a.place_at))
     (d / 'LuaUI/Config/nuke_chain.lua').write_text(conf)
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'layout': a.layout.upper(),
-        'centre': CENTRE, 'ai_start': AI_START, 'host_start': HOST_START, 'calib': (CALIB2 if a.calib_set == 2 else CALIB) if calib else None}, indent=2))
+        'centre': CENTRE, 'ai_start': AI_START, 'host_start': HOST_START, 'calib': {2: CALIB2, 3: CALIB3}.get(a.calib_set, CALIB) if calib else None}, indent=2))
     if a.stage_only:
         return 0
     from playtest import running_pids

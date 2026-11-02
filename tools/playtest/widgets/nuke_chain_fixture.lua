@@ -95,7 +95,7 @@ end
 local function placeProbes(s)
     local n=#s.probes
     for k,p in ipairs(s.probes) do
-        local a=2*math.pi*(k-1)/n
+        local a=p[3] and math.rad(p[3]) or 2*math.pi*(k-1)/n   -- optional third field: the probe's angle in degrees
         give(p[1],myTeam,s.x+p[2]*math.cos(a),s.z+p[2]*math.sin(a))
     end
     echo(string.format("calib shot %d at (%d,%d): %d probes placed frame=%d",s.i,s.x,s.z,n,frameNow))
