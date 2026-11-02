@@ -14,6 +14,7 @@
 #include "util/DefinitionCounts.h"
 
 #include <map>
+#include <unordered_map>
 
 namespace circuit {
 
@@ -175,7 +176,14 @@ public:
 	// Owner (2026-10-25): spam and edge-lane labs hold one repeat recruit each; those
 	// standing orders don't count against the 2-per-factory cap, so a gantry is not
 	// held idle by them. O(1): the repeat count is kept at Enqueue/DequeueTask.
-	bool CanEnqueueTask() const { return factoryTasks.size() - repeatTaskCount < factories.size() * 2; }
+	// Owner (2026-11-02): the cap binds only T2 factories, as a group. A T1 lab or plant
+	// and a T3 gantry always enqueue; the T2 group may hold 2 pending recruits per T2
+	// factory, counting only recruits a standing T2 factory can build (a T1 bot wave
+	// behind rez orders no longer idles the T2 lab). O(tasks x factories), both small,
+	// on a factory's ask only; tech levels are cached per def (FactoryTechLevel).
+	bool CanEnqueueTask(const CCircuitUnit* factory) const;
+	float FactoryTechLevel(const CCircuitDef* cdef) const;  // BAR customparams.techlevel, 1 when absent
+	bool IsGantry(const CCircuitDef* cdef) const { return FactoryTechLevel(cdef) >= 3.f; }
 	const std::vector<CRecruitTask*>& GetTasks() const { return factoryTasks; }
     int GetPendingRecruitCount(const CCircuitDef* def) const;
     void RefreshPendingRecruit(CRecruitTask* task);
@@ -255,6 +263,7 @@ private:
 	std::map<CAllyUnit*, IBuilderTask*> unfinishedUnits;
 	std::vector<CRecruitTask*> factoryTasks;  // order matters
 	size_t repeatTaskCount = 0;  // repeat recruits in factoryTasks (spam labs)
+	mutable std::unordered_map<CCircuitDef::Id, float> techLevels;  // factory def -> techlevel (CanEnqueueTask)
 	std::unordered_map<CCircuitUnit::Id, CCircuitUnit::Id> lagStrays;  // factory -> its repeat-built unit
     DefinitionCounts<CRecruitTask*> pendingRecruits;
 	float metalRequire;

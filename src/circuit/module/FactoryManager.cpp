@@ -172,6 +172,11 @@ void CFactoryManager::InitHandlers()
 			unit->GetUnit()->SetRepeat(false);
 			unit->GetUnit()->SetIdleMode(0);
 		)
+		// Owner (2026-11-02): every gantry runs with repeat on (the lag fallback keeps its
+		// last product cycling between AI orders; RecruitTask::ExecuteLagRepeat)
+		if (IsGantry(unit->GetCircuitDef())) {
+			unit->SetLagRepeat(true);
+		}
 
 		this->circuit->GetEconomyManager()->AddFactoryInfo(unit);
 		UnitAdded(unit, UseAs::FACTORY);
@@ -1432,7 +1437,7 @@ const CFactoryManager::SSideInfo& CFactoryManager::GetSideInfo() const
 
 CRecruitTask* CFactoryManager::UpdateBuildPower(CCircuitUnit* unit, bool isActive)
 {
-	if (!CanEnqueueTask()) {
+	if (!CanEnqueueTask(unit)) {
 		return nullptr;
 	}
 
@@ -1468,7 +1473,7 @@ CRecruitTask* CFactoryManager::UpdateBuildPower(CCircuitUnit* unit, bool isActiv
 
 CRecruitTask* CFactoryManager::UpdateFirePower(CCircuitUnit* builder, bool isActive)
 {
-	if (!CanEnqueueTask()) {
+	if (!CanEnqueueTask(builder)) {
 		return nullptr;
 	}
 
@@ -1507,6 +1512,55 @@ void CFactoryManager::AddFactory(const CCircuitDef* cdef)
 void CFactoryManager::DelFactory(const CCircuitDef* cdef)
 {
 	factoryData->DelFactory(cdef);
+}
+
+float CFactoryManager::FactoryTechLevel(const CCircuitDef* cdef) const
+{
+	auto it = techLevels.find(cdef->GetId());
+	if (it != techLevels.end()) {
+		return it->second;
+	}
+	// BAR customparams.techlevel (alldefs_post sets 1 when absent)
+	const std::map<std::string, std::string>& params = cdef->GetDef()->GetCustomParams();
+	auto tl = params.find("techlevel");
+	const float tech = (tl != params.end()) ? utils::string_to_float(tl->second) : 1.f;
+	techLevels[cdef->GetId()] = tech;
+	return tech;
+}
+
+bool CFactoryManager::CanEnqueueTask(const CCircuitUnit* factory) const
+{
+	// Owner (2026-11-02): T1 labs/plants and T3 gantries are never capped
+	const float tech = FactoryTechLevel(factory->GetCircuitDef());
+	if ((tech < 2.f) || (tech >= 3.f)) {
+		return true;
+	}
+	// T2 group: 2 pending recruits per standing T2 factory, counting only what a T2 factory builds
+	std::vector<const CCircuitDef*> t2Defs;
+	t2Defs.reserve(factories.size());
+	for (const SFactory& fac : factories) {
+		const float facTech = FactoryTechLevel(fac.unit->GetCircuitDef());
+		if ((facTech >= 2.f) && (facTech < 3.f)) {
+			t2Defs.push_back(fac.unit->GetCircuitDef());
+		}
+	}
+	const size_t cap = std::max<size_t>(t2Defs.size(), 1) * 2;
+	size_t count = 0;
+	for (const CRecruitTask* task : factoryTasks) {
+		const CCircuitDef* buildDef = task->GetBuildDef();
+		if (task->IsRepeat() || (buildDef == nullptr)) {
+			continue;
+		}
+		for (const CCircuitDef* facDef : t2Defs) {
+			if (facDef->CanBuild(buildDef)) {
+				if (++count >= cap) {
+					return false;
+				}
+				break;
+			}
+		}
+	}
+	return true;
 }
 
 bool CFactoryManager::IsT1Factory(const CCircuitDef* cdef)
@@ -1900,7 +1954,8 @@ IUnitTask* CFactoryManager::CreateFactoryTask(CCircuitUnit* unit, bool keepActiv
 	const bool isStalling = economyMgr->IsMetalEmpty() &&
 							(economyMgr->GetAvgMetalIncome() * 1.2f < economyMgr->GetMetalPull()) &&
 							(metalPull * economyMgr->GetPullMtoS() > circuit->GetBuilderManager()->GetMetalPull());
-	const bool isNotReady = !economyMgr->IsExcessed() || isStalling;
+	// Owner (2026-11-02): a gantry builds anyway; a wait would also clear its engine repeat
+	const bool isNotReady = (!economyMgr->IsExcessed() || isStalling) && !IsGantry(unit->GetCircuitDef());
 	// D-211: script can keep one valid recruit queued through a resource dip.
 	// The existing recruit task still gates energy and lowers spending priority
 	// under metal pressure. Other roles retain admission waits by default.
