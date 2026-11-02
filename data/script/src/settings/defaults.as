@@ -16,6 +16,7 @@
 #include "shared/construction.as"
 #include "shared/idle_reclaim.as"
 #include "shared/lolcannon.as"
+#include "shared/lrpc_block.as"
 #include "shared/rez_replenish.as"
 #include "roles/tech.as"
 #include "roles/air.as"

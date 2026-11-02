@@ -20,6 +20,7 @@
 #include "../systems/team/sea_assist.as"
 #include "../systems/construction/idle_reclaim.as"
 #include "../systems/construction/lolcannon.as"
+#include "../systems/construction/lrpc_block.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).
@@ -2044,6 +2045,8 @@ namespace Builder {
 		if (FrontEcoLadder::Keep(u)) return null;
 		// owner, 2026-10-21: the lolcannon crew builds only the lolcannon program
 		{ IUnitTask@ lc = LolCannon::BuilderTask(u); if (lc !is null) return lc; }
+		// owner, 2026-11-02: the TECH heavy LRPC block crew builds only its block
+		{ IUnitTask@ lb = LrpcBlock::BuilderTask(u); if (lb !is null) return lb; }
 		// New gating via BuilderTaskTrack: grace window, then gate if added, else allow; hard timeout clears
 		BuilderTaskTrack@ tr = GetTrackForBuilder(u);
 		if (tr !is null) {
@@ -2830,6 +2833,7 @@ namespace Builder {
 		Team::SeaAssist::OnUnitRemoved(unit);
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site
 		LolCannon::UnitRemoved(unit);
+		LrpcBlock::UnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
         CommanderGroup::OnRemoved(unit);
 

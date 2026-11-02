@@ -19,6 +19,9 @@ namespace Main {
 		float Tech_T2_RUSH = 0.25f;   // owner, 2026-10-30 (was 0.05): the finite heavy-delivery rush (TechHeavyRush)
 		float Tech_CAPITAL_RUSH = 0.10f; // owner, 2026-10-30 (was 0.05): T2-plant capital ships with fighter escorts (TechCapitalRush)
 		float Tech_Spam_Rush = 0.85f; // roll 2
+		// roll 3, on its own (owner, 2026-11-02): the heavy LRPC block at 500 metal/s
+		// (settings/shared/lrpc_block.as, systems/construction/lrpc_block.as)
+		float Tech_LRPC_BLOCK = 0.60f;
 	}
 
 	// Decide a boolean from a probability using AiDice with two weights: off vs on.
@@ -60,11 +63,16 @@ namespace Main {
 			Global::RoleSettings::Tech::EnableStrategy(Strategy::SPAM_RUSH);
 		}
 
+		// Roll 3: the heavy LRPC block, on its own (owner, 2026-11-02); drawn last so
+		// rolls 1 and 2 keep their draws. Only a TECH builds it.
+		Global::LrpcBlock::Enabled = DecideEnabled(StrategyWeights::Tech_LRPC_BLOCK);
+
 		GenericHelpers::LogUtil(
 			"[Strategy] (EXPERIMENTAL BALANCED) Decided: Tech mask=" + Global::RoleSettings::Tech::StrategyMask +
 			" (" + StrategyUtil::NamesFromMask(Global::RoleSettings::Tech::StrategyMask) + "); roll 1: "
 			+ (pick == 0 ? "NUKE_RUSH" : pick == 1 ? "T3_RUSH" : pick == 2 ? "T2_RUSH (heavy rush)" : pick == 3 ? "CAPITAL_RUSH" : "none")
-			+ (StrategyWeights::SingleRoll ? " (single roll)" : ", roll 2: spam rush " + (spam ? "on" : "off")),
+			+ (StrategyWeights::SingleRoll ? " (single roll)" : ", roll 2: spam rush " + (spam ? "on" : "off"))
+			+ ", roll 3: heavy LRPC block " + (Global::LrpcBlock::Enabled ? "on" : "off"),
 			1);
 	}
 

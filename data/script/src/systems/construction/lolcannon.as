@@ -469,6 +469,7 @@ namespace LolCannon {
     void UnitAdded(CCircuitUnit@ unit)
     {
         if (!Enabled() || phase != BUILD || unit is null || unit.circuitDef is null || crewOf.exists(Key(unit.id))) return;
+        if (LrpcBlock::IsCrew(unit.id)) return;   // the TECH heavy LRPC block's crew (owner, 2026-11-02)
         const string name = unit.circuitDef.GetName();
         const bool standIn = groundLabs.exists(Key(unit.GetProducerId())) && unit.GetProductionFrame() >= started;
         Claim(unit, KindFor(name, standIn), "new");
@@ -510,6 +511,7 @@ namespace LolCannon {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f || crewOf.exists(Key(u.id))) continue;
             if (u.task !is null && u.task.GetType() == int(Task::Type::PLAYER)) continue;   // a player's own unit
+            if (LrpcBlock::IsCrew(u.id)) continue;   // the TECH heavy LRPC block's crew (owner, 2026-11-02)
             const bool standIn = groundT2 && T2_GROUND.find(u.circuitDef.GetName()) >= 0;
             const int kind = KindFor(u.circuitDef.GetName(), standIn);
             if (kind < 0 || !Claim(u, kind, standIn ? "taken off its task, ground stand-in" : "taken off its task")) continue;
