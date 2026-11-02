@@ -142,6 +142,8 @@ namespace AirScoutSweep {
     }
     void Urgent(const AIFloat3 &in at, float spread) {
         if (!Enabled() || !AirEconomy::Active()) return;
+        if (probeSince < 0) probeSince = ai.frame;
+        probeCall = ai.frame; probeCallBest = -1000.0f;
         Draft(at, spread);
         // What the draft lacked is built and flown later: the whole 10 T1 when
         // short of them, 3 radar planes when short of those (only with a T2 plant).
@@ -274,9 +276,47 @@ namespace AirScoutSweep {
         def.maxThisUnit=2147483647;
         return AirProduction::Recruit(plant,def.GetName(),AirProduction::Projected(def)+missing,"scout.sweep",Task::Priority::HIGH);
     }
+    // Nuke scout probe (owner 2026-11-02): from TECH's first nuke request, the
+    // furthest any scout-sweep aircraft got toward the enemy starts
+    // (NukeScoutProbe::Progress) and when one first passed 80%.
+    // probeCall*: the same since TECH's latest call (the half-stockpile redraft)
+    int probeSince = -1, probe80 = -1, probeBestId = -1, probeCall = -1;
+    float probeBest = -1000.0f, probeCallBest = -1000.0f;
+    float ProbeNow(int &out count) {
+        float now = -1000.0f; count = 0;
+        array<string>@ ids = flying.getKeys();
+        array<string>@ staged = members.getKeys();
+        for (uint i = 0; i < staged.length(); ++i) ids.insertLast(staged[i]);
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+            if (u is null) continue;
+            ++count;
+            const float p = NukeScoutProbe::Progress(u.GetPos(ai.frame));
+            if (p > now) now = p;
+            if (p > probeBest) { probeBest = p; probeBestId = u.id; }
+            if (p > probeCallBest) probeCallBest = p;
+        }
+        if (probeBest >= 80.0f && probe80 < 0) probe80 = ai.frame;
+        return now;
+    }
+    void ProbeReport(const string &in ev, int tech) {
+        if (probeSince < 0) {
+            GenericHelpers::LogUtil("[AIR][NukeScout] TECH="+tech+" "+ev+" at "+NukeScoutProbe::Clock(ai.frame)
+                +": no nuke scout request yet (T2 plant "+NukeScoutProbe::Clock(firstPlantFrame)+")",1);
+            return;
+        }
+        int count = 0;
+        const float now = ProbeNow(count);
+        GenericHelpers::LogUtil("[AIR][NukeScout] TECH="+tech+" "+ev+" at "+NukeScoutProbe::Clock(ai.frame)
+            +": request "+NukeScoutProbe::Clock(probeSince)+" furthest="+(probeBest > -1000.0f ? int(probeBest)+"% unit="+probeBestId : "none")
+            +" now="+(count > 0 ? int(now)+"%" : "none")+" aircraft="+count+" forming="+forming+" T1="+Count(0)+"/"+Wanted(0)
+            +" radar="+Count(1)+"/"+Wanted(1)+" past80="+NukeScoutProbe::Clock(probe80)
+            +" latest call "+NukeScoutProbe::Clock(probeCall)+" furthest="+(probeCallBest > -1000.0f ? int(probeCallBest)+"%" : "none")+" pass80="+(probeBest >= 80.0f ? "yes" : "NO"),1);
+    }
     void Tick() {
         if (!Enabled() || !AirEconomy::Active() || ai.frame-checked<SECOND) return;
         checked=ai.frame;
+        if (probeSince >= 0) { int count = 0; ProbeNow(count); }
         // Lifecycle factory list: O(F) only until the first completed T2 plant.
         if (firstPlantFrame<0) for (uint i=0;i<Factory::factoryList.length();++i) PlantFinished(Factory::factoryList[i]);
         if (nextPeriodic>=0 && ai.frame>=nextPeriodic) {
@@ -391,7 +431,7 @@ namespace AirScoutSweep {
         @ids=caps.getKeys();
         for(uint i=0;i<ids.length();++i) { CCircuitDef@ def=ai.GetCircuitDef(ids[i]); int cap=0; if(def !is null && caps.get(ids[i],cap)) def.maxThisUnit=cap; }
         pendT1=-1; pendRadar=-1; wantT1=-1; wantRadar=-1; pendAt=AIFloat3(-1,0,-1); wantAt=AIFloat3(-1,0,-1); pendUrgent=false; wantUrgent=false;
-        draftT1=-1; draftRadar=0; formedAt=-1; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false;
+        draftT1=-1; draftRadar=0; formedAt=-1; probeSince=-1; probe80=-1; probeBestId=-1; probeBest=-1000.0f; probeCall=-1; probeCallBest=-1000.0f; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false;
         @assembly=null; forming=false; dispatching=false; requested=false; firstPlantFrame=-1; nextPeriodic=-1; checked=-SECOND; planAfter=0;
         excluded.deleteAll(); members.deleteAll(); arrived.deleteAll(); flying.deleteAll(); endpoints.deleteAll(); expires.deleteAll(); caps.deleteAll(); starts.resize(0); goals.resize(0);
     }
