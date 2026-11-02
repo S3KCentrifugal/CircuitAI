@@ -70,6 +70,8 @@
 		"commander_group_jammer_spacing": 0.6,
 		"commander_group_jammer_hold": 10,
 		"commander_group_sensor_defense_band": 3,
+		// owner 2026-11-02: at least this many LLT/Beamer/Twin Guard/LHT/HLT within the group radius, before sensors and nanos
+		"commander_group_light_floor": 2,
 		"commander_group_jammer_outage": 60,
 		"commander_group_jammer_income": 25,
 		"commander_group_defence_metal": 50,

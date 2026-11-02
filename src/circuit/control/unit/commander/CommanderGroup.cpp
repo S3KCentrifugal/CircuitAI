@@ -535,9 +535,10 @@ IUnitTask* CCommanderController::GroupConstruction(CCircuitUnit* unit,CCircuitUn
         const auto probe=battle->GetFrontLanePoint(battle->GetFrontLaneProgress(center)+cfg->group.combatDistance);
         auto* radar2=ai->GetCircuitDefSafe(groupRadar2);
         auto* jammer2=ai->GetCircuitDefSafe(groupJammer2);
+        // Owner 2026-11-02: sensors earn no nano; only weapons do.
         if(OnMap(probe) && !ai->GetMapManager()->IsInRadar(probe))
-            if(auto* task=GroupBuild(unit,GroupCanBuild(radar2,anchor)?radar2:ai->GetCircuitDefSafe(groupRadar),center)) return TrackGroupJob(task);
-        if(auto* task=GroupBuild(unit,GroupCanBuild(jammer2,anchor)?jammer2:ai->GetCircuitDefSafe(groupJammer),center)) return TrackGroupJob(task);
+            if(auto* task=GroupBuild(unit,GroupCanBuild(radar2,anchor)?radar2:ai->GetCircuitDefSafe(groupRadar),center)) return TrackGroupJob(task,false);
+        if(auto* task=GroupBuild(unit,GroupCanBuild(jammer2,anchor)?jammer2:ai->GetCircuitDefSafe(groupJammer),center)) return TrackGroupJob(task,false);
         return nullptr;
     }
     auto* advancedDef=ai->GetCircuitDefSafe(groupDef2);
@@ -574,6 +575,46 @@ IUnitTask* CCommanderController::GroupConstruction(CCircuitUnit* unit,CCircuitUn
     }
     return nullptr;
 }
+// Owner 2026-11-02: the group keeps at least cfg->group.lightFloor light towers
+// (LLT, the planner's light row Beamer/Twin Guard/LHT, or its HLT row) within
+// its radius, ahead of sensors and owed nanos. One friendly query per group per
+// second while the floor is unmet (K local units); queued tasks count as pending.
+// The light row is used only while the bank can fire it, else the plain LLT.
+IUnitTask* CCommanderController::GroupLightFloor(CCircuitUnit* unit,CCircuitUnit* anchor,int frame) {
+    if(cfg->group.lightFloor<=0) return nullptr;
+    const int lineId=int(cfg->front.lineDef),lightId=defenseRules[0].def,hltId=defenseRules[1].def;
+    const auto isLight=[&](int id){return id>=0 && (id==lineId || id==lightId || id==hltId);};
+    const auto center=anchor->GetPos(frame);
+    if(frame>=groupLightNext) {
+        groupLightNext=frame+FRAMES_PER_SEC;
+        int count=0;
+        for(int id:ai->GetCallback()->GetFriendlyUnitIdsIn(center,cfg->group.radius,false))
+            if(isLight(ai->GetCallback()->Unit_GetDefId(id))) ++count;
+        for(auto* task:ai->GetBuilderManager()->GetTasks(BT::DEFENCE))
+            if(!task->IsDead() && !task->GetTarget() && task->GetBuildDef() && isLight(task->GetBuildDef()->GetId())
+                && task->GetPosition().SqDistance2D(center)<=SQUARE(cfg->group.radius)) ++count;
+        groupLightCount=count;
+    }
+    if(groupLightCount>=int(cfg->group.lightFloor)) return nullptr;
+    auto* line=ai->GetCircuitDefSafe(lineId);
+    auto* light=ai->GetCircuitDefSafe(lightId);
+    if(light && (!unit->GetCircuitDef()->CanBuild(light)
+        || DefenseFactsFor(light).shotEnergy>ai->GetEconomyManager()->GetEnergyCur())) light=nullptr;
+    auto* def=light?light:line;
+    if(!def || !unit->GetCircuitDef()->CanBuild(def)) return nullptr;
+    // A finished tower of this type near a probe vetoes that probe in GroupBuild,
+    // so try the planner's five fixed sites rather than only the anchor.
+    IUnitTask* task=nullptr;
+    for(const auto& offset:{AIFloat3(0,0,0),AIFloat3(192,0,0),AIFloat3(-192,0,0),AIFloat3(0,0,192),AIFloat3(0,0,-192)})
+        if((task=GroupBuild(unit,def,center+offset,false))) break;
+    if(!task) return nullptr;
+    ai->LOG("[CommanderGroup] light_floor unit=%i def=%s have=%i floor=%.0f",unit->GetId(),def->GetDef()->GetName(),
+        groupLightCount,cfg->group.lightFloor);
+    ++groupLightCount; // the new order is pending until the next census
+    TrackGroupJob(task);
+    groupJobCommitted=true; // an owner floor, not a discretionary offer
+    return task;
+}
 IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     if(!unit || !role.frontDuty || (!IsGroupMember(unit->GetId()) && !Handles(unit)) || !unit->IsFinished()) return nullptr;
     auto* current=unit->GetTask();
@@ -598,6 +639,8 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
             if(auto* task=ExpansionMexWork(unit,*state,ai->GetCircuitDefSafe(int(cfg->front.lineDef)),frame))
                 return TrackGroupJob(task);
     }
+    if(builder && nearby && !groupJob)
+        if(auto* task=GroupLightFloor(unit,anchor,frame)) return task;
     if(builder && nearby && !groupJob) {
         // Routine weapons must not starve missing radar/jammer coverage. Only
         // the configured urgent bands precede it; accepted jobs are untouched.
