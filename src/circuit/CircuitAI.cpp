@@ -412,6 +412,7 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
 			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
 			if (unit != nullptr) {
+				unit->SetFireFrame(lastFrame);  // ghost porc fire: shots seen directly
                 if (controllers) controllers->WeaponFired(evt->unitId,evt->weaponDefId);
 				CAirWaveTask* wave = dynamic_cast<CAirWaveTask*>(unit->GetTask());
                 if (wave != nullptr) wave->OnWeaponFired(unit, evt->weaponDefId);

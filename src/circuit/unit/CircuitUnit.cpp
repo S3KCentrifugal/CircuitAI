@@ -43,6 +43,7 @@ CCircuitUnit::CCircuitUnit(CCircuitAI* circuit, Id unitId, Unit* unit, CCircuitD
 		, moveFails(0)
 		, failFrame(-1)
 		, damagedFrame(-1)
+		, fireFrame(-1)
 		, execFrame(-1)
 		, disarmFrame(-1)
 		, ammoFrame(-1)
