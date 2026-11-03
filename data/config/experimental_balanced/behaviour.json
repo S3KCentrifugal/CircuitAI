@@ -274,7 +274,7 @@
 				"legbombard", "leghive", "cormexp",                // Bombardier, Hive, Advanced Exploiter
 				"armkraken", "corfdoom", "armfhlt", "corfhlt"],    // naval: Gorgon, Devastator, Manta, Coral
 			"avoid_other_porc": true,     // prep firing spots also outside other armed porc's reach (the target excepted)
-			"threat_margin": 100,         // elmos past a structure's weapon range that still counts as inside
+			"threat_margin": 250,         // elmos past a structure's weapon range that still counts as inside (test: 100 let units slide in)
 			"trigger_distance": 700,      // starts when within reach + this of a threat
 			"porc_radius": 1600,          // prep porc within this of the threat
 			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
@@ -283,6 +283,8 @@
 			"visible_max_volleys": 0,     // owner 01:43Z: seen porc until dead (0 = no cap)
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
 			"repeat_seconds": 60,
+			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
+			"group_wait_seconds": 30,     // ... and go in together once all are there, or after this
 			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]

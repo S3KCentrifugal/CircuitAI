@@ -408,7 +408,7 @@ public:
 		std::unordered_set<CCircuitDef::Id> directThreats;
 		std::unordered_set<CCircuitDef::Id> porc;     // prep targets
 		bool avoidOtherPorc = true;   // prep spots also outside other armed porc
-		float threatMargin = 100.f;   // elmos past a structure's weapon range
+		float threatMargin = 250.f;   // elmos past a structure's weapon range
 		float triggerDistance = 700.f;
 		float porcRadius = 1600.f;    // prep porc within this of the threat
 		float prepFraction = 0.99f;
@@ -418,6 +418,12 @@ public:
 		int confirmFrames = 3 * 30;
 		int repeatFrames = 60 * 30;
 		int stageFrames = 60 * 30;    // a stage/target with no volley this long is given up
+		// Test 2026-11-03 (ghost Persecutor): units went in one by one and all 8
+		// died. Units that must enter a threat's reach gather hold_margin outside
+		// it and go in together, once every unit on that threat is there or
+		// after group_wait_seconds.
+		float holdMargin = 150.f;
+		int groupWaitFrames = 30 * 30;
 	};
 	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
 	struct SArtySnipeState {
@@ -431,13 +437,20 @@ public:
 		int lastVolley = -1, reload = -1, fireSeen = -2;
 		int orderKey = -1, orderUntil = -1;
 		int lastCall = -1;
-		int nextScan = -1;
-		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted      // stage 0: threat scans at most every 0.5 s per unit
+		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
+		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
+		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
+		bool atHold = false;    // stage 2: waiting at the gathering spot
+		int holdSince = -1;
+		int drifts = 0;         // prep: times the unit slid into a threat's reach on this target
+		bool drifting = false;
+		std::unordered_set<int> ghostDone;  // ghost images already given their volleys (until seen again)
 		springai::AIFloat3 spot;
 		std::unordered_map<int, int> skipUntil;  // enemy id -> frame (done prep targets, sniped threats)
 	};
 	const SArtySnipeInfo& GetArtySnipeInfo() const { return artySnipeInfo; }
 	SArtySnipeState& GetArtySnipeState(int unitId, int frame);
+	const std::unordered_map<int, SArtySnipeState>& GetArtySnipeStates() const { return artySnipeStates; }
 	// A def whose escort is rationed: a mobile radar or jammer.
 	bool IsSensorUnit(const CCircuitDef* cdef) const;
 	// Live sensors already escorting `task`.
