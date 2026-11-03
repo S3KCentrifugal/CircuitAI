@@ -637,6 +637,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.atHold = false;
 		st.holdSince = -1;
 		st.hasSnipeSpot = false;
+		st.spotFor = -1;
 		st.threat = best->GetId();
 		st.target = -1;
 		st.volleys = 0;
@@ -715,6 +716,21 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		const float maxWalk = std::max(0.f, pos.distance2D(aim) - radius) + porcRange * 1.5707963f;
 		bool found = false;
 		float bestSq = std::numeric_limits<float>::max();
+		// Owner 2026-11-03 16:30Z: with significant overlap, attack from the side
+		// with the least shared overlap: the fallback (no fully safe spot) is the
+		// candidate covered by the fewest other hazards, then the least exposed
+		// walk, then the nearest. O(26 candidates x hazards x walk samples).
+		bool haveLeast = false;
+		AIFloat3 least;
+		int leastExp = std::numeric_limits<int>::max(), leastWalk = std::numeric_limits<int>::max();
+		float leastSq = std::numeric_limits<float>::max();
+		auto exposure = [&hazards, except](const AIFloat3& p) {
+			int n = 0;
+			for (const SSnipeHazard& h : hazards) {
+				if ((h.id != except) && (p.SqDistance2D(h.pos) < h.sqReach)) ++n;
+			}
+			return n;
+		};
 		for (float ring : {1.f, 0.85f}) {
 			for (int k = 0; k <= 12; ++k) {
 				const float off = ((k + 1) / 2) * (3.14159265f / 12.f) * ((k % 2 == 0) ? 1.f : -1.f);
@@ -723,9 +739,26 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				if (!terrain->CanMoveToPos(unit->GetArea(), c)) continue;
 				const float sq = pos.SqDistance2D(c);
 				if (sq > SQUARE(maxWalk)) continue;
-				if (!safeAt(c, except, false) || !walkSafe(pos, c, except)) continue;
-				if (sq < bestSq) { bestSq = sq; out = c; found = true; }
+				if (safeAt(c, except, false) && walkSafe(pos, c, except)) {
+					if (sq < bestSq) { bestSq = sq; out = c; found = true; }
+					continue;
+				}
+				if (strict || found) continue;
+				const int e = exposure(c);
+				int w = 0;
+				const int n = std::max(1, int(std::sqrt(sq) / 100.f));
+				for (int i = 1; i <= n; ++i) {
+					const float t = float(i) / n;
+					if (exposure(AIFloat3(pos.x + (c.x - pos.x) * t, 0.f, pos.z + (c.z - pos.z) * t)) > 0) ++w;
+				}
+				if ((e < leastExp) || ((e == leastExp) && ((w < leastWalk) || ((w == leastWalk) && (sq < leastSq))))) {
+					least = c; leastExp = e; leastWalk = w; leastSq = sq; haveLeast = true;
+				}
 			}
+		}
+		if (!found && !strict && haveLeast) {
+			out = least;
+			found = true;
 		}
 		if (!found && !strict) {
 			out = AIFloat3(aim.x + std::cos(base) * radius, 0.f, aim.z + std::sin(base) * radius);
@@ -892,17 +925,25 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		} else {
 			const float holdRadius = reach + info.holdMargin;
 			const float d = pos.distance2D(threat->GetPos());
-			const bool at = safeAt(pos, -1, true) && (d <= holdRadius + 250.f);
+			// Test round 8: units arriving from prep were already at the hold
+			// radius, so the snipe spot below was never chosen and they went in
+			// from their own side. Choose it once on entering this stage; only the
+			// hold point on its line counts as gathered.
+			const bool fresh = (st.spotFor != st.threat);
+			const bool at = !fresh && safeAt(pos, -1, true) && (d <= holdRadius + 250.f)
+				&& (pos.SqDistance2D(st.spot) <= SQUARE(300.f));
 			st.atHold = at;
 			if (!at) {
 				st.holdSince = -1;
-				if (st.orderKey != -5 - st.threat) {
+				if (fresh || (st.orderKey != -5 - st.threat)) {
 					// Round 6: the threat pick found a clear snipe spot (maybe behind
 					// the threat) but the group gathered and went in on its own side,
 					// through the other threat's reach. Gather on the line out from the
-					// checked snipe spot instead; else as before.
+					// checked snipe spot instead; else as before. Owner 16:30Z: with
+					// no fully safe spot, the side with the least shared overlap.
+					st.spotFor = st.threat;
 					const float snipeR2 = range * info.snipeFraction;
-					st.hasSnipeSpot = findSpot(threat->GetPos(), snipeR2, threat->GetId(), true, st.snipeSpot,
+					st.hasSnipeSpot = findSpot(threat->GetPos(), snipeR2, threat->GetId(), false, st.snipeSpot,
 							rangeOf(threat, snipeR2));
 					bool placed = false;
 					if (st.hasSnipeSpot) {
@@ -922,7 +963,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					// Diagnostic (test round 7: no unit used a far-side spot): once per gather order.
 					circuit->LOG("SNIPE: %s %i spot for %s %i: snipe %s (%.0f, %.0f), hold %s (%.0f, %.0f), unit at (%.0f, %.0f)",
 							cdef->GetDef()->GetName(), unit->GetId(), SnipeName(threat), st.threat,
-							st.hasSnipeSpot ? "strict" : "none", st.hasSnipeSpot ? st.snipeSpot.x : 0.f,
+							st.hasSnipeSpot ? "least-overlap" : "none", st.hasSnipeSpot ? st.snipeSpot.x : 0.f,
 							st.hasSnipeSpot ? st.snipeSpot.z : 0.f, placed ? "on its line" : "fallback",
 							st.spot.x, st.spot.z, pos.x, pos.z);
 				}
