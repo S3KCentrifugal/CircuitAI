@@ -454,9 +454,18 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			if (e->IsInRadarOrLOS()) st.ghostDone.erase(e->GetId());
 			else if (st.ghostDone.count(e->GetId()) > 0) continue;  // its ghost already had the volleys
 			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
-			const float sq = pos.SqDistance2D(e->GetPos());
+			float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
-			if ((sq < SQUARE(trigger)) && ((sq < bestSq) || (bestDirect && !direct)) && !skipped(e->GetId())) {
+			if (sq >= SQUARE(trigger)) continue;
+			// A threat other units already work on comes first among equals, so
+			// the group is not split (O(snipe states), only for threats in range).
+			for (const auto& kv2 : military->GetArtySnipeStates()) {
+				if ((kv2.second.threat == e->GetId()) && (kv2.second.stage != 0) && (kv2.first != unit->GetId())) {
+					sq *= 0.25f;
+					break;
+				}
+			}
+			if (((sq < bestSq) || (bestDirect && !direct)) && !skipped(e->GetId())) {
 				bestSq = sq;
 				best = e;
 				bestDirect = direct;
@@ -477,7 +486,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.orderKey = -1;
 		circuit->LOG("SNIPE: %s %i starts on %s%s %i (%s) at (%.0f, %.0f), %.0f away, its reach %.0f, own range %.0f",
 				cdef->GetDef()->GetName(), unit->GetId(), bestDirect ? "porc " : "", SnipeName(best), best->GetId(),
-				best->IsInRadarOrLOS() ? "seen" : "ghost", best->GetPos().x, best->GetPos().z,
+				best->IsInRadarOrLOS() ? "visible" : "ghost", best->GetPos().x, best->GetPos().z,
 				std::sqrt(bestSq), reachOf(best->GetCircuitDef()), range);
 	}
 
@@ -695,6 +704,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			for (const auto& kv : enemyMgr->GetEnemyUnits()) {
 				const CEnemyUnit* e = kv.second;
 				if (!SnipeAlive(e) || (info.porc.count(e->GetCircuitDef()->GetId()) == 0)
+					|| (info.threats.count(e->GetCircuitDef()->GetId()) > 0)  // a threat gets its own snipe
 					|| (e->IsInRadarOrLOS() && e->IsBeingBuilt())
 					|| (e->GetPos().SqDistance2D(threat->GetPos()) > SQUARE(info.porcRadius))
 					|| skipped(e->GetId()))
@@ -786,15 +796,28 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				circuit->LOG("SNIPE: %s %i gathers %.0f from %s %i", cdef->GetDef()->GetName(), unit->GetId(),
 						d, SnipeName(threat), st.threat);
 			}
-			int waiting = 0, going = 0, total = 0;
+			int members = 0, gathered = 0, going = 0;
+			int settledSince = st.holdSince;  // when the last gatherer arrived
 			for (const auto& kv : military->GetArtySnipeStates()) {
 				const CMilitaryManager::SArtySnipeState& o = kv.second;
 				if ((o.threat != st.threat) || (o.stage == 0) || (frame - o.lastCall > FRAMES_PER_SEC * 10)) continue;
-				++total;
-				if ((o.stage >= 2) && o.go) ++going;
-				else if ((o.stage != 2) || !o.atHold) ++waiting;
+				++members;
+				if ((o.stage >= 2) && o.go) {
+					++going;
+				} else if ((o.stage == 2) && o.atHold) {
+					++gathered;
+					settledSince = std::max(settledSince, o.holdSince);
+				}
 			}
-			if ((going == 0) && (waiting > 0) && (frame - st.holdSince < info.groupWaitFrames)) {
+			const int need = std::min(info.minGroup, members);
+			const bool allGathered = (gathered >= members);
+			const bool settled = (frame - settledSince >= info.groupSettleFrames);
+			const bool go = (going > 0) || (gathered >= need && (allGathered || settled));
+			if (!go) {
+				if (frame - st.holdSince >= info.groupWaitFrames) {
+					st.stage = 2;
+					return finish("too few gathered to go in");
+				}
 				if (st.orderKey != -6 - st.threat) {
 					st.orderKey = -6 - st.threat;
 					TRY_UNIT(circuit, unit,
@@ -807,8 +830,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.stageFrame = frame;
 			st.volleys = 0;
 			st.orderKey = -1;
-			circuit->LOG("SNIPE: %s %i goes in on %s %i with %i unit(s)%s", cdef->GetDef()->GetName(), unit->GetId(),
-					SnipeName(threat), st.threat, total, ((waiting > 0) && (going == 0)) ? " (group wait over)" : "");
+			circuit->LOG("SNIPE: %s %i goes in on %s %i: %i gathered, %i going, %i on it", cdef->GetDef()->GetName(),
+					unit->GetId(), SnipeName(threat), st.threat, gathered, going, members);
 		}
 	}
 	if (st.stage == 2) {
@@ -825,7 +848,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.stageFrame = frame;
 			circuit->LOG("SNIPE: %s %i fired %i volleys at %s %i (%s), checks it",
 					cdef->GetDef()->GetName(), unit->GetId(), st.volleys, SnipeName(threat), st.threat,
-					threatSeen ? "seen" : "ghost");
+					threatSeen ? "visible" : "ghost");
 			return true;
 		}
 		if (frame - std::max(st.stageFrame, st.lastVolley) > info.stageFrames) {
