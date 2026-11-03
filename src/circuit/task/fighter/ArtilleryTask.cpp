@@ -383,12 +383,89 @@ const char* SnipeName(const CEnemyUnit* e)
 }
 }  // namespace
 
+namespace {
+/*
+ * Owner 2026-11-01 / 2026-11-03: artillery_commander units shoot a slow enemy
+ * commander, then a slow heavy unit (heavy_units, now with Tremor) in current
+ * weapon range before anything else, wherever they are: the native artillery
+ * task, a FRONT squad route (owner 02:33Z: Arbiters in squads never got this),
+ * or a snipe sequence (which waits; those volleys do not count). O(known
+ * enemies) at most every 0.5 s per unit while nothing qualifies.
+ */
+bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilitaryManager::SArtySnipeState& st,
+		const AIFloat3& pos, float range)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	if ((frame < st.nextHvScan) && (frame >= st.hvUntil)) {
+		return false;
+	}
+	st.nextHvScan = frame + FRAMES_PER_SEC / 2;
+	const CMilitaryManager::SArtyCommInfo& comm = military->GetArtyCommInfo();
+	CEnemyInfo* hv = nullptr;
+	bool hvComm = false;
+	float hvSq = std::numeric_limits<float>::max();
+	if (comm.isEnabled && (comm.defs.count(cdef->GetId()) > 0)) {
+		const int canTargetCat = cdef->GetTargetCategory();
+		const float sqRange = SQUARE(range);
+		for (auto& kv : circuit->GetEnemyInfos()) {
+			CEnemyInfo* e = kv.second;
+			if (e->IsHidden() || !e->IsInRadarOrLOS()) continue;
+			const CCircuitDef* edef = e->GetCircuitDef();
+			if ((edef == nullptr) || ((edef->GetCategory() & canTargetCat) == 0)) continue;
+			const float sq = pos.SqDistance2D(e->GetPos());
+			if (sq > sqRange) continue;
+			const float v = e->GetVel().SqLength2D();
+			const bool isComm = edef->IsRoleComm() && (v <= comm.maxSqSpeed);
+			bool isHeavy = false;
+			if (!isComm) {
+				auto it = comm.heavyMaxSqSpeed.find(edef->GetId());
+				isHeavy = (it != comm.heavyMaxSqSpeed.end()) && (v <= it->second);
+			}
+			if ((!isComm && !isHeavy) || (hvComm && !isComm)) continue;
+			if ((sq < hvSq) || (isComm && !hvComm)) {
+				hv = e;
+				hvSq = sq;
+				hvComm = isComm;
+			}
+		}
+	}
+	if (hv != nullptr) {
+		st.hvUntil = frame + FRAMES_PER_SEC * 3;
+		const int key = -1000000 - hv->GetId();
+		if ((st.orderKey != key) || (frame >= st.orderUntil)) {
+			if (st.orderKey != key) {
+				circuit->LOG("PRIORITY: %s %i shoots %s %s %i in range%s", cdef->GetDef()->GetName(), unit->GetId(),
+						hvComm ? "commander" : "heavy unit", hv->GetCircuitDef()->GetDef()->GetName(), hv->GetId(),
+						(st.stage != 0) ? " (snipe waits)" : "");
+			}
+			st.orderKey = key;
+			st.orderUntil = frame + FRAMES_PER_SEC * 4;
+			const int timeout = frame + FRAMES_PER_SEC * 5;
+			if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+			TRY_UNIT(circuit, unit,
+				if (!circuit->IsCheating()) {
+					unit->GetUnit()->Attack(hv->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+				} else {
+					unit->CmdAttackGround(hv->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+				}
+			)
+		}
+		return true;
+	}
+	return false;
+}
+}  // namespace
+
 bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 {
 	CMilitaryManager* military = circuit->GetMilitaryManager();
 	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	if (!info.isEnabled || (info.defs.count(cdef->GetId()) == 0)) {
+	const bool isSnipe = info.isEnabled && (info.defs.count(cdef->GetId()) > 0);
+	const CMilitaryManager::SArtyCommInfo& commInfo = military->GetArtyCommInfo();
+	const bool isPriority = commInfo.isEnabled && (commInfo.defs.count(cdef->GetId()) > 0);
+	if (!isSnipe && !isPriority) {
 		return false;
 	}
 	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
@@ -426,6 +503,12 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 
 	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
 	const AIFloat3 pos = unit->GetPos(frame);
+	if (isPriority && ArtyPriorityStep(circuit, unit, frame, st, pos, range)) {
+		return true;
+	}
+	if (!isSnipe) {
+		return false;
+	}
 	auto skipped = [&st, frame](int id) {
 		auto it = st.skipUntil.find(id);
 		if (it == st.skipUntil.end()) return false;
@@ -444,7 +527,38 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.nextScan = frame + FRAMES_PER_SEC / 2;
 		const CEnemyUnit* best = nullptr;
 		bool bestDirect = true;
+		bool bestClear = false;
+		int bestRank = std::numeric_limits<int>::max();
 		float bestSq = std::numeric_limits<float>::max();
+		// Test round 3: the nearest threat (a Pulsar 370 from a Persecutor) was
+		// sniped first from a spot inside the other's reach. A threat whose snipe
+		// spot can sit outside every other threat's reach goes first; else the
+		// earliest in "threats" (Persecutor before Pulsar); then nearest.
+		// O(threats^2 x 13) once per 0.5 s, only with a threat in range.
+		std::vector<std::pair<AIFloat3, float>> allThreats;  // pos, reach^2
+		std::vector<int> allIds;
+		for (const auto& kv : enemyMgr->GetEnemyUnits()) {
+			const CEnemyUnit* e = kv.second;
+			if (!SnipeAlive(e) || (e->IsInRadarOrLOS() && e->IsBeingBuilt())) continue;
+			if (info.threats.count(e->GetCircuitDef()->GetId()) == 0) continue;
+			allThreats.push_back({e->GetPos(), SQUARE(reachOf(e->GetCircuitDef()))});
+			allIds.push_back(e->GetId());
+		}
+		const float snipeR = range * info.snipeFraction;
+		auto clearSpot = [&](const CEnemyUnit* t) {
+			const AIFloat3& tp = t->GetPos();
+			const float base = std::atan2(pos.z - tp.z, pos.x - tp.x);
+			for (int k = 0; k < 24; ++k) {
+				const float off = ((k + 1) / 2) * (3.14159265f / 12.f) * ((k % 2 == 0) ? 1.f : -1.f);
+				AIFloat3 c(tp.x + std::cos(base + off) * snipeR, 0.f, tp.z + std::sin(base + off) * snipeR);
+				bool ok = true;
+				for (size_t i = 0; ok && (i < allThreats.size()); ++i) {
+					if ((allIds[i] != t->GetId()) && (c.SqDistance2D(allThreats[i].first) < allThreats[i].second)) ok = false;
+				}
+				if (ok) return true;
+			}
+			return false;
+		};
 		for (const auto& kv : enemyMgr->GetEnemyUnits()) {
 			const CEnemyUnit* e = kv.second;
 			if (!SnipeAlive(e) || (e->IsInRadarOrLOS() && e->IsBeingBuilt())) continue;
@@ -465,10 +579,26 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					break;
 				}
 			}
-			if (((sq < bestSq) || (bestDirect && !direct)) && !skipped(e->GetId())) {
+			if (skipped(e->GetId())) continue;
+			bool better;
+			bool clear = false;
+			int rank = std::numeric_limits<int>::max();
+			if (direct) {
+				better = bestDirect && (sq < bestSq);
+			} else {
+				clear = clearSpot(e);
+				auto rit = info.threatRank.find(e->GetCircuitDef()->GetId());
+				if (rit != info.threatRank.end()) rank = rit->second;
+				better = (best == nullptr) || bestDirect
+					|| (clear && !bestClear)
+					|| ((clear == bestClear) && ((rank < bestRank) || ((rank == bestRank) && (sq < bestSq))));
+			}
+			if (better) {
 				bestSq = sq;
 				best = e;
 				bestDirect = direct;
+				bestClear = clear;
+				bestRank = rank;
 			}
 		}
 		if (best == nullptr) {
@@ -503,62 +633,6 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	};
 	if (!SnipeAlive(threat)) {
 		return finish("gone");
-	}
-
-	// Higher value target first (see above). O(known enemies), only while a
-	// sequence runs and only for artillery_commander units.
-	{
-		const CMilitaryManager::SArtyCommInfo& comm = military->GetArtyCommInfo();
-		CEnemyInfo* hv = nullptr;
-		bool hvComm = false;
-		float hvSq = std::numeric_limits<float>::max();
-		if (comm.isEnabled && (comm.defs.count(cdef->GetId()) > 0)) {
-			const int canTargetCat = cdef->GetTargetCategory();
-			const float sqRange = SQUARE(range);
-			for (auto& kv : circuit->GetEnemyInfos()) {
-				CEnemyInfo* e = kv.second;
-				if (e->IsHidden() || !e->IsInRadarOrLOS()) continue;
-				const CCircuitDef* edef = e->GetCircuitDef();
-				if ((edef == nullptr) || ((edef->GetCategory() & canTargetCat) == 0)) continue;
-				const float sq = pos.SqDistance2D(e->GetPos());
-				if (sq > sqRange) continue;
-				const float v = e->GetVel().SqLength2D();
-				const bool isComm = edef->IsRoleComm() && (v <= comm.maxSqSpeed);
-				bool isHeavy = false;
-				if (!isComm) {
-					auto it = comm.heavyMaxSqSpeed.find(edef->GetId());
-					isHeavy = (it != comm.heavyMaxSqSpeed.end()) && (v <= it->second);
-				}
-				if ((!isComm && !isHeavy) || (hvComm && !isComm)) continue;
-				if ((sq < hvSq) || (isComm && !hvComm)) {
-					hv = e;
-					hvSq = sq;
-					hvComm = isComm;
-				}
-			}
-		}
-		if (hv != nullptr) {
-			st.hvUntil = frame + FRAMES_PER_SEC * 3;
-			const int key = -1000000 - hv->GetId();
-			if ((st.orderKey != key) || (frame >= st.orderUntil)) {
-				if (st.orderKey != key) {
-					circuit->LOG("SNIPE: %s %i pauses for %s %s %i in range", cdef->GetDef()->GetName(), unit->GetId(),
-							hvComm ? "commander" : "heavy unit", hv->GetCircuitDef()->GetDef()->GetName(), hv->GetId());
-				}
-				st.orderKey = key;
-				st.orderUntil = frame + FRAMES_PER_SEC * 4;
-				const int timeout = frame + FRAMES_PER_SEC * 5;
-				if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
-				TRY_UNIT(circuit, unit,
-					if (!circuit->IsCheating()) {
-						unit->GetUnit()->Attack(hv->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
-					} else {
-						unit->CmdAttackGround(hv->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
-					}
-				)
-			}
-			return true;
-		}
 	}
 
 	// Hazards: every known threat structure, plus (avoid_other_porc) other armed
@@ -809,13 +883,17 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					settledSince = std::max(settledSince, o.holdSince);
 				}
 			}
+			// Test round 3: min_group of gathered+going let part of the group in
+			// while the rest was still on prep. Now: everyone on the threat
+			// gathered (and settled), or past group_wait_seconds min_group
+			// gathered; late arrivals join a group already going in.
 			const int need = std::min(info.minGroup, members);
 			const bool allGathered = (gathered >= members);
 			const bool settled = (frame - settledSince >= info.groupSettleFrames);
-			const bool go = (going > 0) || (gathered >= need && (allGathered || settled));
+			const bool waitOver = (frame - st.holdSince >= info.groupWaitFrames);
+			const bool go = (going > 0) || (allGathered && (settled || members == 1)) || (waitOver && (gathered >= need));
 			if (!go) {
-				if (frame - st.holdSince >= info.groupWaitFrames) {
-					st.stage = 2;
+				if (waitOver) {
 					return finish("too few gathered to go in");
 				}
 				if (st.orderKey != -6 - st.threat) {
