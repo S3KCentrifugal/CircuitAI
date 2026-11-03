@@ -14,6 +14,7 @@
 #include "task/static/DebugStrike.h"
 #include "task/static/StrategicTargeting.h"
 #include "unit/CircuitDef.h"
+#include "unit/CoreUnit.h"
 #include "util/AvailList.h"
 
 #include <vector>
