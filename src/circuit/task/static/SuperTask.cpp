@@ -2008,6 +2008,26 @@ bool CSuperTask::SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame)
 		targetFrame = frame - TARGET_DELAY + lp.syncRecheckFrames;
 		return true;
 	}
+	// A launcher aimed (attack order) or fired in the last sync_settle_seconds
+	// is still open (Catalyst doors, Perdition popup: they close 4 s after the
+	// last aim and take ~4 s) and launches far sooner than its cold delay, so
+	// the volley waits until every member has closed.
+	if (lp.syncSettleFrames > 0) {
+		auto busy = [frame, &lp](const CSuperTask* t, const CCircuitUnit* u) {
+			return (frame - std::max(u->GetFireFrame(), t->lastAttackOrder) <= lp.syncSettleFrames);
+		};
+		bool settled = !busy(this, unit);
+		for (const auto& c : crew) settled = settled && !busy(c.first, c.second);
+		if (!settled) {
+			TRY_UNIT(circuit, unit,
+				unit->CmdStop();
+			)
+			SetTarget(nullptr);
+			state = State::ROAM;
+			targetFrame = frame - TARGET_DELAY + lp.syncRecheckFrames;
+			return true;
+		}
+	}
 	syncHoldSince = -1;
 	syncLogPos = AIFloat3(-1.f, 0.f, -1.f);
 
@@ -2056,13 +2076,15 @@ bool CSuperTask::SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame)
 			m.task->syncAnchorUntil = frame + int(std::lround(m.delay)) + FRAMES_PER_SEC * 15;
 		}
 		if (offset <= 0) {
-			m.task->FireSync(m.unit, aim);
-			m.task->syncPredDelay = m.delay;
+			m.task->FireSync(m.unit, aim, m.delay);
 		} else {
 			m.task->syncPending = true;
+			TRY_UNIT(circuit, m.unit,
+				m.unit->CmdStop();  // an older attack order would fire before the timed one
+			)
 			m.task->SetTarget(nullptr);
 			m.task->targetPos = aim;
-			militaryMgr->AddSyncOrder({m.unit->GetId(), aim, frame + offset, volley, m.delay + m.flight, frame});
+			militaryMgr->AddSyncOrder({m.unit->GetId(), aim, frame + offset, volley, m.delay + m.flight, frame, m.delay});
 		}
 	}
 	return true;
@@ -2093,12 +2115,15 @@ void CSuperTask::CancelSyncPending()
 	targetFrame = 0;  // rescan at the next update
 }
 
-void CSuperTask::FireSync(CCircuitUnit* unit, const AIFloat3& pos)
+void CSuperTask::FireSync(CCircuitUnit* unit, const AIFloat3& pos, float predDelay)
 {
 	syncPending = false;
 	syncOrderFrame = manager->GetCircuit()->GetLastFrame();
 	float flight = 0.f;
-	if (!SyncPredict(unit, pos, syncOrderFrame, syncPredDelay, flight)) syncPredDelay = -1.f;
+	// a timed volley passes the delay it planned with, so the learned bias
+	// compares the launch with the plan that set the order frame
+	if (predDelay >= 0.f) syncPredDelay = predDelay;
+	else if (!SyncPredict(unit, pos, syncOrderFrame, syncPredDelay, flight)) syncPredDelay = -1.f;
 	SetTarget(nullptr);
 	targetPos = pos;
 	areaRank = 0;
@@ -2162,6 +2187,7 @@ void CSuperTask::ExecuteAttack(CCircuitUnit* unit)
 			unit->GetUnit()->Attack(GetTarget()->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
 		} else {
 			unit->CmdAttackGround(targetPos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
+			lastAttackOrder = frame;
 		}
 	)
 	targetFrame = frame;

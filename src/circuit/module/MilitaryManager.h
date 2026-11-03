@@ -451,6 +451,7 @@ public:
 			int readyFrames = 0;
 		};
 		std::unordered_map<CCircuitDef::Id, STiming> timing;
+		int syncSettleFrames = 9 * 30;  // a member aimed or fired this recently is still open: its next delay is unpredictable
 		int syncPendingMaxFrames = 20 * 30;  // a timed order older than this is dropped
 		static float Interp(const std::vector<std::pair<float, float>>& t, float x) {
 			if (t.empty()) return 0.f;
@@ -473,6 +474,7 @@ public:
 		int volley;
 		float total;    // this shot's predicted delay + flight, frames
 		int created;
+		float delay;    // this shot's order-to-launch delay predicted at the volley, frames
 	};
 	int NewSyncVolley() { return ++syncVolleySerial; }
 	void AddSyncOrder(const SSyncOrder& o) { syncOrders.push_back(o); }

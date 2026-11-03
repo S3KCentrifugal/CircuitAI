@@ -99,7 +99,7 @@ private:
 	bool SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame);
 public:
 	// Same-impact volleys (CMilitaryManager::UpdateSyncOrders): the timed order, or its drop.
-	void FireSync(CCircuitUnit* unit, const springai::AIFloat3& pos);
+	void FireSync(CCircuitUnit* unit, const springai::AIFloat3& pos, float predDelay = -1.f);
 	void CancelSyncPending();
 private:
 	bool syncPending = false;     // a timed volley order is waiting: Update leaves the unit alone
@@ -108,6 +108,7 @@ private:
 	int syncAnchorUntil = -1;
 	int syncOrderFrame = -1;      // when the last volley order was given, and the delay predicted for it
 	float syncPredDelay = -1.f;
+	int lastAttackOrder = -1000000;  // last attack order: the launcher stays open (aimed) for a while after it
 	// The predicted order-to-impact time of a sync launcher at `pos`: delay +
 	// flight (frames), flight alone in *flight. False with no timing for the def.
 	bool SyncPredict(CCircuitUnit* unit, const springai::AIFloat3& pos, int frame, float& delay, float& flight) const;

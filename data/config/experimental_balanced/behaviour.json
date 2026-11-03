@@ -292,6 +292,7 @@
 					"flight": [[1000, 251], [1500, 242], [2000, 226], [2200, 215]],
 					"delay_ready": 95, "ready_seconds": 3.5}
 			},
+			"sync_settle_seconds": 9,   // a member aimed or fired this recently is still open and waits: it would launch far sooner than the table
 			"sync_pending_max_seconds": 20
 		},
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,

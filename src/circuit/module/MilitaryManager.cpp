@@ -778,6 +778,7 @@ void CMilitaryManager::ReadConfig()
 					if (!tm.delay.empty() && !tm.flight.empty()) lp.timing[d->GetId()] = tm;
 				}
 			}
+			lp.syncSettleFrames = int(std::max(0.f, lpCfg.get("sync_settle_seconds", 9.f).asFloat()) * FRAMES_PER_SEC);
 			lp.syncPendingMaxFrames = int(std::max(1.f, lpCfg.get("sync_pending_max_seconds", 20.f).asFloat()) * FRAMES_PER_SEC);
 			lp.isEnabled = !lp.defs.empty();
 		}
@@ -2067,7 +2068,7 @@ void CMilitaryManager::UpdateSyncOrders()
 		if (frame >= it->frame) {
 			circuit->LOG("SYNC %s(%i): timed order of volley %i (+%i frames)",
 					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), it->volley, frame - it->created);
-			task->FireSync(unit, it->pos);
+			task->FireSync(unit, it->pos, it->delay);
 			it = syncOrders.erase(it);
 			continue;
 		}
