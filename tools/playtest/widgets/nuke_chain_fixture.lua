@@ -79,7 +79,16 @@ local function placeEco()
     echo(string.format("supplied AI team %d: %d corsilo (%ds apart), %d corafus, %d cormoho near (%d,%d)",A,n,cfg.siloStaggerSec or 0,2+n,1+5*n,ax,az))
 end
 
+local pendingHealth={}   -- {def,x,z,pct}: set by BAR's dev helpers (cheats on) once the unit exists
 local function placeLayout()
+    if cfg.units then   -- an explicit list {def, x, z, health percent} (antinuke scenarios)
+        for _,e in ipairs(cfg.units) do
+            give(e[1],myTeam,e[2],e[3])
+            if e[4] and e[4]<100 then pendingHealth[#pendingHealth+1]={e[1],e[2],e[3],e[4]} end
+        end
+        echo(string.format("layout %s: %d units (explicit list)",cfg.layout,#cfg.units))
+        return
+    end
     local L=LAYOUTS[cfg.layout]
     for _,e in ipairs(L) do give(e[1],myTeam,cfg.cx+e[2],cfg.cz+e[3]) end
     echo(string.format("layout %s at (%d,%d): %d units",cfg.layout,cfg.cx,cfg.cz,#L))
@@ -119,6 +128,14 @@ function widget:UnitCreated(u,ud,team)
     local x,y,z=Spring.GetUnitPosition(u)
     local hp,maxhp=Spring.GetUnitHealth(u)
     tracked[u]={def=d.name,x=x,y=y,z=z,metal=d.metalCost,hp=maxhp}
+    for i=#pendingHealth,1,-1 do
+        local h=pendingHealth[i]
+        if h[1]==d.name and math.abs(h[2]-x)<16 and math.abs(h[3]-z)<16 then
+            Spring.SendLuaRulesMsg(string.format("$dev$:sethealth %d:%.3f",u,h[4]))
+            echo(string.format("sethealth id=%d def=%s to %.1f%%",u,d.name,h[4]))
+            table.remove(pendingHealth,i)
+        end
+    end
     echo(string.format("unit id=%d def=%s pos=(%.0f,%.0f,%.0f) hp=%.0f metal=%.0f radius=%.1f height=%.1f xsize=%s zsize=%s %s",
         u,d.name,x,y,z,maxhp or -1,d.metalCost,d.radius or -1,d.height or -1,tostring(d.xsize),tostring(d.zsize),volText(u)))
 end

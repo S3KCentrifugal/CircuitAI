@@ -57,6 +57,7 @@ def main():
     p.add_argument('--wall-minutes', type=float, default=25)
     p.add_argument('--stage-only', action='store_true')
     p.add_argument('--calib-set', type=int, default=1)
+    p.add_argument('--units', default='', help='explicit Lua unit list {{def,x,z,healthPct},...} (the layout name is a label)')
     p.add_argument('--place-at', type=int, default=400, help='layout give frame (5100: about 20 s before the silo stocks)')
     p.add_argument('--stagger', type=int, default=60, help='seconds between the calibration silos')
     a = p.parse_args()
@@ -97,6 +98,8 @@ def main():
     else:
         conf = 'return {mode="layout", layout="%s", cx=%d, cz=%d, aiStart={%d,%d}, timeoutMin=%d, placeAt=%d}\n' % (
             (a.layout.upper(),) + CENTRE + AI_START + (int(minutes), a.place_at))
+        if a.units:
+            conf = conf.replace('placeAt=', 'units=%s, placeAt=' % a.units)
     (d / 'LuaUI/Config/nuke_chain.lua').write_text(conf)
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'layout': a.layout.upper(),
         'centre': CENTRE, 'ai_start': AI_START, 'host_start': HOST_START, 'calib': {2: CALIB2, 3: CALIB3}.get(a.calib_set, CALIB) if calib else None}, indent=2))
