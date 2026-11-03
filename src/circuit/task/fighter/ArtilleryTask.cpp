@@ -552,7 +552,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				const float off = ((k + 1) / 2) * (3.14159265f / 12.f) * ((k % 2 == 0) ? 1.f : -1.f);
 				AIFloat3 c(tp.x + std::cos(base + off) * snipeR, 0.f, tp.z + std::sin(base + off) * snipeR);
 				const float cap = std::max(0.f, pos.distance2D(tp) - snipeR)
-					+ t->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);  // owner 02:49Z detour cap
+					+ t->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND) * 1.5707963f;  // owner 02:50Z detour cap
 				if (pos.SqDistance2D(c) > SQUARE(cap)) continue;
 				// The spot and the straight walk to it (test round 4: a Pulsar spot
 				// existed only behind it, reached through the Persecutor's reach).
@@ -686,15 +686,16 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	// degrees either side of the line to the unit, two rings. strict: every
 	// spot and the walk to it must be safe (except `except`); otherwise the
 	// safest-first fallback is the straight approach.
-	// Owner 02:49Z: no detour longer than the aimed porc's own weapon range: a
-	// spot counts only within (straight distance to firing range) + that range.
+	// Owner 02:49Z/02:50Z: no detour longer than pi/2 x the aimed porc's weapon
+	// range (a quarter circle around it): a spot counts only within (straight
+	// distance to firing range) + that.
 	auto rangeOf = [](const CEnemyUnit* e, float fallback) {
 		const float r = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
 		return (r > 0.f) ? r : fallback;
 	};
 	auto findSpot = [&](const AIFloat3& aim, float radius, int except, bool strict, AIFloat3& out, float porcRange) {
 		float base = std::atan2(pos.z - aim.z, pos.x - aim.x);
-		const float maxWalk = std::max(0.f, pos.distance2D(aim) - radius) + porcRange;
+		const float maxWalk = std::max(0.f, pos.distance2D(aim) - radius) + porcRange * 1.5707963f;
 		bool found = false;
 		float bestSq = std::numeric_limits<float>::max();
 		for (float ring : {1.f, 0.85f}) {
