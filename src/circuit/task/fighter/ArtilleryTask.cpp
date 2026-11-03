@@ -665,13 +665,16 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 		return true;
 	};
+	// Owner 02:47Z: the walk to a firing spot must stay out of every hazard's
+	// reach (threats and other armed porc, ghost images included), the target
+	// excepted; no safe walk means no spot, and the prep porc step comes first.
 	auto walkSafe = [&](const AIFloat3& a, const AIFloat3& b, int except) {
-		if (!safeAt(a, except, true)) return true;  // already inside: any way out will do
+		if (!safeAt(a, except, false)) return true;  // already inside: any way out will do
 		const float len = a.distance2D(b);
 		const int n = std::max(1, int(len / 100.f));
 		for (int i = 1; i <= n; ++i) {
 			const float t = float(i) / n;
-			if (!safeAt(AIFloat3(a.x + (b.x - a.x) * t, 0.f, a.z + (b.z - a.z) * t), except, true)) return false;
+			if (!safeAt(AIFloat3(a.x + (b.x - a.x) * t, 0.f, a.z + (b.z - a.z) * t), except, false)) return false;
 		}
 		return true;
 	};
