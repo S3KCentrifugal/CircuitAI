@@ -10,6 +10,7 @@
 #include "module/FactoryManager.h"
 #include "scheduler/Scheduler.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/FactoryDistrictGeometry.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
@@ -18,6 +19,8 @@
 #include "AISCommands.h"
 #include "map/ThreatMap.h"
 #include "Log.h"
+
+#include <algorithm>
 
 namespace circuit {
 
@@ -82,7 +85,7 @@ void CBFactoryTask::Activate()
 	CFactoryManager* factoryMgr = circuit->GetFactoryManager();
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	const bool isProductionFactory = factoryMgr->GetFactoryDef(buildDef) != nullptr;
-	if (!IsLayoutOwned() && terrainMgr->IsLayoutEnabled() && terrainMgr->IsFactoryLayoutRequired() && isProductionFactory && buildDef->IsLander()) {
+	if (!IsLayoutOwned() && terrainMgr->IsLayoutEnabled() && terrainMgr->IsFactoryReservationOnActivate() && isProductionFactory && buildDef->IsLander()) {
 		const int reservation = terrainMgr->AcquireFactoryReservation(buildDef);
 		if ((reservation < 0) || !PinReservation(reservation)) {
 			RequireReservation();
@@ -106,7 +109,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	// D-104 (owner's rule): every factory, whoever ordered it, stands flush
 	// against the construction turrets once one stands; an order that already
 	// has its layout slot (pinned) keeps it
-	if (preferredFacing < 0 && terrainMgr->IsLayoutEnabled() && terrainMgr->IsFactoryLayoutRequired() && !pinRequired && (pinnedReservation < 0) && (reservationId < 0)) {
+	if (preferredFacing < 0 && terrainMgr->IsLayoutEnabled() && terrainMgr->IsFactoryFlushPacking() && !pinRequired && (pinnedReservation < 0) && (reservationId < 0)) {
 		const int flushId = terrainMgr->PackFactoryFlush(buildDef, pos);
 		if ((flushId >= 0) && !PinReservation(flushId)) {
 			terrainMgr->ReleaseReservation(flushId);
@@ -117,7 +120,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	}
 	// While a slot for this def is planned, the search runs so it is served.
 	const bool planned = terrainMgr->IsLayoutEnabled() && (terrainMgr->GetReservationCount(buildDef) > 0);
-	if (terrainMgr->IsFactoryLayoutRequired() && preferredFacing < 0 && !pinRequired && !planned && (facing != UNIT_NO_FACING) && !terrainMgr->IsAllyLayoutBlocked(buildDef, pos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
+	if (terrainMgr->IsFactoryDirectSite() && preferredFacing < 0 && !pinRequired && !planned && (facing != UNIT_NO_FACING) && !terrainMgr->IsAllyLayoutBlocked(buildDef, pos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
 		if (terrainMgr->EnsureFactoryCorridor(buildDef,pos,facing)) {
 			SetBuildPos(pos);
 			return;
@@ -146,9 +149,23 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 					&& terrainMgr->CanBeBuiltAt(reprDef, p);
 		};
 	}
+	// D-460 (KI-743): a planned slot carries the facing it was validated with.
+	// The facing passes below filter reserved slots by the pass facing for a
+	// preferred-facing task, which passed over a west-facing district slot and
+	// built the lab elsewhere; serve the plan first. O(this def's slots).
+	if (planned && preferredFacing >= 0 && !pinRequired && (pinnedReservation < 0)) {
+		const AIFloat3 bp = terrainMgr->FindPlannedSite(buildDef, pos, predicate);
+		if (geom::is_valid(bp)) {
+			TakeReservation(terrainMgr);
+			if (reservationId >= 0) {
+				SetBuildPos(bp);
+				return;
+			}
+		}
+	}
 	const float testSize = std::max(buildDef->GetDef()->GetXSize(), buildDef->GetDef()->GetZSize()) * SQUARE_SIZE;
 	int rejectedAccess = 0, rejectedExit = 0;
-	auto checkFacing = [this, map, terrainMgr, builder, testSize, &predicate, &pos, searchRadius, &rejectedAccess, &rejectedExit]() {
+	auto checkFacing = [this, map, terrainMgr, testSize, &predicate, &pos, searchRadius, &rejectedAccess, &rejectedExit]() {
 		if (pinRequired && (pinnedReservation < 0)) {
 			pinFailed = true;
 			return false;
@@ -157,7 +174,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 		// facing. Otherwise a west-facing berth could be accepted during the
 		// south-facing pass, with its exit tested in the wrong direction.
 		terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired,
-            preferredFacing >= 0 && !pinRequired ? facing : -1, builder);
+            preferredFacing >= 0 && !pinRequired ? facing : -1);
         // For the script-opted-in opening yard, test its exit inside the
         // candidate predicate. Rejecting only the first returned footprint
         // used to switch facing even when a later forward site was usable.
@@ -213,14 +230,26 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 		return false;
 	};
 
-	auto trySites = [this, &checkFacing, &rejectedAccess, &rejectedExit]() {
+	// D-460 (KI-743): with a facing goal (FRONT, TACTICAL) a factory faces
+	// toward it or sideways, never away: the native order below tried the
+	// opposite facing second and built a T2 plant facing the map edge.
+	const AIFloat3& goal = terrainMgr->GetFactoryFacingGoal();
+	int aimed[3] = {-1, -1, -1};
+	const int aimedCount = (goal.x >= 0.f)
+		? base_layout::FacingsToward(pos.x, pos.z, goal.x, goal.z,
+			terrainMgr->GetTerrainWidth() * 0.5f, terrainMgr->GetTerrainHeight() * 0.5f, aimed)
+		: 0;
+	const auto allowed = [&aimed, aimedCount](int f) {
+		return aimedCount == 0 || std::find(aimed, aimed + aimedCount, f) != aimed + aimedCount;
+	};
+	auto trySites = [this, &checkFacing, &rejectedAccess, &rejectedExit, &aimed, aimedCount, &allowed, circuit]() {
         if (preferredFacing >= 0) {
             // Script opts in only the first SEA yard. Each facing searches
             // its entire candidate disc before trying the next; opposite last.
             // Existing pinned plans and other roles retain their exact policy.
             for (int offset : {0, 1, 3, 2}) {
                 facing = (preferredFacing + offset) % 4;
-                if (!checkFacing()) continue;
+                if (!allowed(facing) || !checkFacing()) continue;
                 manager->GetCircuit()->LOG("SEA_OPENING: preferred=%i actual=%i fallback=%i reason=%s accessRejected=%i exitRejected=%i slot=%i site=(%.0f,%.0f)",
                     preferredFacing, facing, int(facing != preferredFacing),
                     facing == preferredFacing ? "preferred-site-valid" : "earlier-facing-no-reachable-buildable-exit",
@@ -229,6 +258,16 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
             }
             return false;
         }
+		if (aimedCount > 0) {
+			for (int i = 0; i < aimedCount; ++i) {
+				facing = aimed[i];
+				if (!checkFacing()) continue;
+				circuit->LOG("FACTORY_FACING: %s facing=%i order=%i of %i slot=%i site=(%.0f,%.0f)",
+					buildDef->GetDef()->GetName(), facing, i + 1, aimedCount, reservationId, buildPos.x, buildPos.z);
+				return true;
+			}
+			return false;
+		}
 		if (checkFacing()) {
 			return true;
 		}

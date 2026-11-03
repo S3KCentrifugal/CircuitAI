@@ -3,11 +3,15 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <limits>
-#include <queue>
+#include <utility>
 #include <vector>
 
 namespace circuit::factory_corridor {
+
+// Largest planning raster side, in blocking cells (the 4096-elmo window).
+constexpr int kMaxRasterSide = 512;
 
 struct Route {
     std::vector<int> cells;
@@ -17,17 +21,20 @@ struct Route {
 
 // Each centre must fit the entire square footprint, including the half-step
 // joining neighbouring centres. The prefix sum keeps admission O(W*H + V).
-inline std::vector<std::uint8_t> OpenCentres(int width, int height,
-        const std::vector<std::uint8_t>& blocked, int step, int clearance)
+// The scratch overload reuses caller-owned buffers (D-451): no allocation
+// once they have grown to the window size.
+inline bool OpenCentres(int width, int height, const std::vector<std::uint8_t>& blocked,
+        int step, int clearance, std::vector<int>& sums, std::vector<std::uint8_t>& result)
 {
-    if (width<=0 || height<=0 || width>512 || height>512 || step<=0
-        || clearance<step/2 || int(blocked.size())!=width*height) return {};
-    std::vector<int> sums((width+1)*(height+1),0);
+    result.clear();
+    if (width<=0 || height<=0 || width>kMaxRasterSide || height>kMaxRasterSide || step<=0
+        || clearance<step/2 || int(blocked.size())!=width*height) return false;
+    sums.assign((width+1)*(height+1),0);
     for (int z=0;z<height;++z) for (int x=0;x<width;++x)
         sums[(z+1)*(width+1)+x+1]=(blocked[z*width+x]!=0)+sums[z*(width+1)+x+1]
             +sums[(z+1)*(width+1)+x]-sums[z*(width+1)+x];
     const int w=width/step,h=height/step;
-    std::vector<std::uint8_t> result(w*h,0);
+    result.assign(w*h,0);
     for (int z=0;z<h;++z) for (int x=0;x<w;++x) {
         const int cx=x*step+step/2,cz=z*step+step/2;
         const int a=cx-clearance,b=cz-clearance,c=cx+clearance+1,d=cz+clearance+1;
@@ -35,10 +42,42 @@ inline std::vector<std::uint8_t> OpenCentres(int width, int height,
         result[z*w+x]=(sums[d*(width+1)+c]-sums[b*(width+1)+c]
             -sums[d*(width+1)+a]+sums[b*(width+1)+a])==0;
     }
+    return true;
+}
+inline std::vector<std::uint8_t> OpenCentres(int width, int height,
+        const std::vector<std::uint8_t>& blocked, int step, int clearance)
+{
+    std::vector<int> sums;
+    std::vector<std::uint8_t> result;
+    OpenCentres(width, height, blocked, step, clearance, sums, result);
     return result;
 }
 
 struct Rect { int x1,z1,x2,z2; };
+
+// D-460: the 4-connected grid cells a polyline crosses, in order, without
+// consecutive duplicates. Vertices are grid coordinates; the first must lie
+// inside width x height, and tracing is clipped at the first cell that leaves
+// it (the caller's window). O(cells).
+inline void TraceCells(const std::vector<std::pair<int,int>>& vertices, int width, int height, std::vector<int>& out)
+{
+    out.clear();
+    for (const auto& [x, z] : vertices) {
+        if (out.empty()) {
+            if (x<0 || z<0 || x>=width || z>=height) return;
+            out.push_back(z*width+x);
+            continue;
+        }
+        int cx=out.back()%width, cz=out.back()/width;
+        const int nx=std::abs(x-cx), nz=std::abs(z-cz), sx=x>cx?1:-1, sz=z>cz?1:-1;
+        for (int ix=0,iz=0; ix<nx || iz<nz;) {
+            // step along the axis whose next cell boundary the segment meets first
+            if ((1+2*ix)*nz < (1+2*iz)*nx) { cx+=sx; ++ix; } else { cz+=sz; ++iz; }
+            if (cx<0 || cz<0 || cx>=width || cz>=height) return;
+            out.push_back(cz*width+cx);
+        }
+    }
+}
 // The route grid snaps a requested cell towards its centre by up to step-1.
 // Negative-facing mouths need that extra margin plus the exclusive upper edge
 // of the clearance square. Otherwise north/west roads overlap their own factory.
@@ -73,30 +112,45 @@ inline std::vector<Rect> Rectangles(const std::vector<int>& cells, int width,
     return result;
 }
 
+// Reused search buffers for Connect (D-451).
+struct ConnectScratch {
+    std::vector<int> costs, parent;
+    std::vector<std::pair<int, int>> heap;
+};
+
 // Planning-time deterministic Dijkstra. Open cells already include clearance
 // for the widest factory product. Reuse is a cost preference, never permission
 // to cross blocked terrain or to stop at a disconnected old corridor.
-// O(V log V) time/O(V) scratch, explicitly bounded by maximumVisited.
+// O(V log V) time/O(V) scratch, explicitly bounded by maximumVisited. The heap
+// uses std::push_heap/pop_heap with std::greater, exactly what
+// std::priority_queue does, so the tie order is unchanged.
 inline Route Connect(int width, int height, int start,
         const std::vector<std::uint8_t>& open,
         const std::vector<std::uint8_t>& shared,
         const std::vector<std::uint8_t>& goals, int maximumVisited,
-        int newCost = 10, int sharedCost = 4)
+        ConnectScratch& scratch, int newCost = 10, int sharedCost = 4)
 {
     Route result;
-    if (width <= 0 || height <= 0 || width > 512 || height > 512
+    if (width <= 0 || height <= 0 || width > kMaxRasterSide || height > kMaxRasterSide
             || maximumVisited <= 0 || sharedCost <= 0 || newCost < sharedCost) return result;
     const int size = width * height;
     if (int(open.size()) != size || int(shared.size()) != size || int(goals.size()) != size
             || start < 0 || start >= size || !open[start]) return result;
     using Entry = std::pair<int, int>;
-    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pending;
-    std::vector<int> costs(size, std::numeric_limits<int>::max()), parent(size, -1);
+    const std::greater<Entry> later;
+    auto& heap = scratch.heap;
+    auto& costs = scratch.costs;
+    auto& parent = scratch.parent;
+    heap.clear();
+    costs.assign(size, std::numeric_limits<int>::max());
+    parent.assign(size, -1);
     costs[start] = 0;
-    pending.emplace(0, start);
-    while (!pending.empty()) {
-        const auto [cost, cell] = pending.top();
-        pending.pop();
+    heap.emplace_back(0, start);
+    std::push_heap(heap.begin(), heap.end(), later);
+    while (!heap.empty()) {
+        std::pop_heap(heap.begin(), heap.end(), later);
+        const auto [cost, cell] = heap.back();
+        heap.pop_back();
         if (cost != costs[cell]) continue;
         if (result.visited == maximumVisited) { result.exhausted = true; return result; }
         ++result.visited;
@@ -116,9 +170,19 @@ inline Route Connect(int width, int height, int start,
             if (candidate >= costs[next]) continue;
             costs[next] = candidate;
             parent[next] = cell;
-            pending.emplace(candidate, next);
+            heap.emplace_back(candidate, next);
+            std::push_heap(heap.begin(), heap.end(), later);
         }
     }
     return result;
+}
+inline Route Connect(int width, int height, int start,
+        const std::vector<std::uint8_t>& open,
+        const std::vector<std::uint8_t>& shared,
+        const std::vector<std::uint8_t>& goals, int maximumVisited,
+        int newCost = 10, int sharedCost = 4)
+{
+    ConnectScratch scratch;
+    return Connect(width, height, start, open, shared, goals, maximumVisited, scratch, newCost, sharedCost);
 }
 }

@@ -171,7 +171,7 @@ namespace FrontConstructors {
             && build.GetBuildType()<int(Task::BuildType::REPAIR)) return current;
         if(UsefulTurret(factory)) {
             CCircuitUnit@ turret=ai.GetTeamUnit(openingTurret);
-            const int phase=FrontConstructorMath::CommanderPhase(false,true,turret.GetBuildProgress());
+            const int phase=FrontConstructorMath::CommanderPhase(true,turret.GetBuildProgress());
             if(phase==2) return null;
             if(build !is null && !build.IsDead() && build.target is turret
                 && build.GetBuildType()==int(Task::BuildType::REPAIR)) return current;

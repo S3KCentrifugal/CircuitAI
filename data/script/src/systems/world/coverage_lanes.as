@@ -141,7 +141,7 @@ namespace CoverageLanes {
     bool ComputeSeats(const AIFloat3& in a,const AIFloat3& in b) {
         seatCorridor.deleteAll();
         array<Team::Roster::Entry@>@ entries=Seats(AiRole::FRONT);
-        array<int> seatTeam,seatCls;array<float> seatLat;
+        array<int> seatTeam,seatCls;array<float> seatLat;array<AIFloat3> seatStart;
         // the roster may hold only the others: this seat is added from its own settings
         array<int> teams;array<AIFloat3> starts;array<string> factories;
         bool self=false;
@@ -149,14 +149,17 @@ namespace CoverageLanes {
             teams.insertLast(entries[i].teamId);starts.insertLast(entries[i].startPos);factories.insertLast(entries[i].startFactory);
             if(entries[i].teamId==ai.teamId)self=true;
         }
-        if(!self){teams.insertLast(ai.teamId);starts.insertLast(Global::Map::StartPos);factories.insertLast(Global::AISettings::StartFactory);}
+        // Roster starts arrive as whole elmos; truncate our own the same way so
+        // every ally builds a bit-identical table (D-460).
+        if(!self){teams.insertLast(ai.teamId);starts.insertLast(AIFloat3(float(int(Global::Map::StartPos.x)),0.f,float(int(Global::Map::StartPos.z))));factories.insertLast(Global::AISettings::StartFactory);}
         for(uint i=0;i<teams.length();++i) {
             const float lat=LateralOf(starts[i],a,b);
-            seatTeam.insertLast(teams[i]);seatLat.insertLast(lat);seatCls.insertLast(ClassOfFactory(factories[i]));
+            seatTeam.insertLast(teams[i]);seatLat.insertLast(lat);seatCls.insertLast(ClassOfFactory(factories[i]));seatStart.insertLast(starts[i]);
             for(uint j=seatTeam.length()-1;j>0 && (seatLat[j-1]>seatLat[j] || (seatLat[j-1]==seatLat[j] && seatTeam[j-1]>seatTeam[j]));--j) {
                 const int t=seatTeam[j];seatTeam[j]=seatTeam[j-1];seatTeam[j-1]=t;
                 const int c=seatCls[j];seatCls[j]=seatCls[j-1];seatCls[j-1]=c;
                 const float l=seatLat[j];seatLat[j]=seatLat[j-1];seatLat[j-1]=l;
+                const AIFloat3 s=seatStart[j];seatStart[j]=seatStart[j-1];seatStart[j-1]=s;
             }
         }
         if(seatTeam.length()==0)return false;
@@ -201,12 +204,39 @@ namespace CoverageLanes {
         }
         const int m=int(seatTeam.length()),L=int(laneLat.length());
         if(L==0 || m>L)return false;
+        // D-460 (KI-742): the cost of seat i on lane j, computed once (O(m L A)
+        // over A allied starts). Squared lateral displacement: with absolute
+        // differences every matching of seats lying on one side of two lanes
+        // ties, and the solver returned a crossing one (Glitters: the corner
+        // seat got the inner lane through its neighbour's base). Plus a
+        // penalty per allied base the walk from the seat's start to the lane's
+        // home end crosses, held by an ally nearer that end; plus a small
+        // depth term so a tie gives the outer lane to the rearmost seat.
+        const array<AIFloat3> allies=Lanes::AllyStarts();
+        const float axisLength=AiMax(1.f,sqrt(a.SqDistance2D(b)));
+        float minDepth=1e30f;
+        array<float> depth(uint(m));
+        for(int i=0;i<m;++i) {
+            depth[uint(i)]=((seatStart[uint(i)].x-a.x)*(b.x-a.x)+(seatStart[uint(i)].z-a.z)*(b.z-a.z))/axisLength;
+            minDepth=AiMin(minDepth,depth[uint(i)]);
+        }
+        float laneCentre=0.f;
+        for(int j=0;j<L;++j)laneCentre+=laneLat[uint(j)];
+        laneCentre/=float(L);
+        array<float> cost(uint(m*L),Unusable);
+        for(int i=0;i<m;++i)for(int j=0;j<L;++j) {
+            const int id=seatCls[uint(i)]==Lanes::LAND?laneLand[uint(j)]:laneBot[uint(j)];
+            if(id<0)continue;
+            const float lateral=seatLat[uint(i)]-laneLat[uint(j)];
+            float c=lateral*lateral;
+            const AIFloat3 home=HomeEnd(id,a);
+            if(home.x>=0.f)c+=CrossingPenalty(seatStart[uint(i)],home,allies);
+            c+=SeatTieWeight*(depth[uint(i)]-minDepth)*abs(laneLat[uint(j)]-laneCentre);
+            cost[uint(i*L+j)]=c;
+        }
         // minimum-cost assignment of seats to distinct lanes (Hungarian method,
-        // O(m^2 L)); the cost is the lateral displacement, a lane without a
-        // corridor of the seat's class is unusable. Lanes may cross near the
-        // bases: two neighbouring bases a few hundred elmos apart are not forced
-        // onto lanes in their own order when the nearer lanes lie the other way.
-        const float Unusable=1e9f;
+        // O(m^2 L)) over that table; a lane without a corridor of the seat's
+        // class is unusable.
         array<float> u(uint(m+1),0.f),v(uint(L+1),0.f),minv(uint(L+1),0.f);
         array<int> p(uint(L+1),0),way(uint(L+1),0);
         array<bool> used(uint(L+1),false);
@@ -217,9 +247,8 @@ namespace CoverageLanes {
                 used[uint(j0)]=true;const int i0=p[uint(j0)];float delta=1e30f;int j1=0;
                 for(int j=1;j<=L;++j) {
                     if(used[uint(j)])continue;
-                    const int id=seatCls[uint(i0-1)]==Lanes::LAND?laneLand[uint(j-1)]:laneBot[uint(j-1)];
-                    const float cost=(id>=0?abs(seatLat[uint(i0-1)]-laneLat[uint(j-1)]):Unusable)-u[uint(i0)]-v[uint(j)];
-                    if(cost<minv[uint(j)]){minv[uint(j)]=cost;way[uint(j)]=j0;}
+                    const float reduced=cost[uint((i0-1)*L+j-1)]-u[uint(i0)]-v[uint(j)];
+                    if(reduced<minv[uint(j)]){minv[uint(j)]=reduced;way[uint(j)]=j0;}
                     if(minv[uint(j)]<delta){delta=minv[uint(j)];j1=j;}
                 }
                 for(int j=0;j<=L;++j) {
@@ -239,6 +268,35 @@ namespace CoverageLanes {
         }
         GenericHelpers::LogUtil("[CoverageLane] seats matched: "+m+" seats over "+L+" physical lanes ("+allLat.length()+" corridors)",1);
         return true;
+    }
+    // D-460 (KI-742) assignment levers. Unusable outranks any sum of real
+    // costs (m <= 16 seats, squared lateral <= 1e8, penalties <= 16 x 1.44e6).
+    const float Unusable=1e12f;
+    const float SeatTieWeight=1e-4f;    // per elmo of depth x elmo of lane outerness
+    // The end of a corridor nearer our side.
+    AIFloat3 HomeEnd(int corridor,const AIFloat3& in ours) {
+        const AIFloat3 p=aiBattle.CorridorPoint(corridor,0.f),q=aiBattle.CorridorPoint(corridor,1.f);
+        if(p.x<0)return q;
+        if(q.x<0)return p;
+        return p.SqDistance2D(ours)<=q.SqDistance2D(ours)?p:q;
+    }
+    // baseRadius squared per allied base within baseRadius of the walk from
+    // `start` to `home`, held by an ally nearer `home` (a teammate in front).
+    // The seat's own base is the ally start within SelfMatchElmos of it:
+    // roster starts are truncated to whole elmos, script starts are not.
+    const float SelfMatchElmos=64.f;
+    float CrossingPenalty(const AIFloat3& in start,const AIFloat3& in home,const array<AIFloat3>& in allies) {
+        const float own=start.SqDistance2D(home),radiusSq=baseRadius*baseRadius;
+        const float dx=home.x-start.x,dz=home.z-start.z,len2=dx*dx+dz*dz;
+        float penalty=0.f;
+        for(uint k=0;k<allies.length();++k) {
+            const AIFloat3 o=allies[k];
+            if(o.SqDistance2D(start)<SelfMatchElmos*SelfMatchElmos || o.SqDistance2D(home)>=own)continue;
+            float u=len2>0.f?((o.x-start.x)*dx+(o.z-start.z)*dz)/len2:0.f;u=AiMax(0.f,AiMin(1.f,u));
+            const float px=start.x+dx*u-o.x,pz=start.z+dz*u-o.z;
+            if(px*px+pz*pz<radiusSq)penalty+=radiusSq;
+        }
+        return penalty;
     }
     int CorridorOfTeam(int teamId) {
         int64 id=-1;
@@ -393,21 +451,65 @@ namespace CoverageLanes {
         for(uint i=0;i<thin.length();++i) payload+=(i>0?",":"")+int(thin[i].x)+","+int(thin[i].z);
         return payload;
     }
+    // D-456/C5: allies read this message for two things, the mex territory
+    // (claim) and their factory corridors. Send it when either is in use.
+    bool Broadcasts() {
+        return claim || aiSetupMgr.ConfigBool("factory_corridors/enabled",true);
+    }
+    // D-460 (KI-744): the lane road reserved past the factory corridors'
+    // connection point: max(road_share x the map's length along the team
+    // axis, the distance until the lane has passed every allied start by
+    // base_radius), capped by the lane. 0 road_share turns it off.
+    array<AIFloat3>@ RoadPoints(const array<AIFloat3>& in points) {
+        array<AIFloat3> road;
+        const float share=aiSetupMgr.ConfigFloat("factory_corridors/road_share",.2f);
+        AIFloat3 a,b;
+        if(share<=0.f || points.length()<2 || !Axis(a,b))return road;
+        const float length=AiMax(1.f,sqrt(a.SqDistance2D(b)));
+        const float ux=(b.x-a.x)/length,uz=(b.z-a.z)/length;
+        const float mapLength=abs(float(AiTerrainWidth())*ux)+abs(float(AiTerrainHeight())*uz);
+        const array<AIFloat3> allies=Lanes::AllyStarts();
+        float front=-1e30f;
+        for(uint i=0;i<allies.length();++i)front=AiMax(front,(allies[i].x-a.x)*ux+(allies[i].z-a.z)*uz);
+        front+=baseRadius;
+        float passed=0.f,walked=0.f;
+        for(uint i=1;i<points.length() && passed<=0.f;++i) {
+            walked+=sqrt(points[i].SqDistance2D(points[i-1]));
+            if((points[i].x-a.x)*ux+(points[i].z-a.z)*uz>=front)passed=walked;
+        }
+        const float total=Length(points);
+        const float wanted=AiMin(total,AiMax(share*mapLength,passed>0.f?passed:total));
+        road.insertLast(points[0]);
+        walked=0.f;
+        for(uint i=1;i<points.length();++i) {
+            const float step=sqrt(points[i].SqDistance2D(points[i-1]));
+            if(walked+step>=wanted) {
+                road.insertLast(points[i-1]+(points[i]-points[i-1])*((wanted-walked)/AiMax(step,1e-3f)));
+                break;
+            }
+            road.insertLast(points[i]);walked+=step;
+        }
+        return road;
+    }
     void Claim(const array<AIFloat3>& in points) {
         array<AIFloat3>@ thin=Thin(points);
         aiTerrainMgr.SetFactoryLane(ai.teamId,thin);
+        // D-460: FRONT factories now face this lane, and its road is held.
+        aiTerrainMgr.SetFactoryFacingGoal(FrontLayout::ForwardGoal());
+        aiTerrainMgr.SetFactoryLaneRoad(RoadPoints(points),ai.GetCircuitDef(Global::AISettings::StartFactory));
         if(claim)aiEconomyMgr.SetMexCorridor(ai.teamId,thin,halfWidth);
         published=thin;
         rosterSeen=Team::Roster::Count();
-        AiSendMessage(EncodeCorridor(points));
+        if(Broadcasts())AiSendMessage(EncodeCorridor(points));
     }
     void Unclaim() {
         if(published.length()==0)return;
         array<AIFloat3> empty;
         aiTerrainMgr.SetFactoryLane(ai.teamId,empty);
+        aiTerrainMgr.SetFactoryLaneRoad(empty,null);
         aiEconomyMgr.SetMexCorridor(ai.teamId,empty,halfWidth);
         published.resize(0);
-        AiSendMessage(EncodeCorridor(empty));
+        if(Broadcasts())AiSendMessage(EncodeCorridor(empty));
     }
     // ---- assistance (D-359)
     dictionary deadSince;               // team id string -> first frame its income read zero

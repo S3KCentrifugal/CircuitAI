@@ -42,14 +42,6 @@ namespace Tech {
             bool HeavyTransportPoolEnabled = true;
             float HeavyTransportAdditionalIncomeStart = 40.0f;
             float HeavyTransportMetalPerAdditional = 100.0f;
-            float HeavyDeliveryArrivalRadius = 240.0f;
-            float HeavyDeliveryDestinationMove = 192.0f;
-            float HeavyDeliveryRouteRetrySeconds = 10.0f;
-            bool HeavyDeliveryFrontEnabled = false;
-            float HeavyDeliveryAirPadding = 192.0f;
-            float HeavyDeliveryAirThreat = 0.5f;
-            float HeavyDeliveryBlockedSeconds = 90.0f;
-            float HeavyDeliveryFrontRadius = 128.0f;
             bool LocalGeothermalEnabled = true;
             float LocalGeothermalRadius = 1200.0f;
             float LocalGeothermalBudgetSeconds = 90.0f;

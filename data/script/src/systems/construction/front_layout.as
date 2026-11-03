@@ -1,18 +1,45 @@
 #include "../../helpers/spatial/layout_helpers.as"
 #include "../../helpers/units/unit_helpers.as"
 #include "../../helpers/math/front_factory_math.as"
+#include "../world/lanes.as"
 
 namespace FrontLayout {
     const string ROOT = "front.factory.home";
+    // Opening district search: side offsets (elmos) along the rear edge, and
+    // how far ahead of the start position that rear edge sits.
+    const array<float> DistrictSideOffsets={0.0f,128.0f,-128.0f,256.0f,-256.0f};
+    const float DistrictRearForward=64.0f;
+    // D-460 (KI-741): T2 extension sites, nearest first, along the line from
+    // the start toward the forward goal (elmos ahead) and across it.
+    const array<float> ExtensionAhead={256.f,512.f,768.f,1024.f};
+    const array<float> ExtensionAcross={0.f,256.f,-256.f};
 
-    int ForwardFacing() {
-        const AIFloat3 start=Global::Map::StartPos;
-        // Setup's legacy lane position is an expansion anchor, not the combat
-        // lane direction. The lane is not necessarily published at startup.
-        const AIFloat3 goal=aiBattle.GetFrontLaneLength()>0.f
+    // The point FRONT factories face: the lane 1024 elmos out once it is
+    // published, else the nearest enemy start. Setup's legacy lane position
+    // is an expansion anchor, not the combat lane direction.
+    AIFloat3 ForwardGoal() {
+        return aiBattle.GetFrontLaneLength()>0.f
             ? aiBattle.GetFrontLanePoint(AiMin(1024.f,aiBattle.GetFrontLaneLength()))
-            : LayoutHelpers::TerrainCentre();
-        return LayoutHelpers::FacingToward(start,goal);
+            : Lanes::NearestEnemyStart(Global::Map::StartPos);
+    }
+    int ForwardFacing() {
+        return LayoutHelpers::FacingToward(Global::Map::StartPos,ForwardGoal());
+    }
+
+    // A4: FRONT's plan and turret-admission ownership are released here when
+    // the AI stops being FRONT (role selector). Owns every key under ROOT.
+    void Release() {
+        if(aiTerrainMgr.GetLayoutInt(ROOT+".support_owner",0)==0) return;
+        FrontFactorySupport::Reset();
+        aiEconomyMgr.assistNanoEnabled=aiTerrainMgr.GetLayoutInt(ROOT+".prior_nano",1)!=0;
+        aiTerrainMgr.SetLayoutInt(ROOT+".support_owner",0);
+        const array<string> parts={".t1",".t2",".extension",".additional",".utilities"};
+        for(uint i=0;i<parts.length();++i) aiTerrainMgr.ReleaseUnusedLayout(ROOT+parts[i]);
+        // Layout ints outlive released groups; a later FRONT plan must not
+        // resolve tier 1 to the old extension.
+        aiTerrainMgr.SetLayoutInt(ROOT+".extension",0);
+        aiTerrainMgr.SetLayoutInt(ROOT+".t1_slot",-1);
+        aiTerrainMgr.SetLayoutInt(ROOT+".t2_slot",-1);
     }
 
     void OwnSupportAdmission() {
@@ -41,7 +68,8 @@ namespace FrontLayout {
         const string name=def.GetName();
         const bool t2=UnitHelpers::IsT2BotLab(name) || UnitHelpers::IsT2VehicleLab(name);
         if(!t2 && !UnitHelpers::IsT1BotLab(name) && !UnitHelpers::IsT1VehicleLab(name)) return;
-        AiPreferFactoryFacing(task,ForwardFacing());
+        const AIFloat3 seed=Global::Map::StartPos,goal=ForwardGoal();
+        AiPreferFactoryFacing(task,LayoutHelpers::FacingToward(seed,goal));
         if(aiTerrainMgr.GetReservationCount(def)>0) return;
         const bool homeExtension=t2 && Factory(1) is null;
         const string counterKey=ROOT+".extra_index."+def.id;
@@ -52,26 +80,41 @@ namespace FrontLayout {
         aiTerrainMgr.SetLayoutInt(key+".retry",ai.frame);
         CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
         if(nano is null) return;
-        const AIFloat3 seed=Global::Map::StartPos;
-        const int facing=aiTerrainMgr.GetLayoutInt(ROOT+".facing",LayoutHelpers::FacingToward(seed,LayoutHelpers::TerrainCentre()));
-        const array<float> offsets={0.f,256.f,-256.f,512.f,-512.f};
-        for(uint i=0;i<offsets.length();++i) for(int rows=Global::RoleSettings::Front::FactorySupportRows;rows>=1;--rows) {
-            const AIFloat3 site=LayoutHelpers::Offset(seed,facing,offsets[i],256.f);
-            const int slot=aiTerrainMgr.PlanFactoryCluster(key,def,nano,site,facing,t2?3:2,rows);
-            if(slot<0) continue;
-            ArmCluster(key);
-            if(!homeExtension) aiTerrainMgr.SetLayoutInt(counterKey,serial+1);
-            if(homeExtension) {
-                // Commit the alternative first; a failed preview must never
-                // discard the existing expansion or any already-paid work.
-                aiTerrainMgr.ReleaseUnusedLayout(ROOT+".t2");
-                aiTerrainMgr.SetLayoutInt(ROOT+".extension",1);
-                aiTerrainMgr.SetLayoutInt(ROOT+".t2_slot",slot);
-                aiTerrainMgr.SetLayoutInt(ROOT+".capacity",2);
+        // D-460 (KI-741): search between the base and the lane, not on one
+        // line ahead of the start: a corner start found no room there and the
+        // T2 plant went to ordinary placement facing the map edge. Each site
+        // faces the goal. At most 4 x 3 sites x rows cluster previews, once
+        // per retry interval per key.
+        float ux=goal.x-seed.x,uz=goal.z-seed.z;
+        const float length=sqrt(ux*ux+uz*uz);
+        if(length<1.f) return;
+        ux/=length;uz/=length;
+        int facing=-1;
+        for(uint i=0;i<ExtensionAhead.length()*ExtensionAcross.length();++i) {
+            const float ahead=ExtensionAhead[i/ExtensionAcross.length()],across=ExtensionAcross[i%ExtensionAcross.length()];
+            const AIFloat3 site(seed.x+ux*ahead-uz*across,0.f,seed.z+uz*ahead+ux*across);
+            if(site.x<0.f || site.z<0.f || site.x>=float(AiTerrainWidth()) || site.z>=float(AiTerrainHeight())) continue;
+            facing=LayoutHelpers::FacingToward(site,goal);
+            for(int rows=Global::RoleSettings::Front::FactorySupportRows;rows>=1;--rows) {
+                const int slot=aiTerrainMgr.PlanFactoryCluster(key,def,nano,site,facing,t2?3:2,rows);
+                if(slot<0) continue;
+                ArmCluster(key);
+                if(!homeExtension) aiTerrainMgr.SetLayoutInt(counterKey,serial+1);
+                if(homeExtension) {
+                    // Commit the alternative first; a failed preview must never
+                    // discard the existing expansion or any already-paid work.
+                    aiTerrainMgr.ReleaseUnusedLayout(ROOT+".t2");
+                    aiTerrainMgr.SetLayoutInt(ROOT+".extension",1);
+                    aiTerrainMgr.SetLayoutInt(ROOT+".t2_slot",slot);
+                    aiTerrainMgr.SetLayoutInt(ROOT+".capacity",2);
+                }
+                GenericHelpers::LogUtil("[FrontLayout] additional factory="+name+" rows="+rows+" facing="+facing,1);
+                return;
             }
-            GenericHelpers::LogUtil("[FrontLayout] additional factory="+name+" rows="+rows,1);
-            return;
         }
+        // D-459: say why the factory falls back to ordinary placement. At most
+        // once per retry interval per key.
+        GenericHelpers::LogUtil("[FrontLayout] no cluster fits factory="+name+" key="+key+" facing="+facing,1);
     }
 
     CCircuitUnit@ Factory(uint tier) {
@@ -189,33 +232,41 @@ namespace FrontLayout {
         if (aiTerrainMgr.HasLayoutGroup(ROOT+".t1.factory")) return;
         const AIFloat3 start=Global::Map::StartPos;
         CCircuitUnit@ opening=OpeningBuilder(first,start);
+        const AIFloat3 goal=ForwardGoal(),centre=LayoutHelpers::TerrainCentre();
         const int primary=ForwardFacing();
-        const array<float> offsets={0.0f,128.0f,-128.0f,256.0f,-256.0f};
+        GenericHelpers::LogUtil("[FrontLayout] forward facing="+primary+" from="
+            +(aiBattle.GetFrontLaneLength()>0.f?"lane":"enemy-start-or-centre"),1);
         // Same six bounded passes, but orientation precedes growth capacity.
         // A compact forward bay is preferable to a larger sideways district.
-        for (uint pass=0; pass<6; ++pass) {
-                const int facing=FrontFactoryMath::LayoutFacing(primary,pass);
-                const bool compact=(pass%2)!=0;
-                for (uint i=0; i<offsets.length(); ++i) {
-                    // Keep the opening bay close to its builder; starting the
-                    // entire rear edge 128 ahead often exceeded the approach
-                    // preference after adding the factory's own half-depth.
-                    const AIFloat3 rear=LayoutHelpers::Offset(start,facing,offsets[i],64.0f);
-                    for (int rows=Global::RoleSettings::Front::FactorySupportRows; rows>=1; --rows) {
-                        const int capacity=aiTerrainMgr.PlanFactoryDistrict(ROOT,first,second,nano,rear,facing,rows,rows,compact,opening,Global::RoleSettings::Front::FactoryReservationTravelSeconds);
-                        if (capacity==0) continue;
-                        // Generic FRONT build intents use armed slots. The shared
-                        // pair mechanism holds slots by default for TECH's pins.
-                        ArmCluster(ROOT+".t1");
-                        ArmCluster(ROOT+".t2");
-                        OwnSupportAdmission();
-                        ReserveUtilities(side,rear,facing);
-                        GenericHelpers::LogUtil("[FrontLayout] reserved capacity="+capacity+" support rows="+rows+" facing="+facing,1);
-                        const AIFloat3 site=aiTerrainMgr.GetReservationPos(aiTerrainMgr.GetLayoutInt(ROOT+".t1_slot",-1));
-                        GenericHelpers::LogUtil("[FrontLayout] first factory site="+site.x+","+site.z,1);
-                        return;
-                    }
-                }
+        for (uint pass=0; pass<FrontFactoryMath::LAYOUT_PASSES; ++pass) {
+            // D-460 (KI-743): the side toward the goal first; never away.
+            const int facing=FrontFactoryMath::LayoutFacing(primary,pass,goal.x-start.x,goal.z-start.z,
+                centre.x-start.x,centre.z-start.z);
+            if (facing<0) continue;
+            const bool compact=(pass%2)!=0;
+            for (uint i=0; i<DistrictSideOffsets.length(); ++i) {
+                // Keep the opening bay close to its builder; starting the
+                // entire rear edge 128 ahead often exceeded the approach
+                // preference after adding the factory's own half-depth.
+                const AIFloat3 rear=LayoutHelpers::Offset(start,facing,DistrictSideOffsets[i],DistrictRearForward);
+                // B6: native tries support rows FactorySupportRows..1 and tests
+                // the exit and the builder's walk once per site.
+                const int capacity=aiTerrainMgr.PlanFactoryDistrict(ROOT,first,second,nano,rear,facing,
+                    Global::RoleSettings::Front::FactorySupportRows,compact,opening,
+                    Global::RoleSettings::Front::FactoryTravelSeconds);
+                if (capacity==0) continue;
+                // Generic FRONT build intents use armed slots. The shared
+                // pair mechanism holds slots by default for TECH's pins.
+                ArmCluster(ROOT+".t1");
+                ArmCluster(ROOT+".t2");
+                OwnSupportAdmission();
+                ReserveUtilities(side,rear,facing);
+                const int rows=aiTerrainMgr.GetLayoutInt(ROOT+".rows",0);
+                GenericHelpers::LogUtil("[FrontLayout] reserved capacity="+capacity+" support rows="+rows+" facing="+facing,1);
+                const AIFloat3 site=aiTerrainMgr.GetReservationPos(aiTerrainMgr.GetLayoutInt(ROOT+".t1_slot",-1));
+                GenericHelpers::LogUtil("[FrontLayout] first factory site="+site.x+","+site.z,1);
+                return;
+            }
         }
         GenericHelpers::LogUtil("[FrontLayout] no district fits; ordinary placement retained",1);
     }

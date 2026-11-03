@@ -68,34 +68,6 @@ namespace TransportDemandProbe {
             Check(Team::HeavyTransport::desired==0,"stale target cleared");
             return true;
         }
-        array<string>@ fields=message.split("|");
-        if (fields.length()==2 && fields[0]=="transport-demand-ledger" && ai.teamId==0) {
-            const int id=parseInt(fields[1]);
-            CCircuitUnit@ cargo=ai.GetTeamUnit(id);
-            if (cargo is null) { Check(false,"delivery ledger"); return true; }
-            Global::RoleSettings::Tech::StrategyMask=StrategyUtil::Bit(Strategy::T2_RUSH);
-            TechHeavyRush::completed=TechHeavyRush::targetCount;
-            aiTerrainMgr.SetLayoutInt(TechHeavyRush::StateKey+"gift.0",id);
-            aiTerrainMgr.SetLayoutInt(TechHeavyRush::StateKey+"sent.0",0);
-            CCircuitDef@ carrier=ai.GetCircuitDef(Team::HeavyTransport::OwnDefinition());
-            bool passed=TechTransport::WantsCarrier(carrier); // persisted gift before record reconstruction
-            TechHeavyDelivery::Delivery@ delivery=TechHeavyDelivery::Record(0,id);
-            passed=TechTransport::WantsCarrier(carrier) && passed;
-            delivery.landed=true;
-            passed=!TechTransport::WantsCarrier(carrier) && passed;
-            delivery.landed=false;
-            delivery.removed=true;
-            passed=!TechTransport::WantsCarrier(carrier) && passed;
-            delivery.removed=false;
-            aiTerrainMgr.SetLayoutInt(TechHeavyRush::StateKey+"sent.0",1);
-            passed=!TechTransport::WantsCarrier(carrier) && passed;
-            Check(passed,"delivery ledger");
-            TechHeavyDelivery::deliveries.delete(""+id);
-            aiTerrainMgr.SetLayoutInt(TechHeavyRush::StateKey+"gift.0",-1);
-            TechHeavyRush::completed=0;
-            Global::RoleSettings::Tech::StrategyMask=0;
-            return true;
-        }
         if (message == "transport-demand-rush" && ai.teamId==0) {
             Global::RoleSettings::Tech::StrategyMask = StrategyUtil::Bit(Strategy::T2_RUSH);
             Team::HeavyTransport::Update();

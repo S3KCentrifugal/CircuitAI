@@ -301,9 +301,10 @@ struct AirFactoryCluster {
 		return slots;
 	}
 	slots.reserve(static_cast<std::size_t>(cols * rows));
-	// Offset rotates the local basis; rotating dimensions here again creates
-    // gaps/overlap for rectangular footprints (factory_district_geometry_test).
-    const int width = footprint.x;
+	// D-455: Offset rotates the local basis; rotating dimensions here again
+	// creates gaps/overlap for rectangular footprints. In BAR only the air
+	// plants are rectangular (9x6, T3 18x12/16x12); factory_district_geometry_test.
+	const int width = footprint.x;
 	const int depth = footprint.z;
 	const int rowStep2 = 2 * (depth + gapCells);
 	const int colStep2 = 2 * (width + gapCells);

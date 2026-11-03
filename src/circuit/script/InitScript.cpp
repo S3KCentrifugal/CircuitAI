@@ -212,6 +212,15 @@ static void CTerrainManager_SetFactoryLane(CTerrainManager* terrain, int team, c
     for (asUINT i=0;i<input->GetSize();++i) points.push_back(*static_cast<const AIFloat3*>(input->At(i)));
     terrain->SetFactoryLane(team,points);
 }
+// D-460 (KI-744): the FRONT seat's lane road; the def sets its width.
+static void CTerrainManager_SetFactoryLaneRoad(CTerrainManager* terrain, const CScriptArray* input, const CCircuitDef* widthDef) {
+    std::vector<AIFloat3> points;
+    if (input && input->GetSize()<=4096) {
+        points.reserve(input->GetSize());
+        for (asUINT i=0;i<input->GetSize();++i) points.push_back(*static_cast<const AIFloat3*>(input->At(i)));
+    }
+    terrain->SetFactoryLaneRoad(points,const_cast<CCircuitDef*>(widthDef));
+}
 
 // D-296: scout raid route over the observed ground-hazard layer.
 static CScriptArray* CBattleAnalysis_GetUnitRaidRoute(CBattleAnalysis* battle, const CCircuitDef* def,
@@ -506,13 +515,13 @@ static bool CTerrainManager_CanPackNearGroup(CTerrainManager* terrainMgr, int zo
 }
 
 static int CTerrainManager_PlanFactoryDistrict(CTerrainManager* terrainMgr, const std::string& name,
-        const CCircuitDef* first, const CCircuitDef* second, const CCircuitDef* nano,
-        const AIFloat3& rear, int facing, int firstRows, int secondRows, bool compact,
-        CCircuitUnit* builder, float travelSeconds)
+		const CCircuitDef* first, const CCircuitDef* second, const CCircuitDef* nano,
+		const AIFloat3& rear, int facing, int maxRows, bool compact,
+		CCircuitUnit* builder, float travelSeconds)
 {
-    return terrainMgr->PlanFactoryDistrict(name, const_cast<CCircuitDef*>(first),
-        const_cast<CCircuitDef*>(second), const_cast<CCircuitDef*>(nano), rear,
-        facing, firstRows, secondRows, compact, builder, travelSeconds);
+	return terrainMgr->PlanFactoryDistrict(name, const_cast<CCircuitDef*>(first),
+		const_cast<CCircuitDef*>(second), const_cast<CCircuitDef*>(nano), rear,
+		facing, maxRows, compact, builder, travelSeconds);
 }
 
 static int CTerrainManager_ReserveIsolatedBuilding(CTerrainManager* terrain, const std::string& name,
@@ -1464,12 +1473,16 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectProperty("CTerrainManager", "float reservationMatchRadius", asOFFSET(CTerrainManager, reservationMatchRadius)); ASSERT(r >= 0);
 	// Layout: JSON permits the mechanism and TECH opts its own AI instance in.
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetBuildSiteReservations(bool)", asMETHOD(CTerrainManager, SetBuildSiteReservations), asCALL_THISCALL); ASSERT(r >= 0);
-    r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorPolicy(bool, bool, int)", asMETHOD(CTerrainManager, SetFactoryCorridorPolicy), asCALL_THISCALL); ASSERT(r >= 0);
-    r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorOptions(int, int, float, float)", asMETHOD(CTerrainManager, SetFactoryCorridorOptions), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorPolicy(bool, bool)", asMETHOD(CTerrainManager, SetFactoryCorridorPolicy), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorExempt(int)", asMETHOD(CTerrainManager, SetFactoryCorridorExempt), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorOptions(int, int, int, float, float, float)", asMETHOD(CTerrainManager, SetFactoryCorridorOptions), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryLane(int, const array<AIFloat3>@)", asFUNCTION(CTerrainManager_SetFactoryLane), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryLaneRoad(const array<AIFloat3>@, const CCircuitDef@)", asFUNCTION(CTerrainManager_SetFactoryLaneRoad), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryFacingGoal(const AIFloat3& in)", asMETHOD(CTerrainManager, SetFactoryFacingGoal), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool SetLayoutEnabled(bool)", asMETHOD(CTerrainManager, SetLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
-    r = engine->RegisterObjectMethod("CTerrainManager", "void SetReservationTravelSeconds(float)", asMETHOD(CTerrainManager, SetReservationTravelSeconds), asCALL_THISCALL); ASSERT(r >= 0);
-    r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryLayoutRequired(bool)", asMETHOD(CTerrainManager, SetFactoryLayoutRequired), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryReservationOnActivate(bool)", asMETHOD(CTerrainManager, SetFactoryReservationOnActivate), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryFlushPacking(bool)", asMETHOD(CTerrainManager, SetFactoryFlushPacking), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryDirectSite(bool)", asMETHOD(CTerrainManager, SetFactoryDirectSite), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutEnabled() const", asMETHOD(CTerrainManager, IsLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutConfigured() const", asMETHOD(CTerrainManager, IsLayoutConfigured), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanNavalBerth(const string& in, CCircuitDef@, const AIFloat3& in, int, float, float)", asMETHOD(CTerrainManager, PlanNavalBerth), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1481,7 +1494,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsNavalPathReservationBlocked(CCircuitDef@, const AIFloat3& in, const AIFloat3& in) const", asMETHOD(CTerrainManager, IsNavalPathReservationBlocked), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 NearestFriendlyNavalYard(const AIFloat3& in, float)", asMETHOD(CTerrainManager, NearestFriendlyNavalYard), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanUpgradeTerrain(CCircuitDef@, const AIFloat3& in)", asFUNCTION(CTerrainManager_CanUpgradeTerrain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
-    r = engine->RegisterObjectMethod("CTerrainManager", "int PlanFactoryDistrict(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int, int, int, bool, CCircuitUnit@, float)", asFUNCTION(CTerrainManager_PlanFactoryDistrict), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int PlanFactoryDistrict(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int, int, bool, CCircuitUnit@, float)", asFUNCTION(CTerrainManager_PlanFactoryDistrict), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "float GetBuildingBlastRadius(const CCircuitDef@) const", asMETHOD(CTerrainManager, GetBuildingBlastRadius), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveIsolatedBuilding(const string& in, const CCircuitDef@, const AIFloat3& in, int, const string& in, float)", asFUNCTION(CTerrainManager_ReserveIsolatedBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool PlanFactoryPair(const string& in, const CCircuitDef@, const CCircuitDef@, const CCircuitDef@, const AIFloat3& in, int facing, int sideOffsetCells, int forwardOffsetCells)", asFUNCTION(CTerrainManager_PlanFactoryPair), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

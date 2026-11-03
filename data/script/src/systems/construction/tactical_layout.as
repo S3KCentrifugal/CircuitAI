@@ -1,5 +1,7 @@
 #include "../../helpers/spatial/layout_helpers.as"
 #include "../../helpers/units/unit_helpers.as"
+#include "../../helpers/math/front_factory_math.as"
+#include "../world/lanes.as"
 
 // Placement policy only. Existing TACTICAL economy, production, assistance and
 // objective chains decide what to build. No tick, worker scan or extra RNG draw.
@@ -39,14 +41,20 @@ namespace TacticalLayout {
         aiTerrainMgr.SetLayoutInt(stem + ".retry", ai.frame);
         const int serial = aiTerrainMgr.GetLayoutInt(stem + ".serial", 0);
         const string key = stem + "." + serial;
-        const AIFloat3 lane = aiSetupMgr.GetLanePos();
-        const bool known = (lane.x > 0.f || lane.z > 0.f) && MapHelpers::SqDist(anchor, lane) > 10000.f;
-        const int primary = LayoutHelpers::FacingToward(anchor, known ? lane : LayoutHelpers::TerrainCentre());
-        const array<int> rotations = {0, 1, 3};
+        // D-460 (KI-743): face the nearest enemy start (the native facing goal
+        // for TACTICAL); sideways passes take the side toward it first and
+        // never one pointing away. Setup's lane position is an expansion
+        // anchor, not the combat direction.
+        const AIFloat3 goal = Lanes::NearestEnemyStart(anchor), centre = LayoutHelpers::TerrainCentre();
+        const int primary = LayoutHelpers::FacingToward(anchor, goal);
         const array<float> offsets = {0.f, 128.f, -128.f, 256.f, -256.f};
         const int maxRows = AiMax(1, AiMin(4, Global::RoleSettings::Tactical::FactorySupportRows));
-        for (uint rotation = 0; rotation < rotations.length(); ++rotation) {
-            const int facing = (primary + rotations[rotation]) % 4;
+        // LayoutFacing's passes are (full, compact) per direction; TACTICAL
+        // has no compact form, so every second pass is used.
+        for (uint pass = 0; pass < FrontFactoryMath::LAYOUT_PASSES; pass += 2) {
+            const int facing = FrontFactoryMath::LayoutFacing(primary, pass, goal.x - anchor.x, goal.z - anchor.z,
+                centre.x - anchor.x, centre.z - anchor.z);
+            if (facing < 0) continue;
             for (uint offset = 0; offset < offsets.length(); ++offset) {
                 const AIFloat3 site = LayoutHelpers::Offset(anchor, facing, offsets[offset], 128.f);
                 for (int rows = maxRows; rows >= 1; --rows) {

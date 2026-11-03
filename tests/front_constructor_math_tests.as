@@ -8,11 +8,11 @@ void test_two_base_workers_before_expansion() {
  seats[3]=-1; Check(FrontConstructorMath::Missing(seats)==3);
 }
 void test_commander_handoff_waits_for_completed_turret() {
- Check(FrontConstructorMath::CommanderPhase(false,false,0.f)==0);
- Check(FrontConstructorMath::CommanderPhase(false,true,0.01f)==1);
- Check(FrontConstructorMath::CommanderPhase(false,true,0.99f)==1);
- Check(FrontConstructorMath::CommanderPhase(false,true,1.f)==2);
- Check(FrontConstructorMath::CommanderPhase(true,false,0.f)==2);
+ Check(FrontConstructorMath::CommanderPhase(false,0.f)==0);
+ Check(FrontConstructorMath::CommanderPhase(true,0.01f)==1);
+ Check(FrontConstructorMath::CommanderPhase(true,0.99f)==1);
+ Check(FrontConstructorMath::CommanderPhase(true,1.f)==2);
+ Check(FrontConstructorMath::CommanderPhase(false,1.f)==0);
 }
 void test_expansion_and_group_gates() {
  Check(FrontConstructorMath::RecruitAllowed(0,false,false,false));

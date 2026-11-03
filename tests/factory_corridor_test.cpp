@@ -86,5 +86,22 @@ int main()
     int ownHard=0;
     claims.ForEachOther(-1,Claims::TASK,{0,0,20,20},[&](const auto&) { ++ownHard; });
     check(ownHard==1,"road raster includes own ordinary task claims");
+    // D-460: the lane road traces 4-connected cells, so Rectangles accepts every run.
+    {
+        using circuit::factory_corridor::TraceCells;
+        std::vector<int> cells;
+        TraceCells({{0,0},{3,2}}, 10, 10, cells);
+        bool connected = cells.size() == 6 && cells.front() == 0 && cells.back() == 2*10+3;
+        for (std::size_t i = 1; i < cells.size(); ++i) {
+            const int d = std::abs(cells[i] - cells[i-1]);
+            connected = connected && (d == 1 || d == 10);
+        }
+        check(connected, "diagonal trace is 4-connected, endpoints included");
+        check(!circuit::factory_corridor::Rectangles(cells, 10, 0, 0, 2, 2).empty(), "a traced run makes rectangles");
+        TraceCells({{2,2},{2,2},{2,5}}, 10, 10, cells);
+        check(cells.size() == 4, "repeated vertex adds no duplicate cell");
+        TraceCells({{1,1},{4,1},{12,1}}, 10, 10, cells);
+        check(cells.size() == 9 && cells.back() == 19, "trace is clipped at the window edge, not dropped");
+    }
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

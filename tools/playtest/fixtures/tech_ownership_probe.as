@@ -10,14 +10,14 @@ namespace TechOwnershipProbe {
         if(worker is null || heavy is null || factory is null) {
             GenericHelpers::LogUtil("[TechOwnershipTest] FAIL fixture units",1);return true;
         }
-        GenericHelpers::LogUtil("[TechOwnershipTest] actual seats="+TechAirFoundry::members.getSize(),1);
-        bool ok=int(TechAirFoundry::members.getSize())==expected && !TechAirFoundry::Owns(worker.id);
+        GenericHelpers::LogUtil("[TechOwnershipTest] actual seats="+TechAirFoundry::Count(),1);
+        bool ok=int(TechAirFoundry::Count())==expected && !TechAirFoundry::Owns(worker.id);
         if(expected>0) {
             CCircuitUnit@ first=ai.GetTeamUnit(TechAirFoundry::seats[0]);
             TechAirFoundry::Removed(first);
             TechAirFoundry::Added(worker);
             ok=ok && TechAirFoundry::Owns(worker.id) && !TechAirFoundry::Owns(first.id)
-                && int(TechAirFoundry::members.getSize())==expected;
+                && int(TechAirFoundry::Count())==expected;
             TechAirFoundry::Removed(worker);
             TechAirFoundry::Added(first);
             CCircuitUnit@ plant=Factory::primaryT1AirPlant;
@@ -29,7 +29,7 @@ namespace TechOwnershipProbe {
             Global::AISettings::Role=AiRole::TECH;
         }
         Global::RoleSettings::Tech::StrategyMask=uint(1)<<uint(Strategy::T2_RUSH);
-        TechHeavyRush::retained.set(""+heavy.id,true);
+        TechHeavyRush::Retain(heavy.id);
         // Supply a known spam route; the heavy must reuse this exact task,
         // even though its producer is not the spam factory.
         IUnitTask@ base=aiMilitaryMgr.Enqueue(TaskF::Route());
@@ -38,8 +38,7 @@ namespace TechOwnershipProbe {
         route.SetRoute(points);
         Spam::routeByFactory.set(""+factory.id,@route);
         IUnitTask@ selected=TechHeavyRush::MilitaryTask(heavy);
-        ok=ok && selected is route && TechHeavyRush::OnFinished(heavy)
-            && TechHeavyDelivery::deliveries.getSize()==0;
+        ok=ok && selected is route && TechHeavyRush::OnFinished(heavy);
         if(selected !is null) aiMilitaryMgr.TransferUnit(heavy,selected);
         GenericHelpers::LogUtil("[TechOwnershipTest] "+(ok?"PASS":"FAIL")+" seats="+expected+" spare unclaimed; heavy uses spam route without delivery",1);
         return true;

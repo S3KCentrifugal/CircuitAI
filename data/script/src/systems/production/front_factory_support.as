@@ -2,11 +2,13 @@
 
 namespace FrontFactorySupport {
     int frame=-SECOND;
-    dictionary assignments;
+    // B7: assigned[j] is the target id for turrets[j] (-1: none). Both arrays
+    // change together: any turret add/remove forces the next snapshot.
+    array<int> assigned;
     array<int> turrets;
     bool loaded=false;
     void Reset() {
-        loaded=false;frame=-SECOND;turrets.resize(0);assignments.deleteAll();
+        loaded=false;frame=-SECOND;turrets.resize(0);assigned.resize(0);
     }
     void Added(CCircuitUnit@ unit) {
         if(unit is null || unit.circuitDef.IsMobile() || unit.circuitDef.GetBuildDistance()<=0.f
@@ -104,9 +106,10 @@ namespace FrontFactorySupport {
         // while an otherwise unusable T1-only turret could do it. Two linear
         // passes reuse snapshot buffers; no per-worker population scan.
         FrontFactoryMath::Allocate(reachMasks,powers,deficits,owners);
+        assigned.resize(turrets.length());
         for(uint j=0;j<turrets.length();++j) {
             const int owner=owners[j];
-            if(owner>=0 && targets[owner]>=0) assignments.set(""+turrets[j],targets[owner]);
+            assigned[j]=(owner>=0 && targets[owner]>=0)?targets[owner]:-1;
         }
     }
     void PublishState() {
@@ -127,7 +130,7 @@ namespace FrontFactorySupport {
     void Snapshot() {
         Load();
         if(ai.frame<frame+SECOND) return;
-        frame=ai.frame;assignments.deleteAll();
+        frame=ai.frame;
         budget.metal=Economy::GetMinMetalIncomeLast10s()*Global::RoleSettings::Front::FactoryProductionBudgetShare;
         budget.energy=Economy::GetMinEnergyIncomeLast10s()*Global::RoleSettings::Front::FactoryProductionBudgetShare;
         for(uint i=0;i<2;++i) ReadFactory(i,budget);
@@ -151,13 +154,16 @@ namespace FrontFactorySupport {
         return unit !is null && (unit.id==factories[0] || unit.id==factories[1]);
     }
     IUnitTask@ Assist(CCircuitUnit@ u,bool factorySide) {
-        if(!Active() || u is null || u.circuitDef.IsMobile() || u.circuitDef.GetBuildDistance()<=0.f) return null;
+        // Cheap unit tests first: this runs on every FRONT builder MakeTask.
+        if(u is null || u.circuitDef.IsMobile() || u.circuitDef.GetBuildDistance()<=0.f || !Active()) return null;
         if(u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
             || u.task.GetType()==int(Task::Type::PLAYER) || u.task.GetType()==int(Task::Type::RETREAT))) return u.task;
         IUnitTask@ opening=OpeningAssist(u,factorySide);
         if(opening !is null) return opening;
         Snapshot();
-        int targetId=-1;if(!assignments.get(""+u.id,targetId)) return null;
+        const int index=turrets.find(u.id);
+        const int targetId=(index>=0 && uint(index)<assigned.length())?assigned[index]:-1;
+        if(targetId<0) return null;
         CCircuitUnit@ target=ai.GetTeamUnit(targetId);
         if(target is null || target.GetBuildProgress()>=1.f) return null;
         const float reach=u.circuitDef.GetBuildDistance();

@@ -7,7 +7,9 @@ namespace Front {
             bool FactoryLayoutsEnabled = true;
             int FactorySupportRows = 4; // reserved growth, not an instruction to build all turrets
             float FactoryUtilityBlastMargin = 32.f;
-            float FactoryReservationTravelSeconds = 3.0f;
+            // D-459: the opening builder's walking budget when FRONT plans
+            // its first district; later factories keep their district slot.
+            float FactoryTravelSeconds = 3.0f;
             float FactoryProductionBudgetShare = 0.65f;
             float FactoryT1BudgetShare = 0.6f;
             float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy

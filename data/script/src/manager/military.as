@@ -178,7 +178,6 @@ namespace Military {
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
         CommanderGroup::OnRemoved(unit);
-        TechHeavyDelivery::Removed(unit);
         TechHeavyRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		TechFlank::UnitRemoved(unit);

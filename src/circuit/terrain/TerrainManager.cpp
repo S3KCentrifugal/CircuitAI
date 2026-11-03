@@ -7,10 +7,8 @@
  */
 
 #include "terrain/TerrainManager.h"
-#include "terrain/FactoryDistrictGeometry.h"
-#include "terrain/BuildTravelBudget.h"
 #include "terrain/MovementDestination.h"
-#include "terrain/TerrainCorridor.h"
+#include "terrain/ReachDestination.h"
 #include "terrain/LayoutRanking.h"
 #include "terrain/EconomySpine.h"
 #include "terrain/ReservationClaim.h"
@@ -57,16 +55,8 @@
 // cost, so a sim stall names the function that caused it.
 namespace {
 inline circuit::layout_rank::Pt ToPt(const springai::AIFloat3& p) { return circuit::layout_rank::Pt{p.x, p.z}; }  // D-094
-// D-314 / KI-591: reject before float-to-int conversion, threat/influence
-// indexing or the flying-unit shortcut. An index-only guard lets x wrap into
-// an adjacent row. These O(1) checks allocate nothing and do not clamp a bad
-// request into a different job. Actual-VM coverage: run_terrain_reachability.py.
-bool ValidReachDestination(const springai::AIFloat3& p, float range = 0.f) {
-    return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z)
-        && p.x >= 0.f && p.z >= 0.f
-        && p.x < springai::AIFloat3::maxxpos && p.z < springai::AIFloat3::maxzpos
-        && std::isfinite(range) && range >= 0.f;
-}
+// D-314 / KI-591: the destination guard now lives in terrain/ReachDestination.h.
+using circuit::ValidReachDestination;
 constexpr double SLOW_CALL_MS = 20.0;
 struct SSlowCall {
 	const char* name; circuit::CCircuitAI* ai; std::chrono::steady_clock::time_point t0;
@@ -403,8 +393,10 @@ void CTerrainManager::Init()
 		zsize = cdef->GetDef()->GetZSize() / 2;
 	}
 	int notIgnoreMask = ~STRUCT_BIT(MEX);  // all except mex
+	resourceKeepOut.assign(std::size_t(blockingMap.columns) * blockingMap.rows, 0);
 	for (auto& spot : mspots) {
 		if (circuit->GetEconomyManager()->IsMetalMap()) break;
+		MarkResourceKeepOut(spot.position, cdef->GetDef()->GetXSize(), cdef->GetDef()->GetZSize());
 		const AIFloat3 pos = Pos2BuildPos(cdef, spot.position, UNIT_FACING_SOUTH);
 		const int x1 = int(pos.x / (SQUARE_SIZE << 1)) - (xsize >> 1), x2 = x1 + xsize;
 		const int z1 = int(pos.z / (SQUARE_SIZE << 1)) - (zsize >> 1), z2 = z1 + zsize;
@@ -431,6 +423,7 @@ void CTerrainManager::Init()
 	}
 	notIgnoreMask = ~STRUCT_BIT(GEO);  // all except geo
 	for (auto& spot : espots) {
+		MarkResourceKeepOut(spot, cdef->GetDef()->GetXSize(), cdef->GetDef()->GetZSize());
 		const AIFloat3 pos = Pos2BuildPos(cdef, spot, UNIT_FACING_SOUTH);
 		const int x1 = int(pos.x / (SQUARE_SIZE << 1)) - (xsize >> 1), x2 = x1 + xsize;
 		const int z1 = int(pos.z / (SQUARE_SIZE << 1)) - (zsize >> 1), z2 = z1 + zsize;
@@ -745,6 +738,47 @@ AIFloat3 CTerrainManager::GetBusPos(CCircuitDef* facDef, const AIFloat3& pos, in
 	return pos;
 }
 
+// D-460 (KI-744): the extractor footprint (in squares, rounded outward to
+// blocking cells) plus kResourceKeepOutCells on every side. The obstacle mark
+// above covers only the footprint's integer half-size (a 5x5 geothermal plant
+// got two cells), so roads could touch the ground the extractor needs.
+// O(spots x footprint) once; read by the factory corridors and the lane road.
+void CTerrainManager::MarkResourceKeepOut(const AIFloat3& centre, int xSquares, int zSquares)
+{
+	constexpr int kResourceKeepOutCells = 1;
+	constexpr int kCellElmos = SQUARE_SIZE * 2;
+	if (resourceKeepOut.empty() || xSquares <= 0 || zSquares <= 0) return;
+	const float hx = xSquares * SQUARE_SIZE * 0.5f, hz = zSquares * SQUARE_SIZE * 0.5f;
+	const int x1 = std::max(0, int(std::floor((centre.x - hx) / kCellElmos)) - kResourceKeepOutCells);
+	const int z1 = std::max(0, int(std::floor((centre.z - hz) / kCellElmos)) - kResourceKeepOutCells);
+	const int x2 = std::min(blockingMap.columns - 1, int(std::floor((centre.x + hx - 1.f) / kCellElmos)) + kResourceKeepOutCells);
+	const int z2 = std::min(blockingMap.rows - 1, int(std::floor((centre.z + hz - 1.f) / kCellElmos)) + kResourceKeepOutCells);
+	for (int z = z1; z <= z2; ++z)
+		for (int x = x1; x <= x2; ++x) resourceKeepOut[std::size_t(z) * blockingMap.columns + x] = 1;
+}
+
+AIFloat3 CTerrainManager::FindPlannedSite(CCircuitDef* cdef, const AIFloat3& pos, TerrainPredicate& predicate)
+{
+	// The same reserved branch as FindBuildSite, without a facing filter and
+	// without the spiral fallback: O(this def's slots log slots).
+	lastReservedId = -1;
+	lastReservedFacing = -1;
+	pinnedReservation = -1;
+	pinnedReservationRequired = false;
+	reservationFacingFilter = -1;
+	reservationSearch = false;
+	if (!layoutEnabled || reservations.empty()) return -RgtVector;
+	if (circuit->IsAllyAware()) {
+		MarkAllyBuildings();
+	}
+	AIFloat3 rpos;
+	int rfacing, rid;
+	if (!FindReservedSite(cdef, pos, predicate, rpos, rfacing, rid, -1)) return -RgtVector;
+	lastReservedId = rid;
+	lastReservedFacing = rfacing;
+	return rpos;
+}
+
 AIFloat3 CTerrainManager::FindBuildSite(CCircuitDef* cdef, const AIFloat3& pos,
 		float searchRadius, int facing, bool isIgnore, bool isHighRes)
 {
@@ -778,7 +812,6 @@ AIFloat3 CTerrainManager::FindBuildSite(CCircuitDef* cdef, const AIFloat3& pos,
 	reservationFacingFilter = -1;
 	reservationSearch = false;
 	if (!serve) {
-		reservationBuilder = nullptr;
 		pinnedReservation = -1;
 		pinnedReservationRequired = false;
 	}
@@ -1316,7 +1349,7 @@ bool CTerrainManager::ReserveBuildSite(int& claim, CCircuitDef* def, const AIFlo
     // ClaimTask performs admission itself; do not query the same cells twice.
     if (buildSiteReservations) {
         const bool accepted=shared.ClaimTask(circuit->GetTeamId(), claim, {a.x,a.y,b.x,b.y});
-        if (accepted && circuit->GetFactoryManager()->GetFactoryDef(def)) factoryCorridorTasks.insert(claim);
+        if (accepted && circuit->GetFactoryManager()->GetFactoryDef(def)) factoryCorridors.TaskClaimed(claim);
         return accepted;
     }
     ReleaseBuildSite(claim);
@@ -1325,7 +1358,7 @@ bool CTerrainManager::ReserveBuildSite(int& claim, CCircuitDef* def, const AIFlo
 
 void CTerrainManager::ReleaseBuildSite(int& claim)
 {
-    if (factoryCorridorTasks.erase(claim)) QueueFactoryRoutePrune();
+    factoryCorridors.TaskReleased(claim);
     if (claim != 0) circuit->GetAllyTeam()->GetLayoutReservations().ReleaseTask(circuit->GetTeamId(), claim);
 }
 
@@ -1336,12 +1369,7 @@ void CTerrainManager::ObserveBuildStructure(CCircuitUnit* unit)
     const int facing = unit->GetUnit()->GetBuildingFacing();
     const auto pos = unit->GetPos(circuit->GetLastFrame()) + def->GetMidPosOffset(facing);
     if (circuit->GetFactoryManager()->GetFactoryDef(def)) {
-        factoryRouteUnits[unit->GetId()]={def->GetId(),pos};
-        if (!circuit->GetFactoryManager()->IsT1Factory(def)) {
-            factoryCorridorExemptDef=-1;
-            layoutInts["native.factoryRoutes.exempt"]=-1;
-            layoutInts["native.factoryRoutes.promoted"]=1;
-        }
+        factoryCorridors.ObserveFactory(unit->GetId(), def, pos, facing, circuit->GetFactoryManager()->IsT1Factory(def));
     }
     int2 a, b;
     if (!IsResourceBuildingSite(def, pos, facing) && ReservationCells(def, Pos2BuildPos(def, pos, facing), facing, a, b)) {
@@ -1352,7 +1380,7 @@ void CTerrainManager::ObserveBuildStructure(CCircuitUnit* unit)
 
 void CTerrainManager::ForgetBuildStructure(int unitId)
 {
-    if (factoryRouteUnits.erase(unitId)) { PruneFactoryRoutes(); QueueFactoryRoutePrune(); }
+    factoryCorridors.ForgetFactory(unitId);
     if (buildSiteReservations) circuit->GetAllyTeam()->GetLayoutReservations().Erase(
         circuit->GetTeamId(), allied_layout::Reservations::STRUCTURE, unitId);
 }
@@ -1929,23 +1957,6 @@ void CTerrainManager::ReleaseLayoutPrefix(const std::string& prefix)
 	}
 }
 
-bool CTerrainManager::ReleaseUnusedLayout(const std::string& name)
-{
-    if (name.empty()) return false;
-    const std::string prefix = name + ".";
-    // Lifecycle-only cleanup, O(named groups + reservations). Never revoke a
-    // task's claim or completed support when adopting an ordinary factory.
-    std::unordered_set<int> groups;
-    for (const auto& entry : layoutGroups) {
-        if (entry.first.rfind(prefix, 0) == 0) groups.insert(entry.second);
-    }
-    for (const auto& entry : reservations) {
-        const auto& r = entry.second;
-        if (groups.count(r.group) && (r.claimed || r.consumed || r.unitId != 0)) return false;
-    }
-    ReleaseLayoutPrefix(prefix);
-    return true;
-}
 
 bool CTerrainManager::ReserveFactoryCluster(const std::string& name, const base_layout::FactoryCluster& cluster,
 		CCircuitDef* factoryDef, CCircuitDef* nanoDef, int& factoryReservation)
@@ -1991,166 +2002,6 @@ bool CTerrainManager::ReserveFactoryCluster(const std::string& name, const base_
 	return true;
 }
 
-bool CTerrainManager::FactoryExitUsable(const base_layout::FactoryCluster& cluster, CCircuitDef* factory)
-{
-    if (!cluster.valid || !factory) return false;
-    const auto& facts = FactoryMovementFacts(factory);
-    if (facts.empty()) return false;
-    const auto& slot = cluster.factory;
-    const int depth = base_layout::Along(slot.footprint,slot.facing);
-    const auto entrance = base_layout::Offset(slot.centre,slot.facing,depth,0);
-    const auto departure = base_layout::Offset(slot.centre,slot.facing,
-        depth + 2*base_layout::FACTORY_EXIT_DEPTH + 8,0);
-    const AIFloat3 from(entrance.x2*8.f,0.f,entrance.z2*8.f), to(departure.x2*8.f,0.f,departure.z2*8.f);
-    return FactoryExitTerrainUsable(facts, from, to);
-}
-
-const std::vector<CTerrainManager::ExitMovementFacts>& CTerrainManager::FactoryMovementFacts(CCircuitDef* factory)
-{
-    auto [it, inserted] = factoryExitFacts.try_emplace(factory->GetId());
-    auto& facts = it->second;
-    if (inserted) for (const auto id : factory->GetBuildOptions()) {
-        auto* product = circuit->GetCircuitDef(id);
-        if (!product || !product->IsMobile() || product->GetDef()->IsAbleToFly()) continue;
-        const std::unique_ptr<MoveData> move(product->GetDef()->GetMoveData());
-        if (!move || move->GetSpeedModClass() > 2 || product->GetMobileId() < 0) continue;
-        const bool hover = move->GetSpeedModClass() == 2;
-        const float half = std::max(move->GetXSize(),move->GetZSize()) * SQUARE_SIZE * .5f;
-        auto same = std::find_if(facts.begin(),facts.end(),[&](const auto& f) { return f.mobile==product->GetMobileId(); });
-        if (same == facts.end()) facts.push_back({product->GetMobileId(),half,move->GetMaxSlope(),
-            hover ? std::numeric_limits<float>::max() : move->GetDepth(),hover});
-        else same->halfWidth = std::max(same->halfWidth,half);
-    }
-    return facts;
-}
-
-bool CTerrainManager::FactoryExitTerrainUsable(const std::vector<ExitMovementFacts>& facts, const AIFloat3& from, const AIFloat3& to)
-{
-    if (!ValidReachDestination(from) || !ValidReachDestination(to)) return false;
-    const auto& slopes = terrainData->GetSlopeMap();
-    const int slopeWidth = terrainData->GetSlopeMapXSize();
-    const auto height = [&](float x,float z) {
-        return ValidReachDestination({x,0.f,z}) ? areaData->GetElevationAt(x,z)
-            : std::numeric_limits<float>::quiet_NaN();
-    };
-    const auto slope = [&](float x,float z) {
-        if (!ValidReachDestination({x,0.f,z})) return std::numeric_limits<float>::quiet_NaN();
-        const int px=int(x/16), pz=int(z/16);
-        const auto index=std::size_t(pz)*slopeWidth+px;
-        if (index>=slopes.size() || !blockingMap.IsInBounds(px,pz)) return std::numeric_limits<float>::quiet_NaN();
-        const auto& cell=blockingMap.grid[pz*blockingMap.columns+px];
-        if (cell.blockerMask!=0 || static_cast<unsigned>(cell.structMask)!=0) return std::numeric_limits<float>::infinity();
-        return slopes[index];
-    };
-    // Startup/extension admission only: distinct production move classes and
-    // a short fine-grid corridor. No whole-map path solve or recurring scan.
-    for (const auto& f : facts) {
-        const auto* mobile=GetMobileTypeById(f.mobile);
-        const int a=GetSectorIndex(from), b=GetSectorIndex(to);
-        if (!mobile || a<0 || b<0 || a>=int(mobile->sector.size()) || b>=int(mobile->sector.size())
-            || !mobile->sector[a].area || mobile->sector[a].area!=mobile->sector[b].area) return false;
-        const auto movementSlope = [&](float x, float z) {
-            const float value = slope(x,z);
-            return f.hover ? base_layout::FactoryExitSlope(height(x,z),value,true) : value;
-        };
-        if (!lane::TerrainCorridor(from.x,from.z,to.x,to.z,f.halfWidth,f.slope,f.depth,false,height,movementSlope)) return false;
-    }
-    return true;
-}
-
-float CTerrainManager::GetBuildingBlastRadius(const CCircuitDef* def) const
-{
-    if (!def) return 0.f;
-    const auto known=buildingBlastRadii.find(def->GetId());
-    if (known!=buildingBlastRadii.end()) return known->second;
-    const std::unique_ptr<WeaponDef> death(def->GetDef()->GetDeathExplosion());
-    const float radius=death ? std::max(0.f,death->GetAreaOfEffect()) : 0.f;
-    buildingBlastRadii.emplace(def->GetId(),radius);
-    return radius;
-}
-
-int CTerrainManager::ReserveIsolatedBuilding(const std::string& name, CCircuitDef* def,
-        const AIFloat3& pos, int facing, const std::string& protectedPrefix, float margin)
-{
-    if (name.empty() || protectedPrefix.empty() || !def || !std::isfinite(margin) || margin<0.f
-        || !CanReserveBuilding(def,pos,facing)) return -1;
-    const auto snapped=Pos2BuildPos(def,pos,facing);
-    const float radius=GetBuildingBlastRadius(def)+margin;
-    const base_layout::Footprint candidateFp{def->GetDef()->GetXSize()/2,def->GetDef()->GetZSize()/2};
-    const base_layout::Point candidateCentre{int(std::round(snapped.x/8.f)),int(std::round(snapped.z/8.f))};
-    const auto candidateRect=base_layout::RectFromCentre(candidateCentre,candidateFp,facing);
-    std::unordered_set<int> protectedGroups;
-    const std::string prefix=protectedPrefix+".";
-    for (const auto& group : layoutGroups)
-        if (group.first.rfind(prefix,0)==0) protectedGroups.insert(group.second);
-    for (const auto& [id,r] : reservations) {
-        if (!protectedGroups.count(r.group)) continue;
-        const base_layout::Footprint fp{r.def->GetDef()->GetXSize()/2,r.def->GetDef()->GetZSize()/2};
-        const base_layout::Point centre{int(std::round(r.pos.x/8.f)),int(std::round(r.pos.z/8.f))};
-        const auto rect=base_layout::RectFromCentre(centre,fp,r.facing);
-        if (!base_layout::OutsideBlast(snapped.x,snapped.z,rect,radius)
-            || !base_layout::OutsideBlast(r.pos.x,r.pos.z,candidateRect,GetBuildingBlastRadius(r.def)+margin)) return -1;
-    }
-    return ReserveBuilding(def,snapped,facing,0,EnsureLayoutGroup(name));
-}
-
-int CTerrainManager::PlanFactoryCluster(const std::string& name, CCircuitDef* factory,
-        CCircuitDef* nano, const AIFloat3& centre, int facing, int columns, int rows)
-{
-    if (!layoutEnabled || name.empty() || !factory || !nano || facing<0 || facing>3
-        || !geom::is_in_map(centre)) return -1;
-    const int existing = GetLayoutInt(name + ".factory_slot", -1);
-    if (reservations.count(existing)) return existing;
-    const auto fp = [](CCircuitDef* def) {
-        return base_layout::Footprint{def->GetDef()->GetXSize()/2, def->GetDef()->GetZSize()/2};
-    };
-    const auto snapped = Pos2BuildPos(factory, centre, facing);
-    auto cluster = base_layout::MakeFactoryCluster(
-        {int(std::round(snapped.x/8.f)), int(std::round(snapped.z/8.f))}, facing,
-        fp(factory), fp(nano), base_layout::FactoryTier::T1);
-    if (!base_layout::ResizeSupportBank(cluster, fp(nano), columns, rows, nano->GetBuildDistance())) return -1;
-    if (!FactoryExitUsable(cluster, factory)) return -1;
-    int id=-1;
-    return ReserveFactoryCluster(name,cluster,factory,nano,id) ? id : -1;
-}
-
-int CTerrainManager::PlanFactoryDistrict(const std::string& name, CCircuitDef* firstFactory,
-        CCircuitDef* secondFactory, CCircuitDef* nanoDef, const AIFloat3& rear,
-        int facing, int firstRows, int secondRows, bool allowCompact, CCircuitUnit* builder, float travelSeconds)
-{
-    if (!layoutEnabled || name.empty() || !firstFactory || !secondFactory || !nanoDef
-        || !geom::is_in_map(rear)) return 0;
-    if (HasLayoutGroup(name + ".t1.factory")) return GetLayoutInt(name + ".capacity", 1);
-    const auto footprint = [](CCircuitDef* def) {
-        return base_layout::Footprint{def->GetDef()->GetXSize() / 2, def->GetDef()->GetZSize() / 2};
-    };
-    const base_layout::Point origin{int(std::round(rear.x / base_layout::HALF_CELL_ELMOS)),
-        int(std::round(rear.z / base_layout::HALF_CELL_ELMOS))};
-    const auto pair = base_layout::MakeFactoryDistrict(origin, facing, footprint(firstFactory),
-        footprint(secondFactory), footprint(nanoDef), firstRows, secondRows,
-        base_layout::FACTORY_EXIT_MARGIN * 2, nanoDef->GetBuildDistance());
-    if (!pair.valid || !CanReserveFactoryCluster(pair.first, firstFactory, nanoDef)) return 0;
-    if (!FactoryExitUsable(pair.first, firstFactory)) return 0;
-    // Preview only: do not commit an attractive but inaccessible opening bay.
-    // The borrowed builder is used synchronously and never retained by the plan.
-    const AIFloat3 firstPos(pair.first.factory.centre.x2 * base_layout::HALF_CELL_ELMOS, 0.f,
-        pair.first.factory.centre.z2 * base_layout::HALF_CELL_ELMOS);
-    if (builder && travelSeconds > 0.f && !WithinBuildTravel(builder, firstPos, travelSeconds)) return 0;
-    const bool expandable = CanReserveFactoryCluster(pair.second, secondFactory, nanoDef)
-        && FactoryExitUsable(pair.second, secondFactory);
-    if (!expandable && !allowCompact) return 0;
-    int firstId = -1, secondId = -1;
-    if (!ReserveFactoryCluster(name + ".t1", pair.first, firstFactory, nanoDef, firstId)
-        || (expandable && !ReserveFactoryCluster(name + ".t2", pair.second, secondFactory, nanoDef, secondId))) {
-        ReleaseLayoutPrefix(name + ".");
-        return 0;
-    }
-    layoutInts[name + ".capacity"] = expandable ? 2 : 1;
-    layoutInts[name + ".facing"] = facing;
-    layoutInts[name + ".t1_slot"] = firstId;
-    layoutInts[name + ".t2_slot"] = secondId;
-    return expandable ? 2 : 1;
-}
 
 bool CTerrainManager::PlanFactoryPair(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* secondFactory,
 		CCircuitDef* nanoDef, const AIFloat3& base, int facing, int sideOffsetCells, int forwardOffsetCells)
@@ -2685,13 +2536,8 @@ void CTerrainManager::ExpireReservations()
 bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, TerrainPredicate& predicate,
 		AIFloat3& outPos, int& outFacing, int& outId, int facingFilter)
 {
-    // FRONT's optional approach probe has a hard work budget. Exhaustion uses
-    // ordinary collision-safe placement; other roles never enter this branch.
-    int travelProbes = 0;
 	const int pinned = pinnedReservation;
 	const bool required = pinnedReservationRequired;
-    CCircuitUnit* builder = reservationBuilder;
-    reservationBuilder = nullptr;
 	pinnedReservation = -1;
 	pinnedReservationRequired = false;
 	if (!layoutEnabled) {
@@ -2744,11 +2590,15 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 	// asked to assist: the anchor of a nano task is the factory it is for.
 	// Serving a nano for the air plant a block slot behind the bot labs put
 	// it out of range of both. The slack covers the task's position shake.
-	if (!cdef->IsMobile() && (cdef->GetBuildDistance() > 0.f)) {
+	// D-459: construction turrets only. A factory is an immobile builder too
+	// (BAR leaves its builddistance at the engine default), and this clamp
+	// refused every factory slot more than ~256 elmos from the asking
+	// position, sending the T2 lab out of its district.
+	const bool isFactory = circuit->GetFactoryManager()->GetFactoryDef(cdef) != nullptr;
+	if (!cdef->IsMobile() && !isFactory && (cdef->GetBuildDistance() > 0.f)) {
 		const float reach = cdef->GetBuildDistance() + SQUARE_SIZE * 16;
 		maxSq = std::min(maxSq, SQUARE(reach));
 	}
-	float bestSq = std::numeric_limits<float>::max();
 	SReservation* best = nullptr;
 	if (pinned >= 0) {
 		// An exact layout task: this slot or nothing. The caller aborts a
@@ -2761,7 +2611,7 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 			: !map->IsPossibleToBuildAt(cdef->GetDef(), it->second.pos, it->second.facing) ? "the engine refuses the ground"
 			: (!StrictReservationAllowed(pinned) || !CanActivateZone(it->second.zone) || IsAllyLayoutBlocked(cdef, it->second.pos, it->second.facing)) ? "allied reservation"
 			: !predicate(it->second.pos) ? "out of the builder's reach"
-            : !EnsureFactoryCorridor(cdef,it->second.pos,it->second.facing) ? "no connected factory corridor"
+			: !EnsureFactoryCorridor(cdef, it->second.pos, it->second.facing) ? "no connected factory corridor"
 			: nullptr;
 		if (why != nullptr) {
 			// D-108 (played: one held advanced-fusion slot the engine refused was
@@ -2779,32 +2629,65 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 		}
 		best = &it->second;
 	}
-	for (auto& kv : reservations) {
-		if (pinned >= 0) {
+	if (pinned < 0) {
+		// C2 (D-452, D-459): candidates in distance order, id breaking ties
+		// exactly as the old strict "<" over id-ordered slots did. The first
+		// candidate that admits its corridor is the nearest valid slot, so
+		// bounded corridor probes go to the nearest candidates rather than to
+		// whichever slot was reserved first. O(R log R) over this def's slots.
+		// No walking test here: the opening site was walk-tested when FRONT
+		// planned it, and a later factory (the T2 lab) keeps its district slot
+		// whoever asks; builder assignment already ranks by path cost.
+		reservedCandidates.clear();
+		// D-459: why a factory's free slots were all refused, logged once per
+		// failed factory search (rare; no cost for other structures).
+		int open = 0, unarmed = 0, otherFacing = 0, allied = 0, engine = 0, reach = 0, range = 0;
+		for (auto& kv : reservations) {
+			SReservation& r = kv.second;
+			if (r.consumed || r.claimed || (r.def != cdef)) {
+				continue;
+			}
+			++open;
+			if (!r.armed) { ++unarmed; continue; }
+			if (!layout_rank::MatchesFacingPass(r.facing, facingFilter)) { ++otherFacing; continue; }
+			// The engine's own test: a wreck or a standing structure keeps the slot
+			// unserved for now (a mobile unit on it does not - that is OCCUPIED, not
+			// BLOCKED, and it will move). The builder must be able to reach it.
+			if (!StrictReservationAllowed(r.id) || !CanActivateZone(r.zone) || IsAllyLayoutBlocked(cdef, r.pos, r.facing)) { ++allied; continue; }
+			if (!map->IsPossibleToBuildAt(cdef->GetDef(), r.pos, r.facing)) { ++engine; continue; }
+			if (!predicate(r.pos)) { ++reach; continue; }
+			const float sq = pos.SqDistance2D(r.pos);
+			const float limit = r.anyReach ? std::numeric_limits<float>::max() : maxSq;
+			if (sq < limit) {
+				reservedCandidates.emplace_back(sq, &r);
+			} else {
+				++range;
+			}
+		}
+		const int candidates = static_cast<int>(reservedCandidates.size());
+		const auto nearer = [](const auto& a, const auto& b) {
+			return (a.first != b.first) ? (a.first < b.first) : (a.second->id < b.second->id);
+		};
+		if (isFactory && factoryCorridors.IsEnabled()) {
+			std::sort(reservedCandidates.begin(), reservedCandidates.end(), nearer);
+		} else if (!reservedCandidates.empty()) {
+			// Only a factory can be refused by its corridor; anything else takes
+			// the nearest candidate: O(R), as before D-452.
+			std::iter_swap(reservedCandidates.begin(), std::min_element(reservedCandidates.begin(), reservedCandidates.end(), nearer));
+			reservedCandidates.resize(1);
+		}
+		for (const auto& candidate : reservedCandidates) {
+			SReservation* r = candidate.second;
+			if (!EnsureFactoryCorridor(cdef, r->pos, r->facing)) {
+				continue;
+			}
+			best = r;
 			break;
 		}
-		SReservation& r = kv.second;
-		if (r.consumed || r.claimed || (r.def != cdef) || !r.armed
-            || !layout_rank::MatchesFacingPass(r.facing, facingFilter)) {
-			continue;
-		}
-		// The engine's own test: a wreck or a standing structure keeps the slot
-		// unserved for now (a mobile unit on it does not - that is OCCUPIED, not
-		// BLOCKED, and it will move). The builder must be able to reach it.
-		if (!StrictReservationAllowed(r.id) || !CanActivateZone(r.zone) || IsAllyLayoutBlocked(cdef, r.pos, r.facing) || !map->IsPossibleToBuildAt(cdef->GetDef(), r.pos, r.facing) || !predicate(r.pos)) {
-			continue;
-		}
-		const float sq = pos.SqDistance2D(r.pos);
-		const float limit = r.anyReach ? std::numeric_limits<float>::max() : maxSq;
-		if ((sq < limit) && (sq < bestSq)) {
-            if (!EnsureFactoryCorridor(cdef,r.pos,r.facing)) continue;
-            if (reservationTravelSeconds > 0.f) {
-                if (travelProbes == 16) break;
-                ++travelProbes;
-                if (!WithinBuildTravel(builder, r.pos, reservationTravelSeconds)) continue;
-            }
-			bestSq = sq;
-			best = &r;
+		reservedCandidates.clear();
+		if ((best == nullptr) && (open > 0) && isFactory) {
+			circuit->LOG("RESERVE: no %s slot served: %i open, %i unarmed, %i other facing, %i allied, %i engine, %i reach, %i range, %i no corridor",
+					cdef->GetDef()->GetName(), open, unarmed, otherFacing, allied, engine, reach, range, candidates);
 		}
 	}
 	if (best == nullptr) {
@@ -2831,41 +2714,6 @@ bool CTerrainManager::FindReservedSite(CCircuitDef* cdef, const AIFloat3& pos, T
 /*
  * Layout: zones, corridors, bands (D-053)
  */
-bool CTerrainManager::WithinBuildTravel(CCircuitUnit* builder, const AIFloat3& site, float seconds)
-{
-    if (!builder || !(seconds > 0.f)) return false;
-    auto* def = builder->GetCircuitDef();
-    const auto from = builder->GetPos(circuit->GetLastFrame());
-    const float range = std::max(0.f, def->GetBuildDistance() - 16.f);
-    const float budget = def->GetSpeed() * seconds;
-    if (from.SqDistance2D(site) > SQUARE(range+budget)) return false;
-    if (!CanReachAtSafe(builder, site, range)) return false;
-    if (from.SqDistance2D(site) <= range*range) return true;
-    auto* pathfinder = circuit->GetPathfinder();
-    // Borrow current mobility/threat arrays synchronously; no worker or cached
-    // unit pointer. The local search has at most 65^2 cells, not map-sized work.
-    const auto query = pathfinder->CreatePathSingleQuery(builder, circuit->GetThreatMap(), from, site, range);
-    return build_travel::Within(site.x-from.x, site.z-from.z, range, budget, [&](float dx, float dz) {
-        const AIFloat3 p(from.x+dx, from.y, from.z+dz);
-        int px, pz;
-        pathfinder->Pos2PathXY(p, &px, &pz);
-        if (!geom::is_in_map(p) || !pathfinder->IsInPathMap(px,pz)) return false;
-        const auto move = reinterpret_cast<std::size_t>(pathfinder->Pos2MoveNode(p));
-        if (!query->GetCanMoveArray()[move]
-            || query->GetThreatFun()(pathfinder->Pos2PathIndex(p)) > THREAT_MIN) return false;
-        if (def->IsAbleToFly()) return true;
-        const int hx = (def->GetDef()->GetXSize()+1)/2;
-        const int hz = (def->GetDef()->GetZSize()+1)/2;
-        for (int z=int((p.z-hz*SQUARE_SIZE)/16); z<=int((p.z+hz*SQUARE_SIZE)/16); ++z)
-            for (int x=int((p.x-hx*SQUARE_SIZE)/16); x<=int((p.x+hx*SQUARE_SIZE)/16); ++x) {
-                if (!blockingMap.IsInBounds(x,z)) return false;
-                const auto& cell = blockingMap.grid[z*blockingMap.columns+x];
-                if (build_travel::PhysicalBlock(cell.blockerMask, static_cast<unsigned>(cell.structMask),
-                        static_cast<unsigned>(SBlockingMap::StructMask::RESERVED))) return false;
-            }
-        return true;
-    });
-}
 
 bool CTerrainManager::RectCells(const AIFloat3& centre, int facing, float halfAcross, float halfAlong, int2& c1, int2& c2) const
 {
@@ -3343,7 +3191,7 @@ void CTerrainManager::EraseReservation(int id)
     }
     const bool factory = circuit->GetFactoryManager()->GetFactoryDef(r.def) != nullptr;
     reservations.erase(found);
-    if (factory) { PruneFactoryRoutes(); QueueFactoryRoutePrune(); }
+    if (factory) factoryCorridors.ReservationErased();
 }
 
 int CTerrainManager::NextReachableSlot(CCircuitUnit* builder, const CCircuitDef* cdef, int zone, int group, int budget)
@@ -5060,12 +4908,7 @@ std::string CTerrainManager::DescribeLayout() const
 	std::string out = resourceLayout;
 	char buf[160];
 	const int cell = SQUARE_SIZE * 2;
-    for (const auto& [id,route] : factoryRoutes) for (std::size_t i=0;i<route.rectangles.size();++i) {
-        const auto& r=route.rectangles[i];
-        snprintf(buf,sizeof(buf),"corridor:%i:%i:%i:0:%i:%i:z;",-(id*1024+int(i)+1),
-            (r.x1+r.x2)*cell/2,(r.z1+r.z2)*cell/2,(r.x2-r.x1)*cell,(r.z2-r.z1)*cell);
-        out+=buf;
-    }
+	factoryCorridors.Describe(out);
 	for (const auto& kv : zones) {
 		const SZone& zn = kv.second;
 		snprintf(buf, sizeof(buf), "%s:%i:%i:%i:0:%i:%i:z;", zn.corridor ? "corridor" : "zone", zn.id,
@@ -5120,11 +4963,11 @@ void CTerrainManager::ResetLayout()
 	lastReservedFacing = -1;
 	layoutGroups.clear();
 	layoutZones.clear();
-	const int corridorPromoted=GetLayoutInt("native.factoryRoutes.promoted",0);
+	const int corridorPromoted = GetLayoutInt("native.factoryRoutes.promoted", 0);
 	layoutInts.clear();
-    layoutInts["native.factoryRoutes.promoted"]=corridorPromoted;
-    PruneFactoryRoutes();
-    SaveFactoryRoutes();
+	layoutInts["native.factoryRoutes.promoted"] = corridorPromoted;
+	SavePlacementPolicy();
+	factoryCorridors.OnLayoutReset();
     if (buildSiteReservations) layoutInts["native.ordinarySites"] = 1;
 	factoryLineReady = false;
 	factoryLineFacing = UNIT_FACING_SOUTH;
@@ -5222,7 +5065,7 @@ void CTerrainManager::SaveLayout(std::ostream& os) const
 
 void CTerrainManager::LoadLayout(std::istream& is)
 {
-    ClearFactoryRoutes();
+	factoryCorridors.Clear();
 	ResetLayout();
 	bool savedEnabled = false;
 	utils::binary_read(is, savedEnabled);
@@ -5353,10 +5196,8 @@ void CTerrainManager::LoadLayout(std::istream& is)
     // Reuse the named state format; task claims rebuild as tasks load next.
     const auto ordinary = layoutInts.find("native.ordinarySites");
     SetBuildSiteReservations(ordinary != layoutInts.end() && ordinary->second != 0);
-    reservationTravelSeconds = float(GetLayoutInt("policy.layout.travel_ms", 0)) / 1000.f;
-    factoryLayoutRequired = GetLayoutInt("policy.layout.factory_required", 1) != 0;
-    LoadFactoryRoutes();
-    reservationBuilder = nullptr;
+	LoadPlacementPolicy();
+	factoryCorridors.Load();
 	circuit->LOG("RESERVE: layout loaded: %i zones, %i reservations, %s", (int)zones.size(), (int)reservations.size(), layoutEnabled ? "on" : "off");
 }
 

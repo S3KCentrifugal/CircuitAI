@@ -34,9 +34,12 @@ int main()
             check(!Intersects(district.first.nanoBounds, district.second.nanoBounds), "separate banks");
             check(!Intersects(district.first.exit, district.second.exit), "separate exits");
         }
-        // Rectangular vehicle plants must rotate the basis, not their local
-        // depth twice: the support bank and exit touch opposite factory edges.
-        for (const auto footprint : {Footprint{12, 8}, Footprint{8, 12}, Footprint{12, 9}, Footprint{9, 12}}) {
+        // Rectangular factories must rotate the basis, not their local depth
+        // twice: the support bank and exit touch opposite factory edges.
+        // {9, 6} is BAR's T1 air plant (armap/corap), the shape D-455 changed
+        // at east/west facings; {6, 9} is the same plant described sideways.
+        for (const auto footprint : {Footprint{12, 8}, Footprint{8, 12}, Footprint{12, 9}, Footprint{9, 12},
+                Footprint{9, 6}, Footprint{6, 9}}) {
             const Point centre{200+Across(footprint,facing)%2,200+Along(footprint,facing)%2};
             auto cluster = MakeFactoryCluster(centre,facing,footprint,{3,3},FactoryTier::T1);
             check(cluster.valid, "rectangular factory cluster fits every rotation");
@@ -55,5 +58,25 @@ int main()
     check(!MakeFactoryDistrict({200,200}, 0, {6,6}, {9,9}, {3,3}, 9, 2, 4, 400.f).valid, "unbounded rows rejected");
     check(!MakeFactoryDistrict({200,200}, 0, {6,6}, {9,9}, {3,3}, 2, 2, 4, 1.f).valid, "unreachable banks rejected");
     check(!MakeFactoryDistrict({200,200}, 4, {6,6}, {9,9}, {3,3}, 2, 2, 4, 400.f).valid, "invalid facing rejected");
+    // D-460 (KI-743): never away from the goal. Glitters team 4's T2 plant
+    // at (200, 9080) with its lane to the north-east took south before.
+    {
+        int order[3] = {-1, -1, -1};
+        int n = FacingsToward(200.f, 9080.f, 1392.f, 8208.f, 3072.f, 5120.f, order);
+        check(n == 2 && order[0] == 1 && order[1] == 2, "goal north-east: east, then north, never south or west");
+        // Goal straight ahead: both sides allowed, the map interior first.
+        n = FacingsToward(600.f, 8000.f, 600.f, 2000.f, 3072.f, 5120.f, order);
+        check(n == 3 && order[0] == 2 && order[1] == 1 && order[2] == 3, "goal ahead at the west edge: north, east, west");
+        n = FacingsToward(100.f, 100.f, 100.f, 100.f, 0.f, 0.f, order);
+        check(n == 0, "no goal distance, no facing");
+        for (int facing = 0; facing < 4; ++facing) {
+            const float gx = facing == 1 ? 1000.f : facing == 3 ? -1000.f : 0.f;
+            const float gz = facing == 0 ? 1000.f : facing == 2 ? -1000.f : 0.f;
+            n = FacingsToward(0.f, 0.f, gx, gz, 0.f, 0.f, order);
+            bool opposite = false;
+            for (int i = 0; i < n; ++i) opposite = opposite || order[i] == (facing + 2) % 4;
+            check(n >= 1 && order[0] == facing && !opposite, "axis goal: its facing first, never the opposite");
+        }
+    }
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

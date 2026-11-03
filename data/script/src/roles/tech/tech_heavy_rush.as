@@ -1,7 +1,6 @@
 #include "../../global.as"
 #include "../../helpers/math/heavy_rush_math.as"
 #include "../../systems/team/donation.as"
-#include "tech_heavy_delivery.as"
 
 // A finite production obligation, independent of SPAM_RUSH. Only one lab and
 // one recruit task belong to this controller. Existing economy update cadence
@@ -48,11 +47,12 @@ namespace TechHeavyRush {
         labId = aiTerrainMgr.GetLayoutInt(StateKey + "lab", -1);
         orderedFrame = aiTerrainMgr.GetLayoutInt(StateKey + "ordered", -1);
         nextRoute = 0;
-        retained.deleteAll();
-        routeFactories.deleteAll();
+        retained.resize(0);
+        routeFactories.resize(0);
+        // The "gift." key name predates D-449 and is kept for saved games.
         for (int index = 0; index < completed; ++index) {
             const int id = aiTerrainMgr.GetLayoutInt(StateKey + "gift." + index, -1);
-            if (ai.GetTeamUnit(id) !is null) retained.set("" + id, true);
+            if (ai.GetTeamUnit(id) !is null) Retain(id);
         }
         priorProductionLimit = aiTerrainMgr.GetLayoutInt(StateKey + "production-limit", -1);
         @recruit = null;
@@ -80,23 +80,6 @@ namespace TechHeavyRush {
         string name;
         if (!Global::RoleSettings::Tech::HeavyRushUnits.get(Global::AISettings::Side, name)) return "";
         return name;
-    }
-    int Recipient() {
-        array<Team::Roster::Entry@>@ allies = Team::Roster::WithRole(AiRole::FRONT);
-        int best = -1;
-        float distance = 1e30f;
-        const AIFloat3 front = Lanes::Front();
-        for (uint i = 0; i < allies.length(); ++i) {
-            Team::Roster::Entry@ entry = allies[i];
-            if (entry is null || entry.teamId == ai.teamId) continue;
-            const AIFloat3 anchor = Team::Roster::DeliveryAnchor(entry);
-            if (anchor.x < 0.0f) continue;
-            const float candidate = MapHelpers::SqDist(front, anchor);
-            if (candidate < distance || (candidate == distance && entry.teamId < best)) {
-                distance = candidate; best = entry.teamId;
-            }
-        }
-        return best;
     }
     void Blocked(const string& in reason) {
         if (ai.frame < nextTrace) return;
@@ -202,8 +185,7 @@ namespace TechHeavyRush {
         for (int index = 0; index < completed; ++index)
             if (aiTerrainMgr.GetLayoutInt(StateKey + "gift." + index, -1) == unit.id) return true;
         aiTerrainMgr.SetLayoutInt(StateKey + "gift." + completed, unit.id);
-        aiTerrainMgr.SetLayoutInt(StateKey + "sent." + completed, 0);
-        retained.set("" + unit.id, true);
+        Retain(unit.id);
         ++completed;
         aiTerrainMgr.SetLayoutInt(StateKey + "completed", completed);
         // Release only the definition limit this finite controller borrowed.
@@ -218,31 +200,39 @@ namespace TechHeavyRush {
         GenericHelpers::LogUtil("[TECH][HeavyRush] completed " + completed + "/" + TargetCount(), 1);
         return true; // route assignment is deferred past native UnitAdded assignment
     }
-    // Lifecycle lookup is O(1); routing searches only registered spam factories
-    // once on assignment/recovery, never the army. IDs never retain native handles.
-    dictionary retained;
-    dictionary routeFactories;
+    // B7: retained heavies and their cached spam factory, in parallel arrays
+    // bounded by the configured batch size (a few units), so lookups are a
+    // short linear scan with no string keys. Routing searches only registered
+    // spam factories on assignment/recovery, never the army. IDs only.
+    array<int> retained;
+    array<int> routeFactories;
+    void Retain(int id) {
+        if (id < 0 || retained.find(id) >= 0) return;
+        retained.insertLast(id);
+        routeFactories.insertLast(-1);
+    }
     bool Owns(CCircuitUnit@ unit) {
-        return Selected() && unit !is null && retained.exists("" + unit.id);
+        return Selected() && unit !is null && retained.find(unit.id) >= 0;
     }
     void Removed(CCircuitUnit@ unit) {
         if (unit is null) return;
-        retained.delete("" + unit.id);
-        routeFactories.delete("" + unit.id);
+        const int index = retained.find(unit.id);
+        if (index < 0) return;
+        retained.removeAt(uint(index));
+        routeFactories.removeAt(uint(index));
     }
     IUnitTask@ MilitaryTask(CCircuitUnit@ unit) {
         if (!Owns(unit) || EdgeLanes::IsReleased(unit)) return null;
         if (unit.task !is null && (unit.task.IsExternalControlled()
             || unit.task.GetType() == int(Task::Type::PLAYER)
             || unit.task.GetType() == int(Task::Type::RETREAT))) return unit.task;
-        const string key = "" + unit.id;
-        int factoryId = -1;
-        routeFactories.get(key, factoryId);
+        const uint index = uint(retained.find(unit.id));
+        const int factoryId = routeFactories[index];
         CCircuitUnit@ factory = Spam::routeByFactory.exists("" + factoryId) ? ai.GetTeamUnit(factoryId) : null;
         if (factory is null) {
             @factory = Spam::_NearestSpamFactory(unit.GetPos(ai.frame));
             if (factory is null) return null;
-            routeFactories.set(key, factory.id);
+            routeFactories[index] = factory.id;
         }
         return Spam::RouteFor(factory);
     }

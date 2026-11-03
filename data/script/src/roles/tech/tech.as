@@ -1499,13 +1499,17 @@ namespace RoleTech
 				// D-101 (owner's rule): while a construction turret stands the new one is
 				// placed by the layout (played: the rebuilt T1 lab went back into its old footprint)
 				if (isReset && fac != "") aiTerrainMgr.SetResetFactorySlot(Layout::ReserveFactorySite(ai.GetCircuitDef(fac)));
+				// D-451/C1: the disposable opening lab needs no protected road.
+				if (!isReset) LayoutHelpers::ExemptStartFactory(fac);
 				return fac;
 			}
 			else
 			{
 				GenericHelpers::LogUtil("[Tech_SelectFactoryHandler] nearestMapPosition is null", 2);
 				// Even if nearest start is unavailable, attempt a safe fallback
-				return FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				const string fallback = FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				if (!isReset) LayoutHelpers::ExemptStartFactory(fallback);
+				return fallback;
 			}
 		}
 

@@ -49,15 +49,29 @@ void test_no_demand_and_invalid_snapshot() {
     Check(owners[0]==-1 && owners[1]==-1);
 }
 void test_forward_compact_precedes_sideways_pair() {
+    // Goal straight ahead, interior to the "primary+1" side: both sides, that one first.
     for(int primary=0;primary<4;++primary) {
-        Check(FrontFactoryMath::LayoutFacing(primary,0)==primary);
-        Check(FrontFactoryMath::LayoutFacing(primary,1)==primary);
-        Check(FrontFactoryMath::LayoutFacing(primary,2)==(primary+1)%4);
-        Check(FrontFactoryMath::LayoutFacing(primary,3)==(primary+1)%4);
-        Check(FrontFactoryMath::LayoutFacing(primary,4)==(primary+3)%4);
-        Check(FrontFactoryMath::LayoutFacing(primary,5)==(primary+3)%4);
+        const int right=(primary+1)%4;
+        const float gx=primary==1?1000.f:(primary==3?-1000.f:0.f), gz=primary==0?1000.f:(primary==2?-1000.f:0.f);
+        const float ix=right==1?500.f:(right==3?-500.f:0.f), iz=right==0?500.f:(right==2?-500.f:0.f);
+        Check(FrontFactoryMath::LayoutFacing(primary,0,gx,gz,ix,iz)==primary);
+        Check(FrontFactoryMath::LayoutFacing(primary,1,gx,gz,ix,iz)==primary);
+        Check(FrontFactoryMath::LayoutFacing(primary,2,gx,gz,ix,iz)==right);
+        Check(FrontFactoryMath::LayoutFacing(primary,3,gx,gz,ix,iz)==right);
+        Check(FrontFactoryMath::LayoutFacing(primary,4,gx,gz,ix,iz)==(primary+3)%4);
+        Check(FrontFactoryMath::LayoutFacing(primary,5,gx,gz,ix,iz)==(primary+3)%4);
     }
-    Check(FrontFactoryMath::LayoutFacing(-1,0)==-1);
-    Check(FrontFactoryMath::LayoutFacing(4,0)==-1);
-    Check(FrontFactoryMath::LayoutFacing(0,6)==-1);
+    Check(FrontFactoryMath::LayoutFacing(-1,0,0,1,0,0)==-1);
+    Check(FrontFactoryMath::LayoutFacing(4,0,0,1,0,0)==-1);
+    Check(FrontFactoryMath::LayoutFacing(0,6,0,1,0,0)==-1);
+}
+// D-460 (KI-743): Glitters team 11 at the west edge, goal north-east: the
+// first side is east (toward the goal), west (away from it) is never offered.
+void test_side_toward_goal_first_never_away() {
+    const float dx=800.f,dz=-6000.f,ix=2400.f,iz=-3000.f;
+    Check(FrontFactoryMath::LayoutFacing(2,2,dx,dz,ix,iz)==1);
+    Check(FrontFactoryMath::LayoutFacing(2,4,dx,dz,ix,iz)==-1);
+    // Goal exactly ahead at the west edge: east (interior) before west.
+    Check(FrontFactoryMath::LayoutFacing(2,2,0.f,-6000.f,2400.f,-3000.f)==1);
+    Check(FrontFactoryMath::LayoutFacing(2,4,0.f,-6000.f,2400.f,-3000.f)==3);
 }

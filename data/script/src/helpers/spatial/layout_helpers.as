@@ -98,34 +98,57 @@ namespace LayoutHelpers {
         return AIFloat3(float(AiTerrainWidth()) * 0.5f, 0.0f, float(AiTerrainHeight()) * 0.5f);
     }
 
+    // D-451/C1: corridors are a per-role opt-in. Roles with played evidence
+    // (FRONT, TACTICAL) default on; the others keep their smrt-test placement
+    // until a layout run clears them. JSON factory_corridors/roles/<ROLE>.
+    bool CorridorsForRole(AiRole role)
+    {
+        const bool played = role == AiRole::FRONT || role == AiRole::TACTICAL;
+        return aiSetupMgr.ConfigBool("factory_corridors/enabled", true)
+            && aiSetupMgr.ConfigBool("factory_corridors/roles/" + Team::Roster::RoleName(role), played);
+    }
+
+    // C1: the start factory a role actually chose is the one it may exempt
+    // (TECH's disposable T1 lab). Native lifts it once a non-T1 factory stands.
+    void ExemptStartFactory(const string& in name)
+    {
+        CCircuitDef@ def = ai.GetCircuitDef(name);
+        aiTerrainMgr.SetFactoryCorridorExempt(def is null ? -1 : def.id);
+    }
+
+    void ApplyFactoryCorridors()
+    {
+        const AiRole role = Global::AISettings::Role;
+        aiTerrainMgr.SetFactoryCorridorPolicy(CorridorsForRole(role), role == AiRole::FRONT);
+        aiTerrainMgr.SetFactoryCorridorExempt(-1);
+        aiTerrainMgr.SetFactoryCorridorOptions(
+            aiSetupMgr.ConfigInt("factory_corridors/probes", 4),
+            aiSetupMgr.ConfigInt("factory_corridors/background_probes", 1),
+            aiSetupMgr.ConfigInt("factory_corridors/visits", 32768),
+            aiSetupMgr.ConfigFloat("factory_corridors/goal_start", 768.f),
+            aiSetupMgr.ConfigFloat("factory_corridors/goal_end", 2048.f),
+            aiSetupMgr.ConfigFloat("factory_corridors/lane_wait_seconds", 30.f));
+    }
+
     // Setup: run the role's plan once, after its caps and porc chain are in.
     void ApplyForRole()
     {
-        CCircuitDef@ opening = Global::AISettings::Role == AiRole::TECH
-            ? ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side)) : null;
-        aiTerrainMgr.SetFactoryCorridorPolicy(aiSetupMgr.ConfigBool("layout/factory_corridors/enabled",true),
-            Global::AISettings::Role == AiRole::FRONT,opening is null ? -1 : opening.id);
-        aiTerrainMgr.SetFactoryCorridorOptions(aiSetupMgr.ConfigInt("layout/factory_corridors/probes",4),
-            aiSetupMgr.ConfigInt("layout/factory_corridors/visits",32768),
-            aiSetupMgr.ConfigFloat("layout/factory_corridors/goal_start",768.f),
-            aiSetupMgr.ConfigFloat("layout/factory_corridors/goal_end",2048.f));
+        ApplyFactoryCorridors();
         const bool frontDistrict=Global::AISettings::Role == AiRole::FRONT && Global::RoleSettings::Front::FactoryLayoutsEnabled;
         const bool tacticalDistrict=Global::AISettings::Role == AiRole::TACTICAL && Global::RoleSettings::Tactical::FactoryLayoutsEnabled;
-        aiTerrainMgr.SetReservationTravelSeconds(frontDistrict
-            ? Global::RoleSettings::Front::FactoryReservationTravelSeconds
-            : (tacticalDistrict ? Global::RoleSettings::Tactical::FactoryReservationTravelSeconds : 0.0f));
-        aiTerrainMgr.SetFactoryLayoutRequired(!frontDistrict && !tacticalDistrict);
-        if (!tacticalDistrict) aiTerrainMgr.ReleaseUnusedLayout("tactical.factory");
-        if(!frontDistrict && aiTerrainMgr.GetLayoutInt("front.factory.home.support_owner",0)!=0) {
-            FrontFactorySupport::Reset();
-            aiEconomyMgr.assistNanoEnabled=aiTerrainMgr.GetLayoutInt("front.factory.home.prior_nano",1)!=0;
-            aiTerrainMgr.SetLayoutInt("front.factory.home.support_owner",0);
-            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.t1");
-            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.t2");
-            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.extension");
-            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.additional");
-            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.utilities");
-        }
+        // C3 (D-453): a district role places factories only through its plan
+        // or the reserved search; the legacy shortcuts stay on for the rest.
+        const bool legacyPlacement = !frontDistrict && !tacticalDistrict;
+        aiTerrainMgr.SetFactoryReservationOnActivate(legacyPlacement);
+        aiTerrainMgr.SetFactoryFlushPacking(legacyPlacement);
+        aiTerrainMgr.SetFactoryDirectSite(legacyPlacement);
+        // D-460 (KI-743): district roles' factories never face away from the
+        // enemy. FRONT moves the goal onto its lane once the lane is claimed
+        // (CoverageLanes::Claim); x < 0 leaves the native search unchanged.
+        aiTerrainMgr.SetFactoryFacingGoal(legacyPlacement ? AIFloat3(-1.f,0.f,-1.f)
+            : Lanes::NearestEnemyStart(Global::Map::StartPos));
+        if (!tacticalDistrict) aiTerrainMgr.ReleaseUnusedLayout(TacticalLayout::ROOT);
+        if (!frontDistrict) FrontLayout::Release();
         aiTerrainMgr.SetLayoutPriority(Global::AISettings::Role == AiRole::TECH ? 2
             : Global::AISettings::Role == AiRole::AIR ? 1 : 0);
         // Share ordinary sites without enabling factory packing or a role plan.

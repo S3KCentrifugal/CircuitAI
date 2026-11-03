@@ -1098,7 +1098,7 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 		SetBuildPos(-RgtVector);
 		return;
 	}
-	terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired, -1, builder);
+	terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired);
 	const AIFloat3 bp = terrainMgr->FindBuildSite(buildDef, pos, searchRadius, facing, predicate);
 	TakeReservation(terrainMgr);
 	pinFailed = pinRequired && (reservationId < 0);

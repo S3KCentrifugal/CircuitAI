@@ -19,8 +19,9 @@ namespace FrontConstructorMath {
         return filled.length()==4 && filled[SUPPORT] && filled[ENERGY];
     }
     // 0: factory assistance, 1: complete the turret, 2: lane duty.
-    int CommanderPhase(bool released, bool turretPresent, float progress) {
-        if(released || (turretPresent && progress>=1.f)) return 2;
+    // The opening turret's completion is the only release (C7).
+    int CommanderPhase(bool turretPresent, float progress) {
+        if(turretPresent && progress>=1.f) return 2;
         return turretPresent ? 1 : 0;
     }
 }
