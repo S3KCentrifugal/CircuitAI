@@ -713,6 +713,47 @@ void CMilitaryManager::ReadConfig()
 			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC, unsigned(artyCommInfo.heavyMaxSqSpeed.size()),
 			unsigned(artyCommInfo.ghostDefs.size()), artyCommInfo.ghostIdleFrames);
 
+	/*
+	 * Artillery snipe: see SArtySnipeInfo. Def names; distances in elmos,
+	 * times in seconds.
+	 */
+	const Json::Value& snipeArtyCfg = root["artillery_snipe"];
+	artySnipeInfo = SArtySnipeInfo();
+	if (!snipeArtyCfg.isNull() && snipeArtyCfg.get("enabled", true).asBool()) {
+		auto readDefs = [&](const char* key, std::unordered_set<CCircuitDef::Id>& out) {
+			std::set<std::string> names;
+			for (const auto& name : snipeArtyCfg[key]) names.insert(name.asString());
+			for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+				if (names.count(d.GetDef()->GetName()) > 0) out.insert(d.GetId());
+			}
+		};
+		readDefs("units", artySnipeInfo.defs);
+		readDefs("threats", artySnipeInfo.threats);
+		readDefs("direct_threats", artySnipeInfo.directThreats);
+		readDefs("porc", artySnipeInfo.porc);
+		artySnipeInfo.avoidOtherPorc = snipeArtyCfg.get("avoid_other_porc", true).asBool();
+		artySnipeInfo.threatMargin = std::max(0.f, snipeArtyCfg.get("threat_margin", 100.f).asFloat());
+		artySnipeInfo.triggerDistance = std::max(0.f, snipeArtyCfg.get("trigger_distance", 700.f).asFloat());
+		artySnipeInfo.porcRadius = std::max(0.f, snipeArtyCfg.get("porc_radius", 1600.f).asFloat());
+		artySnipeInfo.prepFraction = utils::clamp(snipeArtyCfg.get("prep_range_fraction", 0.95f).asFloat(), 0.5f, 1.f);
+		artySnipeInfo.snipeFraction = utils::clamp(snipeArtyCfg.get("snipe_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
+		artySnipeInfo.volleys = std::max(1, snipeArtyCfg.get("volleys", 3).asInt());
+		artySnipeInfo.visibleMaxVolleys = std::max(1, snipeArtyCfg.get("visible_max_volleys", 6).asInt());
+		auto seconds = [&](const char* key, float def) {
+			return int(std::max(0.f, snipeArtyCfg.get(key, def).asFloat()) * FRAMES_PER_SEC);
+		};
+		artySnipeInfo.confirmFrames = seconds("confirm_delay_seconds", 3.f);
+		artySnipeInfo.repeatFrames = seconds("repeat_seconds", 60.f);
+		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 90.f));
+		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()
+				&& (!artySnipeInfo.threats.empty() || !artySnipeInfo.directThreats.empty());
+	}
+	circuit->LOG("CONFIG %s: artillery snipe %s | defs=%u threats=%u direct=%u porc=%u margin=%.0f trigger=%.0f volleys=%i",
+			cfgName.c_str(), artySnipeInfo.isEnabled ? "enabled" : "disabled", unsigned(artySnipeInfo.defs.size()),
+			unsigned(artySnipeInfo.threats.size()), unsigned(artySnipeInfo.directThreats.size()),
+			unsigned(artySnipeInfo.porc.size()),
+			artySnipeInfo.threatMargin, artySnipeInfo.triggerDistance, artySnipeInfo.volleys);
+
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
 	const Json::Value& amount = porc["amount"];
@@ -2848,6 +2889,19 @@ CDefenceData::SDefPoint* CMilitaryManager::FindClosestDefPoint(int cluster, cons
 		}
 	}
 	return closestPoint;
+}
+
+CMilitaryManager::SArtySnipeState& CMilitaryManager::GetArtySnipeState(int unitId, int frame)
+{
+	// O(states) once every 30 s: forget units not seen by the snipe step for a minute.
+	if (frame >= artySnipePrune) {
+		artySnipePrune = frame + FRAMES_PER_SEC * 30;
+		for (auto it = artySnipeStates.begin(); it != artySnipeStates.end();) {
+			if (frame - it->second.lastCall > FRAMES_PER_SEC * 60) it = artySnipeStates.erase(it);
+			else ++it;
+		}
+	}
+	return artySnipeStates[unitId];
 }
 
 } // namespace circuit

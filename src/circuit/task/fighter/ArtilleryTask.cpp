@@ -17,6 +17,7 @@
 #include "unit/action/FightAction.h"
 #include "unit/action/MoveAction.h"
 #include "unit/enemy/EnemyUnit.h"
+#include "unit/enemy/EnemyManager.h"
 #include "unit/CircuitUnit.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
@@ -158,6 +159,9 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
+	if (ArtySnipeStep(circuit, unit, frame)) {
+		return;  // owner 2026-11-03: sniping an outranging artillery structure
+	}
 	const AIFloat3& pos = unit->GetPos(frame);
 	CEnemyInfo* bestTarget = FindTarget(unit, pos);
 
@@ -334,6 +338,401 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 			best->GetPos().x, best->GetPos().z, (track.shot < 0) ? "never seen, game time" : "",
 			float(frame - std::max(0, track.shot)) / FRAMES_PER_SEC);
 	return true;
+}
+
+/*
+ * Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were
+ * lost to Persecutors (1390), Rattlesnakes and Eviscerators (1380), which
+ * outrange them (1200-1310). Before walking into the reach of such a structure
+ * (seen, radar dot or ghost image) the unit:
+ *  1) shoots seen / radar non-light porc ("porc" list, near the threat) that it
+ *     can hit from a spot outside every known threat's reach, until dead;
+ *  2) fires `volleys` at ghost images of that porc, same rule;
+ *  3) closes to snipe_range_fraction of its own range of the threat and fires
+ *     `volleys` at it (ghost: at its last seen spot);
+ *  4) if radar or LOS then shows it alive, fires `volleys` more.
+ * Then the ordinary controller has the unit back; that threat is left alone
+ * by this unit for repeat_seconds. Returns true while it owns the unit.
+ * Owner 2026-11-03 01:36Z: Pulsar, Bulwark and Bastion ("direct_threats") are
+ * attacked from snipe_range_fraction before the unit goes into their reach,
+ * with no prep step: seen ones until dead (visible_max_volleys at most), ghost
+ * images `volleys`, then `volleys` more if seen alive. The outranging threats
+ * above are taken first when both are near.
+ * Cost: O(known enemies) per call while a threat is near, else one pass over
+ * known enemies looking only at the threat defs.
+ */
+namespace {
+struct SSnipeHazard { AIFloat3 pos; float sqReach; int id; bool threat; };
+
+bool SnipeAlive(const CEnemyUnit* e)
+{
+	if ((e == nullptr) || (e->GetCircuitDef() == nullptr) || e->IsHidden() || e->IsDead()) return false;
+	return (e->GetData().losStatus & SEnemyData::LosMask::DYING) == 0;
+}
+
+const char* SnipeName(const CEnemyUnit* e)
+{
+	return (e != nullptr && e->GetCircuitDef() != nullptr) ? e->GetCircuitDef()->GetDef()->GetName() : "?";
+}
+}  // namespace
+
+bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!info.isEnabled || (info.defs.count(cdef->GetId()) == 0)) {
+		return false;
+	}
+	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+	springai::Weapon* weapon = unit->GetMainWeapon();
+	if ((range < 100.f) || (weapon == nullptr)) {
+		return false;
+	}
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	if ((st.stage != 0) && (frame - st.lastCall > FRAMES_PER_SEC * 10)) {
+		st.stage = 0;  // away (retreat, another task) too long: start over
+	}
+	st.lastCall = frame;
+
+	// Volleys: a rising main-weapon reload frame or the engine's weapon-fired
+	// event; anything within half a reload of the last counted one is the same
+	// salvo (Thanatos fires 6 rockets over 1.5 s).
+	{
+		const int gap = std::max(FRAMES_PER_SEC, cdef->GetReloadTime() / 2);
+		const int reload = weapon->GetReloadFrame();
+		int shotAt = -1;
+		if ((st.reload >= 0) && (reload > st.reload)) shotAt = frame;
+		st.reload = reload;
+		const int fired = unit->GetFireFrame();
+		if (st.fireSeen == -2) {
+			st.fireSeen = fired;  // first call: older shots are not ours
+		} else if (fired > st.fireSeen) {
+			st.fireSeen = fired;
+			shotAt = std::max(shotAt, fired);
+		}
+		if ((shotAt >= 0) && ((st.lastVolley < 0) || (shotAt - st.lastVolley >= gap))) {
+			st.lastVolley = shotAt;
+			if (st.stage != 0) ++st.volleys;
+		}
+	}
+
+	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
+	const AIFloat3 pos = unit->GetPos(frame);
+	auto skipped = [&st, frame](int id) {
+		auto it = st.skipUntil.find(id);
+		if (it == st.skipUntil.end()) return false;
+		if (frame < it->second) return true;
+		st.skipUntil.erase(it);
+		return false;
+	};
+	auto reachOf = [&info](const CCircuitDef* edef) {
+		return edef->GetMaxRange(CCircuitDef::RangeType::LAND) + info.threatMargin;
+	};
+
+	if (st.stage == 0) {
+		if (frame < st.nextScan) {
+			return false;
+		}
+		st.nextScan = frame + FRAMES_PER_SEC / 2;
+		const CEnemyUnit* best = nullptr;
+		bool bestDirect = true;
+		float bestSq = std::numeric_limits<float>::max();
+		for (const auto& kv : enemyMgr->GetEnemyUnits()) {
+			const CEnemyUnit* e = kv.second;
+			if (!SnipeAlive(e) || (e->IsInRadarOrLOS() && e->IsBeingBuilt())) continue;
+			const CCircuitDef::Id eid = e->GetCircuitDef()->GetId();
+			const bool direct = info.threats.count(eid) == 0;
+			if (direct && (info.directThreats.count(eid) == 0)) continue;
+			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
+			const float sq = pos.SqDistance2D(e->GetPos());
+			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
+			if ((sq < SQUARE(trigger)) && ((sq < bestSq) || (bestDirect && !direct)) && !skipped(e->GetId())) {
+				bestSq = sq;
+				best = e;
+				bestDirect = direct;
+			}
+		}
+		if (best == nullptr) {
+			return false;
+		}
+		st.stage = bestDirect ? 2 : 1;
+		st.direct = bestDirect;
+		st.threat = best->GetId();
+		st.target = -1;
+		st.volleys = 0;
+		st.stageFrame = frame;
+		st.orderKey = -1;
+		circuit->LOG("SNIPE: %s %i starts on %s%s %i (%s) at (%.0f, %.0f), %.0f away, its reach %.0f, own range %.0f",
+				cdef->GetDef()->GetName(), unit->GetId(), bestDirect ? "porc " : "", SnipeName(best), best->GetId(),
+				best->IsInRadarOrLOS() ? "seen" : "ghost", best->GetPos().x, best->GetPos().z,
+				std::sqrt(bestSq), reachOf(best->GetCircuitDef()), range);
+	}
+
+	const CEnemyUnit* threat = enemyMgr->GetEnemyUnit(st.threat);
+	auto finish = [&](const char* why) {
+		circuit->LOG("SNIPE: %s %i done with %s %i: %s", cdef->GetDef()->GetName(), unit->GetId(),
+				SnipeName(threat), st.threat, why);
+		st.skipUntil[st.threat] = frame + info.repeatFrames;
+		st.stage = 0;
+		st.threat = -1;
+		st.target = -1;
+		st.orderKey = -1;
+		return false;  // the ordinary controller takes over on this same call
+	};
+	if (!SnipeAlive(threat)) {
+		return finish("gone");
+	}
+
+	// Hazards: every known threat structure, plus (avoid_other_porc) other armed
+	// ground-hitting porc with a reach up to 2000. O(known enemies).
+	std::vector<SSnipeHazard> hazards;
+	for (const auto& kv : enemyMgr->GetEnemyUnits()) {
+		const CEnemyUnit* e = kv.second;
+		if (!SnipeAlive(e) || (e->IsInRadarOrLOS() && e->IsBeingBuilt())) continue;
+		const CCircuitDef* edef = e->GetCircuitDef();
+		if (edef->IsMobile()) continue;
+		const bool isThreat = info.threats.count(edef->GetId()) > 0;
+		if (!isThreat && (!info.avoidOtherPorc || !edef->HasSurfToLand())) continue;
+		const float r = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
+		if ((r <= 0.f) || (!isThreat && (r > 2000.f))) continue;
+		hazards.push_back({e->GetPos(), SQUARE(r + info.threatMargin), e->GetId(), isThreat});
+	}
+	// Outside every hazard but `except`; threatsOnly for walk checks.
+	auto safeAt = [&hazards](const AIFloat3& p, int except, bool threatsOnly) {
+		for (const SSnipeHazard& h : hazards) {
+			if ((h.id == except) || (threatsOnly && !h.threat)) continue;
+			if (p.SqDistance2D(h.pos) < h.sqReach) return false;
+		}
+		return true;
+	};
+	auto walkSafe = [&](const AIFloat3& a, const AIFloat3& b, int except) {
+		const float len = a.distance2D(b);
+		const int n = std::max(1, int(len / 100.f));
+		for (int i = 1; i <= n; ++i) {
+			const float t = float(i) / n;
+			if (!safeAt(AIFloat3(a.x + (b.x - a.x) * t, 0.f, a.z + (b.z - a.z) * t), except, true)) return false;
+		}
+		return true;
+	};
+	CTerrainManager* terrain = circuit->GetTerrainManager();
+	// A firing spot `radius` from `aim`, nearest the unit: angles out to 90
+	// degrees either side of the line to the unit, two rings. strict: every
+	// spot and the walk to it must be safe (except `except`); otherwise the
+	// safest-first fallback is the straight approach.
+	auto findSpot = [&](const AIFloat3& aim, float radius, int except, bool strict, AIFloat3& out) {
+		float base = std::atan2(pos.z - aim.z, pos.x - aim.x);
+		bool found = false;
+		float bestSq = std::numeric_limits<float>::max();
+		for (float ring : {1.f, 0.85f}) {
+			for (int k = 0; k <= 12; ++k) {
+				const float off = ((k + 1) / 2) * (3.14159265f / 12.f) * ((k % 2 == 0) ? 1.f : -1.f);
+				AIFloat3 c(aim.x + std::cos(base + off) * radius * ring, 0.f, aim.z + std::sin(base + off) * radius * ring);
+				CTerrainManager::CorrectPosition(c);
+				if (!terrain->CanMoveToPos(unit->GetArea(), c)) continue;
+				if (!safeAt(c, except, false) || !walkSafe(pos, c, except)) continue;
+				const float sq = pos.SqDistance2D(c);
+				if (sq < bestSq) { bestSq = sq; out = c; found = true; }
+			}
+		}
+		if (!found && !strict) {
+			out = AIFloat3(aim.x + std::cos(base) * radius, 0.f, aim.z + std::sin(base) * radius);
+			CTerrainManager::CorrectPosition(out);
+			found = true;
+		}
+		return found;
+	};
+	// Orders: move to the spot (when needed), then the attack queued behind it.
+	// Re-sent every 8 s or when the aim changes; a seen target is attacked
+	// (it is followed by the engine), a ghost gets ground fire on its spot.
+	auto issue = [&](const CEnemyUnit* aim, bool ghost, bool move, int key) {
+		if ((key == st.orderKey) && (frame < st.orderUntil)) return;
+		st.orderKey = key;
+		st.orderUntil = frame + FRAMES_PER_SEC * 8;
+		const int timeout = frame + FRAMES_PER_SEC * 12;
+		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+		TRY_UNIT(circuit, unit,
+			short opts = UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY;
+			if (move) {
+				unit->CmdMoveTo(st.spot, 0, timeout);
+				opts |= UNIT_COMMAND_OPTION_SHIFT_KEY;
+			}
+			if (!ghost && !circuit->IsCheating() && (aim->GetUnit() != nullptr)) {
+				unit->GetUnit()->Attack(aim->GetUnit(), opts, timeout);
+			} else {
+				unit->CmdAttackGround(aim->GetPos(), opts, timeout);
+			}
+		)
+	};
+	auto stop = [&]() {
+		st.orderKey = -1;
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+		)
+	};
+
+	if (st.stage == 1) {
+		// Already inside a threat's reach (it was revealed late): no prep.
+		if (!safeAt(pos, -1, true)) {
+			circuit->LOG("SNIPE: %s %i already inside a threat's reach, snipes %s %i now",
+					cdef->GetDef()->GetName(), unit->GetId(), SnipeName(threat), st.threat);
+			st.stage = 2;
+			st.volleys = 0;
+			st.stageFrame = frame;
+			st.target = -1;
+		} else if (frame - st.stageFrame > info.stageFrames * 3) {
+			circuit->LOG("SNIPE: %s %i prep porc took too long, snipes %s %i", cdef->GetDef()->GetName(), unit->GetId(),
+					SnipeName(threat), st.threat);
+			st.stage = 2;
+			st.volleys = 0;
+			st.stageFrame = frame;
+			st.target = -1;
+		}
+	}
+	while (st.stage == 1) {
+		const CEnemyUnit* target = (st.target >= 0) ? enemyMgr->GetEnemyUnit(st.target) : nullptr;
+		if (target != nullptr) {
+			const bool seen = target->IsInRadarOrLOS();
+			const char* why = nullptr;
+			if (!SnipeAlive(target)) {
+				why = "destroyed";
+			} else {
+				if (!st.targetGhost && !seen) {
+					st.targetGhost = true;  // lost from radar and LOS: the ghost rule from here
+					st.volleys = 0;
+				} else if (st.targetGhost && seen) {
+					st.targetGhost = false;  // shown again: shoot until dead
+				}
+				const int cap = st.targetGhost ? info.volleys : info.visibleMaxVolleys;
+				if (st.volleys >= cap) why = st.targetGhost ? "ghost volleys fired" : "volley cap";
+				else if (frame - st.targetFrame > info.stageFrames) why = "timed out";
+			}
+			if (why != nullptr) {
+				circuit->LOG("SNIPE: %s %i prep %s %i %s (%i volleys)", cdef->GetDef()->GetName(), unit->GetId(),
+						SnipeName(target), st.target, why, st.volleys);
+				st.skipUntil[st.target] = frame + info.repeatFrames;
+				st.target = -1;
+				target = nullptr;
+			}
+		}
+		if (target == nullptr) {
+			// Next prep target: seen / radar first, then ghosts; nearest spot.
+			const CEnemyUnit* best = nullptr;
+			AIFloat3 bestSpot;
+			bool bestSeen = false;
+			float bestSq = std::numeric_limits<float>::max();
+			const float prepRadius = range * info.prepFraction;
+			for (const auto& kv : enemyMgr->GetEnemyUnits()) {
+				const CEnemyUnit* e = kv.second;
+				if (!SnipeAlive(e) || (info.porc.count(e->GetCircuitDef()->GetId()) == 0)
+					|| (e->IsInRadarOrLOS() && e->IsBeingBuilt())
+					|| (e->GetPos().SqDistance2D(threat->GetPos()) > SQUARE(info.porcRadius))
+					|| skipped(e->GetId()))
+				{
+					continue;
+				}
+				const bool seen = e->IsInRadarOrLOS();
+				if (bestSeen && !seen) continue;
+				AIFloat3 spot;
+				if ((pos.SqDistance2D(e->GetPos()) <= SQUARE(prepRadius)) && safeAt(pos, e->GetId(), false)) {
+					spot = pos;  // already a safe firing spot
+				} else if (!findSpot(e->GetPos(), prepRadius, e->GetId(), true, spot)) {
+					continue;  // cannot be shot from outside the threats' reach
+				}
+				const float sq = pos.SqDistance2D(spot);
+				if ((seen && !bestSeen) || (sq < bestSq)) {
+					best = e;
+					bestSpot = spot;
+					bestSq = sq;
+					bestSeen = seen;
+				}
+			}
+			if (best == nullptr) {
+				circuit->LOG("SNIPE: %s %i no safe prep porc left, closes on %s %i", cdef->GetDef()->GetName(),
+						unit->GetId(), SnipeName(threat), st.threat);
+				st.stage = 2;
+				st.volleys = 0;
+				st.stageFrame = frame;
+				break;
+			}
+			st.target = best->GetId();
+			st.targetGhost = !bestSeen;
+			st.targetFrame = frame;
+			st.volleys = 0;
+			st.spot = bestSpot;
+			st.orderKey = -1;
+			circuit->LOG("SNIPE: %s %i prep %s %s %i at (%.0f, %.0f) from (%.0f, %.0f), %.0f to walk",
+					cdef->GetDef()->GetName(), unit->GetId(), bestSeen ? "attacks" : "fires on ghost",
+					SnipeName(best), best->GetId(), best->GetPos().x, best->GetPos().z,
+					bestSpot.x, bestSpot.z, std::sqrt(bestSq));
+			target = best;
+		}
+		const bool inRange = pos.SqDistance2D(target->GetPos()) <= SQUARE(range * info.prepFraction + 16.f);
+		const bool move = !inRange || !safeAt(pos, target->GetId(), false);
+		issue(target, st.targetGhost, move, target->GetId() * 2 + (st.targetGhost ? 1 : 0));
+		return true;
+	}
+
+	const bool threatSeen = threat->IsInRadarOrLOS();
+	if (st.stage == 2) {
+		// A seen direct threat (Pulsar, Bulwark, Bastion) is attacked until dead.
+		const int cap = (st.direct && threatSeen) ? info.visibleMaxVolleys : info.volleys;
+		if (st.direct && threatSeen && (st.volleys >= cap)) {
+			stop();
+			return finish("volley cap on a seen porc");
+		}
+		if (st.volleys >= cap) {
+			stop();
+			st.stage = 3;
+			st.stageFrame = frame;
+			circuit->LOG("SNIPE: %s %i fired %i volleys at %s %i (%s), checks it",
+					cdef->GetDef()->GetName(), unit->GetId(), st.volleys, SnipeName(threat), st.threat,
+					threatSeen ? "seen" : "ghost");
+			return true;
+		}
+		if (frame - st.stageFrame > info.stageFrames) {
+			return finish("snipe timed out");
+		}
+		const float snipeRange = range * info.snipeFraction;
+		if (st.orderKey != -2 - st.threat) {
+			// Firing spot once per stage: outside other threats if possible.
+			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot);
+		}
+		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
+		issue(threat, !threatSeen, move, -2 - st.threat);
+		return true;
+	}
+	if (st.stage == 3) {
+		if ((frame - std::max(st.stageFrame, st.lastVolley) < info.confirmFrames) && !threatSeen) {
+			return true;  // shells still landing
+		}
+		if (!threatSeen) {
+			return finish("not seen alive after the volleys");
+		}
+		circuit->LOG("SNIPE: %s %i sees %s %i alive, fires %i more", cdef->GetDef()->GetName(), unit->GetId(),
+				SnipeName(threat), st.threat, info.volleys);
+		st.stage = 4;
+		st.volleys = 0;
+		st.stageFrame = frame;
+		st.orderKey = -1;
+	}
+	if (st.stage == 4) {
+		if (st.volleys >= info.volleys) {
+			stop();
+			return finish("confirm volleys fired");
+		}
+		if (frame - st.stageFrame > info.stageFrames) {
+			return finish("confirm timed out");
+		}
+		const float snipeRange = range * info.snipeFraction;
+		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
+		if (move && (st.orderKey != -3 - st.threat)) {
+			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot);
+		}
+		issue(threat, !threatSeen, move, -3 - st.threat);
+		return true;
+	}
+	return false;
 }
 
 bool CArtilleryTask::FireAtGhost(CCircuitUnit* unit, const AIFloat3& pos, int frame)
