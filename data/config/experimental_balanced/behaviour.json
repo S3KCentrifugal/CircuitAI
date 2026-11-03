@@ -336,6 +336,7 @@
 			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
 			"group_wait_seconds": 240,    // ... and go in together when all on that threat are there (settled 10 s); past this,
 			"min_group": 3,               // with min_group gathered; fewer: the threat is given up for repeat_seconds
+			"double_heavy_overlap": 0.5,   // owner 2026-11-03: weapon-range half-discs of the aimed heavy and another (facing the hold point) sharing more than this of the smaller: go in only with 3+ gathered, together
 			"close_in_min_range": 1290,   // owner option 2026-11-03: below this range (Thanatos 1200, Arbiter 1210) prep porc
 			                              // only, no close-in on a threat that outranges the snipe spot
 			"group_settle_seconds": 10,

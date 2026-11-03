@@ -537,6 +537,10 @@ public:
 		// reach is beyond their snipe spot (0: everyone closes in).
 		float closeMinRange = 1290.f;
 		int groupSettleFrames = 10 * 30;
+		// Owner 2026-11-03 20:53Z: double heavy = the aimed heavy's weapon-range
+		// half-disc (facing the group's hold point) and another heavy's share
+		// more than this fraction of the smaller one; then go in only with 3+.
+		float doubleHeavyOverlap = 0.5f;
 	};
 	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
 	struct SArtySnipeState {
@@ -554,6 +558,8 @@ public:
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
+		int goFrame = -1;       // stage 2: when it left the gathering spot
+		int dhLoggedFor = -1;   // threat whose double-heavy share was last logged
 		bool atHold = false;    // stage 2: waiting at the gathering spot
 		int holdSince = -1;
 		bool hasSnipeSpot = false;  // stage 2: a checked snipe spot (outside other threats, safe walk)
@@ -569,6 +575,9 @@ public:
 	const SArtySnipeInfo& GetArtySnipeInfo() const { return artySnipeInfo; }
 	SArtySnipeState& GetArtySnipeState(int unitId, int frame);
 	const std::unordered_map<int, SArtySnipeState>& GetArtySnipeStates() const { return artySnipeStates; }
+	// Double-heavy shares per (aimed, other) heavy pair: value, frame computed.
+	// Recomputed after ~10 s; pairs of dead heavies are dropped with the states.
+	std::unordered_map<uint64_t, std::pair<float, int>>& GetArtySnipeOverlaps() { return artySnipeOverlaps; }
 	// A def whose escort is rationed: a mobile radar or jammer.
 	bool IsSensorUnit(const CCircuitDef* cdef) const;
 	// Live sensors already escorting `task`.
@@ -812,6 +821,7 @@ private:
 	void UpdateSyncOrders();
 	SArtySnipeInfo artySnipeInfo;
 	std::unordered_map<int, SArtySnipeState> artySnipeStates;
+	std::unordered_map<uint64_t, std::pair<float, int>> artySnipeOverlaps;
 	int artySnipePrune = 0;
 
 	unsigned int preventCount = 0;

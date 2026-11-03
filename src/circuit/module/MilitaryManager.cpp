@@ -837,6 +837,7 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 3).asInt());
 		artySnipeInfo.closeMinRange = std::max(0.f, snipeArtyCfg.get("close_in_min_range", 1290.f).asFloat());
 		artySnipeInfo.groupSettleFrames = seconds("group_settle_seconds", 10.f);
+		artySnipeInfo.doubleHeavyOverlap = utils::clamp(snipeArtyCfg.get("double_heavy_overlap", 0.5f).asFloat(), 0.f, 1.f);
 		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()
 				&& (!artySnipeInfo.threats.empty() || !artySnipeInfo.directThreats.empty());
 	}
@@ -3131,6 +3132,10 @@ CMilitaryManager::SArtySnipeState& CMilitaryManager::GetArtySnipeState(int unitI
 		artySnipePrune = frame + FRAMES_PER_SEC * 30;
 		for (auto it = artySnipeStates.begin(); it != artySnipeStates.end();) {
 			if (frame - it->second.lastCall > FRAMES_PER_SEC * 60) it = artySnipeStates.erase(it);
+			else ++it;
+		}
+		for (auto it = artySnipeOverlaps.begin(); it != artySnipeOverlaps.end();) {
+			if (frame - it->second.second > FRAMES_PER_SEC * 30) it = artySnipeOverlaps.erase(it);
 			else ++it;
 		}
 	}
