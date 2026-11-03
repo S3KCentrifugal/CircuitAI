@@ -544,6 +544,22 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			allThreats.push_back({e->GetPos(), SQUARE(reachOf(e->GetCircuitDef()))});
 			allIds.push_back(e->GetId());
 		}
+		// Round 5: coming in from one side, a unit entered the Pulsar's trigger
+		// before the Persecutor's, so the Persecutor was never compared. Once one
+		// threat triggers, every threat within porc_radius of it is a candidate.
+		std::vector<AIFloat3> triggered;
+		for (size_t i = 0; i < allThreats.size(); ++i) {
+			const CEnemyUnit* e = enemyMgr->GetEnemyUnit(allIds[i]);
+			if ((e == nullptr) || (!e->IsInRadarOrLOS() && (st.ghostDone.count(allIds[i]) > 0))) continue;
+			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
+			if (pos.SqDistance2D(allThreats[i].first) < SQUARE(trigger)) triggered.push_back(allThreats[i].first);
+		}
+		auto nearTriggered = [&](const AIFloat3& p) {
+			for (const AIFloat3& t : triggered) {
+				if (p.SqDistance2D(t) <= SQUARE(info.porcRadius)) return true;
+			}
+			return false;
+		};
 		const float snipeR = range * info.snipeFraction;
 		auto clearSpot = [&](const CEnemyUnit* t) {
 			const AIFloat3& tp = t->GetPos();
@@ -581,7 +597,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
 			float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
-			if (sq >= SQUARE(trigger)) continue;
+			if ((sq >= SQUARE(trigger)) && (direct || !nearTriggered(e->GetPos()))) continue;
 			// A threat other units already work on comes first among equals, so
 			// the group is not split (O(snipe states), only for threats in range).
 			for (const auto& kv2 : military->GetArtySnipeStates()) {
