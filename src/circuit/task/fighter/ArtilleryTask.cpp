@@ -432,8 +432,8 @@ float HalfDiscShare(const AIFloat3& pA, float rA, const AIFloat3& pB, float rB, 
 	return float(inside) / float(NR * NA);
 }
 
-// The highest weapon-range half-disc share of aimed heavy `t` with any other
-// live or ghost heavy (threats + direct threats) within both ranges; `with`
+// The highest weapon-range half-disc share of aimed ghost heavy `t` with any
+// other ghost heavy (threats + direct threats) within both ranges; `with`
 // gets that heavy. Shares cached per pair for 10 s. O(known enemies + 480 per
 // new pair).
 float DoubleHeavyShare(CMilitaryManager* military, CEnemyManager* enemyMgr, const CEnemyUnit* t,
@@ -442,11 +442,14 @@ float DoubleHeavyShare(CMilitaryManager* military, CEnemyManager* enemyMgr, cons
 	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
 	float best = 0.f;
 	with = nullptr;
+	// Owner 2026-11-03 21:55Z: only ghost pairs count; a live (radar or LOS)
+	// target or partner is not in the pair test at all.
+	if (t->IsInRadarOrLOS()) return 0.f;
 	const float rT = t->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
 	auto& cache = military->GetArtySnipeOverlaps();
 	for (const auto& kv : enemyMgr->GetEnemyUnits()) {
 		const CEnemyUnit* e = kv.second;
-		if ((e == t) || (e->GetCircuitDef() == nullptr) || e->IsHidden() || e->IsDead()) continue;
+		if ((e == t) || (e->GetCircuitDef() == nullptr) || e->IsHidden() || e->IsDead() || e->IsInRadarOrLOS()) continue;
 		const CCircuitDef::Id hid = e->GetCircuitDef()->GetId();
 		if ((info.threats.count(hid) == 0) && (info.directThreats.count(hid) == 0)) continue;
 		const float rH = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
