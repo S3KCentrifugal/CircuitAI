@@ -636,6 +636,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.go = false;
 		st.atHold = false;
 		st.holdSince = -1;
+		st.hasSnipeSpot = false;
 		st.threat = best->GetId();
 		st.target = -1;
 		st.volleys = 0;
@@ -893,7 +894,30 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.atHold = at;
 			if (!at) {
 				st.holdSince = -1;
-				if (st.orderKey != -5 - st.threat) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot, rangeOf(threat, holdRadius));
+				if (st.orderKey != -5 - st.threat) {
+					// Round 6: the threat pick found a clear snipe spot (maybe behind
+					// the threat) but the group gathered and went in on its own side,
+					// through the other threat's reach. Gather on the line out from the
+					// checked snipe spot instead; else as before.
+					const float snipeR2 = range * info.snipeFraction;
+					st.hasSnipeSpot = findSpot(threat->GetPos(), snipeR2, threat->GetId(), true, st.snipeSpot,
+							rangeOf(threat, snipeR2));
+					bool placed = false;
+					if (st.hasSnipeSpot) {
+						const AIFloat3& tp = threat->GetPos();
+						const float dx = st.snipeSpot.x - tp.x, dz = st.snipeSpot.z - tp.z;
+						const float len = std::sqrt(dx * dx + dz * dz);
+						if (len > 1.f) {
+							AIFloat3 h(tp.x + dx / len * holdRadius, 0.f, tp.z + dz / len * holdRadius);
+							CTerrainManager::CorrectPosition(h);
+							if (terrain->CanMoveToPos(unit->GetArea(), h) && safeAt(h, -1, false)) {
+								st.spot = h;
+								placed = true;
+							}
+						}
+					}
+					if (!placed) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot, rangeOf(threat, holdRadius));
+				}
 				if ((st.orderKey != -5 - st.threat) || (frame >= st.orderUntil)) {
 					st.orderKey = -5 - st.threat;
 					st.orderUntil = frame + FRAMES_PER_SEC * 8;
@@ -973,8 +997,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 		const float snipeRange = range * info.snipeFraction;
 		if (st.orderKey != -2 - st.threat) {
-			// Firing spot once per stage: outside other threats if possible.
-			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
+			// Firing spot once per stage: the checked one from gathering, else
+			// outside other threats if possible.
+			if (st.hasSnipeSpot) st.spot = st.snipeSpot;
+			else findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
 		}
 		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
 		issue(threat, !threatSeen, move, -2 - st.threat);
@@ -1020,7 +1046,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
 		const int key = -3 - st.threat * 2 - (threatSeen ? 0 : 1);  // re-aims at once on live <-> ghost
 		if (move && (st.orderKey != key)) {
-			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
+			if (st.hasSnipeSpot) st.spot = st.snipeSpot;
+			else findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
 		}
 		issue(threat, !threatSeen, move, key);
 		return true;

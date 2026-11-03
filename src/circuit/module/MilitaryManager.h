@@ -381,6 +381,8 @@ public:
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
 		bool atHold = false;    // stage 2: waiting at the gathering spot
 		int holdSince = -1;
+		bool hasSnipeSpot = false;  // stage 2: a checked snipe spot (outside other threats, safe walk)
+		springai::AIFloat3 snipeSpot;
 		int drifts = 0;         // prep: times the unit slid into a threat's reach on this target
 		bool drifting = false;
 		std::unordered_set<int> ghostDone;  // ghost images already given their volleys (until seen again)
