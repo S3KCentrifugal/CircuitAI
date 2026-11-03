@@ -124,6 +124,10 @@ void CSuperTask::Update()
 		return;  // Do not interrupt current action
 	}
 
+	if (syncPending) {
+		return;  // a timed volley order is due (CMilitaryManager::UpdateSyncOrders)
+	}
+
 	if (UpdateDebug(unit)) {
 		return;  // the widget's debug strike owns this silo or cannon
 	}
@@ -1395,6 +1399,19 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* d = unit->GetCircuitDef();
+	if (syncOrderFrame >= 0) {
+		// same-impact volley: learn the def's real order-to-launch delay
+		CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+		const int actual = frame - syncOrderFrame;
+		circuit->LOG("SYNC %s(%i): launched %i frames after the order (predicted %.0f)",
+				d->GetDef()->GetName(), unit->GetId(), actual, syncPredDelay);
+		if (syncPredDelay >= 0.f) militaryMgr->NoteSyncDelay(d->GetId(), float(actual) - syncPredDelay);
+		syncOrderFrame = -1;
+		if ((syncAnchorVolley >= 0) && (frame <= syncAnchorUntil)) {
+			militaryMgr->SyncAnchorLaunched(syncAnchorVolley, frame + syncAnchorFlight);
+		}
+		syncAnchorVolley = -1;
+	}
 	CountTierShot(unit, frame);
 	const bool nuke = IsNukeSilo(d), pulse = IsPulse(d);
 	if (!nuke && !pulse) return;
@@ -1951,7 +1968,7 @@ bool CSuperTask::SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame)
 		CCircuitDef* odef = other->GetCircuitDef();
 		if (lp.syncDefs.count(odef->GetId()) == 0) continue;
 		CSuperTask* st = static_cast<CSuperTask*>(task);
-		if (st->isTargetOverride || !st->tierByDef.empty() || st->debugEngaged || (other->Blocker() != nullptr)) continue;
+		if (st->isTargetOverride || st->syncPending || !st->tierByDef.empty() || st->debugEngaged || (other->Blocker() != nullptr)) continue;
 		if (other->GetPos(frame).SqDistance2D(targetPos) >= SQUARE(odef->GetMaxRange())) continue;
 		auto& friendlies = circuit->GetCallback()->GetFriendlyUnitsIn(targetPos, odef->GetAoe());
 		const bool hit = !friendlies.empty();
@@ -1991,19 +2008,97 @@ bool CSuperTask::SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame)
 		targetFrame = frame - TARGET_DELAY + lp.syncRecheckFrames;
 		return true;
 	}
-	circuit->LOG("SYNC %s(%i): volley of %i at (%i,%i)", cdef->GetDef()->GetName(), unit->GetId(), total,
-			int(targetPos.x), int(targetPos.z));
-	for (const auto& c : crew) {
-		c.first->FireSync(c.second, targetPos);
-	}
 	syncHoldSince = -1;
 	syncLogPos = AIFloat3(-1.f, 0.f, -1.f);
-	ExecuteAttack(unit);
+
+	// Same impact (owner 2026-11-03): the shot that takes longest from order to
+	// impact is ordered now, every other one later by the difference, so all
+	// land together. With no timing for a def, all are ordered now.
+	struct SMember { CSuperTask* task; CCircuitUnit* unit; float delay, flight; };
+	std::vector<SMember> members;
+	members.reserve(crew.size() + 1);
+	members.push_back({this, unit, 0.f, 0.f});
+	for (const auto& c : crew) members.push_back({c.first, c.second, 0.f, 0.f});
+	bool timed = true;
+	for (SMember& m : members) {
+		timed = timed && m.task->SyncPredict(m.unit, targetPos, frame, m.delay, m.flight);
+	}
+	if (!timed) {
+		circuit->LOG("SYNC %s(%i): volley of %i at (%i,%i)", cdef->GetDef()->GetName(), unit->GetId(), total,
+				int(targetPos.x), int(targetPos.z));
+		for (const auto& c : crew) {
+			c.first->FireSync(c.second, targetPos);
+		}
+		ExecuteAttack(unit);
+		return true;
+	}
+	unsigned anchor = 0;
+	for (unsigned i = 1; i < members.size(); ++i) {
+		if (members[i].delay + members[i].flight > members[anchor].delay + members[anchor].flight) anchor = i;
+	}
+	const float tMax = members[anchor].delay + members[anchor].flight;
+	const int volley = militaryMgr->NewSyncVolley();
+	std::string plan;
+	for (const SMember& m : members) {
+		plan += std::format(" {}({}) +{}", m.unit->GetCircuitDef()->GetDef()->GetName(), m.unit->GetId(),
+				int(std::lround(tMax - m.delay - m.flight)));
+	}
+	circuit->LOG("SYNC %s(%i): timed volley %i of %i at (%i,%i), impact predicted at frame %i:%s",
+			cdef->GetDef()->GetName(), unit->GetId(), volley, total, int(targetPos.x), int(targetPos.z),
+			frame + int(std::lround(tMax)), plan.c_str());
+	const AIFloat3 aim = targetPos;
+	for (unsigned i = 0; i < members.size(); ++i) {
+		SMember& m = members[i];
+		const int offset = int(std::lround(tMax - m.delay - m.flight));
+		if (i == anchor) {
+			m.task->syncAnchorVolley = volley;
+			m.task->syncAnchorFlight = int(std::lround(m.flight));
+			m.task->syncAnchorUntil = frame + int(std::lround(m.delay)) + FRAMES_PER_SEC * 15;
+		}
+		if (offset <= 0) {
+			m.task->FireSync(m.unit, aim);
+			m.task->syncPredDelay = m.delay;
+		} else {
+			m.task->syncPending = true;
+			m.task->SetTarget(nullptr);
+			m.task->targetPos = aim;
+			militaryMgr->AddSyncOrder({m.unit->GetId(), aim, frame + offset, volley, m.delay + m.flight, frame});
+		}
+	}
 	return true;
+}
+
+bool CSuperTask::SyncPredict(CCircuitUnit* unit, const AIFloat3& pos, int frame, float& delay, float& flight) const
+{
+	const CMilitaryManager* militaryMgr = manager->GetCircuit()->GetMilitaryManager();
+	const CMilitaryManager::SLauncherPrioInfo& lp = militaryMgr->GetLauncherPrioInfo();
+	const CCircuitDef* d = unit->GetCircuitDef();
+	auto it = lp.timing.find(d->GetId());
+	if (it == lp.timing.end()) {
+		return false;
+	}
+	const CMilitaryManager::SLauncherPrioInfo::STiming& tm = it->second;
+	const float dist = unit->GetPos(frame).distance2D(pos);
+	const bool ready = (tm.delayReady >= 0.f) && (frame - unit->GetFireFrame() <= tm.readyFrames);
+	delay = std::max(0.f, (ready ? tm.delayReady : CMilitaryManager::SLauncherPrioInfo::Interp(tm.delay, dist))
+			+ militaryMgr->GetSyncDelayBias(d->GetId()));
+	flight = std::max(0.f, CMilitaryManager::SLauncherPrioInfo::Interp(tm.flight, dist));
+	return true;
+}
+
+void CSuperTask::CancelSyncPending()
+{
+	syncPending = false;
+	syncAnchorVolley = -1;
+	targetFrame = 0;  // rescan at the next update
 }
 
 void CSuperTask::FireSync(CCircuitUnit* unit, const AIFloat3& pos)
 {
+	syncPending = false;
+	syncOrderFrame = manager->GetCircuit()->GetLastFrame();
+	float flight = 0.f;
+	if (!SyncPredict(unit, pos, syncOrderFrame, syncPredDelay, flight)) syncPredDelay = -1.f;
 	SetTarget(nullptr);
 	targetPos = pos;
 	areaRank = 0;

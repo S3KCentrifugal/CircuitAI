@@ -754,6 +754,31 @@ void CMilitaryManager::ReadConfig()
 			readDefs(lpCfg["sync_units"], lp.syncDefs);
 			lp.syncMaxWaitFrames = int(std::max(0.f, lpCfg.get("sync_max_wait_seconds", 150.f).asFloat()) * FRAMES_PER_SEC);
 			lp.syncRecheckFrames = std::max(1, int(lpCfg.get("sync_recheck_seconds", 1.f).asFloat() * FRAMES_PER_SEC));
+			// "sync_timing": {def: {"delay": [[dist, frames], ...], "flight": [[dist, frames], ...],
+			//                       "delay_ready": frames, "ready_seconds": s}}
+			const Json::Value& timingCfg = lpCfg["sync_timing"];
+			if (timingCfg.isObject()) {
+				auto readTable = [](const Json::Value& list) {
+					std::vector<std::pair<float, float>> t;
+					for (const auto& row : list) {
+						if (row.isArray() && (row.size() >= 2)) t.push_back({row[0].asFloat(), row[1].asFloat()});
+					}
+					std::sort(t.begin(), t.end());
+					return t;
+				};
+				for (const std::string& name : timingCfg.getMemberNames()) {
+					CCircuitDef* d = circuit->GetCircuitDef(name.c_str());
+					if (d == nullptr) continue;
+					const Json::Value& tc = timingCfg[name];
+					SLauncherPrioInfo::STiming tm;
+					tm.delay = readTable(tc["delay"]);
+					tm.flight = readTable(tc["flight"]);
+					tm.delayReady = tc.get("delay_ready", -1.f).asFloat();
+					tm.readyFrames = int(std::max(0.f, tc.get("ready_seconds", 0.f).asFloat()) * FRAMES_PER_SEC);
+					if (!tm.delay.empty() && !tm.flight.empty()) lp.timing[d->GetId()] = tm;
+				}
+			}
+			lp.syncPendingMaxFrames = int(std::max(1.f, lpCfg.get("sync_pending_max_seconds", 20.f).asFloat()) * FRAMES_PER_SEC);
 			lp.isEnabled = !lp.defs.empty();
 		}
 		circuit->LOG("CONFIG %s: launcher priority %s | defs=%u primary=%u shields=%i comm_speed=%.1f tertiary=%u t3=%u t3_speed=%.1f sync=%u wait=%is",
@@ -761,6 +786,7 @@ void CMilitaryManager::ReadConfig()
 				int(lp.primaryShields), (lp.commMaxSqSpeed < 0.f) ? -1.f : std::sqrt(lp.commMaxSqSpeed) * FRAMES_PER_SEC,
 				unsigned(lp.tertiary.size()), unsigned(lp.t3Defs.size()), std::sqrt(lp.t3MaxSqSpeed) * FRAMES_PER_SEC,
 				unsigned(lp.syncDefs.size()), lp.syncMaxWaitFrames / FRAMES_PER_SEC);
+		circuit->LOG("CONFIG %s: launcher sync timing defs=%u", cfgName.c_str(), unsigned(lp.timing.size()));
 	}
 
 	/*
@@ -979,6 +1005,10 @@ void CMilitaryManager::InitMilitary()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDefenceTasks, this), FRAMES_PER_SEC * 5, offset + 2);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSensorGuards, this), FRAMES_PER_SEC * 5, offset + 3);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDebugGoal, this), FRAMES_PER_SEC * 2, offset + 1);
+		if (launcherPrioInfo.isEnabled && !launcherPrioInfo.timing.empty()) {
+			// same-impact volleys: timed orders are given on their exact frame
+			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSyncOrders, this), 1, 0);
+		}
 		if (commSnipeInfo.isEnabled) {
 			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateCommanderSnipe, this),
 					commSnipeInfo.interval, offset + 2);
@@ -2008,6 +2038,65 @@ int CMilitaryManager::GetEmpSalvoSize() const
 		}
 	}
 	return std::max(1, count);
+}
+
+/*
+ * Same-impact volleys (owner 2026-11-03), see CSuperTask::SyncLaunch: each
+ * frame, give the timed orders that are due.
+ */
+void CMilitaryManager::UpdateSyncOrders()
+{
+	if (syncOrders.empty()) {
+		return;
+	}
+	const int frame = circuit->GetLastFrame();
+	for (auto it = syncOrders.begin(); it != syncOrders.end();) {
+		CCircuitUnit* unit = circuit->GetTeamUnit(it->unitId);
+		CSuperTask* task = (unit == nullptr) ? nullptr : dynamic_cast<CSuperTask*>(unit->GetTask());
+		if (task == nullptr) {
+			it = syncOrders.erase(it);
+			continue;
+		}
+		if (frame - it->created > launcherPrioInfo.syncPendingMaxFrames) {
+			circuit->LOG("SYNC %s(%i): timed order of volley %i dropped (waited %is)",
+					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), it->volley, (frame - it->created) / FRAMES_PER_SEC);
+			task->CancelSyncPending();
+			it = syncOrders.erase(it);
+			continue;
+		}
+		if (frame >= it->frame) {
+			circuit->LOG("SYNC %s(%i): timed order of volley %i (+%i frames)",
+					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), it->volley, frame - it->created);
+			task->FireSync(unit, it->pos);
+			it = syncOrders.erase(it);
+			continue;
+		}
+		++it;
+	}
+}
+
+void CMilitaryManager::SyncAnchorLaunched(int volley, int impactFrame)
+{
+	const int frame = circuit->GetLastFrame();
+	for (SSyncOrder& o : syncOrders) {
+		if (o.volley != volley) continue;
+		const int moved = impactFrame - int(std::lround(o.total));
+		circuit->LOG("SYNC: volley %i first shot left, predicted impact frame %i: order of %i moves %i -> %i%s",
+				volley, impactFrame, o.unitId, o.frame, moved, (moved <= frame) ? " (now)" : "");
+		o.frame = moved;
+	}
+}
+
+void CMilitaryManager::NoteSyncDelay(CCircuitDef::Id id, float residual)
+{
+	// a slow running mean, clamped so one odd shot cannot throw the timing
+	residual = utils::clamp(residual, -90.f, 90.f);
+	auto it = syncDelayBias.find(id);
+	if (it == syncDelayBias.end()) {
+		syncDelayBias[id] = residual * 0.3f;
+	} else {
+		it->second = it->second * 0.7f + (it->second + residual) * 0.3f;
+	}
 }
 
 void CMilitaryManager::UpdateDefenceTasks()

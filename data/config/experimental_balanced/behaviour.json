@@ -279,7 +279,20 @@
 			"t3_max_speed": 3,
 			"sync_units": ["cortron", "legperdition"],
 			"sync_max_wait_seconds": 150,
-			"sync_recheck_seconds": 1
+			"sync_recheck_seconds": 1,
+			// Owner 2026-11-03: same impact. A mixed volley is timed so every shot lands on the same frame: the one that
+			// takes longest from order to impact is ordered first, the others later by the difference; when it leaves,
+			// the rest are re-timed to its predicted impact. Frames (30 = 1 s) by distance, measured headless 2026-11-03.
+			// delay = order to launch (Perdition: delay_ready if it fired within ready_seconds, turret still open);
+			// the AI also learns a running correction of each def's delay from its own shots.
+			"sync_timing": {
+				"cortron": {"delay": [[1000, 108], [1500, 106], [2000, 117], [2200, 108]],
+					"flight": [[1000, 178], [1500, 195], [2000, 210], [2200, 216]]},
+				"legperdition": {"delay": [[1000, 173], [1500, 181], [2000, 204], [2200, 202]],
+					"flight": [[1000, 251], [1500, 242], [2000, 226], [2200, 215]],
+					"delay_ready": 95, "ready_seconds": 3.5}
+			},
+			"sync_pending_max_seconds": 20
 		},
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
 		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of

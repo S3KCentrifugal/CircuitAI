@@ -17,6 +17,7 @@
 #include "util/AvailList.h"
 
 #include <vector>
+#include <cmath>
 #include <string>
 #include <set>
 #include <unordered_map>
@@ -438,8 +439,51 @@ public:
 		std::unordered_set<CCircuitDef::Id> syncDefs;
 		int syncMaxWaitFrames = 0;   // 0: wait for ever
 		int syncRecheckFrames = 30;
+		// Owner 2026-11-03 (same impact): a mixed volley (Catalyst + Perdition)
+		// is timed so every shot lands on the same frame. Per def, from headless
+		// measurements: order-to-launch delay and launch-to-impact flight, both
+		// in frames, by distance (piecewise linear); delayReady is the delay
+		// when the def fired within readyFrames (its turret is still open).
+		struct STiming {
+			std::vector<std::pair<float, float>> delay, flight;
+			float delayReady = -1.f;
+			int readyFrames = 0;
+		};
+		std::unordered_map<CCircuitDef::Id, STiming> timing;
+		int syncPendingMaxFrames = 20 * 30;  // a timed order older than this is dropped
+		static float Interp(const std::vector<std::pair<float, float>>& t, float x) {
+			if (t.empty()) return 0.f;
+			if (t.size() == 1) return t[0].second;
+			unsigned i = 1;
+			while ((i + 1 < t.size()) && (x > t[i].first)) ++i;
+			const auto& a = t[i - 1];
+			const auto& b = t[i];
+			const float span = b.first - a.first;
+			return (std::abs(span) < 1e-3f) ? a.second : a.second + (b.second - a.second) * (x - a.first) / span;
+		}
 	};
 	const SLauncherPrioInfo& GetLauncherPrioInfo() const { return launcherPrioInfo; }
+	// Same-impact volleys: a shot ordered later than the volley's first, so
+	// that it lands with it. UpdateSyncOrders gives the order on `frame`.
+	struct SSyncOrder {
+		ICoreUnit::Id unitId;
+		springai::AIFloat3 pos;
+		int frame;
+		int volley;
+		float total;    // this shot's predicted delay + flight, frames
+		int created;
+	};
+	int NewSyncVolley() { return ++syncVolleySerial; }
+	void AddSyncOrder(const SSyncOrder& o) { syncOrders.push_back(o); }
+	// The volley's first shot left: its impact frame is now known, so the
+	// orders still waiting are re-timed to it.
+	void SyncAnchorLaunched(int volley, int impactFrame);
+	// Learned correction of a def's predicted delay (actual - predicted, frames).
+	float GetSyncDelayBias(CCircuitDef::Id id) const {
+		auto it = syncDelayBias.find(id);
+		return (it == syncDelayBias.end()) ? 0.f : it->second;
+	}
+	void NoteSyncDelay(CCircuitDef::Id id, float residual);
 	/*
 	 * Owner 2026-11-03: artillery snipe ("artillery_snipe"). Listed long-range
 	 * rocket artillery (Thanatos, Arbiter, Boreas, Negotiator, Ambassador) that
@@ -759,6 +803,10 @@ private:
 	SCommSnipeInfo commSnipeInfo;
 	SArtyCommInfo artyCommInfo;
 	SLauncherPrioInfo launcherPrioInfo;
+	std::vector<SSyncOrder> syncOrders;
+	int syncVolleySerial = 0;
+	std::unordered_map<CCircuitDef::Id, float> syncDelayBias;
+	void UpdateSyncOrders();
 	SArtySnipeInfo artySnipeInfo;
 	std::unordered_map<int, SArtySnipeState> artySnipeStates;
 	int artySnipePrune = 0;

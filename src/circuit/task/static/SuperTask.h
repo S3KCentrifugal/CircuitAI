@@ -97,7 +97,20 @@ private:
 	// Synchronised volley on a primary target (sync_units): true when the
 	// caller must not ExecuteAttack (holding, or the volley already fired).
 	bool SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame);
+public:
+	// Same-impact volleys (CMilitaryManager::UpdateSyncOrders): the timed order, or its drop.
 	void FireSync(CCircuitUnit* unit, const springai::AIFloat3& pos);
+	void CancelSyncPending();
+private:
+	bool syncPending = false;     // a timed volley order is waiting: Update leaves the unit alone
+	int syncAnchorVolley = -1;    // this shot opens that volley: its launch re-times the rest
+	int syncAnchorFlight = 0;     // its predicted flight, frames
+	int syncAnchorUntil = -1;
+	int syncOrderFrame = -1;      // when the last volley order was given, and the delay predicted for it
+	float syncPredDelay = -1.f;
+	// The predicted order-to-impact time of a sync launcher at `pos`: delay +
+	// flight (frames), flight alone in *flight. False with no timing for the def.
+	bool SyncPredict(CCircuitUnit* unit, const springai::AIFloat3& pos, int frame, float& delay, float& flight) const;
 	int areaRank = -1;            // the rank SelectAreaTarget picked at the last scan, -1 none
 	bool areaPeacePool = false;   // SelectAreaTarget is scanning the peace (unarmed) pool
 	int syncHoldSince = -1;       // first frame of the current sync hold, -1 none
