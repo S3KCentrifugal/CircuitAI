@@ -44,6 +44,8 @@ def main():
     p.add_argument('--minutes', type=float, default=10)
     p.add_argument('--wall-minutes', type=float, default=25)
     p.add_argument('--los-off', type=int, default=25, help='ghost mode: game seconds when global LOS goes off')
+    p.add_argument('--extra', default='', help='host units at absolute spots, "def,x,z;def,x,z" (e.g. a parked commander or Tremor for the artillery_commander priority)')
+    p.add_argument('--damage', default='', help='pre-damage host porc, "def:healthPct,..." (e.g. cortoast:18,armanni:20; BAR dev sethealth, cheats on)')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
@@ -76,11 +78,13 @@ def main():
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     lua = lambda rows: '{' + ','.join('{"%s",%d,%d}' % r for r in rows) + '}'
     defs = '{' + ','.join('%s=true' % r[0] for r in ARTY) + '}'
+    extra = [tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.extra.split(';') if e]
     ghost = a.mode == 'ghost'
     at = ARTY_NEAR if ghost else ARTY_AT
     conf = ('return {mode="%s", cx=%d, cz=%d, ax=%d, az=%d, porc=%s, arty=%s, artyDefs=%s, placeAt=300, artyAt=%d, '
-            'losOnAt=60, %stimeoutMin=%d, afterKill=60}\n') % (
-        a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(PORC), lua(ARTY), defs, a.los_off * 30 + 60 if ghost else 360,
+            'losOnAt=60, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
+        a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(PORC), lua(ARTY), defs, a.los_off * 30 + 60 if ghost else 360, lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
+        '{' + ''.join('%s=%s,' % tuple(kv.split(':')) for kv in a.damage.split(',') if kv) + '}',
         ('losOffAt=%d, ' % (a.los_off * 30)) if a.mode == 'ghost' else '', int(minutes))
     (d / 'LuaUI/Config/arty_snipe.lua').write_text(conf)
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'mode': a.mode, 'cluster': CLUSTER,

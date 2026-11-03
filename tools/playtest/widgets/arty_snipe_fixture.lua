@@ -40,8 +40,13 @@ function widget:UnitCreated(u,ud,team)
     if not d then return end
     local x,_,z=Spring.GetUnitPosition(u)
     if team==A and not cfg.artyDefs[d.name] then return end
-    if team==myTeam and d.canMove then return end
+    if team==myTeam and d.canMove and not (cfg.extraDefs or {})[d.name] then return end
     tracked[u]={def=d.name,team=team,x=x,z=z}
+    local dmg=team==myTeam and (cfg.damage or {})[d.name]
+    if dmg then   -- pre-damaged (BAR dev helper, cheats on); in ghost mode then seen once and turned into a ghost
+        Spring.SendLuaRulesMsg(string.format("$dev$:sethealth %d:%.3f",u,dmg))
+        echo(string.format("sethealth id=%d def=%s to %.1f%%",u,d.name,dmg))
+    end
     echo(string.format("unit id=%d team=%d def=%s pos=(%.0f,%.0f) range=%.0f",u,team,d.name,x,z,d.maxWeaponRange or -1))
 end
 
@@ -91,6 +96,8 @@ local function gameFrame(f)
     if f==(cfg.placeAt or 300) then
         for _,e in ipairs(cfg.porc) do give(e[1],myTeam,cfg.cx+e[2],cfg.cz+e[3]) end
         echo(string.format("porc cluster at (%d,%d): %d units",cfg.cx,cfg.cz,#cfg.porc))
+        for _,e in ipairs(cfg.extra or {}) do give(e[1],myTeam,e[2],e[3]) end
+        if cfg.extra and #cfg.extra>0 then echo(string.format("extra host units: %d",#cfg.extra)) end
     end
     if f==(cfg.artyAt or 360) then
         for _,e in ipairs(cfg.arty) do give(e[1],A,cfg.ax+e[2],cfg.az+e[3]) end
@@ -100,6 +107,14 @@ local function gameFrame(f)
     if f==(cfg.artyAt or 360)+20 then
         for _,u in ipairs(Spring.GetAllUnits() or {}) do
             if not tracked[u] and Spring.GetUnitTeam(u)==A then widget:UnitCreated(u,Spring.GetUnitDefID(u),A) end
+        end
+    end
+    if f==(cfg.placeAt or 300)+60 then
+        for u,t in pairs(tracked) do
+            if (cfg.damage or {})[t.def] then
+                local hp,maxhp=Spring.GetUnitHealth(u)
+                echo(string.format("health id=%d def=%s hp=%s maxhp=%s",u,t.def,tostring(hp and math.floor(hp)),tostring(maxhp and math.floor(maxhp))))
+            end
         end
     end
     if cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
