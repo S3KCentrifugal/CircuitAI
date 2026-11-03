@@ -450,6 +450,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const CCircuitDef::Id eid = e->GetCircuitDef()->GetId();
 			const bool direct = info.threats.count(eid) == 0;
 			if (direct && (info.directThreats.count(eid) == 0)) continue;
+			if (e->IsInRadarOrLOS()) st.ghostDone.erase(e->GetId());
+			else if (st.ghostDone.count(e->GetId()) > 0) continue;  // its ghost already had the volleys
 			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
 			const float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
@@ -464,6 +466,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 		st.stage = bestDirect ? 2 : 1;
 		st.direct = bestDirect;
+		st.go = false;
+		st.atHold = false;
+		st.holdSince = -1;
 		st.threat = best->GetId();
 		st.target = -1;
 		st.volleys = 0;
@@ -569,6 +574,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		return true;
 	};
 	auto walkSafe = [&](const AIFloat3& a, const AIFloat3& b, int except) {
+		if (!safeAt(a, except, true)) return true;  // already inside: any way out will do
 		const float len = a.distance2D(b);
 		const int n = std::max(1, int(len / 100.f));
 		for (int i = 1; i <= n; ++i) {
@@ -634,11 +640,17 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	};
 
 	if (st.stage == 1) {
-		// Already inside a threat's reach (it was revealed late): no prep.
-		if (!safeAt(pos, -1, true)) {
-			circuit->LOG("SNIPE: %s %i already inside a threat's reach, snipes %s %i now",
+		// Already inside a threat's reach and within snipe range of it (it was
+		// revealed late): exposed anyway, so snipe now. Inside but farther out:
+		// the prep spots below lead it back out first (test: 4 of 8 units that
+		// sniped alone from inside died).
+		if (!safeAt(pos, -1, true)
+			&& (pos.SqDistance2D(threat->GetPos()) <= SQUARE(range * info.snipeFraction + 16.f)))
+		{
+			circuit->LOG("SNIPE: %s %i already within range of %s %i inside its reach, snipes now",
 					cdef->GetDef()->GetName(), unit->GetId(), SnipeName(threat), st.threat);
 			st.stage = 2;
+			st.go = true;
 			st.volleys = 0;
 			st.stageFrame = frame;
 			st.target = -1;
@@ -660,12 +672,14 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				}
 				const int cap = st.targetGhost ? info.volleys : info.visibleMaxVolleys;  // 0: until dead
 				if ((cap > 0) && (st.volleys >= cap)) why = st.targetGhost ? "ghost volleys fired" : "volley cap";
+				else if (st.drifts >= 2) why = "cannot be hit from outside the threats' reach";
 				else if (frame - std::max(st.targetFrame, st.lastVolley) > info.stageFrames) why = "no volley, gives up";
 			}
 			if (why != nullptr) {
 				circuit->LOG("SNIPE: %s %i prep %s %i %s (%i volleys)", cdef->GetDef()->GetName(), unit->GetId(),
 						SnipeName(target), st.target, why, st.volleys);
 				st.skipUntil[st.target] = frame + info.repeatFrames;
+				if (st.targetGhost) st.ghostDone.insert(st.target);  // a dead one stays a ghost: once is enough
 				st.target = -1;
 				target = nullptr;
 			}
@@ -687,6 +701,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					continue;
 				}
 				const bool seen = e->IsInRadarOrLOS();
+				if (seen) st.ghostDone.erase(e->GetId());
+				else if (st.ghostDone.count(e->GetId()) > 0) continue;
 				if (bestSeen && !seen) continue;
 				AIFloat3 spot;
 				if ((pos.SqDistance2D(e->GetPos()) <= SQUARE(prepRadius)) && safeAt(pos, e->GetId(), false)) {
@@ -716,6 +732,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.volleys = 0;
 			st.spot = bestSpot;
 			st.orderKey = -1;
+			st.drifts = 0;
+			st.drifting = false;
 			circuit->LOG("SNIPE: %s %i prep %s %s %i at (%.0f, %.0f) from (%.0f, %.0f), %.0f to walk",
 					cdef->GetDef()->GetName(), unit->GetId(), bestSeen ? "attacks" : "fires on ghost",
 					SnipeName(best), best->GetId(), best->GetPos().x, best->GetPos().z,
@@ -723,12 +741,75 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			target = best;
 		}
 		const bool inRange = pos.SqDistance2D(target->GetPos()) <= SQUARE(range * info.prepFraction + 16.f);
+		// Slid into a threat's reach (the engine walks a unit closer when 3D
+		// range falls short): back to the spot; the second time, give it up.
+		const bool drift = !safeAt(pos, -1, true) && safeAt(st.spot, target->GetId(), false);
+		if (drift && !st.drifting) {
+			++st.drifts;
+			circuit->LOG("SNIPE: %s %i slid into a threat's reach on prep %s %i, backs out (%i)",
+					cdef->GetDef()->GetName(), unit->GetId(), SnipeName(target), st.target, st.drifts);
+		}
+		st.drifting = drift;
 		const bool move = !inRange || !safeAt(pos, target->GetId(), false);
-		issue(target, st.targetGhost, move, target->GetId() * 2 + (st.targetGhost ? 1 : 0));
+		issue(target, st.targetGhost, move, target->GetId() * 4 + (st.targetGhost ? 2 : 0) + (move ? 1 : 0));
 		return true;
 	}
 
 	const bool threatSeen = threat->IsInRadarOrLOS();
+	if ((st.stage == 2) && !st.go) {
+		// Gather just outside the threat's reach and go in together, when its
+		// reach is beyond the snipe spot. O(snipe states).
+		const float reach = reachOf(threat->GetCircuitDef());
+		if (range * info.snipeFraction >= reach) {
+			st.go = true;  // shoots from outside its reach: no need to gather
+		} else {
+			const float holdRadius = reach + info.holdMargin;
+			const float d = pos.distance2D(threat->GetPos());
+			const bool at = safeAt(pos, -1, true) && (d <= holdRadius + 250.f);
+			st.atHold = at;
+			if (!at) {
+				st.holdSince = -1;
+				if (st.orderKey != -5 - st.threat) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot);
+				if ((st.orderKey != -5 - st.threat) || (frame >= st.orderUntil)) {
+					st.orderKey = -5 - st.threat;
+					st.orderUntil = frame + FRAMES_PER_SEC * 8;
+					if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+					TRY_UNIT(circuit, unit,
+						unit->CmdMoveTo(st.spot, 0, frame + FRAMES_PER_SEC * 12);
+					)
+				}
+				return true;
+			}
+			if (st.holdSince < 0) {
+				st.holdSince = frame;
+				circuit->LOG("SNIPE: %s %i gathers %.0f from %s %i", cdef->GetDef()->GetName(), unit->GetId(),
+						d, SnipeName(threat), st.threat);
+			}
+			int waiting = 0, going = 0, total = 0;
+			for (const auto& kv : military->GetArtySnipeStates()) {
+				const CMilitaryManager::SArtySnipeState& o = kv.second;
+				if ((o.threat != st.threat) || (o.stage == 0) || (frame - o.lastCall > FRAMES_PER_SEC * 10)) continue;
+				++total;
+				if ((o.stage >= 2) && o.go) ++going;
+				else if ((o.stage != 2) || !o.atHold) ++waiting;
+			}
+			if ((going == 0) && (waiting > 0) && (frame - st.holdSince < info.groupWaitFrames)) {
+				if (st.orderKey != -6 - st.threat) {
+					st.orderKey = -6 - st.threat;
+					TRY_UNIT(circuit, unit,
+						unit->CmdStop();
+					)
+				}
+				return true;  // others still on their way or on prep porc
+			}
+			st.go = true;
+			st.stageFrame = frame;
+			st.volleys = 0;
+			st.orderKey = -1;
+			circuit->LOG("SNIPE: %s %i goes in on %s %i with %i unit(s)%s", cdef->GetDef()->GetName(), unit->GetId(),
+					SnipeName(threat), st.threat, total, ((waiting > 0) && (going == 0)) ? " (group wait over)" : "");
+		}
+	}
 	if (st.stage == 2) {
 		// A seen direct threat (Pulsar, Bulwark, Bastion) is attacked until dead
 		// (visible_max_volleys 0); "gone" ends it.
@@ -763,6 +844,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			return true;  // shells still landing
 		}
 		if (!threatSeen) {
+			st.ghostDone.insert(st.threat);  // not again while it stays a ghost
 			return finish("not seen alive after the volleys");
 		}
 		circuit->LOG("SNIPE: %s %i sees %s %i alive, fires %i more", cdef->GetDef()->GetName(), unit->GetId(),
