@@ -40,6 +40,7 @@ def main():
     p.add_argument('--mode', choices=['juno', 'group'], required=True)
     p.add_argument('--minutes', type=float, default=26)
     p.add_argument('--wall-minutes', type=float, default=40)
+    p.add_argument('--protect', action='store_true', help='heal the cluster porc to full on every hit, so it lives until a probe pulse')
     p.add_argument('--recycle', type=int, default=60, help='game seconds after the whole cluster died before it is placed again')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
@@ -73,8 +74,8 @@ def main():
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     lua = lambda rows: '{' + ','.join('{"%s",%d,%d}' % r for r in rows) + '}'
     ours = OURS + (JUNO if a.mode == 'juno' else ECO)
-    (d / 'LuaUI/Config/juno_probe.lua').write_text('return {mode="%s", cx=%d, cz=%d, cluster=%s, ours=%s, jammer="armveil", recycleSec=%d, timeoutMin=%d}\n' % (
-        a.mode, CLUSTER[0], CLUSTER[1], lua(JAMMED), lua(ours), a.recycle, int(minutes)))
+    (d / 'LuaUI/Config/juno_probe.lua').write_text('return {mode="%s", cx=%d, cz=%d, cluster=%s, ours=%s, jammer="armveil", protect=%s, recycleSec=%d, timeoutMin=%d}\n' % (
+        a.mode, CLUSTER[0], CLUSTER[1], lua(JAMMED), lua(ours), 'true' if a.protect else 'false', a.recycle, int(minutes)))
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'mode': a.mode, 'cluster': CLUSTER,
         'jammed': JAMMED, 'ours': ours}, indent=2))
     if a.stage_only:

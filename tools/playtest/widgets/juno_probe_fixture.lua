@@ -46,7 +46,11 @@ function widget:UnitCreated(u,ud,team)
 end
 
 function widget:UnitDamaged(u,ud,team,damage,para,wd,pid,attacker,attackerDef)
-    if not tracked[u] or not para then return end
+    if not tracked[u] then return end
+    -- protect: the porc is healed to full on every hit (BAR dev sethealth, cheats on), so the
+    -- cluster outlives the raiders until a probe pulse; the pulse deletes the Veil regardless
+    if cfg.protect and tracked[u].def~=cfg.jammer then Spring.SendLuaRulesMsg(string.format("$dev$:sethealth %d:100",u)) end
+    if not para then return end
     echo(string.format("emp frame=%d id=%d def=%s damage=%.0f",frameNow,u,tracked[u].def,damage))
 end
 
