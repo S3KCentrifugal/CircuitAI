@@ -559,6 +559,8 @@ public:
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
 		int goFrame = -1;       // stage 2: when it left the gathering spot
+		int ghostAim = -1;      // default targeting: ghost being given its blind volleys
+		int ghostShots = 0;
 		// Owner 2026-11-03 21:04Z synced volley: a gathered group walks in with
 		// fire held and all open fire in one frame (see ArtySnipeStep stage 2).
 		bool syncWait = false;  // stage 2: walking in, waiting for the group's volley

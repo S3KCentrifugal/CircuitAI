@@ -172,13 +172,32 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		// of the firing spot; the next Execute re-picks (a structure if it left).
 		const CCircuitDef* edef = bestTarget->GetCircuitDef();
 		const int timeout = frame + FRAMES_PER_SEC * ((edef != nullptr && edef->IsMobile()) ? 5 : 60);
+		// Owner 21:36Z: a ghost pick is ground fire on its image; ArtySnipeStep
+		// counts the volleys against it.
+		const bool ghost = !bestTarget->IsInRadarOrLOS();
+		CMilitaryManager* military = circuit->GetMilitaryManager();
+		if (military->GetArtySnipeInfo().isEnabled && (military->GetArtySnipeInfo().defs.count(unit->GetCircuitDef()->GetId()) > 0)) {
+			CMilitaryManager::SArtySnipeState& gst = military->GetArtySnipeState(unit->GetId(), frame);
+			if (!ghost) {
+				gst.ghostAim = -1;
+				gst.ghostShots = 0;
+			} else if (gst.ghostAim != bestTarget->GetId()) {
+				gst.ghostAim = bestTarget->GetId();
+				gst.ghostShots = 0;
+				circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f)", unit->GetCircuitDef()->GetDef()->GetName(),
+						unit->GetId(), (edef != nullptr) ? edef->GetDef()->GetName() : "?", bestTarget->GetId(),
+						bestTarget->GetPos().x, bestTarget->GetPos().z);
+			}
+		}
 		TRY_UNIT(circuit, unit,
-			if (!circuit->IsCheating()) {
+			if (ghost) {
+				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+			} else if (!circuit->IsCheating()) {
 				unit->GetUnit()->Attack(bestTarget->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			} else {
 				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			}
-			unit->CmdSetTarget(bestTarget);
+			if (!ghost) unit->CmdSetTarget(bestTarget);
 		)
 		return;
 	}
@@ -413,6 +432,39 @@ float HalfDiscShare(const AIFloat3& pA, float rA, const AIFloat3& pB, float rB, 
 	return float(inside) / float(NR * NA);
 }
 
+// The highest weapon-range half-disc share of aimed heavy `t` with any other
+// live or ghost heavy (threats + direct threats) within both ranges; `with`
+// gets that heavy. Shares cached per pair for 10 s. O(known enemies + 480 per
+// new pair).
+float DoubleHeavyShare(CMilitaryManager* military, CEnemyManager* enemyMgr, const CEnemyUnit* t,
+		const AIFloat3& face, int frame, const CEnemyUnit*& with)
+{
+	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
+	float best = 0.f;
+	with = nullptr;
+	const float rT = t->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
+	auto& cache = military->GetArtySnipeOverlaps();
+	for (const auto& kv : enemyMgr->GetEnemyUnits()) {
+		const CEnemyUnit* e = kv.second;
+		if ((e == t) || (e->GetCircuitDef() == nullptr) || e->IsHidden() || e->IsDead()) continue;
+		const CCircuitDef::Id hid = e->GetCircuitDef()->GetId();
+		if ((info.threats.count(hid) == 0) && (info.directThreats.count(hid) == 0)) continue;
+		const float rH = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
+		if (e->GetPos().SqDistance2D(t->GetPos()) > SQUARE(rT + rH)) continue;
+		const uint64_t key = (uint64_t(uint32_t(t->GetId())) << 32) | uint32_t(e->GetId());
+		auto it = cache.find(key);
+		float share;
+		if ((it != cache.end()) && (frame - it->second.second < FRAMES_PER_SEC * 10)) {
+			share = it->second.first;
+		} else {
+			share = HalfDiscShare(t->GetPos(), rT, e->GetPos(), rH, face);
+			cache[key] = {share, frame};
+		}
+		if (share > best) { best = share; with = e; }
+	}
+	return best;
+}
+
 const char* SnipeName(const CEnemyUnit* e)
 {
 	return (e != nullptr && e->GetCircuitDef() != nullptr) ? e->GetCircuitDef()->GetDef()->GetName() : "?";
@@ -538,6 +590,16 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		if ((shotAt >= 0) && ((st.lastVolley < 0) || (shotAt - st.lastVolley >= gap))) {
 			st.lastVolley = shotAt;
 			if ((st.stage != 0) && (frame >= st.hvUntil)) ++st.volleys;
+			// Owner 2026-11-03 21:36Z: a ghost picked by the default target
+			// choice gets `volleys` blind volleys, then is left until a fresh
+			// LOS sighting (CArtilleryTask::FindTarget / Execute).
+			if ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil) && (++st.ghostShots >= info.volleys)) {
+				st.ghostDone.insert(st.ghostAim);
+				circuit->LOG("SNIPE: %s %i fired %i blind volleys at ghost %i, leaves it until seen", cdef->GetDef()->GetName(),
+						unit->GetId(), st.ghostShots, st.ghostAim);
+				st.ghostAim = -1;
+				st.ghostShots = 0;
+			}
 		}
 	}
 
@@ -546,8 +608,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	if (isPriority && ArtyPriorityStep(circuit, unit, frame, st, pos, range)) {
 		return true;
 	}
-	if (!isSnipe) {
-		return false;
+	if (!isSnipe || (range < info.closeMinRange)) {
+		return false;  // owner 21:36Z: Thanatos/Arbiter: default target choice + GhostFireStep only
 	}
 	auto skipped = [&st, frame](int id) {
 		auto it = st.skipUntil.find(id);
@@ -677,7 +739,18 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		if (best == nullptr) {
 			return false;
 		}
-		st.stage = bestDirect ? 2 : 1;
+		// Owner 2026-11-03 21:36Z: the default target choice is the baseline (a
+		// single ghost is one of its targets); only a ghost heavy sharing more
+		// than double_heavy_overlap with another heavy starts a sequence, and
+		// that goes straight to the gather (no prep porc).
+		{
+			const CEnemyUnit* with = nullptr;
+			const float share = DoubleHeavyShare(military, enemyMgr, best, pos, frame, with);
+			if ((with == nullptr) || (share <= info.doubleHeavyOverlap)) {
+				return false;
+			}
+		}
+		st.stage = 2;
 		st.direct = bestDirect;
 		st.go = false;
 		st.atHold = false;
@@ -975,31 +1048,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		// weapon-range half-discs facing the hold point; a share above
 		// double_heavy_overlap is double heavy. Shares cached per pair ~10 s.
 		// O(known enemies + 480 per new pair).
-		float dhShare = 0.f;
 		const CEnemyUnit* dhWith = nullptr;
-		{
-			const float rT = threat->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
-			const AIFloat3 face = (st.spotFor == st.threat) ? st.spot : pos;
-			auto& cache = military->GetArtySnipeOverlaps();
-			for (const auto& kv : enemyMgr->GetEnemyUnits()) {
-				const CEnemyUnit* e = kv.second;
-				if ((e->GetId() == st.threat) || !SnipeAlive(e)) continue;
-				const CCircuitDef::Id hid = e->GetCircuitDef()->GetId();
-				if ((info.threats.count(hid) == 0) && (info.directThreats.count(hid) == 0)) continue;
-				const float rH = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
-				if (e->GetPos().SqDistance2D(threat->GetPos()) > SQUARE(rT + rH)) continue;
-				const uint64_t key = (uint64_t(uint32_t(st.threat)) << 32) | uint32_t(e->GetId());
-				auto it = cache.find(key);
-				float share;
-				if ((it != cache.end()) && (frame - it->second.second < FRAMES_PER_SEC * 10)) {
-					share = it->second.first;
-				} else {
-					share = HalfDiscShare(threat->GetPos(), rT, e->GetPos(), rH, face);
-					cache[key] = {share, frame};
-				}
-				if (share > dhShare) { dhShare = share; dhWith = e; }
-			}
-		}
+		const float dhShare = DoubleHeavyShare(military, enemyMgr, threat,
+				(st.spotFor == st.threat) ? st.spot : pos, frame, dhWith);
 		const bool doubleHeavy = (dhWith != nullptr) && (dhShare > info.doubleHeavyOverlap);
 		if ((dhWith != nullptr) && (st.dhLoggedFor != st.threat)) {
 			st.dhLoggedFor = st.threat;
@@ -1368,10 +1419,26 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		// own top speed, still ahead of every structure.
 		CEnemyInfo* heavyTarget = nullptr;
 		float heavySqDist = SQUARE(range);
+		// Owner 2026-11-03 21:36Z: for the artillery_snipe units of at least
+		// close_in_min_range (Boreas, Negotiator, Ambassador) ghost images of
+		// structures are targets too, in the same order as everything else; each
+		// gets `volleys` blind volleys (counted in ArtySnipeStep), then waits for
+		// a fresh LOS sighting. Same O(enemies) loop.
+		CMilitaryManager* military = circuit->GetMilitaryManager();
+		const CMilitaryManager::SArtySnipeInfo& snipeInfo = military->GetArtySnipeInfo();
+		CMilitaryManager::SArtySnipeState* ghostSt = (snipeInfo.isEnabled && (snipeInfo.defs.count(cdef->GetId()) > 0)
+				&& (cdef->GetMaxRange(CCircuitDef::RangeType::LAND) >= snipeInfo.closeMinRange))
+				? &military->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame()) : nullptr;
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
+			if ((ghostSt != nullptr) && enemy->IsInLOS()) {
+				ghostSt->ghostDone.erase(enemy->GetId());  // a fresh sighting resets its blind volleys
+			}
+			const bool ghost = !enemy->IsInRadarOrLOS();
 			if (enemy->IsHidden()
-				|| !enemy->IsInRadarOrLOS()
+				|| (ghost && ((ghostSt == nullptr) || (enemy->GetCircuitDef() == nullptr) || enemy->GetCircuitDef()->IsMobile()
+					|| enemy->GetData()->IsDying() || enemy->GetData()->IsDead()
+					|| (ghostSt->ghostDone.count(enemy->GetId()) > 0)))
 				|| (notAW && (enemy->GetPos().y < -SQUARE_SIZE * 5)))
 			{
 				continue;
