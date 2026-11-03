@@ -1005,6 +1005,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 			frame, policy.overnukeStock);
 	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
 			over.Stocking() ? ", stocking the salvo first" : "");
+	circuit->GetMilitaryManager()->NoteOvernukeRound();  // our silo began it: we ask AIR (team/nuke_recon.as)
 	if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
 		return false;
 	}

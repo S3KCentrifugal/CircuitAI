@@ -18,7 +18,9 @@
 #include "resource/MetalField.h"
 #include "task/static/StrategicTargeting.h"
 
+#include <cstdlib>
 #include <memory>
+#include <string>
 #include <map>
 #include <unordered_set>
 
@@ -149,7 +151,18 @@ public:
 	// One overnuke per ally team (owner 2026-11-01): every allied BARb's silos, FRONT's
 	// grid included, count towards the breakpoints and fire at the same target.
 	strategic::Overnuke& GetOvernuke() { return overnuke; }
+	// Team rolls (owner 2026-11-03, front nukerush): one draw per key for the
+	// whole ally team, made by whichever allied BARb asks first; every later
+	// ask, by any ally, gets the same answer.
+	bool TeamRoll(const std::string& key, float chance, bool& first)
+	{
+		auto it = teamRolls.find(key);
+		first = (it == teamRolls.end());
+		if (first) it = teamRolls.emplace(key, (float(rand()) / (float(RAND_MAX) + 1.f)) < chance).first;
+		return it->second;
+	}
 private:
+	std::map<std::string, bool> teamRolls;
     commander::ShotClaims commanderShots;
     CCombatSnapshot combatSnapshot;
     defense::Claims defenseClaims;

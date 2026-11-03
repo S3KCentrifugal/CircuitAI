@@ -68,6 +68,20 @@ namespace NukeRecon {
             }
             return true;
         }
+        if (msg.findFirst("nukerecon|overnuke|")==0) {
+            // nukerecon|overnuke|x|z|spread|round (front nukerush, OvernukeRecon::Rounds): any rostered
+            // ally's overnuke began or finished a salvo; draft the built scouts there now, owe the rest
+            array<string>@ parts=msg.split("|");
+            if (parts.length()<5 || !AirEconomy::Active()) return true;
+            if (fromTeamId!=ai.teamId && Team::Roster::Get(fromTeamId) is null) return true;
+            const AIFloat3 at(parseFloat(parts[2]),0,parseFloat(parts[3]));
+            const float spread=parseFloat(parts[4]);
+            AirScoutSweep::Nuked(at,spread);
+            AirScoutSweep::Urgent(at,spread);
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] overnuke request from "+fromTeamId+(parts.length()>=6 ? " round "+parts[5] : "")
+                +" at=("+int(at.x)+","+int(at.z)+") spread="+int(spread),1);
+            return true;
+        }
         if (msg.findFirst("nukerecon|probe|")==0) {
             // nukerecon|probe|event: TECH's silo stocked or fired; AIR logs its scouts' reach
             array<string>@ parts=msg.split("|");
@@ -182,12 +196,38 @@ namespace NukeLaunchRecon {
 // raises its scout count and we ask AIR for the lolcannon-style package: each
 // plane to its own point spread over the blast, not all onto the centre
 // (LolCannonRecon::Route). Any role that owns silos asks; AIR flies it.
+//
+// Front nukerush (owner 2026-11-03, team/front_nukerush.as): with the team roll
+// on, the overnuke also asks AIR for a scout package across the map when it
+// begins (the trigger: 3+ finished silos across every allied BARb) and every
+// time a salvo is fully launched and the next target starts stocking - the AI
+// whose silo began the target asks (C++ GetOvernukeRounds). The request is
+// nukerecon|overnuke|x|z|spread|round: AIR drafts its built scouts at once and
+// owes the rest, ungated, as for TECH's nuke rush call (AirScoutSweep::Urgent);
+// with no AIR, TECH builds them (LolCannonRecon::Send).
 namespace OvernukeRecon {
     const int T1Scouts = 10, RadarScouts = 3;
-    int seen = 0, checked = -SECOND;
+    int seen = 0, checked = -SECOND, seenRounds = 0;
+    void Rounds() {
+        const int rounds = aiMilitaryMgr.GetOvernukeRounds();
+        if (rounds <= seenRounds) return;
+        seenRounds = rounds;
+        if (!Global::FrontNukeRush::RoundScouts || !FrontNukeRush::On()) return;
+        const AIFloat3 at = aiMilitaryMgr.GetOvernukePos();
+        if (at.x < 0.0f) return;
+        const float spread = aiMilitaryMgr.GetOvernukeRadius();
+        const string why = rounds == 1 ? "overnuke begins" : "overnuke round " + rounds + ": the last salvo is out, the next stocks";
+        const int air = (Global::AISettings::Role == AiRole::AIR) ? ai.teamId : LolCannonRecon::Provider(AiRole::AIR);
+        if (air < 0) { LolCannonRecon::Send(T1Scouts, RadarScouts, at, spread, "nukerush " + why); return; }
+        const string msg = "nukerecon|overnuke|" + int(at.x) + "|" + int(at.z) + "|" + int(spread) + "|" + rounds;
+        GenericHelpers::LogUtil("[NukeRush] " + why + " at (" + int(at.x) + "," + int(at.z) + "): AIR=" + air + " asked to scout across the map", 1);
+        if (air == ai.teamId) NukeRecon::Handle(msg, ai.teamId);
+        else AiSendMessage(msg, air);
+    }
     void Tick() {
         if (ai.frame - checked < SECOND) return;
         checked = ai.frame;
+        Rounds();
         const int scouts = aiMilitaryMgr.GetOvernukeScouts();
         if (scouts <= seen) return;
         seen = scouts;

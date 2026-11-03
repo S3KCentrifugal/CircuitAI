@@ -516,6 +516,8 @@ namespace TechRules {
         return null;
     }
     IUnitTask@ DoNukeAfus(Ctx@ c)       { return RoleTech::Tech_AfusSilo(c.u, c.mi, c.ei); }
+    // owner 2026-11-03: the front nukerush team roll (team/front_nukerush.as) - silos in the FRONT grid's tight blocks
+    IUnitTask@ DoNukeRushGrid(Ctx@ c)   { return (FrontNukeRush::On() && FrontNukeRush::TechOpen()) ? FrontSiloGrid::Work(c.u) : null; }
     IUnitTask@ DoLegacy(Ctx@ c)
     {
         if (c.who == COMMANDER) return RoleTech::Tech_Commander_AiMakeTask(c.u, null, c.mi);
@@ -578,6 +580,7 @@ namespace TechRules {
         table.insertLast(Rule("engineering.front", MOBILE, W1(@T2LandReleased), @DoEngineering, "Released T2 bots and fast assistants reinforce the least-progressed reachable FRONT lane"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));
         table.insertLast(Rule("eco.flak", CON_T2, W0(), @DoEcoFlak, "D-321: perimeter flak minimum, air response and replacement; shared cooldown and per-cluster cap"));
+        table.insertLast(Rule("nukerush.grid",     CON_T2,       W0(), @DoNukeRushGrid, "owner 2026-11-03: front nukerush roll on: after the first finished gantry (t3rush: its first 10 units), silos one at a time at a 10 s minimum +115 metal / +2000 energy, up to 6, in tight blocks off the layouts, at most 45% of the way to the enemy"));
         table.insertLast(Rule("nuke.afus",         CON_T2,       W0(), @DoNukeAfus,     "owner 2026-10-17: a nuke rush adds a silo after each completed advanced fusion (1 + AFUS, NukeLimit), one at a time, on the regular silo gates, packed on the base layout"));
         if (Global::Map::Config.TechCompactEconomy)
             table.insertLast(Rule("eco.compact.support", CON_T1, W0(), @DoCompactSupport, "D-307: one local turret for an active compact economy bank"));

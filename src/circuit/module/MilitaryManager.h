@@ -320,6 +320,14 @@ public:
 	// Only the AI whose launch raised the ally team's scout count asks AIR: one package.
 	int GetOvernukeScouts() const { return overnukeScouts; }
 	void NoteOvernukeScout() { ++overnukeScouts; }
+	// Front nukerush (owner 2026-11-03): a rise in GetOvernukeRounds() is a new
+	// overnuke target begun by one of our silos - the first is the trigger
+	// (3+ silos across the allies), every later one follows a finished salvo
+	// while the next stocks; the script asks AIR for a scout package each time.
+	int GetOvernukeRounds() const { return overnukeRounds; }
+	void NoteOvernukeRound() { ++overnukeRounds; }
+	// One draw per key for the ally team (CAllyTeam::TeamRoll).
+	bool AllyTeamRoll(const std::string& key, float chance);
 	springai::AIFloat3 GetOvernukePos() const;
 	float GetOvernukeRadius() const;
 	// Nuke rush scouting (owner 2026-10-28): the latest aim point the nuclear
@@ -816,6 +824,7 @@ private:
 	SStockInfo stockInfo;
 	SNuclearInfo nuclearInfo;
 	int overnukeScouts = 0;
+	int overnukeRounds = 0;
 	springai::AIFloat3 nuclearAim = springai::AIFloat3(-1.f, 0.f, -1.f);
 	float nuclearAimRadius = 0.f;
 	std::array<debug::Strike, debug::_WEAPONS_> debugStrikes;

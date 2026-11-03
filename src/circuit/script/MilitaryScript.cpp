@@ -108,6 +108,9 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetOvernukeScouts() const", asMETHOD(CMilitaryManager, GetOvernukeScouts), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetOvernukePos() const", asMETHOD(CMilitaryManager, GetOvernukePos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetOvernukeRadius() const", asMETHOD(CMilitaryManager, GetOvernukeRadius), asCALL_THISCALL); ASSERT(r >= 0);
+	// Front nukerush (owner 2026-11-03): overnuke targets begun by our silos; one team-wide draw per key
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetOvernukeRounds() const", asMETHOD(CMilitaryManager, GetOvernukeRounds), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool AllyTeamRoll(const string& in, float)", asMETHOD(CMilitaryManager, AllyTeamRoll), asCALL_THISCALL); ASSERT(r >= 0);
 	// Nuke rush scouting (owner 2026-10-28): where the first silo aims, for TECH's scout request
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetNuclearAim() const", asMETHOD(CMilitaryManager, GetNuclearAim), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetNuclearAimRadius() const", asMETHOD(CMilitaryManager, GetNuclearAimRadius), asCALL_THISCALL); ASSERT(r >= 0);

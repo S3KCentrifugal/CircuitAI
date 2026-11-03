@@ -612,6 +612,7 @@ namespace RoleTech
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
         NukeRecon::Finished(unit);
+        FrontNukeRush::TechUnitAdded(unit);   // owner 2026-11-03: a t3rush TECH's silos wait for 10 gantry units
 		Invariants::OnUnitAdded(unit);   // D-076: INV-001
         if (FrontlineEngineering::IsFiendProduct(unit)) return; // local combat support, not factory donation quota
         if (TechHeavyRush::OnFinished(unit)) return;

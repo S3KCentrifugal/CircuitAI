@@ -2600,6 +2600,17 @@ springai::AIFloat3 CMilitaryManager::GetOvernukePos() const
 	return springai::AIFloat3(overnuke.Pos().x, 0.f, overnuke.Pos().z);
 }
 
+bool CMilitaryManager::AllyTeamRoll(const std::string& key, float chance)
+{
+	bool first = false;
+	const bool on = circuit->GetAllyTeam()->TeamRoll(key, chance, first);
+	if (first) {
+		circuit->LOG("TEAM ROLL: %s %s (chance %.0f%%, drawn by this AI for ally team %i)", key.c_str(),
+				on ? "ON" : "off", chance * 100.f, circuit->GetAllyTeamId());
+	}
+	return on;
+}
+
 float CMilitaryManager::GetOvernukeRadius() const
 {
 	return circuit->GetAllyTeam()->GetOvernuke().Radius();

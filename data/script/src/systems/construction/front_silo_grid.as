@@ -27,6 +27,11 @@
 // SiloGridRetryMaxSeconds), at most 2 facings x SiloGridSearchRings x SiloGridSearchSpokes probes, the
 // cheap tests first; each later ask reads at most NukeLimit reservation states.
 // Log [FRONT][SiloGrid].
+//
+// Front nukerush (owner 2026-11-03, team/front_nukerush.as): when the team roll is on, the gates are
+// Global::FrontNukeRush's (20 min, 115 metal, 2000 energy, 6 silos, 3x2 first) for every FRONT and AIR,
+// and for TECH once its first gantry is finished (its rule row asks); a site may be no more than
+// MaxForwardShare of the way from our start to the nearest enemy start, at every tier.
 namespace FrontSiloGrid {
     int sustainedSince = -1;     // first frame of the current unbroken run above both incomes
     int nextSearch = 0;
@@ -40,6 +45,24 @@ namespace FrontSiloGrid {
     AIFloat3 centre(-1.0f, 0.0f, -1.0f);
     string gridDef = "";        // the def the grid was reserved for; builders of another faction leave it alone
 
+    string Tag()
+    {
+        const AiRole r = Global::AISettings::Role;
+        return r == AiRole::FRONT ? "[FRONT]" : r == AiRole::AIR ? "[AIR]" : r == AiRole::TECH ? "[TECH]" : "[ROLE " + int(r) + "]";
+    }
+    // the gates: the FRONT grid's own, or the front nukerush's when the team roll is on
+    bool Rush() { return FrontNukeRush::On(); }
+    int MinSeconds() { return Rush() ? (Global::AISettings::Role == AiRole::TECH ? 0 : Global::FrontNukeRush::MinSeconds) : Global::RoleSettings::Front::NukeMinSeconds; }
+    float MetalGate() { return Rush() ? Global::FrontNukeRush::MetalIncome : Global::RoleSettings::Front::NukeMetalIncome; }
+    float EnergyGate() { return Rush() ? Global::FrontNukeRush::EnergyIncome : Global::RoleSettings::Front::NukeEnergyIncome; }
+    int SustainSeconds() { return Rush() ? 0 : Global::RoleSettings::Front::NukeSustainSeconds; }
+    int Limit() { return Rush() ? Global::FrontNukeRush::Limit : Global::RoleSettings::Front::NukeLimit; }
+    const array<int>@ Shapes()
+    {
+        if (Rush()) return @Global::FrontNukeRush::Shapes;
+        return @Global::RoleSettings::Front::SiloGridShapes;
+    }
+
     CCircuitDef@ SiloDef(CCircuitUnit@ u)
     {
         const string side = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
@@ -51,14 +74,14 @@ namespace FrontSiloGrid {
     {
         if (ai.frame - nextLog < 60 * SECOND) return;
         nextLog = ai.frame;
-        GenericHelpers::LogUtil("[FRONT][SiloGrid] held: " + why, 1);
+        GenericHelpers::LogUtil(Tag() + "[SiloGrid] held: " + why, 1);
     }
 
     // Unbroken run above both incomes, in frames; 0 when below now.
     int Sustained()
     {
-        const bool ok = Economy::GetMinMetalIncomeLast10s() >= Global::RoleSettings::Front::NukeMetalIncome
-            && Economy::GetMinEnergyIncomeLast10s() >= Global::RoleSettings::Front::NukeEnergyIncome;
+        const bool ok = Economy::GetMinMetalIncomeLast10s() >= MetalGate()
+            && Economy::GetMinEnergyIncomeLast10s() >= EnergyGate();
         if (!ok) { sustainedSince = -1; return 0; }
         if (sustainedSince < 0) sustainedSince = ai.frame;
         return ai.frame - sustainedSince;
@@ -134,13 +157,17 @@ namespace FrontSiloGrid {
         }
         const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
         if (!layoutOn && !aiTerrainMgr.SetLayoutEnabled(true)) {
-            GenericHelpers::LogUtil("[FRONT][SiloGrid] the profile's layout gate is closed; no grid", 1);
+            GenericHelpers::LogUtil(Tag() + "[SiloGrid] the profile's layout gate is closed; no grid", 1);
             return false;
         }
         // candidates: centre, facing, lane distance, squared home distance, lane-clear
         array<AIFloat3> candC; array<int> candF; array<float> candLane, candHome; array<int> candTier;
-        int offMap = 0, far = 0, onLane = 0, refused = 0, unbuildable = 0, unreachable = 0, forward = 0;
+        int offMap = 0, far = 0, onLane = 0, refused = 0, unbuildable = 0, unreachable = 0, forward = 0, pastShare = 0;
         const float enemyD = enemy.x < 0.0f ? 0.0f : sqrt(MapHelpers::SqDist(home, enemy));
+        // nukerush: no block more than MaxForwardShare of the way to the nearest enemy start (along that line)
+        const bool rush = Rush();
+        const float shareMax = Global::FrontNukeRush::MaxForwardShare;
+        const float axisX = enemyD > 1.0f ? (enemy.x - home.x) / enemyD : 0.0f, axisZ = enemyD > 1.0f ? (enemy.z - home.z) / enemyD : 0.0f;
         const AIFloat3 origin0 = centre.x >= 0.0f ? centre : home;
         const float step = centre.x >= 0.0f ? Global::RoleSettings::Front::SiloGridSearchStep * 0.5f : Global::RoleSettings::Front::SiloGridSearchStep;
         for (int turn = 0; turn < 2; ++turn) {
@@ -158,6 +185,8 @@ namespace FrontSiloGrid {
                     const AIFloat3 c(origin0.x + cos(ang) * step * float(ring), 0.0f, origin0.z + sin(ang) * step * float(ring));
                     if (MapHelpers::SqDist(c, home) > Global::RoleSettings::Front::SiloGridMaxHomeDistance * Global::RoleSettings::Front::SiloGridMaxHomeDistance) { ++far; continue; }
                     if (c.x < own || c.z < own || c.x >= AiTerrainWidth() - own || c.z >= AiTerrainHeight() - own) { ++offMap; continue; }
+                    // the block's far edge counts: its centre's progress plus its own half size
+                    if (rush && enemyD > 1.0f && ((c.x - home.x) * axisX + (c.z - home.z) * axisZ) + own > shareMax * enemyD) { ++pastShare; continue; }
                     // not toward the enemy: played, grids 4-5 km out stood mid-map and no constructor ever started one
                     const bool fwd = enemy.x >= 0.0f && sqrt(MapHelpers::SqDist(c, enemy)) < enemyD - Global::RoleSettings::Front::SiloGridMaxForward;
                     if (fwd && maxTier < 2) { ++forward; continue; }
@@ -213,32 +242,38 @@ namespace FrontSiloGrid {
             for (uint s = 0; s < block.length(); ++s) slots.insertLast(block[s]);
             zones.insertLast(zone);
             if (centre.x < 0.0f) centre = candC[i];
-            GenericHelpers::LogUtil("[FRONT][SiloGrid] reserved " + cols + "x" + rows + " " + d.GetName() + " block " + zones.length() + " at ("
+            GenericHelpers::LogUtil(Tag() + "[SiloGrid] reserved " + cols + "x" + rows + " " + d.GetName() + " block " + zones.length() + " at ("
                 + int(candC[i].x) + ", " + int(candC[i].z) + ") facing " + f + ", " + int(sqrt(candHome[i]))
                 + " from home, " + int(candLane[i]) + " from the nearest allied lane"
                 + (candTier[i] == 0 ? "" : candTier[i] == 1 ? " (no lane-clear site: the farthest)" : candTier[i] == 2 ? " (toward the enemy)" : " (on a lane line: last resort)") + ", zone " + zones[zones.length() - 1] + "; "
-                + candC.length() + " candidates (skipped " + offMap + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + onLane + " on lanes, "
+                + candC.length() + " candidates (skipped " + offMap + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + pastShare + " past " + int(shareMax * 100.0f) + "% to the enemy, " + onLane + " on lanes, "
                 + unreachable + " unreachable, " + refused + " refused by layouts, " + unbuildable + " unbuildable), "
                 + tried + " tried", 1);
         }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
         if (!found)
-            GenericHelpers::LogUtil("[FRONT][SiloGrid] no grid site: " + candC.length() + " candidates (skipped " + offMap
-                + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + onLane + " on lanes, " + unreachable + " unreachable, " + refused + " refused by layouts, "
+            GenericHelpers::LogUtil(Tag() + "[SiloGrid] no grid site: " + candC.length() + " candidates (skipped " + offMap
+                + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + pastShare + " past " + int(shareMax * 100.0f) + "% to the enemy, " + onLane + " on lanes, " + unreachable + " unreachable, " + refused + " refused by layouts, "
                 + unbuildable + " unbuildable), " + tried + " tried; retry in " + Global::RoleSettings::Front::SiloGridRetrySeconds + " s", 1);
         return found;
     }
 
     IUnitTask@ Work(CCircuitUnit@ u)
     {
-        if (!Global::RoleSettings::Front::SiloGrid || u is null || u.circuitDef is null) return null;
-        if (ai.frame < Global::RoleSettings::Front::NukeMinSeconds * SECOND) return null;
+        if (u is null || u.circuitDef is null) return null;
+        // FRONT: its own grid, or the nukerush's; AIR and TECH: only the nukerush's (TECH asks once its gantry gate is open)
+        const bool rush = Rush();
+        const AiRole role = Global::AISettings::Role;
+        if (role == AiRole::FRONT ? !(rush || Global::RoleSettings::Front::SiloGrid)
+                : !(rush && (role == AiRole::AIR || role == AiRole::TECH))) return null;
+        if (ai.frame < MinSeconds() * SECOND) return null;
+        const int limit = Limit();
         // the grid's own def once reserved (played: a gifted builder of another faction ordered its own
         // silo onto a legsilo slot, "another def", and the order was aborted every ask)
         CCircuitDef@ d = gridDef.length() > 0 ? ai.GetCircuitDef(gridDef) : SiloDef(u);
         if (d is null || !u.circuitDef.CanBuild(d)) return null;
         const int sustained = Sustained();
-        if (sustained < Global::RoleSettings::Front::NukeSustainSeconds * SECOND) return null;
+        if (sustained < SustainSeconds() * SECOND) return null;
         const int total = EconomyHelpers::GetNukeSiloCount(), queued = Builder::NukeSiloQueuedCount;
         if (queued > 0 || ai.frame < nextOrder) return null;   // one at a time
         // one at a time over the grid too: Builder's queued count misses pinned BIG_GUN orders, and a
@@ -246,15 +281,23 @@ namespace FrontSiloGrid {
         if (pending !is null && !pending.IsDead()) return null;
         @pending = null;
         const float mi = Economy::GetMinMetalIncomeLast10s(), ei = Economy::GetMinEnergyIncomeLast10s();
-        if (!EconomyHelpers::ShouldRushNuke(mi, ei, queued, total, Global::RoleSettings::Front::NukeLimit,
-                Global::RoleSettings::Front::NukeMetalIncome, Global::RoleSettings::Front::NukeEnergyIncome)) {
-            if (total < Global::RoleSettings::Front::NukeLimit)
-                Held("10 s min income +" + int(mi) + " metal of " + int(Global::RoleSettings::Front::NukeMetalIncome)
-                    + ", +" + int(ei) + " energy of " + int(Global::RoleSettings::Front::NukeEnergyIncome));
+        if (!EconomyHelpers::ShouldRushNuke(mi, ei, queued, total, limit, MetalGate(), EnergyGate())) {
+            if (total < limit)
+                Held("10 s min income +" + int(mi) + " metal of " + int(MetalGate())
+                    + ", +" + int(ei) + " energy of " + int(EnergyGate()) + (rush ? " (nukerush)" : ""));
             return null;
         }
         if (!capsRaised) {
-            UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllNukeSilos(), Global::RoleSettings::Front::NukeLimit);
+            if (role == AiRole::FRONT && !rush) {
+                UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllNukeSilos(), limit);
+            } else {
+                // only ever raised: TECH's own nuke plans keep their larger caps
+                array<string> names = UnitHelpers::GetAllNukeSilos();
+                for (uint i = 0; i < names.length(); ++i) {
+                    CCircuitDef@ sd = ai.GetCircuitDef(names[i]);
+                    if (sd !is null && sd.maxThisUnit < limit) sd.maxThisUnit = limit;
+                }
+            }
             capsRaised = true;
         }
         if (!d.IsAvailable(ai.frame)) { Held(d.GetName() + " not available"); return null; }
@@ -262,17 +305,17 @@ namespace FrontSiloGrid {
         // every slot so far is taken (played: no 4x2 site round 9 of 10 crowded FRONT bases)
         bool freeSlot = false;
         for (uint s = 0; s < slots.length() && !freeSlot; ++s) freeSlot = aiTerrainMgr.GetReservationState(slots[s]) == 0;
-        if (!freeSlot && int(slots.length()) < Global::RoleSettings::Front::NukeLimit) {
+        if (!freeSlot && int(slots.length()) < limit) {
             if (ai.frame < nextSearch) return null;
             bool reserved = false;
-            const array<int>@ shapes = Global::RoleSettings::Front::SiloGridShapes;
+            const array<int>@ shapes = Shapes();
             // every shape off the lanes first; only then the smallest shapes on a lane line
             for (uint k = 0; k + 1 < shapes.length() && !reserved; k += 2) {
-                if (shapes[k] * shapes[k + 1] > Global::RoleSettings::Front::NukeLimit - int(slots.length())) continue;
+                if (shapes[k] * shapes[k + 1] > limit - int(slots.length())) continue;
                 reserved = Reserve(u, d, shapes[k], shapes[k + 1], 2);
             }
             for (int k = int(shapes.length()) - 2; k >= 0 && !reserved; k -= 2) {
-                if (shapes[k] * shapes[k + 1] > Global::RoleSettings::Front::NukeLimit - int(slots.length())) continue;
+                if (shapes[k] * shapes[k + 1] > limit - int(slots.length())) continue;
                 reserved = Reserve(u, d, shapes[k], shapes[k + 1], 3);
             }
             if (!reserved) {
@@ -297,7 +340,7 @@ namespace FrontSiloGrid {
             }
             nextOrder = ai.frame + 10 * SECOND;
             @pending = t;
-            GenericHelpers::LogUtil("[FRONT][SiloGrid] silo " + (total + 1) + " of " + Global::RoleSettings::Front::NukeLimit
+            GenericHelpers::LogUtil(Tag() + "[SiloGrid] silo " + (total + 1) + " of " + limit + (rush ? " (nukerush)" : "")
                 + " on grid slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income sustained "
                 + (sustained / SECOND) + " s", 1);
             return t;

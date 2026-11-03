@@ -55,6 +55,7 @@ namespace Main {
 
 	void AiMain()
 	{
+		Global::FrontNukeRush::Chance = 0.20f; // owner 2026-11-03: front nukerush, one 20% draw at game start for the whole ally team (systems/team/front_nukerush.as)
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 
 		// Air-factory gate. Native CEnemyManager::IsAirValid() tests
@@ -118,6 +119,7 @@ namespace Main {
 			Global::profileController.MainUpdate();
 		}
 		Team::Roster::Update();  // announce ourselves to allied BARb instances until the roster is complete
+		FrontNukeRush::Tick();     // owner, 2026-11-03: the front nukerush team roll, drawn at game start
 		OvernukeRecon::Tick();      // owner, 2026-10-28: AIR scouts the overnuke target every 10 launches
 		NukeLaunchRecon::Tick();    // owner, 2026-10-31: AIR learns each nuke spot, scouts every 3rd below overnuke
 		Spam::Update();          // economy-gated spam: activation, focus rotation
