@@ -887,6 +887,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		const float reach = reachOf(threat->GetCircuitDef());
 		if (range * info.snipeFraction >= reach) {
 			st.go = true;  // shoots from outside its reach: no need to gather
+		} else if (range < info.closeMinRange) {
+			return finish("outranged, leaves the close-in to longer-ranged artillery");
 		} else {
 			const float holdRadius = reach + info.holdMargin;
 			const float d = pos.distance2D(threat->GetPos());
