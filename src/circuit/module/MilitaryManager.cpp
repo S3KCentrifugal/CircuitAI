@@ -730,10 +730,10 @@ void CMilitaryManager::ReadConfig()
 		SLauncherPrioInfo& lp = launcherPrioInfo;
 		lp = SLauncherPrioInfo();
 		if (!lpCfg.isNull() && lpCfg.get("enabled", true).asBool()) {
-			auto readDefs = [circuit](const Json::Value& list, std::unordered_set<CCircuitDef::Id>& out) {
+			auto readDefs = [ai = circuit](const Json::Value& list, std::unordered_set<CCircuitDef::Id>& out) {
 				std::set<std::string> names;
 				for (const auto& name : list) names.insert(name.asString());
-				for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+				for (CCircuitDef& d : ai->GetCircuitDefs()) {
 					if (names.count(d.GetDef()->GetName()) > 0) out.insert(d.GetId());
 				}
 			};
