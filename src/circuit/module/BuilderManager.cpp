@@ -299,6 +299,7 @@ void CBuilderManager::InitHandlers()
 	rezPorcRange = root["economy"].get("rez_porc_range", 1000.f).asFloat();
 	rezPorcMargin = root["economy"].get("rez_porc_margin", 64.f).asFloat();
 	rezWallRadius = root["economy"].get("rez_wall_radius", 1500.f).asFloat();
+	commanderReclaimWalls = root["economy"].get("commander_reclaim_walls", true).asBool();
 	{
 		const Json::Value& walls = root["economy"]["rez_reclaim_walls"];
 		std::vector<std::string> names;

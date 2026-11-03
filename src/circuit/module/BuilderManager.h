@@ -381,7 +381,14 @@ public:
     // Rez bots reclaim enemy dragon's teeth / fortification walls within
     // rezWallRadius whose spot is safe on the threat map and reachable safely.
     IBuilderTask* FindEnemyWallReclaim(CCircuitUnit* unit);
+    // Owner 2026-11-03: a capture-capable builder (the commander) reclaims an
+    // enemy wall (rezWallDefs) instead of capturing it. JSON economy
+    // commander_reclaim_walls (default true; false restores the capture).
+    bool IsReclaimWallDef(const CCircuitDef* def) const {
+        return commanderReclaimWalls && (def != nullptr) && (rezWallDefs.count(const_cast<CCircuitDef*>(def)) != 0);
+    }
 private:
+    bool commanderReclaimWalls = true;
     float rezPorcRange = 1000.f;
     float rezPorcMargin = 64.f;
     float rezWallRadius = 1500.f;

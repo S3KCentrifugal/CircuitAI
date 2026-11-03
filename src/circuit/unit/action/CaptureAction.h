@@ -10,6 +10,10 @@
 
 #include "unit/action/UnitAction.h"
 
+namespace springai {
+	class Unit;
+}
+
 namespace circuit {
 
 class CCaptureAction final: public IUnitAction {
@@ -20,8 +24,15 @@ public:
 	virtual void Update(CCircuitAI* circuit) override;
 
 private:
+	// Owner 2026-11-03: enemy dragon's teeth / walls are reclaimed, not
+	// captured. The reclaim is an order on the target id; a neutral (objectified)
+	// wall and an enemy unit share the engine id space.
+	bool ReclaimWall(CCircuitAI* circuit, CCircuitUnit* unit, springai::Unit* wall, int wallId);
+
 	float range;
 	unsigned int updCount;
+	int lastWallId = -1;  // the last wall a reclaim was ordered for
+	int lastWallOrder = -1000000;
 };
 
 } // namespace circuit
