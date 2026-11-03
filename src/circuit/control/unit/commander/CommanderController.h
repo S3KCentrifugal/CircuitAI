@@ -204,6 +204,13 @@ struct CommanderSafetyConfig {
     // of scouted enemy LLTs, Beamers, Twin Guards and Cacophonies; dive one alone
     // rarely (towerDiveChance per tower per towerDiveCooldown seconds).
     float towerKeepOut=1,towerMargin=100,towerDiveChance=0,towerDiveCooldown=180,towerDiveHealth=.85f;
+    // Owner 2026-11-03 porc keep-out: every commander also stays towerMargin
+    // outside the reach of (a) any ghost porc, an armed enemy structure image out
+    // of radar and LOS whose spot was not seen empty, and (b) seen heavy porc,
+    // armed structures of techlevel >= porcHeavyTech. Super/long-range statics
+    // (land reach > porcMaxRange: LRPC, nukes) are left out. Only a D-gun on a
+    // nearby T3 (T3Exempt) may enter. 0 = off.
+    float porcKeepOut=1,porcMaxRange=2000,porcHeavyTech=2;
     // Shelling: health lost per second over shellWindow, mostly unexplained by
     // visible enemies in reach, with no radar dot closer than shellDotRange.
     // The commander steps shellStep back, keeps out of a shellZone disc there
@@ -542,15 +549,17 @@ private:
     // nearby T3 (an engaged T3 plan, or a T3 in D-gun reach with the D-gun ready).
     bool T3Exempt(CCircuitUnit* unit,const State& s,int frame) const;
     // ---- keep-out and shelling withdrawal (CommanderKeepOut.cpp) ----
-    struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false; };
+    struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false,porc=false,ghost=false; };
     std::vector<KeepOutZone> keepOut; // towers rebuilt once a second; shell zones until expiry
     int keepOutFrame=-10000,nextDiveFrame=0;
     std::set<int> towerDefs; bool towerDefsResolved=false;
+    std::map<int,float> porcTech; // static armed def id -> customparams techlevel (cache)
     std::map<int,int> diveRolled; // tower id -> frame a new dive roll is allowed
     float nearestDot=-1; springai::AIFloat3 nearestDotPos; // radar-only contact, from Observe
     float visibleReachDps=0; // in-LOS weapons whose range reaches the commander, from Observe
     int dronesInReach=0; springai::AIFloat3 nearestDronePos{-1,0,-1}; // in-LOS enemy drones in weapon reach, from Observe
     void RefreshKeepOut(CCircuitUnit* unit,int frame);
+    float PorcTech(CCircuitDef* def);
     const KeepOutZone* KeepOutAt(commander::Point p,float margin=0) const;
     springai::AIFloat3 KeepOutGoal(CCircuitUnit* unit,const springai::AIFloat3& goal) const;
     springai::AIFloat3 WithdrawGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,bool shelled,int frame,bool droned=false);

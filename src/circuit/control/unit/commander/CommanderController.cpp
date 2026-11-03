@@ -80,6 +80,8 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::decoyHealthRetreat>("decoy_health_retreat",0,1),Safety<&SC::decoyHealthRecover>("decoy_health_recover",0,1),
         Safety<&SC::decoyBait>("decoy_bait",0,1),
         Safety<&SC::towerKeepOut>("tower_keep_out",0,1),Safety<&SC::towerMargin>("tower_margin",0,600),
+        Safety<&SC::porcKeepOut>("porc_keep_out",0,1),Safety<&SC::porcMaxRange>("porc_max_range",0,6000),
+        Safety<&SC::porcHeavyTech>("porc_heavy_tech",0,5),
         Safety<&SC::towerDiveChance>("tower_dive_chance",0,1),Safety<&SC::towerDiveCooldown>("tower_dive_cooldown",0,1800),
         Safety<&SC::towerDiveHealth>("tower_dive_health",.3f,1),
         Safety<&SC::shellLossRate>("shell_loss_rate",0,5000),Safety<&SC::shellWindow>("shell_window",1,20),

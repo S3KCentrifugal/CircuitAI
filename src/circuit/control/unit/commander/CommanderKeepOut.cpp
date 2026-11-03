@@ -51,6 +51,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 namespace circuit {
@@ -72,21 +73,49 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
         [frame](const KeepOutZone& z){return z.tower || z.until<frame;}),keepOut.end());
     for(auto it=diveRolled.begin();it!=diveRolled.end();) it=it->second<frame?diveRolled.erase(it):std::next(it);
     Bind bound(this,PresetOfUnit(unit->GetId()));
-    if(cfg->safety.towerKeepOut<=0) return;
+    const bool towers=cfg->safety.towerKeepOut>0, porc=cfg->safety.porcKeepOut>0;
+    if(!towers && !porc) return;
     if(!towerDefsResolved) {
         towerDefsResolved=true;
         for(const char* name:TOWER_NAMES) if(auto* def=ai->GetCircuitDef(name)) towerDefs.insert(def->GetId());
     }
     for(const auto& [id,enemy]:ai->GetEnemyManager()->GetEnemyUnits()) {
         auto* def=enemy?enemy->GetCircuitDef():nullptr;
-        if(!def || !towerDefs.count(def->GetId()) || enemy->IsFake() || enemy->IsDead() || enemy->IsDying()) continue;
+        if(!def || enemy->IsFake() || enemy->IsDead() || enemy->IsDying()) continue;
         // Owner 2026-11-01: built and alive towers; a frame last seen unfinished does not count.
         if(enemy->IsBeingBuilt()) continue;
+        const bool tower=towerDefs.count(def->GetId())>0;
+        bool ghost=false;
+        if(tower) {
+            if(!towers) continue;
+        } else {
+            // Owner 2026-11-03: ghost porc of any tier and seen heavy porc.
+            if(!porc || def->IsMobile() || def->IsAbleToFly() || def->IsRoleSuper()) continue;
+            const auto& g=enemy->GetData();
+            // An image whose spot was seen empty (HIDDEN) is gone.
+            if(g.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
+            ghost=!enemy->IsInRadarOrLOS();
+            if(!ghost && PorcTech(def)<cfg->safety.porcHeavyTech) continue;
+        }
         const auto& m=MatchupFor(def,unit->GetCircuitDef());
         if(m.range<=0.f) continue;
-        KeepOutZone z; z.center=P(enemy->GetPos()); z.radius=m.range+cfg->safety.towerMargin; z.id=id; z.tower=true;
+        if(!tower && m.range>cfg->safety.porcMaxRange) continue;
+        const AIFloat3& at=enemy->GetPos();
+        if(!std::isfinite(at.x) || !std::isfinite(at.z)) continue;
+        KeepOutZone z; z.center=P(at); z.radius=m.range+cfg->safety.towerMargin; z.id=id; z.tower=true;
+        z.porc=!tower; z.ghost=ghost;
         keepOut.push_back(z);
     }
+}
+
+float CCommanderController::PorcTech(CCircuitDef* def) {
+    auto found=porcTech.find(def->GetId());
+    if(found!=porcTech.end()) return found->second;
+    float tech=1.f;
+    const auto& params=def->GetDef()->GetCustomParams();
+    const auto level=params.find("techlevel");
+    if(level!=params.end()) tech=float(std::atof(level->second.c_str()));
+    return porcTech.emplace(def->GetId(),tech).first->second;
 }
 
 const CCommanderController::KeepOutZone* CCommanderController::KeepOutAt(Point p,float margin) const {
@@ -165,7 +194,8 @@ AIFloat3 CCommanderController::WithdrawGoal(CCircuitUnit* unit,State& s,const AI
 }
 
 bool CCommanderController::TowerDive(CCircuitUnit* unit,State& s,const KeepOutZone& zone,int frame) {
-    if(cfg->safety.towerDiveChance<=0 || frame<nextDiveFrame) return false;
+    // Owner 2026-11-03: porc zones (ghost or heavy) are never dived; only light towers.
+    if(zone.porc || cfg->safety.towerDiveChance<=0 || frame<nextDiveFrame) return false;
     if(diveRolled.count(zone.id)) return false;
     auto* tower=ai->GetEnemyInfo(zone.id);
     // A remembered image cannot be aimed at; a tower under construction is not worth a shot.
@@ -294,7 +324,8 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;
         TRY_UNIT(ai,unit,unit->CmdStop();)
     }
-    const char* reason=zone && zone->tower?"tower":shelled?"shelled":droned?"drones":"shell_zone";
+    const char* reason=zone && zone->porc?(zone->ghost?"porc_ghost":"porc_heavy")
+        :zone && zone->tower?"tower":shelled?"shelled":droned?"drones":"shell_zone";
     if(!s.keep.active || std::strcmp(s.keep.reason,reason)!=0)
         ai->LOG("[CommanderSafety] unit=%i action=keep_out reason=%s tower=%i hp=%.2f x=%.0f z=%.0f",
             unit->GetId(),reason,zone && zone->tower?zone->id:-1,unit->GetHealthPercent(),pos.x,pos.z);
