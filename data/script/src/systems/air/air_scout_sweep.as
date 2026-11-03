@@ -84,9 +84,9 @@ namespace AirScoutSweep {
         if (at.x < 0.0f) return;
         nukedAt = at; nukedSpread = spread;
     }
-    bool Draftable(CCircuitUnit@ u, dictionary@ picked) {
+    bool Draftable(CCircuitUnit@ u, dictionary@ picked, bool ownMembers) {
         if (u is null || u.GetBuildProgress() < 1.0f || !AirRecon::Controlled(u) || picked.exists(""+u.id)
-            || Flying(u.id) || members.exists(""+u.id) || AirOperations::Committed(u.id)) return false;
+            || Flying(u.id) || (!ownMembers && members.exists(""+u.id)) || AirOperations::Committed(u.id)) return false;
         IUnitTask@ task = u.task;
         if (task !is null && (task.GetType() == int(Task::Type::RETREAT) || task.IsExternalControlled())) return false;
         CAirWaveTask@ wave = cast<CAirWaveTask>(task);
@@ -109,19 +109,26 @@ namespace AirScoutSweep {
     // fighters, then any fighter (owner: 10 fighters when every plant is on
     // base defence), plus finished radar planes. Each flies to its own point
     // over the aim and on to the far edge; with no aim, over an enemy start.
+    // The base-emergency draft (Emergency) takes scouts and radar planes only,
+    // the forming package's own members included. O(owned units) x 4 passes,
+    // once per draft (a nuke request, or an emergency start at most once per
+    // ScoutSweepEmergencyRearmSeconds), never per tick.
     void Draft(const AIFloat3 &in at, float spread) {
+        Draft(at, spread, Global::RoleSettings::Air::ScoutSweepT1Count, Global::RoleSettings::Air::NukeScoutRadarCount, true, false, "nuke");
+    }
+    void Draft(const AIFloat3 &in at, float spread, int wantT1, int wantR, bool fighters, bool ownMembers, const string &in why) {
         const string side = Global::AISettings::Side;
         const string scout = UnitHelpers::GetT1AirScoutForSide(side), fighter = AirEconomy::Fighter(false), radar = AirRecon::Name(side);
-        const int wantT1 = Global::RoleSettings::Air::ScoutSweepT1Count, wantR = Global::RoleSettings::Air::NukeScoutRadarCount;
         dictionary picked;
         array<CCircuitUnit@> units;
         int t1 = 0, r = 0;
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (int pass = 0; pass < 4; ++pass) {
+            if (!fighters && (pass == 1 || pass == 2)) continue;
             for (uint i = 0; i < ids.length(); ++i) {
                 if (pass < 3 ? t1 >= wantT1 : r >= wantR) break;
                 CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
-                if (!Draftable(u, picked)) continue;
+                if (!Draftable(u, picked, ownMembers)) continue;
                 const string name = u.circuitDef.GetName();
                 if (pass == 0 ? name != scout : pass == 1 ? name != fighter
                     : pass == 2 ? !AirScreen::IsFighter(u.circuitDef) : name != radar) continue;
@@ -132,13 +139,64 @@ namespace AirScoutSweep {
         const array<AIFloat3> enemies = Lanes::ScriptStarts(true);
         for (uint i = 0; i < units.length(); ++i) {
             const AIFloat3 from = units[i].GetPos(ai.frame);
+            const string key = ""+units[i].id;
+            members.delete(key); arrived.delete(key);   // a forming member leaves the package for its own flight
             if (at.x >= 0.0f) Fly(units[i], LolCannonRecon::Route(from,at,int(i),int(units.length()),spread));
             else if (!enemies.isEmpty()) Fly(units[i], LolCannonRecon::Route(from,enemies[i%enemies.length()],0,1,0.0f));
         }
         draftT1 = (at.x >= 0.0f || !enemies.isEmpty()) ? t1 : 0;
         draftRadar = (at.x >= 0.0f || !enemies.isEmpty()) ? r : 0;
-        GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke draft T1="+draftT1+"/"+wantT1+" radar="+draftRadar+"/"+wantR
+        GenericHelpers::LogUtil("[AIR][ScoutSweep] "+why+" draft T1="+draftT1+"/"+wantT1+" radar="+draftRadar+"/"+wantR
             +" baseContact="+AirBaseResponse::Emergency(),1);
+    }
+    // Base emergency (owner 2026-11-03), modelled on the nuke rush scout: when the
+    // base response's contact goes on while a package is forming or due, the
+    // scouts and radar planes already built (the forming members first among
+    // them) fly it now, to its target or across to the enemy starts; what they
+    // lacked is owed as a fresh package. It forms while the base defends (its
+    // clock is held, Tick) and flies once the emergency is over; at the next
+    // emergency start its built members are drafted the same way.
+    int emergencyDraftFrame = -1;
+    bool owedEmergency = false;
+    void EmergencyStarted() {
+        if (!Enabled() || !AirEconomy::Active() || !Global::RoleSettings::Air::ScoutSweepEmergencyDraft) return;
+        if (dispatching || (!forming && !requested)) return;   // nothing due, or the package is already flying out
+        if (emergencyDraftFrame >= 0 && ai.frame - emergencyDraftFrame < Global::RoleSettings::Air::ScoutSweepEmergencyRearmSeconds * SECOND) return;
+        emergencyDraftFrame = ai.frame;
+        // the due package's counts and target: the forming one's, else the pending request's
+        const int dueT1 = forming ? Wanted(0) : (pendT1 >= 0 ? pendT1 : Global::RoleSettings::Air::ScoutSweepT1Count);
+        const int dueRadar = forming ? Wanted(1) : (pendRadar >= 0 ? pendRadar : Global::RoleSettings::Air::ScoutSweepRadarCount);
+        const AIFloat3 at = forming ? wantAt : pendAt;
+        const float spread = forming ? wantSpread : pendSpread;
+        const bool urgent = forming ? wantUrgent : pendUrgent;
+        Draft(at, spread, dueT1, dueRadar, false, true, "emergency");
+        const int restT1 = AiMax(0, dueT1 - draftT1), restRadar = AiMax(0, dueRadar - draftRadar);
+        if (forming) {
+            // the package re-plans for what is owed; members not drafted (none finished) go home
+            array<string>@ left = members.getKeys();
+            for (uint i = 0; i < left.length(); ++i) {
+                CCircuitUnit@ u = ai.GetTeamUnit(parseInt(left[i]));
+                if (u !is null && u.task is assembly) { u.SetIdleMode(1); u.SetFireState(u.circuitDef.GetFireState()); }
+            }
+            if (assembly !is null && !assembly.IsDead()) assembly.Abort();
+            @assembly = null; forming = false; excluded.deleteAll(); members.deleteAll(); arrived.deleteAll();
+            wantT1 = -1; wantRadar = -1; wantAt = AIFloat3(-1,0,-1); wantUrgent = false;
+        }
+        if (restT1 + restRadar <= 0) {
+            requested = false; pendT1 = -1; pendRadar = -1; pendAt = AIFloat3(-1,0,-1); pendUrgent = false; owedEmergency = false;
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] emergency: the whole package flew now, nothing owed",1);
+            return;
+        }
+        pendT1 = restT1; pendRadar = restRadar; pendAt = at; pendSpread = spread; pendUrgent = urgent;
+        requested = true; owedEmergency = true;
+        GenericHelpers::LogUtil("[AIR][ScoutSweep] emergency: owed T1="+restT1+" radar="+restRadar
+            +(at.x >= 0.0f ? " to ("+int(at.x)+","+int(at.z)+")" : " (lane sweep)")+", flies once the base is clear",1);
+    }
+    void EmergencyEnded() {
+        if (!owedEmergency) return;
+        if (!forming && !requested) { owedEmergency = false; return; }
+        GenericHelpers::LogUtil("[AIR][ScoutSweep] emergency over: the owed package "+(forming ? "forms (T1="+Count(0)+"/"+Wanted(0)
+            +" radar="+Count(1)+"/"+Wanted(1)+"), its clock runs again" : "is due"),1);
     }
     void Urgent(const AIFloat3 &in at, float spread) {
         if (!Enabled() || !AirEconomy::Active()) return;
@@ -347,6 +405,7 @@ namespace AirScoutSweep {
         if (late) GenericHelpers::LogUtil("[AIR][ScoutSweep] forming timeout: flying with T1="+Count(0)+"/"+Wanted(0)+" radar="+Count(1)+"/"+Wanted(1),1);
         if (!dispatching && owedNuke && wantUrgent && Targeted() && nukedAt.x>=0.0f) { wantAt=nukedAt; wantSpread=nukedSpread; }
         if (!dispatching && wantUrgent) owedNuke=false;
+        if (!dispatching && owedEmergency) { owedEmergency=false; GenericHelpers::LogUtil("[AIR][ScoutSweep] the owed emergency package flies",1); }
         dispatching=true;
         // One task per aircraft lets a surviving route be released independently.
         for (uint i=0;i<ids.length();++i) {
@@ -392,6 +451,7 @@ namespace AirScoutSweep {
         for(uint i=0;i<ids.length();++i) { CCircuitDef@ def=ai.GetCircuitDef(ids[i]); int cap=0; if(def !is null && caps.get(ids[i],cap)) def.maxThisUnit=cap; }
         pendT1=-1; pendRadar=-1; wantT1=-1; wantRadar=-1; pendAt=AIFloat3(-1,0,-1); wantAt=AIFloat3(-1,0,-1); pendUrgent=false; wantUrgent=false;
         draftT1=-1; draftRadar=0; formedAt=-1; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false;
+        emergencyDraftFrame=-1; owedEmergency=false;
         @assembly=null; forming=false; dispatching=false; requested=false; firstPlantFrame=-1; nextPeriodic=-1; checked=-SECOND; planAfter=0;
         excluded.deleteAll(); members.deleteAll(); arrived.deleteAll(); flying.deleteAll(); endpoints.deleteAll(); expires.deleteAll(); caps.deleteAll(); starts.resize(0); goals.resize(0);
     }

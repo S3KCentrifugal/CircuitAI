@@ -235,7 +235,11 @@ namespace AirBaseResponse {
         if (Global::RoleSettings::Air::BomberSupportEnabled && contact && !bomberBase) selected[1] = -1;
         bomberContact = selected[1] >= 0;
         if (contact) lastSeen = ai.frame;
-        if (contact != previous) GenericHelpers::LogUtil("[AIR][BaseResponse] contact=" + contact, 1);
+        if (contact != previous) {
+            GenericHelpers::LogUtil("[AIR][BaseResponse] contact=" + contact, 1);
+            // owner 2026-11-03: the due scout package flies what is built now, owes the rest
+            if (contact) AirScoutSweep::EmergencyStarted(); else AirScoutSweep::EmergencyEnded();
+        }
         if (!contact && !bomberContact && ai.frame-lastSeen >= AiMax(1, Global::RoleSettings::Air::BaseResponseSearchSeconds)*SECOND) {
             for (int k = 0; k < 4; ++k) ClearGroup(k);
             members.deleteAll(); ClearReserve(); return;

@@ -181,6 +181,14 @@ namespace Air {
             // it has (the clock stops while the base defends).
             int NukeScoutRadarCount = 3;
             int ScoutSweepFormSeconds = 90;
+            // Base emergency (owner 2026-11-03): when the base response's contact goes on
+            // while a package is forming or due, the scouts and radar planes already built
+            // fly it at once (never fighters: the base needs them); the rest is owed and
+            // forms while the base defends, flying once the emergency is over. A new
+            // emergency within ScoutSweepEmergencyRearmSeconds of the last draft drafts
+            // nothing (the contact can flip every few seconds).
+            bool ScoutSweepEmergencyDraft = true;
+            int ScoutSweepEmergencyRearmSeconds = 30;
             int RadarWaveIntervalSeconds = 600;
             int RadarMaxWaitSeconds = 90; // launch available planes even below the full cohort
             int RadarPatrolCheckSeconds = 2;
