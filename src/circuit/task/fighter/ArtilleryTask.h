@@ -24,6 +24,11 @@ struct SGhostFire { int reload = -1, shot = -1, orderUntil = -1; };
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFloat3& pos, int frame,
 		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport);
 
+// Owner 2026-11-03: sequenced snipe of outranging artillery structures
+// (SArtySnipeInfo). True while it owns the unit; state lives in the military
+// manager so a task change keeps the sequence.
+bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
+
 class CArtilleryTask final: public IFighterTask {
 public:
 	CArtilleryTask(ITaskModule* mgr);

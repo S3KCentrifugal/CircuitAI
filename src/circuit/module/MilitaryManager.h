@@ -317,6 +317,57 @@ public:
 		int ghostIdleFrames = 300;
 	};
 	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
+	/*
+	 * Owner 2026-11-03: artillery snipe ("artillery_snipe"). Listed long-range
+	 * rocket artillery (Thanatos, Arbiter, Boreas, Negotiator, Ambassador) that
+	 * comes near a known outranging pop-up artillery structure (Persecutor,
+	 * Rattlesnake, Eviscerator; seen, radar or ghost) first shoots the listed
+	 * non-light porc it can reach from outside every such structure's reach
+	 * (seen ones until dead, ghost images "volleys" times), then closes to
+	 * snipe_range_fraction of its own range and fires "volleys" at the
+	 * structure, and "volleys" more if radar or LOS shows it still alive.
+	 * Then the ordinary controller has the unit back. See ArtySnipeStep.
+	 * "direct_threats" (Pulsar, Bulwark, Bastion) skip the prep porc step.
+	 */
+	struct SArtySnipeInfo {
+		bool isEnabled = false;
+		std::unordered_set<CCircuitDef::Id> defs;     // the artillery that snipes
+		std::unordered_set<CCircuitDef::Id> threats;  // what it snipes
+		// Owner 2026-11-03 01:36Z: Pulsar, Bulwark, Bastion. No prep porc: attacked
+		// from snipe_range_fraction (seen: until dead, at most visible_max_volleys;
+		// ghost: "volleys", then "volleys" more if seen alive).
+		std::unordered_set<CCircuitDef::Id> directThreats;
+		std::unordered_set<CCircuitDef::Id> porc;     // prep targets
+		bool avoidOtherPorc = true;   // prep spots also outside other armed porc
+		float threatMargin = 100.f;   // elmos past a structure's weapon range
+		float triggerDistance = 700.f;
+		float porcRadius = 1600.f;    // prep porc within this of the threat
+		float prepFraction = 0.95f;
+		float snipeFraction = 0.99f;
+		int volleys = 3;
+		int visibleMaxVolleys = 6;
+		int confirmFrames = 3 * 30;
+		int repeatFrames = 60 * 30;
+		int stageFrames = 90 * 30;
+	};
+	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
+	struct SArtySnipeState {
+		int stage = 0;          // 0 off, 1 prep porc, 2 snipe, 3 confirm wait, 4 confirm fire
+		int threat = -1;        // enemy unit id
+		bool direct = false;    // threat is a directThreats def
+		int target = -1;        // current prep target
+		bool targetGhost = false;
+		int volleys = 0;
+		int stageFrame = -1, targetFrame = -1;
+		int lastVolley = -1, reload = -1, fireSeen = -2;
+		int orderKey = -1, orderUntil = -1;
+		int lastCall = -1;
+		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
+		springai::AIFloat3 spot;
+		std::unordered_map<int, int> skipUntil;  // enemy id -> frame (done prep targets, sniped threats)
+	};
+	const SArtySnipeInfo& GetArtySnipeInfo() const { return artySnipeInfo; }
+	SArtySnipeState& GetArtySnipeState(int unitId, int frame);
 	// A def whose escort is rationed: a mobile radar or jammer.
 	bool IsSensorUnit(const CCircuitDef* cdef) const;
 	// Live sensors already escorting `task`.
@@ -537,6 +588,9 @@ private:
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
 	SArtyCommInfo artyCommInfo;
+	SArtySnipeInfo artySnipeInfo;
+	std::unordered_map<int, SArtySnipeState> artySnipeStates;
+	int artySnipePrune = 0;
 
 	unsigned int preventCount = 0;
 	float amountFactor = 0.f;

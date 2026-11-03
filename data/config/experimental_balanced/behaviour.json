@@ -211,6 +211,41 @@
 			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
 			"ghost_idle_seconds": 10
 		},
+		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
+		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of
+		// these "threats" (seen, radar dot or ghost image), the unit 1) attacks seen / radar "porc" near it that can be
+		// hit from outside every threat's reach (+threat_margin), until dead (visible_max_volleys at most), 2) fires
+		// `volleys` at ghost images of that porc, same rule, 3) closes to snipe_range_fraction of its own range and
+		// fires `volleys` at the threat, 4) if radar or LOS shows it alive, `volleys` more. Then its ordinary
+		// controller has it back, and that threat is left alone by this unit for repeat_seconds.
+		// "direct_threats" (owner 01:36Z: Pulsar, Bulwark, Bastion) skip steps 1-2: attacked from
+		// snipe_range_fraction before going into their reach, seen ones until dead, ghosts as in 3-4. DLL feature.
+		"artillery_snipe": {
+			"enabled": true,
+			"units": ["leghrk", "corhrk", "legavroc", "corvroc", "armmerl"],   // Thanatos, Arbiter, Boreas, Negotiator, Ambassador
+			"threats": ["cortoast", "armamb", "legacluster"],                   // Persecutor, Rattlesnake, Eviscerator
+			"direct_threats": ["armanni", "cordoom", "legbastion"],             // Pulsar, Bulwark, Bastion
+			"porc": ["armanni", "cordoom", "legbastion",          // Pulsar, Bulwark, Bastion
+				"armhlt", "corhlt", "corhllt", "armbeamer", "legmg",   // Overwatch, Warden, Twin Guard, Beamer, Cacophony
+				"armflak", "corflak", "legflak",                   // Arbalest, Birdshot, Pluto (T2 flak)
+				"legrhapsis", "leglupara", "armcir", "corerad", "armferret", "cormadsam",  // Rhapsis, Lupara, Chainsaw, Eradicator, Ferret, SAM
+				"legdtr", "armclaw", "cormaw",                     // Dragon's Jaw, Claw, Maw
+				"legapopupdef", "armpb", "corvipe",                // Chimera, Pit Bull, Scorpion
+				"armguard", "corpun", "legcluster",                // Gauntlet, Agitator, Amputator
+				"legbombard", "leghive", "cormexp",                // Bombardier, Hive, Advanced Exploiter
+				"armkraken", "corfdoom", "armfhlt", "corfhlt"],    // naval: Gorgon, Devastator, Manta, Coral
+			"avoid_other_porc": true,     // prep firing spots also outside other armed porc's reach (the target excepted)
+			"threat_margin": 100,         // elmos past a structure's weapon range that still counts as inside
+			"trigger_distance": 700,      // starts when within reach + this of a threat
+			"porc_radius": 1600,          // prep porc within this of the threat
+			"prep_range_fraction": 0.95,  // prep firing spots at this fraction of own range
+			"snipe_range_fraction": 0.99,
+			"volleys": 3,
+			"visible_max_volleys": 6,
+			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
+			"repeat_seconds": 60,
+			"stage_max_seconds": 90
+		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base
 		// if there is, then ai checks speed, direction and threat on enemys position. if all conditions positive => com attacks

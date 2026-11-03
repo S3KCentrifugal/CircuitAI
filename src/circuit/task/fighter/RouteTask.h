@@ -102,6 +102,9 @@ private:
 	// fires on ghost porc in range after ghost_idle_seconds (GhostFireStep).
 	std::unordered_map<int, SGhostFire> ghostFire;
 	std::unordered_map<int, bool> ghostSupport;
+	// Owner 2026-11-03: units the artillery snipe owns (ArtySnipeStep); route
+	// orders (script SetUnitRoute included) wait until it hands them back.
+	std::set<CCircuitUnit*> sniping;
 	int laneCount;
 	float laneSpacing;
     float rowSpacing = 0.f;

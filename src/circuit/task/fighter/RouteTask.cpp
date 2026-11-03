@@ -92,6 +92,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
 	ghostFire.erase(unit->GetId());
+	sniping.erase(unit);
 	lanes.erase(unit);
     rows.erase(unit);
     const auto slot = formationSlots.find(unit);
@@ -189,6 +190,14 @@ void CRouteTask::Update()
 	for (CCircuitUnit* unit : units) {
 		CCircuitAI* circuit = manager->GetCircuit();
 		CCircuitDef* def = unit->GetCircuitDef();
+		// Owner 2026-11-03: the artillery snipe comes before range micro and
+		// ghost fire; the route resumes (below) once it lets go.
+		if (ArtySnipeStep(circuit, unit, circuit->GetLastFrame())) {
+			sniping.insert(unit);
+			engaging.insert(unit);
+			continue;
+		}
+		sniping.erase(unit);
 		CEnemyInfo* nearest = nullptr;
 		float nearestSq = SQUARE(def->GetMaxRange() * 1.1f);
 		if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
@@ -424,6 +433,7 @@ unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
 
 void CRouteTask::IssueDirect(CCircuitUnit* unit)
 {
+	if (sniping.count(unit) != 0) return;  // ArtySnipeStep owns it; resumes after
 	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return;
@@ -449,6 +459,7 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 
 void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 {
+	if (sniping.count(unit) != 0) return;  // ArtySnipeStep owns it; resumes after
     if (airControl && airTarget >= 0) {
         auto* circuit = manager->GetCircuit();
         auto* enemy = circuit->GetEnemyInfo(airTarget);
