@@ -551,9 +551,17 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			for (int k = 0; k < 24; ++k) {
 				const float off = ((k + 1) / 2) * (3.14159265f / 12.f) * ((k % 2 == 0) ? 1.f : -1.f);
 				AIFloat3 c(tp.x + std::cos(base + off) * snipeR, 0.f, tp.z + std::sin(base + off) * snipeR);
+				// The spot and the straight walk to it (test round 4: a Pulsar spot
+				// existed only behind it, reached through the Persecutor's reach).
 				bool ok = true;
-				for (size_t i = 0; ok && (i < allThreats.size()); ++i) {
-					if ((allIds[i] != t->GetId()) && (c.SqDistance2D(allThreats[i].first) < allThreats[i].second)) ok = false;
+				const float len = pos.distance2D(c);
+				const int n = std::max(1, int(len / 100.f));
+				for (int w = n; ok && (w >= 1); --w) {
+					const float f = float(w) / n;
+					const AIFloat3 p(pos.x + (c.x - pos.x) * f, 0.f, pos.z + (c.z - pos.z) * f);
+					for (size_t i = 0; ok && (i < allThreats.size()); ++i) {
+						if ((allIds[i] != t->GetId()) && (p.SqDistance2D(allThreats[i].first) < allThreats[i].second)) ok = false;
+					}
 				}
 				if (ok) return true;
 			}
