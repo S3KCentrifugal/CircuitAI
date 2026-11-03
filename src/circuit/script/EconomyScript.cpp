@@ -27,6 +27,12 @@ namespace circuit {
 
 using namespace springai;
 
+static IUnitTask* EnqueueWorkerEnergy(CEconomyManager* economy, CCircuitUnit* builder)
+{
+    if (!builder) return nullptr;
+    return economy->UpdateEnergyTasks(builder->GetPos(economy->GetCircuit()->GetLastFrame()), builder, true);
+}
+
 // Explicit script opt-in. BAR permits an advanced geo over an owned T1 geo;
 // its upgrade gadget retires/refunds the old unit on completion. Never reclaim
 // the source here. Scan immutable vent positions, then only local occupants.
@@ -218,6 +224,7 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 
 	r = engine->RegisterObjectType("CEconomyManager", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CEconomyManager aiEconomyMgr", manager); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueWorkerEnergy(CCircuitUnit@)", asFUNCTION(EnqueueWorkerEnergy), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueLocalGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueLocalGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMetalMap() const", asMETHOD(CEconomyManager, IsMetalMap), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEffectiveUnitLimit() const", asMETHOD(CEconomyManager, GetEffectiveUnitLimit), asCALL_THISCALL); ASSERT(r >= 0);

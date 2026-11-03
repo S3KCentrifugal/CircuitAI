@@ -1,11 +1,10 @@
 #include "../../global.as"
 #include "../../helpers/math/heavy_rush_math.as"
 #include "../../systems/team/donation.as"
-#include "tech_heavy_delivery.as"
 
 // A finite production obligation, independent of SPAM_RUSH. Only one lab and
 // one recruit task belong to this controller. Existing economy update cadence
-// services a bounded gift ledger; no per-frame army census or command resend.
+// services a bounded retained-unit ledger; no per-frame army census or command resend.
 namespace TechHeavyRush {
     const string StateKey = "tech.heavy.";
     int completed = 0;
@@ -14,7 +13,7 @@ namespace TechHeavyRush {
     int orderedFrame = -1;
     IUnitTask@ recruit;
     int nextTrace = 0;
-    int nextGift = 0;
+    int nextRoute = 0;
     int engineUnitLimit = 0;
     int priorProductionLimit = -1;
 
@@ -47,7 +46,14 @@ namespace TechHeavyRush {
         if (Selected()) TargetCount();
         labId = aiTerrainMgr.GetLayoutInt(StateKey + "lab", -1);
         orderedFrame = aiTerrainMgr.GetLayoutInt(StateKey + "ordered", -1);
-        nextGift = aiTerrainMgr.GetLayoutInt(StateKey + "next-gift", 0);
+        nextRoute = 0;
+        retained.resize(0);
+        routeFactories.resize(0);
+        // The "gift." key name predates D-449 and is kept for saved games.
+        for (int index = 0; index < completed; ++index) {
+            const int id = aiTerrainMgr.GetLayoutInt(StateKey + "gift." + index, -1);
+            if (ai.GetTeamUnit(id) !is null) Retain(id);
+        }
         priorProductionLimit = aiTerrainMgr.GetLayoutInt(StateKey + "production-limit", -1);
         @recruit = null;
         CCircuitDef@ definition = ai.GetCircuitDef(UnitName());
@@ -74,23 +80,6 @@ namespace TechHeavyRush {
         string name;
         if (!Global::RoleSettings::Tech::HeavyRushUnits.get(Global::AISettings::Side, name)) return "";
         return name;
-    }
-    int Recipient() {
-        array<Team::Roster::Entry@>@ allies = Team::Roster::WithRole(AiRole::FRONT);
-        int best = -1;
-        float distance = 1e30f;
-        const AIFloat3 front = Lanes::Front();
-        for (uint i = 0; i < allies.length(); ++i) {
-            Team::Roster::Entry@ entry = allies[i];
-            if (entry is null || entry.teamId == ai.teamId) continue;
-            const AIFloat3 anchor = Team::Roster::DeliveryAnchor(entry);
-            if (anchor.x < 0.0f) continue;
-            const float candidate = MapHelpers::SqDist(front, anchor);
-            if (candidate < distance || (candidate == distance && entry.teamId < best)) {
-                distance = candidate; best = entry.teamId;
-            }
-        }
-        return best;
     }
     void Blocked(const string& in reason) {
         if (ai.frame < nextTrace) return;
@@ -162,8 +151,8 @@ namespace TechHeavyRush {
             }
         }
         CCircuitDef@ definition = ai.GetCircuitDef(UnitName());
-        if (definition is null || !factory.circuitDef.CanBuild(definition) || Recipient() < 0 || engineUnitLimit <= 0) {
-            Blocked("available heavy unit and FRONT recipient");
+        if (definition is null || !factory.circuitDef.CanBuild(definition) || engineUnitLimit <= 0) {
+            Blocked("available heavy unit");
             return aiFactoryMgr.Enqueue(TaskS::Wait(false, 3 * SECOND));
         }
         if (recruit !is null && !recruit.IsDead()) return recruit;
@@ -189,18 +178,18 @@ namespace TechHeavyRush {
             && unit.GetProducerId() == labId && orderedFrame >= 0 && unit.GetProductionFrame() >= orderedFrame;
     }
     bool OnFinished(CCircuitUnit@ unit) {
+        if (Owns(unit)) return true;
         if (!IsBatchProduction(unit)) return false;
-        // Persistent per-budget-slot identity survives donation and duplicate
+        // Persistent per-budget-slot identity survives reassignment and duplicate
         // callbacks. The ledger grows with configured batch size, not army size.
         for (int index = 0; index < completed; ++index)
             if (aiTerrainMgr.GetLayoutInt(StateKey + "gift." + index, -1) == unit.id) return true;
         aiTerrainMgr.SetLayoutInt(StateKey + "gift." + completed, unit.id);
-        aiTerrainMgr.SetLayoutInt(StateKey + "sent." + completed, 0);
-        TechHeavyDelivery::Record(completed, unit.id);
+        Retain(unit.id);
         ++completed;
         aiTerrainMgr.SetLayoutInt(StateKey + "completed", completed);
         // Release only the definition limit this finite controller borrowed.
-        // Owned gifts still in flight do not justify another production slot.
+        // Retained combat units do not justify another production slot.
         if (!Pending() && priorProductionLimit >= 0) {
             CCircuitDef@ definition = ai.GetCircuitDef(UnitName());
             if (definition !is null) definition.maxThisUnit = priorProductionLimit;
@@ -209,20 +198,58 @@ namespace TechHeavyRush {
         aiTerrainMgr.SetLayoutInt(StateKey + "ordered", -1);
         @recruit = null;
         GenericHelpers::LogUtil("[TECH][HeavyRush] completed " + completed + "/" + TargetCount(), 1);
-        return true; // delivery is deferred past native UnitAdded assignment
+        return true; // route assignment is deferred past native UnitAdded assignment
+    }
+    // B7: retained heavies and their cached spam factory, in parallel arrays
+    // bounded by the configured batch size (a few units), so lookups are a
+    // short linear scan with no string keys. Routing searches only registered
+    // spam factories on assignment/recovery, never the army. IDs only.
+    array<int> retained;
+    array<int> routeFactories;
+    void Retain(int id) {
+        if (id < 0 || retained.find(id) >= 0) return;
+        retained.insertLast(id);
+        routeFactories.insertLast(-1);
+    }
+    bool Owns(CCircuitUnit@ unit) {
+        return Selected() && unit !is null && retained.find(unit.id) >= 0;
+    }
+    void Removed(CCircuitUnit@ unit) {
+        if (unit is null) return;
+        const int index = retained.find(unit.id);
+        if (index < 0) return;
+        retained.removeAt(uint(index));
+        routeFactories.removeAt(uint(index));
+    }
+    IUnitTask@ MilitaryTask(CCircuitUnit@ unit) {
+        if (!Owns(unit) || EdgeLanes::IsReleased(unit)) return null;
+        if (unit.task !is null && (unit.task.IsExternalControlled()
+            || unit.task.GetType() == int(Task::Type::PLAYER)
+            || unit.task.GetType() == int(Task::Type::RETREAT))) return unit.task;
+        const uint index = uint(retained.find(unit.id));
+        const int factoryId = routeFactories[index];
+        CCircuitUnit@ factory = Spam::routeByFactory.exists("" + factoryId) ? ai.GetTeamUnit(factoryId) : null;
+        if (factory is null) {
+            @factory = Spam::_NearestSpamFactory(unit.GetPos(ai.frame));
+            if (factory is null) return null;
+            routeFactories[index] = factory.id;
+        }
+        return Spam::RouteFor(factory);
     }
     void Tick() {
-        if (!Selected() || (!Pending() && nextGift >= completed)) return;
-        if (AiPerfEnabled) AiPerfBeginLabel("tech-heavy-delivery");
-        DeliverPending();
-        if (AiPerfEnabled) AiPerfEndLabel();
-    }
-    void DeliverPending() {
-        for (int index = nextGift; index < completed; ++index) {
-            if (aiTerrainMgr.GetLayoutInt(StateKey + "sent." + index, 0) != 0) continue;
-            TechHeavyDelivery::Update(index, aiTerrainMgr.GetLayoutInt(StateKey + "gift." + index, -1));
+        if (!Selected() || nextRoute >= completed) return;
+        // Completion callback precedes native assignment. Attach afterward on
+        // the existing economy cadence; wait for a spam route without donating.
+        while (nextRoute < completed) {
+            const int id = aiTerrainMgr.GetLayoutInt(StateKey + "gift." + nextRoute, -1);
+            CCircuitUnit@ unit = ai.GetTeamUnit(id);
+            if (unit !is null && !EdgeLanes::IsReleased(unit)) {
+                IUnitTask@ task = MilitaryTask(unit);
+                if (task is null) return;
+                if (unit.task !is task) aiMilitaryMgr.TransferUnit(unit, task);
+                GenericHelpers::LogUtil("[TECH][HeavyRush] retained cargo=" + id + " spam route assigned", 1);
+            }
+            ++nextRoute;
         }
-        while (nextGift < completed && aiTerrainMgr.GetLayoutInt(StateKey + "sent." + nextGift, 0) != 0) ++nextGift;
-        aiTerrainMgr.SetLayoutInt(StateKey + "next-gift", nextGift);
     }
 }

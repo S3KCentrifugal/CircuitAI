@@ -14,7 +14,7 @@ namespace TechGrowth {
     }
     bool Available(CCircuitUnit@ u) {
         if(u is null || u.circuitDef is null || u.GetBuildProgress()<1.f) return false;
-        if(Team::Ferry::IsGift(u.id) || Team::Recovery::IsGift(u.id)
+        if(TechAirFoundry::Owns(u.id) || Team::Ferry::IsGift(u.id) || Team::Recovery::IsGift(u.id)
             || UnitHelpers::IsCommander(u.circuitDef) || SeaConstructor::IsT1(u.circuitDef)
             || SeaConstructor::IsT2(u.circuitDef) || TechHarbour::IsHoverConstructor(u.circuitDef)
             || FrontlineEngineering::members.exists(""+u.id)) return false;

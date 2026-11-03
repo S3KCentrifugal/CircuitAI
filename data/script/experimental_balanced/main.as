@@ -13,7 +13,7 @@ namespace Main {
 		float Tech_Spam_Rush = 0.85f;   // 85% chance
 		float Tech_T3_RUSH = 0.35f;   // 35% chance
 		float Tech_NUKE_RUSH = 0.25f; // 25% chance
-		float Tech_T2_RUSH = 0.25f; // Independent finite heavy-delivery rush
+		float Tech_T2_RUSH = 0.25f; // Independent finite heavy rush; TECH keeps the heavies (D-449)
 	}
 
 	// Decide a boolean from a probability using AiDice with two weights: off vs on.
@@ -71,8 +71,6 @@ namespace Main {
 
         // The opening Tick must search for gaps and raid just like later scouts.
         Global::ScoutRaid::KeepNativeScouts = 0;
-        Global::RoleSettings::Tech::HeavyDeliveryFrontEnabled = true;
-        Global::RoleSettings::Tech::HeavyDeliveryBlockedSeconds = 5.0f;
 
 		// Air-factory gate. Native CEnemyManager::IsAirValid() tests
 		//     GetEnemyThreat(AA) <= maxAAThreat

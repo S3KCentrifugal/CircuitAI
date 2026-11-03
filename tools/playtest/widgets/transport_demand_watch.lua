@@ -20,16 +20,6 @@ function widget:GameFrame(f)
         Spring.SendCommands("give 1 "..aircraft[1].." "..(localBuild and 0 or 1).." @1600,0,4000")
         Spring.SendCommands("give 1 "..cargoName.." 0 @1200,0,4200")
     end
-    if f==450 then
-        local found=false
-        for _,id in ipairs(Spring.GetTeamUnits(0)) do
-            if UnitDefs[Spring.GetUnitDefID(id)].name==cargoName then
-                Spring.SendSkirmishAIMessage(0,"transport-demand-ledger|"..id)
-                found=true
-            end
-        end
-        if not found then emit("FAIL missing ledger cargo") end
-    end
     if f==1800 then
         emit((lightBuilt==1 and has(0,aircraft[2]) and heavyBuilt==0 and "PASS " or "FAIL ").."light only before rush")
         Spring.SendSkirmishAIMessage(0,"transport-demand-rush")

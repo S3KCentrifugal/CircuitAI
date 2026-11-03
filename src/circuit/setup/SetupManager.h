@@ -135,7 +135,7 @@ private:
 	CSetupData* setupData;
 	CSetupScript* script;
 	Json::Value* config;  // owner;
-	Json::Value* scriptConfig;  // owner; D-126: "weapons" and "lanes", kept past CloseConfig
+	Json::Value* scriptConfig;  // owner; selected script-policy sections, kept past CloseConfig
 	std::string configName;
 
 	CCircuitUnit* commander;
