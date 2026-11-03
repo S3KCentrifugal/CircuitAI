@@ -250,9 +250,13 @@ bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircu
 
 bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& site) const {
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
-    if(!GroupBuildSiteAllowed(unit,def,site) || HealthRetreat(unit) || EnergyRetreat(unit)) return false;
+    // The probe Juno's site is behind the forward porc, outside the group's
+    // area by design: its order skips the area gates (retreat and keep-out stay).
+    const bool juno=junoJob && unit && unit->GetTask()==junoJob && def
+        && def==static_cast<IBuilderTask*>(junoJob)->GetBuildDef();
+    if((!juno && !GroupBuildSiteAllowed(unit,def,site)) || HealthRetreat(unit) || EnergyRetreat(unit)) return false;
     if(KeepOutBlocks(unit,site)) return false;
-    if(!IsGroupMember(unit->GetId())) return true;
+    if(juno || !IsGroupMember(unit->GetId())) return true;
     auto* anchor=GroupCommander();
     return anchor && def && commander::GroupJobInRange(site.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
         cfg->group.radius,unit->GetCircuitDef()->GetBuildDistance(),unit->GetTask()==groupJob);
@@ -717,13 +721,52 @@ IUnitTask* CCommanderController::GroupJunoProbe(CCircuitUnit* unit,int frame) {
         auto* task=ai->GetBuilderManager()->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,at,0.f,true,180*FRAMES_PER_SEC));
         if(!task) return nullptr;
         military->AddProbeOrder(at,aim,frame+20*60*FRAMES_PER_SEC);
-        junoJob=task;
+        junoJob=task;junoOrderFrame=frame;junoIdleSince=-1;junoUnit=unit->GetId();
         junoHoldUntil=frame+int(cfg->group.junoHoldSeconds*FRAMES_PER_SEC);
         ai->LOG("[CommanderGroup] juno_probe unit=%i def=%s ghosts=%i near=%i metal=%.0f minM=%.1f minE=%.0f porc=(%.0f,%.0f) x=%.0f z=%.0f aim=(%.0f,%.0f)",
             unit->GetId(),def->GetDef()->GetName(),c.count,nearGhosts,c.metal,minM,minE,guard.x,guard.z,at.x,at.z,aim.x,aim.z);
         return task;
     }
     return nullptr;
+}
+// Owner 2026-11-03: a probe Juno order can outlive its purpose without ever
+// reaching TaskFinished (built by another task, never taken, never framed),
+// and junoJob then blocks every later order. Checked once a second
+// (UpdateCommanderGroup); one bounded unit query at the site.
+void CCommanderController::WatchJunoJob(int frame) {
+    if(!junoJob) return;
+    auto* build=dynamic_cast<IBuilderTask*>(junoJob);
+    const char* why=nullptr;
+    if(!build || junoJob->IsDead()) why="dead";
+    else {
+        const auto site=build->GetPosition();
+        auto* target=build->GetTarget();
+        if(target && target->IsFinished()) why="finished";
+        if(!why) for(int id:ai->GetCallback()->GetFriendlyUnitIdsIn(site,300.f,false)) {
+            auto* u=ai->GetTeamUnit(id);
+            if(u && u->IsFinished() && u->GetCircuitDef()==build->GetBuildDef()) {why="built";break;}
+        }
+        if(!why) {
+            if(junoJob->GetAssignees().empty()) {if(junoIdleSince<0) junoIdleSince=frame;}
+            else junoIdleSince=-1;
+            if(junoIdleSince>=0 && frame-junoIdleSince>60*FRAMES_PER_SEC) why="unassigned";
+            else if(!target && frame-junoOrderFrame>240*FRAMES_PER_SEC) why="no_frame";
+        }
+        if(!why && (frame-junoOrderFrame)%(10*FRAMES_PER_SEC)<FRAMES_PER_SEC) {
+            // Who is (not) building it: the ordering constructor's current task.
+            auto* u=ai->GetTeamUnit(junoUnit);
+            auto* t=u?u->GetTask():nullptr;
+            auto* tb=dynamic_cast<IBuilderTask*>(t);
+            ai->LOG("[CommanderGroup] juno_probe_wait unit=%i task=%s type=%i bt=%i assignees=%zu frame=%i dist=%.0f",
+                junoUnit,t==junoJob?"juno":(t?"other":"none"),t?int(t->GetType()):-1,tb?int(tb->GetBuildType()):-1,
+                junoJob->GetAssignees().size(),int(target!=nullptr),u?std::sqrt(u->GetPos(frame).SqDistance2D(site)):-1.f);
+        }
+    }
+    if(!why) return;
+    ai->LOG("[CommanderGroup] juno_probe_retire reason=%s",why);
+    IUnitTask* task=junoJob;
+    if(!task->IsDead()) task->GetManager()->AbortTask(task); // dequeue -> TaskFinished
+    junoJob=nullptr;junoIdleSince=-1;
 }
 IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     if(!unit || !role.frontDuty || (!IsGroupMember(unit->GetId()) && !Handles(unit)) || !unit->IsFinished()) return nullptr;
@@ -793,6 +836,7 @@ void CCommanderController::UpdateCommanderGroup() {
         junoHistIdx=(junoHistIdx+1)%int(junoMetalHist.size());
         junoHistCount=std::min(junoHistCount+1,int(junoMetalHist.size()));
     }
+    WatchJunoJob(frame);
     auto* anchor=GroupCommander();
     const int anchorId=anchor?anchor->GetId():-1;
     // Only shields can use the remote-plasma lane exception. Refresh its
