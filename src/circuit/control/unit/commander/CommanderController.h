@@ -436,7 +436,7 @@ private:
     // Probe Juno (owner 2026-11-03): one order at a time, outside the shared group job slot.
     IUnitTask* GroupJunoProbe(CCircuitUnit* unit,int frame);
     IUnitTask* junoJob=nullptr; // borrowed until TaskFinished
-    int junoNext=0,junoHoldUntil=0,junoOrderFrame=0,junoIdleSince=-1,junoUnit=-1;
+    int junoNext=0,junoHoldUntil=0,junoOrderFrame=0,junoIdleSince=-1,junoUnit=-1,junoSkipNext=0;
     void WatchJunoJob(int frame); // retires a probe Juno order that is built, stuck or abandoned
     std::array<float,60> junoMetalHist{},junoEnergyHist{}; // per-second income samples, ring
     int junoHistCount=0,junoHistIdx=0;

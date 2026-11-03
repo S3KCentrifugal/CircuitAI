@@ -80,7 +80,8 @@
 		"commander_group_juno_metal": 45,
 		"commander_group_juno_energy": 1200,
 		"commander_group_juno_seconds": 10,
-		"commander_group_juno_porc_range": 1200,
+		// owner 2026-11-03 White Fire Remake: 1900 (1200 left the jammed block 270-680 out of reach)
+		"commander_group_juno_porc_range": 1900,
 		"commander_group_juno_behind": 250,
 		"commander_group_juno_hold_seconds": 180,
 		"commander_group_juno_max": 2,

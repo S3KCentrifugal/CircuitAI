@@ -285,7 +285,7 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     for(auto& entry:states) entry.value->work.Retire(task);
     if(task==junoJob) {
         junoJob=nullptr;
-        ai->LOG("[CommanderGroup] juno_probe_end done=%i",int(done));
+        ai->LOG("[CommanderGroup] juno_probe_end team=%i done=%i",ai->GetTeamId(),int(done));
         return;
     }
     if(task!=groupJob) return;
@@ -691,13 +691,28 @@ IUnitTask* CCommanderController::GroupJunoProbe(CCircuitUnit* unit,int frame) {
     if(!OnMap(forward)) return nullptr;
     const auto& history=ai->GetAllyTeam()->GetProbeHistory();
     const float sqPorc=SQUARE(cfg->group.junoPorcRange);
+    // Owner 2026-11-03 (White Fire Remake): the cluster nearest to passing, for juno_probe_skip.
+    int bestNear=0,blocked=0;
+    float bestDist3=std::numeric_limits<float>::max();
+    std::vector<float> dists;
     for(const auto& c:clusters) {
         int nearGhosts=0;
-        for(const auto& m:c.members) if(AIFloat3(m.x,0,m.z).SqDistance2D(forward)<=sqPorc) ++nearGhosts;
+        dists.clear();
+        for(const auto& m:c.members) {
+            const float sq=AIFloat3(m.x,0,m.z).SqDistance2D(forward);
+            dists.push_back(sq);
+            if(sq<=sqPorc) ++nearGhosts;
+        }
+        const size_t k=size_t(std::max(1,pulse.probeMinGhosts))-1;
+        if(dists.size()>k) {
+            std::nth_element(dists.begin(),dists.begin()+k,dists.end());
+            const float dist3=std::sqrt(dists[k]);
+            if(nearGhosts>bestNear || (nearGhosts==bestNear && dist3<bestDist3)) {bestNear=nearGhosts;bestDist3=dist3;}
+        }
         if(nearGhosts<pulse.probeMinGhosts) continue;
         const AIFloat3 aim(c.center.x,ai->GetMap()->GetElevationAt(c.center.x,c.center.z),c.center.z);
         if(history.Blocked(c.center,-1,frame,false)
-            || ai->GetAllyTeam()->GetPulseClaims().Blocked(c.center,-1,frame,false,false)) continue; // a Juno is on it
+            || ai->GetAllyTeam()->GetPulseClaims().Blocked(c.center,-1,frame,false,false)) {++blocked;continue;} // a Juno is on it
         // The porc nearest the images; the Juno goes behind it, away from them.
         AIFloat3 guard=forward;
         float bestSq=guard.SqDistance2D(aim);
@@ -714,8 +729,8 @@ IUnitTask* CCommanderController::GroupJunoProbe(CCircuitUnit* unit,int frame) {
         };
         const AIFloat3 at=ai->GetTerrainManager()->FindBuildSite(def,site,300.f,0,admit);
         if(!OnMap(at)) {
-            ai->LOG("[CommanderGroup] juno_probe_nosite unit=%i ghosts=%i near=%i porc=(%.0f,%.0f) x=%.0f z=%.0f",
-                unit->GetId(),c.count,nearGhosts,guard.x,guard.z,site.x,site.z);
+            ai->LOG("[CommanderGroup] juno_probe_nosite team=%i unit=%i ghosts=%i near=%i porc=(%.0f,%.0f) x=%.0f z=%.0f",
+                ai->GetTeamId(),unit->GetId(),c.count,nearGhosts,guard.x,guard.z,site.x,site.z);
             continue;
         }
         auto* task=ai->GetBuilderManager()->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,at,0.f,true,180*FRAMES_PER_SEC));
@@ -723,9 +738,15 @@ IUnitTask* CCommanderController::GroupJunoProbe(CCircuitUnit* unit,int frame) {
         military->AddProbeOrder(at,aim,frame+20*60*FRAMES_PER_SEC);
         junoJob=task;junoOrderFrame=frame;junoIdleSince=-1;junoUnit=unit->GetId();
         junoHoldUntil=frame+int(cfg->group.junoHoldSeconds*FRAMES_PER_SEC);
-        ai->LOG("[CommanderGroup] juno_probe unit=%i def=%s ghosts=%i near=%i metal=%.0f minM=%.1f minE=%.0f porc=(%.0f,%.0f) x=%.0f z=%.0f aim=(%.0f,%.0f)",
-            unit->GetId(),def->GetDef()->GetName(),c.count,nearGhosts,c.metal,minM,minE,guard.x,guard.z,at.x,at.z,aim.x,aim.z);
+        ai->LOG("[CommanderGroup] juno_probe team=%i unit=%i def=%s ghosts=%i near=%i metal=%.0f minM=%.1f minE=%.0f porc=(%.0f,%.0f) x=%.0f z=%.0f aim=(%.0f,%.0f)",
+            ai->GetTeamId(),unit->GetId(),def->GetDef()->GetName(),c.count,nearGhosts,c.metal,minM,minE,guard.x,guard.z,at.x,at.z,aim.x,aim.z);
         return task;
+    }
+    if(frame>=junoSkipNext) {
+        junoSkipNext=frame+30*FRAMES_PER_SEC;
+        ai->LOG("[CommanderGroup] juno_probe_skip team=%i forward=(%.0f,%.0f) best_near=%i best_dist3=%.0f range=%.0f minM=%.1f minE=%.0f junos=%i clusters=%zu blocked=%i",
+            ai->GetTeamId(),forward.x,forward.z,bestNear,bestDist3<std::numeric_limits<float>::max()?bestDist3:-1.f,
+            cfg->group.junoPorcRange,minM,minE,junos,clusters.size(),blocked);
     }
     return nullptr;
 }
@@ -757,13 +778,13 @@ void CCommanderController::WatchJunoJob(int frame) {
             auto* u=ai->GetTeamUnit(junoUnit);
             auto* t=u?u->GetTask():nullptr;
             auto* tb=dynamic_cast<IBuilderTask*>(t);
-            ai->LOG("[CommanderGroup] juno_probe_wait unit=%i task=%s type=%i bt=%i assignees=%zu frame=%i dist=%.0f",
-                junoUnit,t==junoJob?"juno":(t?"other":"none"),t?int(t->GetType()):-1,tb?int(tb->GetBuildType()):-1,
+            ai->LOG("[CommanderGroup] juno_probe_wait team=%i unit=%i task=%s type=%i bt=%i assignees=%zu frame=%i dist=%.0f",
+                ai->GetTeamId(),junoUnit,t==junoJob?"juno":(t?"other":"none"),t?int(t->GetType()):-1,tb?int(tb->GetBuildType()):-1,
                 junoJob->GetAssignees().size(),int(target!=nullptr),u?std::sqrt(u->GetPos(frame).SqDistance2D(site)):-1.f);
         }
     }
     if(!why) return;
-    ai->LOG("[CommanderGroup] juno_probe_retire reason=%s",why);
+    ai->LOG("[CommanderGroup] juno_probe_retire team=%i reason=%s",ai->GetTeamId(),why);
     IUnitTask* task=junoJob;
     if(!task->IsDead()) task->GetManager()->AbortTask(task); // dequeue -> TaskFinished
     junoJob=nullptr;junoIdleSince=-1;

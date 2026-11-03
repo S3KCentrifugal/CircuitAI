@@ -110,7 +110,7 @@ namespace CommanderCombat {
             Option("commander_group_juno_metal",45.f);
             Option("commander_group_juno_energy",1200.f);
             Option("commander_group_juno_seconds",10.f);
-            Option("commander_group_juno_porc_range",1200.f);
+            Option("commander_group_juno_porc_range",1900.f);
             Option("commander_group_juno_behind",250.f);
             Option("commander_group_juno_hold_seconds",180.f);
             Option("commander_group_juno_max",2.f);
