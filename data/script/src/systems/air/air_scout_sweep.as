@@ -166,11 +166,23 @@ namespace AirScoutSweep {
         // the due package's counts and target: the forming one's, else the pending request's
         const int dueT1 = forming ? Wanted(0) : (pendT1 >= 0 ? pendT1 : Global::RoleSettings::Air::ScoutSweepT1Count);
         const int dueRadar = forming ? Wanted(1) : (pendRadar >= 0 ? pendRadar : Global::RoleSettings::Air::ScoutSweepRadarCount);
-        const AIFloat3 at = forming ? wantAt : pendAt;
-        const float spread = forming ? wantSpread : pendSpread;
+        // target: the forming package's, else a pending request's (a lolcannon area behind a lane sweep)
+        const bool pendAim = requested && pendAt.x >= 0.0f && !(forming && Targeted());
+        const AIFloat3 at = pendAim ? pendAt : (forming ? wantAt : pendAt);
+        const float spread = pendAim ? pendSpread : (forming ? wantSpread : pendSpread);
         const bool urgent = forming ? wantUrgent : pendUrgent;
         Draft(at, spread, dueT1, dueRadar, false, true, "emergency");
-        const int restT1 = AiMax(0, dueT1 - draftT1), restRadar = AiMax(0, dueRadar - draftRadar);
+        int restT1 = AiMax(0, dueT1 - draftT1), restRadar = AiMax(0, dueRadar - draftRadar);
+        AIFloat3 owedAt = at;
+        float owedSpread = spread;
+        bool owedUrgent = urgent;
+        if (forming && requested) {
+            // a request still pending behind the forming package (a lolcannon's area) is not lost:
+            // the owed package takes its target and the larger counts
+            if (pendAt.x >= 0.0f) { owedAt = pendAt; owedSpread = pendSpread; }
+            restT1 = AiMax(restT1, pendT1 >= 0 ? pendT1 : 0); restRadar = AiMax(restRadar, pendRadar >= 0 ? pendRadar : 0);
+            owedUrgent = owedUrgent || pendUrgent;
+        }
         if (forming) {
             // the package re-plans for what is owed; members not drafted (none finished) go home
             array<string>@ left = members.getKeys();
@@ -187,10 +199,10 @@ namespace AirScoutSweep {
             GenericHelpers::LogUtil("[AIR][ScoutSweep] emergency: the whole package flew now, nothing owed",1);
             return;
         }
-        pendT1 = restT1; pendRadar = restRadar; pendAt = at; pendSpread = spread; pendUrgent = urgent;
+        pendT1 = restT1; pendRadar = restRadar; pendAt = owedAt; pendSpread = owedSpread; pendUrgent = owedUrgent;
         requested = true; owedEmergency = true;
         GenericHelpers::LogUtil("[AIR][ScoutSweep] emergency: owed T1="+restT1+" radar="+restRadar
-            +(at.x >= 0.0f ? " to ("+int(at.x)+","+int(at.z)+")" : " (lane sweep)")+", flies once the base is clear",1);
+            +(owedAt.x >= 0.0f ? " to ("+int(owedAt.x)+","+int(owedAt.z)+")" : " (lane sweep)")+", flies once the base is clear",1);
     }
     void EmergencyEnded() {
         if (!owedEmergency) return;
