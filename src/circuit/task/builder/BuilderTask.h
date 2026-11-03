@@ -118,6 +118,7 @@ public:
 
 	virtual bool IsGeneric() const { return false; }
 	BuildType GetBuildType() const { return buildType; }
+	CCircuitUnit* GetInitiator() const { return initiator; }
 	// D-211: opt-in, transient recovery selection. Script re-adopts after load.
 	// Prevent legacy feature-area reevaluation from silently changing the job.
 	bool recoveryControlled = false;

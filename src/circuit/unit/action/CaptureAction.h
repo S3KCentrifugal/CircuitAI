@@ -12,6 +12,7 @@
 
 namespace springai {
 	class Unit;
+	class AIFloat3;
 }
 
 namespace circuit {
@@ -27,6 +28,10 @@ private:
 	// Owner 2026-11-03: enemy dragon's teeth / walls are reclaimed, not
 	// captured. The reclaim is an order on the target id; a neutral (objectified)
 	// wall and an enemy unit share the engine id space.
+	// Squared distance within which a wall ranks with the current work: 0
+	// unless the commander does lowest-tier work (repair, wreck reclaim,
+	// assist, guard, patrol); then the distance to that work's site.
+	float LowTierReach(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFloat3& pos) const;
 	bool ReclaimWall(CCircuitAI* circuit, CCircuitUnit* unit, springai::Unit* wall, int wallId);
 
 	float range;

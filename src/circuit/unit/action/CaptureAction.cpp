@@ -11,6 +11,7 @@
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
 #include "control/unit/commander/CommanderController.h"
+#include "task/builder/BuilderTask.h"
 #include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
@@ -60,7 +61,12 @@ void CCaptureAction::Update(CCircuitAI* circuit)
 	const float energyIncome = circuit->GetEconomyManager()->GetAvgEnergyIncome() * 0.5f;
 
 	CBuilderManager* builderMgr = circuit->GetBuilderManager();
-	const bool canReclaim = unit->GetCircuitDef()->IsAbleToReclaim();
+	// Owner 2026-11-03: wall reclaim ranks with the commander's lowest work
+	// (repair, wreck reclaim, assisting construction, guard/patrol), never
+	// above anything: only while doing such work, and only for a wall nearer
+	// than that work (equal priority, nearest first).
+	const float wallSqReach = LowTierReach(circuit, unit, pos);
+	const bool canReclaim = unit->GetCircuitDef()->IsAbleToReclaim() && (wallSqReach > 0.f);
 	// Enemy walls within range, nearest first; the porc and keep-out gates
 	// run on a short list only (ReclaimWall).
 	std::vector<std::pair<float, std::pair<Unit*, int>>> walls;
@@ -83,8 +89,9 @@ void CCaptureAction::Update(CCircuitAI* circuit)
 					if (canReclaim) {
 						AIFloat3 wpos = n->GetPos();
 						CTerrainManager::CorrectPosition(wpos);
-						if (threatMap->GetThreatAt(wpos) <= power) {
-							walls.push_back({wpos.SqDistance2D(pos), {n, n->GetUnitId()}});
+						const float sq = wpos.SqDistance2D(pos);
+						if ((threatMap->GetThreatAt(wpos) <= power) && (sq < wallSqReach)) {
+							walls.push_back({sq, {n, n->GetUnitId()}});
 						}
 					}
 					continue;
@@ -157,8 +164,9 @@ void CCaptureAction::Update(CCircuitAI* circuit)
 		}
 		CCircuitDef* edef = e->GetCircuitDef();
 		if (builderMgr->IsReclaimWallDef(edef)) {
-			if (canReclaim && !e->IsHidden()) {
-				walls.push_back({e->GetPos().SqDistance2D(pos), {e->GetUnit(), eId}});
+			const float sq = e->GetPos().SqDistance2D(pos);
+			if (canReclaim && !e->IsHidden() && (sq < wallSqReach)) {
+				walls.push_back({sq, {e->GetUnit(), eId}});
 			}
 			continue;
 		}
@@ -195,6 +203,41 @@ void CCaptureAction::Update(CCircuitAI* circuit)
 		)
 		isBlocking = true;
 	}
+}
+
+float CCaptureAction::LowTierReach(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos) const
+{
+	IUnitTask* task = unit->GetTask();
+	if ((task == nullptr) || (task->GetType() != IUnitTask::Type::BUILDER) || task->IsDead()
+		|| task->IsExternalControlled() || task->IsEnemyReclaim()
+		|| (task->GetPriority() == IUnitTask::Priority::NOW))
+	{
+		return 0.f;
+	}
+	IBuilderTask* build = static_cast<IBuilderTask*>(task);
+	bool low = false;
+	switch (build->GetBuildType()) {
+		case IBuilderTask::BuildType::REPAIR:
+		case IBuilderTask::BuildType::RECLAIM:
+		case IBuilderTask::BuildType::RESURRECT:
+		case IBuilderTask::BuildType::GUARD:
+		case IBuilderTask::BuildType::PATROL:
+			low = true;
+			break;
+		default:
+			// Assisting construction: another worker's build the commander joined.
+			low = (build->GetBuildDef() != nullptr)
+				&& (build->GetInitiator() != nullptr) && (build->GetInitiator() != unit);
+			break;
+	}
+	if (!low) {
+		return 0.f;
+	}
+	const AIFloat3& at = build->GetPosition();
+	if (!geom::is_valid(at) || (build->GetBuildType() == IBuilderTask::BuildType::PATROL)) {
+		return SQUARE(range) + 1.f;  // no fixed site: any wall in range
+	}
+	return std::max(1.f, at.SqDistance2D(pos));
 }
 
 bool CCaptureAction::ReclaimWall(CCircuitAI* circuit, CCircuitUnit* unit, Unit* wall, int wallId)
