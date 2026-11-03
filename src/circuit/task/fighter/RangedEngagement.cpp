@@ -3,6 +3,7 @@
 #include "CircuitAI.h"
 #include "module/MilitaryManager.h"
 #include "module/EconomyManager.h"
+#include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/path/PathFinder.h"
 #include "terrain/path/QueryPathSingle.h"
@@ -451,6 +452,11 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         reach=std::max(reach,reclaim);
         const bool approvedStatic=assessed && group.committed
             && std::find(group.assault.begin(),group.assault.end(),c.id)!=group.assault.end();
+        // Owner 2026-11-03: a commander is shot, not fled, by commander_no_retreat
+        // hulls; its death blast (explosionRadius) still counts below.
+        const bool approvedCommander=policy.commanderNoRetreat && c.mobile
+            && c.def->IsEnemyRoleAny(CCircuitDef::COMM)
+            && distance>c.explosionRadius+policy.safetyMargin;
         const bool approvedMobile=c.mobile && !c.def->IsEnemyRoleAny(CCircuitDef::COMM)
             && group.mode==cohort::Mode::RUSH && (!assessed || c.groundRange>=maxRange
                 || (policy.supportAllies && group.supporting
@@ -458,7 +464,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         // A poker accepts the reach of a similar-range mobile; its cadence,
         // not the escape, takes it back out while the weapon reloads.
         if((c.hazardRadius>0.f || reclaim>0.f) && distance<reach && reach-distance>penetration
-            && (distance<reclaim || !(approvedStatic || approvedMobile || poked))) {
+            && (distance<reclaim || !(approvedStatic || approvedMobile || approvedCommander || poked))) {
             danger=&c; penetration=reach-distance;
         }
         // Target permissions never suppress the hazard above. Coordinated
@@ -554,6 +560,24 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         point=closest->pos+away*reach;
     }
     if(group.sustainedRush) { danger=nullptr; incoming=nullptr; withdrawalUntil=0; }
+    // Owner 2026-11-03: the danger kite had no leash, so a pursuing enemy walked
+    // Thugs straight past their own base. At home (inside home_hold_radius of the
+    // base) or already behind it (on the far side from the threat), hold and
+    // fight instead. A reclaimer in reach still counts: it would take the hull.
+    if(danger && policy.homeHoldRadius>0.f
+        && !(danger->def->IsAbleToReclaim() && std::sqrt(pos.SqDistance2D(danger->pos))<danger->def->GetBuildDistance()+danger->radius+policy.safetyMargin)) {
+        const AIFloat3& base=ai->GetSetupManager()->GetBasePos();
+        AIFloat3 threat=danger->pos-base; threat.y=0.f;
+        const bool home=pos.SqDistance2D(base)<policy.homeHoldRadius*policy.homeHoldRadius;
+        const bool behind=(pos.x-base.x)*threat.x+(pos.z-base.z)*threat.z<0.f;
+        if(home || behind) {
+            if(trace && frame>=homeHoldLogFrame+150) {
+                homeHoldLogFrame=frame;
+                ai->LOG("RANGED: home hold unit=%d danger=%d home=%d behind=%d",id,danger->id,int(home),int(behind));
+            }
+            danger=nullptr; withdrawalUntil=0;
+        }
+    }
     if(danger) {
         AIFloat3 away=pos-danger->pos; away.Normalize2D();
         if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;

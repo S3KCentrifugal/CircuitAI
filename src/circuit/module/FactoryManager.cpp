@@ -577,6 +577,8 @@ void CFactoryManager::ReadConfig()
 			boolean("always_fire_at_will", policy.alwaysFireAtWill);
 			boolean("fire_in_range", policy.fireInRange);
 			boolean("commander_focus", policy.commanderFocus);
+			number("home_hold_radius", policy.homeHoldRadius, 0.f, 4000.f);
+			boolean("commander_no_retreat", policy.commanderNoRetreat);
 			number("spam_max_cost", policy.spamMaxCost, 0.f, 2000.f);
 			{
 				// Owner 2026-10-27: an explicit spam roster. A name this game

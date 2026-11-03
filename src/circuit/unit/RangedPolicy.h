@@ -142,6 +142,13 @@ struct RangedPolicy {
     // commander strict shot priority.
     bool fireInRange = false;
     bool commanderFocus = false;
+    // Owner 2026-11-03: Thugs pulled back well behind their base by the danger
+    // kite. Inside home_hold_radius of our base, or on the far side of it from
+    // the threat, a hull never withdraws from danger: it holds and fights.
+    // 0 = off. commander_no_retreat: an enemy commander is not a reason to
+    // withdraw (it still is inside its death blast).
+    float homeHoldRadius = 0.f;
+    bool commanderNoRetreat = false;
     float spamMaxCost = 0.f;
     // Owner 2026-10-27: named spam ("spam_units", def ids resolved at load),
     // in addition to spamMaxCost. Same rules: mobile, never a commander.
