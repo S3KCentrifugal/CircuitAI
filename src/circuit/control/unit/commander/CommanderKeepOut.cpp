@@ -82,13 +82,15 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
     for(const auto& [id,enemy]:ai->GetEnemyManager()->GetEnemyUnits()) {
         auto* def=enemy?enemy->GetCircuitDef():nullptr;
         if(!def || enemy->IsFake() || enemy->IsDead() || enemy->IsDying()) continue;
-        // Owner 2026-11-01: built and alive towers; a frame last seen unfinished does not count.
-        if(enemy->IsBeingBuilt()) continue;
         const bool tower=towerDefs.count(def->GetId())>0;
         bool ghost=false;
         if(tower) {
-            if(!towers) continue;
+            // Owner 2026-11-01: built and alive towers; a frame last seen unfinished does not count.
+            if(!towers || enemy->IsBeingBuilt()) continue;
         } else {
+            // Owner 2026-11-03 (Glitters replay: a commander walked 218 inside a
+            // 30%-built Pulsar): heavy and ghost porc count from the nanoframe,
+            // since an assisted frame finishes in seconds.
             // Owner 2026-11-03: ghost porc of any tier and seen heavy porc.
             if(!porc || def->IsMobile() || def->IsAbleToFly() || def->IsRoleSuper()) continue;
             const auto& g=enemy->GetData();
