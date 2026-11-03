@@ -105,6 +105,15 @@ namespace CommanderCombat {
             Option("commander_group_sensor_defense_band",3.f);
             Option("commander_group_jammer_outage",60.f);
             Option("commander_group_jammer_income",25.f);
+            // owner 2026-11-03: the probe Juno (commander.json commander_group_juno_*); native keeps it off until set.
+            Option("commander_group_juno_probe",1.f);
+            Option("commander_group_juno_metal",45.f);
+            Option("commander_group_juno_energy",1200.f);
+            Option("commander_group_juno_seconds",10.f);
+            Option("commander_group_juno_porc_range",1200.f);
+            Option("commander_group_juno_behind",250.f);
+            Option("commander_group_juno_hold_seconds",180.f);
+            Option("commander_group_juno_max",2.f);
             Option("commander_group_defence_metal",50.f);
             Option("commander_group_defence_energy",1000.f);
             Option("commander_group_budget_seconds",30.f);
