@@ -458,6 +458,7 @@ public:
 		bool hasSnipeSpot = false;  // stage 2: a checked snipe spot (outside other threats, safe walk)
 		springai::AIFloat3 snipeSpot;
 		int spotFor = -1;            // stage 2: threat the snipe / hold spots were chosen for
+		bool holding = false;        // stage 2: outranged (close_in_min_range), holding outside its reach
 		int drifts = 0;         // prep: times the unit slid into a threat's reach on this target
 		bool drifting = false;
 		std::unordered_set<int> ghostDone;  // ghost images already given their volleys (until seen again)

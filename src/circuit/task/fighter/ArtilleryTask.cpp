@@ -638,6 +638,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.holdSince = -1;
 		st.hasSnipeSpot = false;
 		st.spotFor = -1;
+		st.holding = false;
 		st.threat = best->GetId();
 		st.target = -1;
 		st.volleys = 0;
@@ -921,7 +922,42 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		if (range * info.snipeFraction >= reach) {
 			st.go = true;  // shoots from outside its reach: no need to gather
 		} else if (range < info.closeMinRange) {
-			return finish("outranged, leaves the close-in to longer-ranged artillery");
+			// Test round 8: released to the ordinary controller, these walked into
+			// the threat anyway (4 of 4 lost). Hold outside its reach, on the side
+			// with the least shared overlap, while a longer-ranged unit is on the
+			// same threat; then let go. O(snipe states).
+			bool others = false;
+			for (const auto& kv : military->GetArtySnipeStates()) {
+				const CMilitaryManager::SArtySnipeState& o = kv.second;
+				if ((kv.first != unit->GetId()) && (o.threat == st.threat) && (o.stage != 0) && !o.holding
+					&& (frame - o.lastCall <= FRAMES_PER_SEC * 10))
+				{
+					others = true;
+					break;
+				}
+			}
+			if (!others) {
+				st.holding = false;
+				return finish("outranged, no longer-ranged artillery on it");
+			}
+			const float holdRadius = reach + info.holdMargin;
+			if (!st.holding || (st.spotFor != st.threat)) {
+				st.holding = true;
+				st.spotFor = st.threat;
+				findSpot(threat->GetPos(), holdRadius, -1, false, st.spot, rangeOf(threat, holdRadius));
+				st.orderKey = -1;
+				circuit->LOG("SNIPE: %s %i outranged by %s %i, holds at (%.0f, %.0f) while longer-ranged artillery snipes it",
+						cdef->GetDef()->GetName(), unit->GetId(), SnipeName(threat), st.threat, st.spot.x, st.spot.z);
+			}
+			if ((pos.SqDistance2D(st.spot) > SQUARE(100.f)) && ((st.orderKey != -7 - st.threat) || (frame >= st.orderUntil))) {
+				st.orderKey = -7 - st.threat;
+				st.orderUntil = frame + FRAMES_PER_SEC * 8;
+				if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+				TRY_UNIT(circuit, unit,
+					unit->CmdMoveTo(st.spot, 0, frame + FRAMES_PER_SEC * 12);
+				)
+			}
+			return true;
 		} else {
 			const float holdRadius = reach + info.holdMargin;
 			const float d = pos.distance2D(threat->GetPos());
