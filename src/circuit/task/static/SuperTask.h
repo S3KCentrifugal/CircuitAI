@@ -88,7 +88,20 @@ private:
 			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify,
 			float minValue = 0.f, bool avoidFriendly = false, bool allEnemies = false,
 			bool pulseClaims = false, bool nuclearHistory = false, const TAimScale& aimScale = nullptr,
-			const TExtraAims& extraAims = nullptr, const CWeaponDef* blastWeapon = nullptr);
+			const TExtraAims& extraAims = nullptr, const CWeaponDef* blastWeapon = nullptr, int centerRanks = 0);
+	// Launcher priority (owner 2026-11-03, SLauncherPrioInfo): 0 primary,
+	// 1 slow commander, 2 tertiary / stationary T3, -1 none. Ranks below
+	// LAUNCHER_PRIO_RANKS are passed as centerRanks: an aim point holds such a
+	// rank only on the target itself, and the stockpile floor does not apply.
+	int LauncherPriorityRank(const SEnemyData& e, CCircuitDef* edef, CCircuitDef* cdef) const;
+	// Synchronised volley on a primary target (sync_units): true when the
+	// caller must not ExecuteAttack (holding, or the volley already fired).
+	bool SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame);
+	void FireSync(CCircuitUnit* unit, const springai::AIFloat3& pos);
+	int areaRank = -1;            // the rank SelectAreaTarget picked at the last scan, -1 none
+	bool areaPeacePool = false;   // SelectAreaTarget is scanning the peace (unarmed) pool
+	int syncHoldSince = -1;       // first frame of the current sync hold, -1 none
+	springai::AIFloat3 syncLogPos = springai::AIFloat3(-1.f, 0.f, -1.f);  // the hold logged last
 	// Blast + chain kills of a nuke (SuperTask.cpp, ChainKill).
 	// volume: the def's collision volume (CollisionVolumes.h), nullptr = def radius x blast_volume_factor
 	struct SDeathBlast { float damage = 0.f, radius = 0.f, edge = 0.f, volume = 0.f; const CV::SVolume* cv = nullptr; };

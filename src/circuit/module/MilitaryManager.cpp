@@ -722,6 +722,48 @@ void CMilitaryManager::ReadConfig()
 			unsigned(artyCommInfo.ghostDefs.size()), artyCommInfo.ghostIdleFrames);
 
 	/*
+	 * Tactical launcher priority: see SLauncherPrioInfo. Def names; speeds in
+	 * elmos per second.
+	 */
+	{
+		const Json::Value& lpCfg = root["launcher_priority"];
+		SLauncherPrioInfo& lp = launcherPrioInfo;
+		lp = SLauncherPrioInfo();
+		if (!lpCfg.isNull() && lpCfg.get("enabled", true).asBool()) {
+			auto readDefs = [circuit](const Json::Value& list, std::unordered_set<CCircuitDef::Id>& out) {
+				std::set<std::string> names;
+				for (const auto& name : list) names.insert(name.asString());
+				for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+					if (names.count(d.GetDef()->GetName()) > 0) out.insert(d.GetId());
+				}
+			};
+			readDefs(lpCfg["units"], lp.defs);
+			readDefs(lpCfg["primary"], lp.primary);
+			lp.primaryShields = lpCfg.get("primary_shields", true).asBool();
+			const float commSpeed = lpCfg.get("commander_max_speed", 12.f).asFloat();
+			lp.commMaxSqSpeed = (commSpeed < 0.f) ? -1.f : SQUARE(commSpeed / FRAMES_PER_SEC);
+			readDefs(lpCfg["tertiary"], lp.tertiary);
+			if (lpCfg.get("tertiary_t3", true).asBool()) {
+				for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+					const auto& params = d.GetDef()->GetCustomParams();
+					auto it = params.find("techlevel");
+					if ((it != params.end()) && (utils::string_to_int(it->second) >= 3)) lp.t3Defs.insert(d.GetId());
+				}
+			}
+			lp.t3MaxSqSpeed = SQUARE(std::max(0.f, lpCfg.get("t3_max_speed", 3.f).asFloat()) / FRAMES_PER_SEC);
+			readDefs(lpCfg["sync_units"], lp.syncDefs);
+			lp.syncMaxWaitFrames = int(std::max(0.f, lpCfg.get("sync_max_wait_seconds", 150.f).asFloat()) * FRAMES_PER_SEC);
+			lp.syncRecheckFrames = std::max(1, int(lpCfg.get("sync_recheck_seconds", 1.f).asFloat() * FRAMES_PER_SEC));
+			lp.isEnabled = !lp.defs.empty();
+		}
+		circuit->LOG("CONFIG %s: launcher priority %s | defs=%u primary=%u shields=%i comm_speed=%.1f tertiary=%u t3=%u t3_speed=%.1f sync=%u wait=%is",
+				cfgName.c_str(), lp.isEnabled ? "enabled" : "disabled", unsigned(lp.defs.size()), unsigned(lp.primary.size()),
+				int(lp.primaryShields), (lp.commMaxSqSpeed < 0.f) ? -1.f : std::sqrt(lp.commMaxSqSpeed) * FRAMES_PER_SEC,
+				unsigned(lp.tertiary.size()), unsigned(lp.t3Defs.size()), std::sqrt(lp.t3MaxSqSpeed) * FRAMES_PER_SEC,
+				unsigned(lp.syncDefs.size()), lp.syncMaxWaitFrames / FRAMES_PER_SEC);
+	}
+
+	/*
 	 * Artillery snipe: see SArtySnipeInfo. Def names; distances in elmos,
 	 * times in seconds.
 	 */

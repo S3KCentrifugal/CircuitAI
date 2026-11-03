@@ -409,6 +409,38 @@ public:
 	};
 	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
 	/*
+	 * Owner 2026-11-03: tactical launcher priority ("launcher_priority").
+	 * Listed super weapons (Paralyzer armemp, Catalyst cortron, Perdition
+	 * legperdition) shoot, before their ordinary pick:
+	 *   rank 0 (primary): static shields and the "primary" defs (Pulsar,
+	 *          Bulwark, Bastion);
+	 *   rank 1: enemy commanders moving at most commander_max_speed
+	 *          (a paralyzer skips this: commanders cannot be stunned);
+	 *   rank 2: the "tertiary" defs (Persecutor, Rattlesnake, Eviscerator) and
+	 *          tech level 3 enemies that are static or move at most
+	 *          t3_max_speed.
+	 * A priority target is aimed at its own position and is not held to the
+	 * stockpile floor. "sync_units" (Catalyst, Perdition): with two or more of
+	 * them reaching the same primary target, each holds until all have a
+	 * stocked missile, then all fire at that target on the same frame
+	 * (after sync_max_wait_seconds a stocked one fires alone). See
+	 * CSuperTask::SyncLaunch.
+	 */
+	struct SLauncherPrioInfo {
+		bool isEnabled = false;
+		std::unordered_set<CCircuitDef::Id> defs;
+		std::unordered_set<CCircuitDef::Id> primary;
+		bool primaryShields = true;
+		float commMaxSqSpeed = 0.f;  // (elmos/frame)^2; < 0: no commander rank
+		std::unordered_set<CCircuitDef::Id> tertiary;
+		std::unordered_set<CCircuitDef::Id> t3Defs;
+		float t3MaxSqSpeed = 0.f;    // (elmos/frame)^2
+		std::unordered_set<CCircuitDef::Id> syncDefs;
+		int syncMaxWaitFrames = 0;   // 0: wait for ever
+		int syncRecheckFrames = 30;
+	};
+	const SLauncherPrioInfo& GetLauncherPrioInfo() const { return launcherPrioInfo; }
+	/*
 	 * Owner 2026-11-03: artillery snipe ("artillery_snipe"). Listed long-range
 	 * rocket artillery (Thanatos, Arbiter, Boreas, Negotiator, Ambassador) that
 	 * comes near a known outranging pop-up artillery structure (Persecutor,
@@ -726,6 +758,7 @@ private:
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
 	SArtyCommInfo artyCommInfo;
+	SLauncherPrioInfo launcherPrioInfo;
 	SArtySnipeInfo artySnipeInfo;
 	std::unordered_map<int, SArtySnipeState> artySnipeStates;
 	int artySnipePrune = 0;

@@ -60,6 +60,8 @@ using namespace springai;
 #define DEBUG_RESCAN_LOL	(FRAMES_PER_SEC * 2)
 #define DEBUG_RESCAN_NUKE	(FRAMES_PER_SEC * 5)
 #define DEBUG_ORDER_RENEW	(FRAMES_PER_SEC * 30)
+// Launcher priority: ranks 0..2 (LauncherPriorityRank); the ordinary pick is shifted above them.
+#define LAUNCHER_PRIO_RANKS	3
 
 CSuperTask::CSuperTask(ITaskModule* mgr)
 		: IFighterTask(mgr, IFighterTask::FightType::SUPER, 1.f)
@@ -208,7 +210,7 @@ void CSuperTask::Update()
 					|| SelectSuspectedJammer(unit, cdef) || SelectFogTarget(unit, cdef))
 				: SelectEmpTarget(unit, cdef);
 		if (hasTarget) {
-			ExecuteAttack(unit);
+			if (!SyncLaunch(unit, cdef, frame)) ExecuteAttack(unit);
 		} else {
 			TRY_UNIT(circuit, unit,
 				unit->CmdStop();
@@ -242,7 +244,7 @@ void CSuperTask::Update()
 	if (cdef->IsAttrStock() && isRegional && (empWd != nullptr)) {
 		const float floor = StockedShotFloor(unit, cdef, frame, empWd->GetCostMShot());
 		if (SelectLauncherTarget(unit, cdef, floor)) {
-			ExecuteAttack(unit);
+			if (!SyncLaunch(unit, cdef, frame)) ExecuteAttack(unit);
 		} else {
 			TRY_UNIT(circuit, unit,
 				unit->CmdStop();
@@ -431,7 +433,8 @@ void CSuperTask::Update()
  */
 bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify, float minValue, bool avoidFriendly,
-		bool allEnemies, bool pulseClaims, bool nuclearHistory, const TAimScale& aimScale, const TExtraAims& extraAims, const CWeaponDef* blastWeapon)
+		bool allEnemies, bool pulseClaims, bool nuclearHistory, const TAimScale& aimScale, const TExtraAims& extraAims, const CWeaponDef* blastWeapon,
+		int centerRanks)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
@@ -449,8 +452,10 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
 
 	const auto* enemies = circuit->GetEnemyManager();
+	areaRank = -1;
 	for (const auto* pool : {&enemies->GetHostileDatas(), allEnemies ? &enemies->GetPeaceDatas() : nullptr}) {
 	if (pool == nullptr) continue;
+	areaPeacePool = (pool == &enemies->GetPeaceDatas());
 	for (const SEnemyData& e : *pool) {
 		if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore()) {
 			continue;
@@ -564,6 +569,11 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 			value += cands[j].value;
 			++count;
 		}
+		// Launcher priority: a priority rank belongs only to the aim point on
+		// that target, so the shot lands on it, not at the edge of a clump.
+		if ((centerRanks > 0) && (rank < centerRanks)) {
+			rank = ((i < cands.size()) && (cands[i].rank < centerRanks)) ? cands[i].rank : centerRanks;
+		}
 		if (count < minTargets) {
 			continue;
 		}
@@ -578,7 +588,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		}
 	}
 
-	if ((bestIdx >= 0) && (bestValue < minValue)) {
+	if ((bestIdx >= 0) && (bestValue < minValue) && (bestRank >= centerRanks)) {
 		bestIdx = -1;  // the richest aim point is not worth the shot yet; see StockedShotFloor
 	}
 	if (bestIdx < 0) {
@@ -590,14 +600,17 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		return false;
 	}
 
+	areaRank = bestRank;
 	SetTarget(nullptr);  // area effect at a position, possibly of a unit we can no longer see
 	const bool isMoved = (targetPos.SqDistance2D(aims[bestIdx]) > SQUARE(1.f));
 	targetPos = aims[bestIdx];
 	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
 	if (isMoved) {  // Update runs every TARGET_DELAY: only log a new aim point
-		circuit->LOG("%s %s(%i): rank=%i targets=%i value=%.0f at (%i,%i)",
+		circuit->LOG("%s %s(%i): rank=%i targets=%i value=%.0f at (%i,%i)%s%s",
 				tag, cdef->GetDef()->GetName(), unit->GetId(), bestRank, bestCount, bestValue,
-				int(targetPos.x), int(targetPos.z));
+				int(targetPos.x), int(targetPos.z),
+				((bestRank < centerRanks) && (bestIdx < int(cands.size()))) ? " priority " : "",
+				((bestRank < centerRanks) && (bestIdx < int(cands.size()))) ? cands[bestIdx].cdef->GetDef()->GetName() : "");
 	}
 	return true;
 }
@@ -768,18 +781,34 @@ float CSuperTask::StockedShotFloor(CCircuitUnit* unit, CCircuitDef* cdef, int fr
  */
 bool CSuperTask::SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, float minValue)
 {
-	const CMilitaryManager::SStockInfo& st = manager->GetCircuit()->GetMilitaryManager()->GetStockInfo();
+	CMilitaryManager* militaryMgr = manager->GetCircuit()->GetMilitaryManager();
+	const CMilitaryManager::SStockInfo& st = militaryMgr->GetStockInfo();
+	const CMilitaryManager::SLauncherPrioInfo& lp = militaryMgr->GetLauncherPrioInfo();
+	const bool prio = lp.isEnabled && (lp.defs.count(cdef->GetId()) > 0);
 	const int canTargetCat = cdef->GetTargetCategory();
+	// Launcher priority (owner 2026-11-03): shields, Pulsar, Bulwark, Bastion;
+	// then slow commanders; then Persecutor, Rattlesnake, Eviscerator and
+	// stationary T3. Shields are unarmed, so the peace pool is scanned too, but
+	// only for priority targets: the ordinary pick is unchanged.
 	return SelectAreaTarget(unit, cdef, "LAUNCHER", SQUARE(cdef->GetAoe()),
 			st.launcherMinTargets, st.launcherMobileMaxAge,
-			[&st, canTargetCat](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
+			[this, &st, canTargetCat, prio, cdef](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
 		if ((canTargetCat & edef->GetCategory()) == 0) {
 			return false;  // outside the weapon's target category (aircraft for napalm)
 		}
-		rank = (st.launcherStructuresFirst && !edef->IsMobile()) ? 0 : 1;
 		value = e.cost;
+		const int pr = prio ? LauncherPriorityRank(e, edef, cdef) : -1;
+		if (pr >= 0) {
+			rank = pr;
+			return true;
+		}
+		if (areaPeacePool) {
+			return false;
+		}
+		rank = ((st.launcherStructuresFirst && !edef->IsMobile()) ? 0 : 1) + (prio ? LAUNCHER_PRIO_RANKS : 0);
 		return true;
-	}, minValue, /*avoidFriendly*/ true);
+	}, minValue, /*avoidFriendly*/ true, /*allEnemies*/ prio, false, false, nullptr, nullptr, nullptr,
+			prio ? LAUNCHER_PRIO_RANKS : 0);
 }
 
 /*
@@ -1286,10 +1315,13 @@ bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	const float shot = wd->GetParalyzeDamage() * float(militaryMgr->GetEmpSalvoSize());
 	const float decline = 1.f / emp.declineRate;
 	const float cap = 1.f + wd->GetParalyzeTime() * decline;
+	const CMilitaryManager::SLauncherPrioInfo& lp = militaryMgr->GetLauncherPrioInfo();
+	const bool prio = lp.isEnabled && (lp.defs.count(cdef->GetId()) > 0);
+	const int shift = prio ? LAUNCHER_PRIO_RANKS : 0;
 
 	return SelectAreaTarget(unit, cdef, "EMP", SQUARE(cdef->GetAoe()),
 			emp.minTargets, emp.mobileMaxAge,
-			[&emp, shot, decline, cap](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
+			[this, &emp, shot, decline, cap, prio, shift, cdef](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
 		// BAR's EMPABLE is SURFACE and paralyzemultiplier != 0, so one bit rejects
 		// aircraft, submerged units and every immune def at once.
 		if ((edef->GetCategory() & emp.empableFlag) == 0) {
@@ -1303,6 +1335,14 @@ bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 		const float stun = (std::min(effective / health, cap) - 1.f) / decline;
 		if (stun < emp.minStunSeconds) {
 			return false;  // too brief to be worth the shot
+		}
+		value = e.cost;
+		// Launcher priority (owner 2026-11-03): a target the shot can hold
+		// (checked above) of the priority ranks; commanders never (paralyzer).
+		const int pr = prio ? LauncherPriorityRank(e, edef, cdef) : -1;
+		if (pr >= 0) {
+			rank = pr;
+			return true;
 		}
 		const bool isMobile = edef->IsMobile();
 		if (!isMobile && edef->IsRespRoleAny(emp.antiNukeRole)) {
@@ -1320,14 +1360,14 @@ bool CSuperTask::SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 			// "highest metal cost except EMP-immune" is what this rank is.
 			rank = 3;
 		}
+		rank += shift;
 		// Value is metal: it floats Ragnarok, AFUS, gantry and silo above a cheap
 		// turret without any of them needing to be tagged.
-		value = e.cost;
 		return true;
 	// Unarmed enemies (anti-nuke, shields, AFUS, gantries) live in the peace
 	// pool, not the hostile one: without allEnemies the silo never saw any of
 	// the structures its ranking is for and only ever shot armed units.
-	}, 0.f, false, true);
+	}, 0.f, false, true, false, false, nullptr, nullptr, nullptr, shift);
 }
 
 bool CSuperTask::IsNukeSilo(CCircuitDef* cdef)
@@ -1849,6 +1889,127 @@ void CSuperTask::EndDebug(CCircuitUnit* unit, const char* why)
 	tierTargetId = -1;
 	targetFrame = 0;  // the normal scan at the next update
 	state = State::ROAM;
+}
+
+/*
+ * Launcher priority (owner 2026-11-03), see CMilitaryManager::SLauncherPrioInfo.
+ */
+int CSuperTask::LauncherPriorityRank(const SEnemyData& e, CCircuitDef* edef, CCircuitDef* cdef) const
+{
+	const CMilitaryManager::SLauncherPrioInfo& lp = manager->GetCircuit()->GetMilitaryManager()->GetLauncherPrioInfo();
+	if (!lp.isEnabled || (lp.defs.count(cdef->GetId()) == 0)) {
+		return -1;
+	}
+	const CCircuitDef::Id id = edef->GetId();
+	const bool isMobile = edef->IsMobile();
+	if ((lp.primary.count(id) > 0) || (!isMobile && lp.primaryShields && (edef->GetMaxShield() > 0.f))) {
+		return 0;
+	}
+	// Speed only means something while radar or LOS tracks the unit.
+	const bool live = e.IsInRadarOrLOS();
+	const float sqSpeed = e.vel.SqLength2D();
+	const CWeaponDef* wd = cdef->GetWeaponDef();
+	const bool isParalyzer = (wd != nullptr) && wd->IsParalyzer();
+	if (!isParalyzer && (lp.commMaxSqSpeed >= 0.f) && edef->IsRoleComm() && live && (sqSpeed <= lp.commMaxSqSpeed)) {
+		return 1;
+	}
+	if (lp.tertiary.count(id) > 0) {
+		return 2;
+	}
+	if ((lp.t3Defs.count(id) > 0) && (!isMobile || (live && (sqSpeed <= lp.t3MaxSqSpeed)))) {
+		return 2;
+	}
+	return -1;
+}
+
+/*
+ * Synchronised volley (owner 2026-11-03). The scan just aimed this launcher at
+ * a primary target (rank 0). Every other sync launcher of this AI that is free
+ * (no script override, tiered fire, debug strike or blocker) and reaches the
+ * same aim point, with none of our units in its own blast, is its crew. With a
+ * crew, nobody fires until every one has a stocked missile; then this update
+ * orders them all at that aim point on the same frame. A launcher that has
+ * held stocked for sync_max_wait_seconds fires alone. Holding launchers get a
+ * stop (an attack order with an empty tube would fire the moment it fills)
+ * and rescan every sync_recheck_seconds.
+ */
+bool CSuperTask::SyncLaunch(CCircuitUnit* unit, CCircuitDef* cdef, int frame)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+	const CMilitaryManager::SLauncherPrioInfo& lp = militaryMgr->GetLauncherPrioInfo();
+	if (!lp.isEnabled || (areaRank != 0) || (lp.syncDefs.count(cdef->GetId()) == 0)) {
+		syncHoldSince = -1;
+		return false;
+	}
+	std::vector<std::pair<CSuperTask*, CCircuitUnit*>> crew;
+	for (IFighterTask* task : militaryMgr->GetTasks(IFighterTask::FightType::SUPER)) {
+		if (task == this) continue;
+		const auto& assignees = task->GetAssignees();
+		if (assignees.empty()) continue;
+		CCircuitUnit* other = *assignees.begin();
+		CCircuitDef* odef = other->GetCircuitDef();
+		if (lp.syncDefs.count(odef->GetId()) == 0) continue;
+		CSuperTask* st = static_cast<CSuperTask*>(task);
+		if (st->isTargetOverride || !st->tierByDef.empty() || st->debugEngaged || (other->Blocker() != nullptr)) continue;
+		if (other->GetPos(frame).SqDistance2D(targetPos) >= SQUARE(odef->GetMaxRange())) continue;
+		auto& friendlies = circuit->GetCallback()->GetFriendlyUnitsIn(targetPos, odef->GetAoe());
+		const bool hit = !friendlies.empty();
+		utils::free(friendlies);
+		if (hit) continue;
+		crew.push_back({st, other});
+	}
+	if (crew.empty()) {
+		syncHoldSince = -1;
+		return false;  // alone in range: fire as usual
+	}
+	const bool selfReady = unit->GetUnit()->GetStockpile() > 0;
+	int ready = selfReady ? 1 : 0;
+	for (const auto& c : crew) {
+		if (c.second->GetUnit()->GetStockpile() > 0) ++ready;
+	}
+	const int total = int(crew.size()) + 1;
+	if (ready < total) {
+		if (syncHoldSince < 0) syncHoldSince = frame;
+		if (selfReady && (lp.syncMaxWaitFrames > 0) && (frame - syncHoldSince >= lp.syncMaxWaitFrames)) {
+			circuit->LOG("SYNC %s(%i): waited %is at (%i,%i), %i/%i stocked: fires alone",
+					cdef->GetDef()->GetName(), unit->GetId(), (frame - syncHoldSince) / FRAMES_PER_SEC,
+					int(targetPos.x), int(targetPos.z), ready, total);
+			syncHoldSince = -1;
+			return false;
+		}
+		if (syncLogPos.SqDistance2D(targetPos) > SQUARE(1.f)) {
+			syncLogPos = targetPos;
+			circuit->LOG("SYNC %s(%i): holds for a volley at (%i,%i): %i/%i stocked",
+					cdef->GetDef()->GetName(), unit->GetId(), int(targetPos.x), int(targetPos.z), ready, total);
+		}
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+		)
+		SetTarget(nullptr);
+		state = State::ROAM;
+		targetFrame = frame - TARGET_DELAY + lp.syncRecheckFrames;
+		return true;
+	}
+	circuit->LOG("SYNC %s(%i): volley of %i at (%i,%i)", cdef->GetDef()->GetName(), unit->GetId(), total,
+			int(targetPos.x), int(targetPos.z));
+	for (const auto& c : crew) {
+		c.first->FireSync(c.second, targetPos);
+	}
+	syncHoldSince = -1;
+	syncLogPos = AIFloat3(-1.f, 0.f, -1.f);
+	ExecuteAttack(unit);
+	return true;
+}
+
+void CSuperTask::FireSync(CCircuitUnit* unit, const AIFloat3& pos)
+{
+	SetTarget(nullptr);
+	targetPos = pos;
+	areaRank = 0;
+	syncHoldSince = -1;
+	syncLogPos = AIFloat3(-1.f, 0.f, -1.f);
+	ExecuteAttack(unit);
 }
 
 void CSuperTask::SetTargetPos(const AIFloat3& pos)

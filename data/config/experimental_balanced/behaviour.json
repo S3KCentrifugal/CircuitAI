@@ -260,6 +260,27 @@
 			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
 			"ghost_idle_seconds": 10
 		},
+		// Owner 2026-11-03: tactical launchers (Paralyzer EMP, Catalyst, Perdition) shoot, before their ordinary pick,
+		// 1) primary: static shields (every faction's) and Pulsar / Bulwark / Bastion,
+		// 2) enemy commanders in radar/LOS moving at most commander_max_speed (the Paralyzer skips this: commanders
+		//    cannot be stunned), 3) tertiary: Persecutor / Rattlesnake / Eviscerator and tech level 3 enemies that are
+		//    static or move at most t3_max_speed. A priority target is aimed at its own position and the stockpile floor
+		//    does not apply. The Paralyzer still only takes what its shot can stun. DLL feature.
+		// sync_units: two or more of them reaching the same primary target hold until every one has a stocked missile,
+		// then all fire at it on the same frame; one stocked for sync_max_wait_seconds fires alone.
+		"launcher_priority": {
+			"enabled": true,
+			"units": ["armemp", "cortron", "legperdition"],   // Paralyzer, Catalyst, Perdition
+			"primary": ["armanni", "cordoom", "legbastion"],  // Pulsar, Bulwark, Bastion
+			"primary_shields": true,
+			"commander_max_speed": 12,
+			"tertiary": ["cortoast", "armamb", "legacluster"], // Persecutor, Rattlesnake, Eviscerator
+			"tertiary_t3": true,
+			"t3_max_speed": 3,
+			"sync_units": ["cortron", "legperdition"],
+			"sync_max_wait_seconds": 150,
+			"sync_recheck_seconds": 1
+		},
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
 		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of
 		// these "threats" (seen, radar dot or ghost image), the unit 1) attacks seen / radar "porc" near it that can be
