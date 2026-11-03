@@ -11,6 +11,7 @@ function widget:GetInfo()
     return {name="Arty snipe fixture",desc="Artillery vs a Persecutor porc cluster",layer=123,enabled=true}
 end
 local cfg=VFS.Include("LuaUI/Config/arty_snipe.lua")
+local KEY=(cfg.porc[1] and cfg.porc[1][1]) or "cortoast"   -- the target: the Persecutor, or the kill-test structure
 local A=0
 local queue={}
 local myTeam
@@ -52,10 +53,12 @@ end
 
 function widget:UnitDamaged(u,ud,team,damage,para,wd,pid,attacker,attackerDef)
     local t=tracked[u]
-    if not t or t.def~="cortoast" then return end
-    local hp=Spring.GetUnitHealth(u)
-    echo(string.format("dmg frame=%d id=%d def=%s damage=%.0f hpNow=%.0f attacker=%s",frameNow,u,t.def,damage,hp or -1,
-        attackerDef and UnitDefs[attackerDef] and UnitDefs[attackerDef].name or "-"))
+    if not t or t.team~=myTeam then return end
+    if t.def~="cortoast" and not (cfg.damage or {})[t.def] then return end
+    local hp,maxhp=Spring.GetUnitHealth(u)
+    local armored=Spring.GetUnitArmored(u)
+    echo(string.format("dmg frame=%d id=%d def=%s damage=%.0f hpNow=%.0f maxhp=%.0f armored=%s attacker=%s attackerId=%s",frameNow,u,t.def,damage,hp or -1,maxhp or -1,
+        tostring(armored),attackerDef and UnitDefs[attackerDef] and UnitDefs[attackerDef].name or "-",tostring(attacker)))
 end
 
 function widget:UnitDestroyed(u,ud,team,attacker,attackerDef)
@@ -72,7 +75,7 @@ local function result()
     local porcDead,porcAlive,artyDead,artyAlive,persecutor={}, {}, {}, {}, "absent"
     for u,t in pairs(tracked) do
         if t.team==myTeam then
-            if t.def=="cortoast" then persecutor=t.dead and ("dead frame="..t.dead.." by="..t.by) or "alive" end
+            if t.def==KEY then persecutor=t.dead and ("dead frame="..t.dead.." by="..t.by) or "alive" end
             if t.dead then porcDead[#porcDead+1]=t.def.."<"..t.by else porcAlive[#porcAlive+1]=t.def end
         else
             if t.dead then artyDead[#artyDead+1]=t.def.."<"..t.by else artyAlive[#artyAlive+1]=t.def end
@@ -101,6 +104,7 @@ local function gameFrame(f)
     end
     if f==(cfg.artyAt or 360) then
         for _,e in ipairs(cfg.arty) do give(e[1],A,cfg.ax+e[2],cfg.az+e[3]) end
+        if cfg.aiRadar then give("armrad",A,cfg.aiRadar[1],cfg.aiRadar[2]); echo(string.format("AI radar tower at (%d,%d)",cfg.aiRadar[1],cfg.aiRadar[2])) end
         echo(string.format("artillery at (%d,%d): %d units",cfg.ax,cfg.az,#cfg.arty))
     end
     -- UnitCreated does not reach this widget for the AI's units: pick them up once they exist
@@ -126,7 +130,7 @@ local function gameFrame(f)
     end
     if not finished then
         local p
-        for u,t in pairs(tracked) do if t.def=="cortoast" then p=t end end
+        for u,t in pairs(tracked) do if t.def==KEY then p=t end end
         local done=(p and p.dead and f>=p.dead+cfg.afterKill*30) or f>=cfg.timeoutMin*1800
         if done then finished=true; result(); echo("DONE "..((p and p.dead) and "persecutor dead" or "timeout")) end
     end

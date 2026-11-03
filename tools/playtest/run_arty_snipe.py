@@ -47,6 +47,9 @@ def main():
     p.add_argument('--extra', default='', help='host units at absolute spots, "def,x,z;def,x,z" (e.g. a parked commander or Tremor for the artillery_commander priority)')
     p.add_argument('--damage', default='', help='pre-damage host porc, "def:healthPct,..." (e.g. cortoast:18,armanni:20; BAR dev sethealth, cheats on)')
     p.add_argument('--pulsar-offset', default='', help='"dx,dz": the Pulsar (armanni) moved to this offset from the Persecutor (e.g. -1131,1131 for a ~0.3 half-disc share)')
+    p.add_argument('--arty-list', default='', help='kill test: "def:N" shooters replace the 8-unit artillery group (e.g. legavroc:3)')
+    p.add_argument('--target', default='', help='kill test: a single host structure at the cluster centre replaces the porc cluster (e.g. cortoast)')
+    p.add_argument('--radar', action='store_true', help='kill test: give the AI a radar tower 1700 from the target (radar dot, no LOS)')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
@@ -78,22 +81,29 @@ def main():
     script.write_text(s, encoding='utf-8')
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     porc = PORC
+    arty = ARTY
+    if a.target:
+        porc = [(a.target, 0, 0)]
+    if a.arty_list:
+        adef, n = a.arty_list.split(':')
+        arty = [(adef, 80 * (i % 3), 80 * (i // 3)) for i in range(int(n))]
     if a.pulsar_offset:
         dx, dz = (int(v) for v in a.pulsar_offset.split(','))
         porc = [('armanni', dx, dz) if r[0] == 'armanni' else r for r in PORC]
     lua = lambda rows: '{' + ','.join('{"%s",%d,%d}' % r for r in rows) + '}'
-    defs = '{' + ','.join('%s=true' % r[0] for r in ARTY) + '}'
+    defs = '{' + ','.join('%s=true' % r[0] for r in arty) + '}'
     extra = [tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.extra.split(';') if e]
     ghost = a.mode == 'ghost'
     at = ARTY_NEAR if ghost else ARTY_AT
     conf = ('return {mode="%s", cx=%d, cz=%d, ax=%d, az=%d, porc=%s, arty=%s, artyDefs=%s, placeAt=300, artyAt=%d, '
-            'losOnAt=60, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
-        a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(porc), lua(ARTY), defs, a.los_off * 30 + 60 if ghost else 360, lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
+            'losOnAt=60, aiRadar=%s, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
+        a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(porc), lua(arty), defs, a.los_off * 30 + 60 if ghost else 360,
+        ('{%d,%d}' % (CLUSTER[0] - 1202, CLUSTER[1] - 1202)) if a.radar else 'nil', lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
         '{' + ''.join('%s=%s,' % tuple(kv.split(':')) for kv in a.damage.split(',') if kv) + '}',
         ('losOffAt=%d, ' % (a.los_off * 30)) if a.mode == 'ghost' else '', int(minutes))
     (d / 'LuaUI/Config/arty_snipe.lua').write_text(conf)
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'mode': a.mode, 'cluster': CLUSTER,
-        'arty_at': at, 'porc': porc, 'arty': ARTY}, indent=2))
+        'arty_at': at, 'porc': porc, 'arty': arty, 'radar': a.radar, }, indent=2))
     if a.stage_only:
         return 0
     from playtest import running_pids
