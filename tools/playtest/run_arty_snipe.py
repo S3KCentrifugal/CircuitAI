@@ -50,6 +50,8 @@ def main():
     p.add_argument('--arty-list', default='', help='kill test: "def:N" shooters replace the 8-unit artillery group (e.g. legavroc:3)')
     p.add_argument('--target', default='', help='kill test: a single host structure at the cluster centre replaces the porc cluster (e.g. cortoast)')
     p.add_argument('--radar', action='store_true', help='kill test: give the AI a radar tower 1700 from the target (radar dot, no LOS)')
+    p.add_argument('--ai-extra', default='', help='AI units at absolute spots, "def,x,z;..." (e.g. an armeyes camera for a live Persecutor next to a ghost Pulsar, or extra artillery)')
+    p.add_argument('--main-at', default='', help='"x,z": where the artillery group is given instead of the default spot')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
@@ -95,10 +97,13 @@ def main():
     extra = [tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.extra.split(';') if e]
     ghost = a.mode == 'ghost'
     at = ARTY_NEAR if ghost else ARTY_AT
+    if a.main_at:
+        at = tuple(int(v) for v in a.main_at.split(','))
     conf = ('return {mode="%s", cx=%d, cz=%d, ax=%d, az=%d, porc=%s, arty=%s, artyDefs=%s, placeAt=300, artyAt=%d, '
-            'losOnAt=60, aiRadar=%s, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
+            'losOnAt=60, aiRadar=%s, aiExtra=%s, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
         a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(porc), lua(arty), defs, a.los_off * 30 + 60 if ghost else 360,
-        ('{%d,%d}' % (CLUSTER[0] - 1202, CLUSTER[1] - 1202)) if a.radar else 'nil', lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
+        ('{%d,%d}' % (CLUSTER[0] - 1202, CLUSTER[1] - 1202)) if a.radar else 'nil',
+        lua([tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.ai_extra.split(';') if e]), lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
         '{' + ''.join('%s=%s,' % tuple(kv.split(':')) for kv in a.damage.split(',') if kv) + '}',
         ('losOffAt=%d, ' % (a.los_off * 30)) if a.mode == 'ghost' else '', int(minutes))
     (d / 'LuaUI/Config/arty_snipe.lua').write_text(conf)
