@@ -729,6 +729,16 @@ void CMilitaryManager::ReadConfig()
 		};
 		readDefs("units", artySnipeInfo.defs);
 		readDefs("threats", artySnipeInfo.threats);
+		{
+			int rank = 0;
+			for (const auto& name : snipeArtyCfg["threats"]) {
+				CCircuitDef* d = circuit->GetCircuitDef(name.asCString());
+				if ((d != nullptr) && (artySnipeInfo.threatRank.count(d->GetId()) == 0)) {
+					artySnipeInfo.threatRank[d->GetId()] = rank;
+				}
+				++rank;
+			}
+		}
 		readDefs("direct_threats", artySnipeInfo.directThreats);
 		readDefs("porc", artySnipeInfo.porc);
 		artySnipeInfo.avoidOtherPorc = snipeArtyCfg.get("avoid_other_porc", true).asBool();
@@ -746,7 +756,7 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.repeatFrames = seconds("repeat_seconds", 60.f);
 		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 60.f));
 		artySnipeInfo.holdMargin = std::max(0.f, snipeArtyCfg.get("hold_margin", 150.f).asFloat());
-		artySnipeInfo.groupWaitFrames = seconds("group_wait_seconds", 60.f);
+		artySnipeInfo.groupWaitFrames = seconds("group_wait_seconds", 240.f);
 		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 4).asInt());
 		artySnipeInfo.groupSettleFrames = seconds("group_settle_seconds", 10.f);
 		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()

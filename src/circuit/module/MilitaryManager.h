@@ -402,6 +402,7 @@ public:
 		bool isEnabled = false;
 		std::unordered_set<CCircuitDef::Id> defs;     // the artillery that snipes
 		std::unordered_set<CCircuitDef::Id> threats;  // what it snipes
+		std::unordered_map<CCircuitDef::Id, int> threatRank;  // position in "threats": earlier goes first
 		// Owner 2026-11-03 01:36Z: Pulsar, Bulwark, Bastion. No prep porc: attacked
 		// from snipe_range_fraction (seen: until dead, at most visible_max_volleys;
 		// ghost: "volleys", then "volleys" more if seen alive).
@@ -423,7 +424,7 @@ public:
 		// it and go in together, once every unit on that threat is there or
 		// after group_wait_seconds.
 		float holdMargin = 150.f;
-		int groupWaitFrames = 60 * 30;
+		int groupWaitFrames = 240 * 30;
 		// Test round 2: gatherers went in alone while others were still on prep.
 		// Go in when every unit on the threat has gathered, or min_group have and
 		// settled for group_settle_seconds; past group_wait_seconds without
@@ -445,6 +446,7 @@ public:
 		int lastCall = -1;
 		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
+		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
 		bool atHold = false;    // stage 2: waiting at the gathering spot
 		int holdSince = -1;

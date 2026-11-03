@@ -238,8 +238,10 @@
 			// heavy units in range when moving at most heavy_speed_fraction of their own top
 			// speed: Incinerator, Fatboy, Tzar, Starlight, Razorback, Mammoth, Demon, Prometheus
 			// (the heat-ray tank; leghack, the combat engineer, shares the name).
+			// Owner 2026-11-03: + Tremor (cortrem). Since then these priorities also hold in FRONT squad routes and
+			// during an artillery snipe (DLL ArtyPriorityStep), not only in the native artillery task.
 			"heavy_units": ["leginc", "armfboy", "corgol", "armmanni",
-				"armraz", "corsumo", "cordemon", "legaheattank"],
+				"armraz", "corsumo", "cordemon", "legaheattank", "cortrem"],
 			"heavy_speed_fraction": 0.25,
 			"heavy_max_speed": 12,   // owner 2026-11-01: no heavy-unit limit above 12 elmos/s
 			// Owner 2026-11-02: these fire on a ghost image (last-seen, out of radar and LOS) of enemy porc, building
@@ -264,6 +266,7 @@
 			"units": ["leghrk", "corhrk", "legavroc", "corvroc", "armmerl"],   // Thanatos, Arbiter, Boreas, Negotiator, Ambassador
 			// Test 2026-11-03: Pulsar (1400) outranges all five, so as a direct threat they walked into it one by one;
 			// it gets the Persecutor treatment (prep porc, gather, go in together, from 99% range).
+			// Order matters: a threat whose snipe spot is outside every other threat's reach goes first, else the earliest here.
 			"threats": ["cortoast", "armamb", "legacluster", "armanni"],        // Persecutor, Rattlesnake, Eviscerator, Pulsar
 			"direct_threats": ["cordoom", "legbastion"],                        // Bulwark, Bastion
 			"porc": ["armanni", "cordoom", "legbastion",          // Pulsar, Bulwark, Bastion
@@ -286,9 +289,9 @@
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
 			"repeat_seconds": 60,
 			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
-			"group_wait_seconds": 60,     // ... and go in together when all on that threat are there, or min_group are and
-			"min_group": 4,               // have waited group_settle_seconds; fewer than min_group after group_wait_seconds:
-			"group_settle_seconds": 10,   // the threat is given up for repeat_seconds
+			"group_wait_seconds": 240,    // ... and go in together when all on that threat are there (settled 10 s); past this,
+			"min_group": 4,               // with min_group gathered; fewer: the threat is given up for repeat_seconds
+			"group_settle_seconds": 10,
 			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
