@@ -26,7 +26,7 @@ namespace TechForward {
 
     float Sq(float v) { return v * v; }
 
-    int T1AirCons() { return UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1AirConstructors()); }
+    int T1AirCons() { return AiMax(0, UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1AirConstructors()) - int(TechAirFoundry::members.getSize())); }
 
     // T2: the air constructors hold both dedicated roles (D-107/D-108)
     bool T2Released()

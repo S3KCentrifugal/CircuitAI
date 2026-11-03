@@ -301,8 +301,10 @@ struct AirFactoryCluster {
 		return slots;
 	}
 	slots.reserve(static_cast<std::size_t>(cols * rows));
-	const int width = Across(footprint, facing);
-	const int depth = Along(footprint, facing);
+	// Offset rotates the local basis; rotating dimensions here again creates
+    // gaps/overlap for rectangular footprints (factory_district_geometry_test).
+    const int width = footprint.x;
+	const int depth = footprint.z;
 	const int rowStep2 = 2 * (depth + gapCells);
 	const int colStep2 = 2 * (width + gapCells);
 	const int firstSide2 = -(cols - 1) * (width + gapCells);
@@ -337,11 +339,11 @@ struct AirFactoryCluster {
 			|| !IsAligned(factoryCentre, factoryFootprint, facing)) {
 		return cluster;
 	}
-	const int factoryWidth = Across(factoryFootprint, facing);
-	const int factoryDepth = Along(factoryFootprint, facing);
+	const int factoryWidth = factoryFootprint.x;
+	const int factoryDepth = factoryFootprint.z;
 	const int nanoCols = (tier == FactoryTier::T2) ? 3 : 2;
 	const int nanoRows = (tier == FactoryTier::T2) ? 2 : 1;
-	const int nanoWidth = Across(nanoFootprint, facing);
+	const int nanoWidth = nanoFootprint.x;
 	if (nanoCols * nanoWidth > factoryWidth) {
 		return cluster;
 	}
@@ -371,10 +373,10 @@ struct AirFactoryCluster {
 	if (!IsFacingValid(facing) || (gapCells < 0)) {
 		return pair;
 	}
-	const int firstWidth = Across(firstFactory, facing);
-	const int secondWidth = Across(secondFactory, facing);
-	const int firstDepth = Along(firstFactory, facing);
-	const int secondDepth = Along(secondFactory, facing);
+	const int firstWidth = firstFactory.x;
+	const int secondWidth = secondFactory.x;
+	const int firstDepth = firstFactory.z;
+	const int secondDepth = secondFactory.z;
 	const int totalWidth = firstWidth + gapCells + secondWidth;
 	Point alignedRear = rearEdgeCentre;
 	if ((facing & 1) == 0) {

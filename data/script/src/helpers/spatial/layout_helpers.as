@@ -101,6 +101,31 @@ namespace LayoutHelpers {
     // Setup: run the role's plan once, after its caps and porc chain are in.
     void ApplyForRole()
     {
+        CCircuitDef@ opening = Global::AISettings::Role == AiRole::TECH
+            ? ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side)) : null;
+        aiTerrainMgr.SetFactoryCorridorPolicy(aiSetupMgr.ConfigBool("layout/factory_corridors/enabled",true),
+            Global::AISettings::Role == AiRole::FRONT,opening is null ? -1 : opening.id);
+        aiTerrainMgr.SetFactoryCorridorOptions(aiSetupMgr.ConfigInt("layout/factory_corridors/probes",4),
+            aiSetupMgr.ConfigInt("layout/factory_corridors/visits",32768),
+            aiSetupMgr.ConfigFloat("layout/factory_corridors/goal_start",768.f),
+            aiSetupMgr.ConfigFloat("layout/factory_corridors/goal_end",2048.f));
+        const bool frontDistrict=Global::AISettings::Role == AiRole::FRONT && Global::RoleSettings::Front::FactoryLayoutsEnabled;
+        const bool tacticalDistrict=Global::AISettings::Role == AiRole::TACTICAL && Global::RoleSettings::Tactical::FactoryLayoutsEnabled;
+        aiTerrainMgr.SetReservationTravelSeconds(frontDistrict
+            ? Global::RoleSettings::Front::FactoryReservationTravelSeconds
+            : (tacticalDistrict ? Global::RoleSettings::Tactical::FactoryReservationTravelSeconds : 0.0f));
+        aiTerrainMgr.SetFactoryLayoutRequired(!frontDistrict && !tacticalDistrict);
+        if (!tacticalDistrict) aiTerrainMgr.ReleaseUnusedLayout("tactical.factory");
+        if(!frontDistrict && aiTerrainMgr.GetLayoutInt("front.factory.home.support_owner",0)!=0) {
+            FrontFactorySupport::Reset();
+            aiEconomyMgr.assistNanoEnabled=aiTerrainMgr.GetLayoutInt("front.factory.home.prior_nano",1)!=0;
+            aiTerrainMgr.SetLayoutInt("front.factory.home.support_owner",0);
+            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.t1");
+            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.t2");
+            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.extension");
+            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.additional");
+            aiTerrainMgr.ReleaseUnusedLayout("front.factory.home.utilities");
+        }
         aiTerrainMgr.SetLayoutPriority(Global::AISettings::Role == AiRole::TECH ? 2
             : Global::AISettings::Role == AiRole::AIR ? 1 : 0);
         // Share ordinary sites without enabling factory packing or a role plan.

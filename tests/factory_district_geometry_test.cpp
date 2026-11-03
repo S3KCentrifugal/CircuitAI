@@ -1,0 +1,59 @@
+#include "circuit/terrain/FactoryDistrictGeometry.h"
+#include "circuit/terrain/TerrainCorridor.h"
+#include <cstdlib>
+#include <iostream>
+
+using namespace circuit::base_layout;
+int main()
+{
+    int failures = 0;
+    const auto check = [&failures](bool value, const char* message) {
+        if (!value) { ++failures; std::cerr << message << '\n'; }
+    };
+    check(!OutsideBlast(32,32,{1,1,3,3},1), "inside protected footprint");
+    check(!OutsideBlast(64,32,{1,1,3,3},16), "blast grazing footprint rejected");
+    check(OutsideBlast(65,32,{1,1,3,3},16), "outside blast radius admitted");
+    check(!OutsideBlast(65,32,{1,1,3,3},-1), "invalid blast radius rejected");
+    const auto flat=[](float,float) { return 0.f; };
+    check(FactoryExitSlope(-30.f,.9f,true)==0.f, "hover ignores submerged slope");
+    check(FactoryExitSlope(30.f,.9f,true)==.9f, "hover respects land slope");
+    check(FactoryExitSlope(-30.f,.9f,false)==.9f, "ground slope unchanged");
+    check(!std::isfinite(FactoryExitSlope(-30.f,INFINITY,true)), "hover retains physical blocker");
+    const auto ramp=[](float x,float) { return x>32.f && x<64.f ? .4f : 0.f; };
+    check(circuit::lane::TerrainCorridor(0,32,96,32,8,.5f,0,false,flat,ramp), "bot exit crosses legal ramp");
+    check(!circuit::lane::TerrainCorridor(0,32,96,32,8,.2f,0,false,flat,ramp), "vehicle exit rejects same steep ramp");
+    check(!circuit::lane::TerrainCorridor(0,32,96,32,8,.5f,10,false,
+        [](float,float){return -20.f;},flat), "exit rejects excessive depth");
+    for (int facing = 0; facing < 4; ++facing) {
+        for (int rows = 1; rows <= 4; ++rows) {
+            const auto district = MakeFactoryDistrict({200, 200}, facing,
+                {6, 6}, {9, 9}, {3, 3}, rows, rows, 4, 400.f);
+            check(district.valid, "rotated district fits");
+            check(district.first.nanos.size() == unsigned(rows * 2), "T1 capacity");
+            check(district.second.nanos.size() == unsigned(rows * 3), "T2 capacity");
+            check(!Intersects(district.first.nanoBounds, district.second.nanoBounds), "separate banks");
+            check(!Intersects(district.first.exit, district.second.exit), "separate exits");
+        }
+        // Rectangular vehicle plants must rotate the basis, not their local
+        // depth twice: the support bank and exit touch opposite factory edges.
+        for (const auto footprint : {Footprint{12, 8}, Footprint{8, 12}, Footprint{12, 9}, Footprint{9, 12}}) {
+            const Point centre{200+Across(footprint,facing)%2,200+Along(footprint,facing)%2};
+            auto cluster = MakeFactoryCluster(centre,facing,footprint,{3,3},FactoryTier::T1);
+            check(cluster.valid, "rectangular factory cluster fits every rotation");
+            check(ResizeSupportBank(cluster,{3,3},2,4,400.f), "rectangular support resize");
+            const auto factoryRect=RectFromCentre(cluster.factory.centre,footprint,facing);
+            check(TouchesEdge(factoryRect,cluster.nanoBounds), "no dead strip behind rectangular factory");
+            check(!Intersects(factoryRect,cluster.nanoBounds), "support does not overlap factory");
+            check(TouchesEdge(factoryRect,cluster.exit), "rectangular exit meets mouth");
+            for (const auto& slot : cluster.nanos)
+                check(!Intersects(RectFromCentre(slot.centre,slot.footprint,facing),cluster.exit), "turrets avoid exit");
+        }
+        const auto legacy = MakeFactoryCluster({200, 200}, facing, {6, 6}, {3, 3}, FactoryTier::T1);
+        check(legacy.valid && legacy.nanos.size() == 2, "legacy T1 unchanged");
+    }
+    check(!MakeFactoryDistrict({200,200}, 0, {6,6}, {9,9}, {3,3}, 0, 2, 4, 400.f).valid, "zero rows rejected");
+    check(!MakeFactoryDistrict({200,200}, 0, {6,6}, {9,9}, {3,3}, 9, 2, 4, 400.f).valid, "unbounded rows rejected");
+    check(!MakeFactoryDistrict({200,200}, 0, {6,6}, {9,9}, {3,3}, 2, 2, 4, 1.f).valid, "unreachable banks rejected");
+    check(!MakeFactoryDistrict({200,200}, 4, {6,6}, {9,9}, {3,3}, 2, 2, 4, 400.f).valid, "invalid facing rejected");
+    return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+}

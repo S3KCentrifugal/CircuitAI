@@ -82,7 +82,7 @@ void CBFactoryTask::Activate()
 	CFactoryManager* factoryMgr = circuit->GetFactoryManager();
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	const bool isProductionFactory = factoryMgr->GetFactoryDef(buildDef) != nullptr;
-	if (!IsLayoutOwned() && terrainMgr->IsLayoutEnabled() && isProductionFactory && buildDef->IsLander()) {
+	if (!IsLayoutOwned() && terrainMgr->IsLayoutEnabled() && terrainMgr->IsFactoryLayoutRequired() && isProductionFactory && buildDef->IsLander()) {
 		const int reservation = terrainMgr->AcquireFactoryReservation(buildDef);
 		if ((reservation < 0) || !PinReservation(reservation)) {
 			RequireReservation();
@@ -99,13 +99,14 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	// A served slot is kept across retries (D-055): the fixed-facing return
 	// below used to move a lab back to the shaken anchor on a second Execute.
-	if ((reservationId >= 0) && geom::is_valid(buildPos) && !terrainMgr->IsAllyLayoutBlocked(buildDef, buildPos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
+	if ((reservationId >= 0) && geom::is_valid(buildPos) && !terrainMgr->IsAllyLayoutBlocked(buildDef, buildPos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)
+        && terrainMgr->EnsureFactoryCorridor(buildDef,buildPos,facing)) {
 		return;
 	}
 	// D-104 (owner's rule): every factory, whoever ordered it, stands flush
 	// against the construction turrets once one stands; an order that already
 	// has its layout slot (pinned) keeps it
-	if (preferredFacing < 0 && terrainMgr->IsLayoutEnabled() && !pinRequired && (pinnedReservation < 0) && (reservationId < 0)) {
+	if (preferredFacing < 0 && terrainMgr->IsLayoutEnabled() && terrainMgr->IsFactoryLayoutRequired() && !pinRequired && (pinnedReservation < 0) && (reservationId < 0)) {
 		const int flushId = terrainMgr->PackFactoryFlush(buildDef, pos);
 		if ((flushId >= 0) && !PinReservation(flushId)) {
 			terrainMgr->ReleaseReservation(flushId);
@@ -116,9 +117,11 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	}
 	// While a slot for this def is planned, the search runs so it is served.
 	const bool planned = terrainMgr->IsLayoutEnabled() && (terrainMgr->GetReservationCount(buildDef) > 0);
-	if (preferredFacing < 0 && !pinRequired && !planned && (facing != UNIT_NO_FACING) && !terrainMgr->IsAllyLayoutBlocked(buildDef, pos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
-		SetBuildPos(pos);
-		return;
+	if (terrainMgr->IsFactoryLayoutRequired() && preferredFacing < 0 && !pinRequired && !planned && (facing != UNIT_NO_FACING) && !terrainMgr->IsAllyLayoutBlocked(buildDef, pos, facing) && map->IsPossibleToBuildAt(buildDef->GetDef(), pos, facing)) {
+		if (terrainMgr->EnsureFactoryCorridor(buildDef,pos,facing)) {
+			SetBuildPos(pos);
+			return;
+		}
 	}
 	if (reservationId >= 0) {
 		// The served slot is no longer possible: hand it back before searching
@@ -145,7 +148,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	}
 	const float testSize = std::max(buildDef->GetDef()->GetXSize(), buildDef->GetDef()->GetZSize()) * SQUARE_SIZE;
 	int rejectedAccess = 0, rejectedExit = 0;
-	auto checkFacing = [this, map, terrainMgr, testSize, &predicate, &pos, searchRadius, &rejectedAccess, &rejectedExit]() {
+	auto checkFacing = [this, map, terrainMgr, builder, testSize, &predicate, &pos, searchRadius, &rejectedAccess, &rejectedExit]() {
 		if (pinRequired && (pinnedReservation < 0)) {
 			pinFailed = true;
 			return false;
@@ -154,7 +157,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 		// facing. Otherwise a west-facing berth could be accepted during the
 		// south-facing pass, with its exit tested in the wrong direction.
 		terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired,
-            preferredFacing >= 0 && !pinRequired ? facing : -1);
+            preferredFacing >= 0 && !pinRequired ? facing : -1, builder);
         // For the script-opted-in opening yard, test its exit inside the
         // candidate predicate. Rejecting only the first returned footprint
         // used to switch facing even when a later forward site was usable.

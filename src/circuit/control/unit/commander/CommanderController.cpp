@@ -1218,7 +1218,10 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 -ai->GetBattle()->GetFrontLaneProgress(pos):0.f;
             if(assignedLane)next=ai->GetBattle()->GetFrontLaneGoal(pos,std::clamp(laneRemaining,-240.f,240.f));
             next.y=ai->GetMap()->GetElevationAt(next.x,next.z);
-            if(Route(unit,pos,next)) { s.detourFails=0; Move(unit,s,next,frame,cfg->front.pushAhead>0); }
+            const auto destinationFree=[&](const AIFloat3& p) {
+                return ai->GetTerrainManager()->IsMovementDestinationFree(unit->GetCircuitDef(),p);
+            };
+            if(destinationFree(next) && Route(unit,pos,next)) { s.detourFails=0; Move(unit,s,next,frame,cfg->front.pushAhead>0); }
             else if(role.frontRecovery) {
                 // A blocked straight step is not an unreachable destination.
                 // Let Recoil route around terrain; local combat still preempts
@@ -1228,7 +1231,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 // A detour that brought the commander 64 elmos closer since the
                 // last one is working, not failing: it does not spend retries.
                 auto detourGoal=assignedLane?next:goal;
-                bool reachable=ai->GetTerrainManager()->CanReachAt(unit,detourGoal,64);
+                bool reachable=destinationFree(detourGoal) && ai->GetTerrainManager()->CanReachAt(unit,detourGoal,64);
                 if(assignedLane && !reachable && (cfg->front.detourSeconds<=0 || s.detourFails<3)) {
                     // A coarse terrain cell at a bend can be unreachable for
                     // this UnitDef even when the corridor continues beyond it.
@@ -1237,10 +1240,14 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                     // coverage-front-supreme exercises this at its north bend.
                     const float remaining=std::abs(laneRemaining);
                     for(float ahead:{480.f,720.f,960.f}) {
-                        auto probe=ai->GetBattle()->GetFrontLaneGoal(pos,std::copysign(std::min(ahead,remaining),laneRemaining));
+                        // Rejoin may itself be inside a newly completed factory.
+                        // Advance from projected progress: GetFrontLaneGoal(from)
+                        // deliberately returns that same rejoin while off lane.
+                        auto probe=ai->GetBattle()->GetFrontLanePoint(ai->GetBattle()->GetFrontLaneProgress(pos)
+                            +std::copysign(std::min(ahead,remaining),laneRemaining));
                         if(probe.SqDistance2D(detourGoal)<64.f*64.f)continue;
                         probe.y=ai->GetMap()->GetElevationAt(probe.x,probe.z);
-                        if(ai->GetTerrainManager()->CanReachAt(unit,probe,64)) {
+                        if(destinationFree(probe) && ai->GetTerrainManager()->CanReachAt(unit,probe,64)) {
                             detourGoal=probe;reachable=true;break;
                         }
                     }

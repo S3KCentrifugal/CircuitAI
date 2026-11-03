@@ -1,5 +1,6 @@
 // Mono-space font required
 {
+"tech_production": {"air_foundry_count": 6},
 "economy": {
 	"energy": {
 		// If land area >= 40% of the map then "land" config used, "water" otherwise

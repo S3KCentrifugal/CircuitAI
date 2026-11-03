@@ -420,7 +420,7 @@ namespace TechChain
         CCircuitDef@ a2 = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(side));
         if (a1 !is null) n += a1.count;
         if (a2 !is null) n += a2.count;
-        return n;
+        return AiMax(0, n - int(TechAirFoundry::members.getSize()));
     }
 
     void Add(const string &in key, int target, float radius = 0.0f)

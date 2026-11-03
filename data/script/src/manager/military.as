@@ -118,7 +118,7 @@ namespace Military {
 			return aiMilitaryMgr.DefaultMakeTask(u);
 		}
 
-		IUnitTask@ t = TechHeavyDelivery::MilitaryTask(u);
+		IUnitTask@ t = TechHeavyRush::MilitaryTask(u);
         if (t !is null) return t;
         @t = AmphibiousOps::MilitaryTask(u);
         if (t !is null) return t;
@@ -179,6 +179,7 @@ namespace Military {
 	{
         CommanderGroup::OnRemoved(unit);
         TechHeavyDelivery::Removed(unit);
+        TechHeavyRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		TechFlank::UnitRemoved(unit);
         AmphibiousOps::UnitRemoved(unit);

@@ -28,6 +28,7 @@
 #include "tech_chain.as"
 #include "tech_plan.as"
 #include "tech_heavy_rush.as"
+#include "../../systems/production/tech_air_foundry.as"
 #include "tech_transport.as"
 
 namespace RoleTech
@@ -207,6 +208,7 @@ namespace RoleTech
 	{
         aiBuilderMgr.recoverConstruction = true;
         TechFortifications::Reset();
+        TechAirFoundry::Configure();
         TechReclaim::ProtectEnergyStorage();   // D-290 (owner): TECH never reclaims an energy storage, on any path
 
 		// Apply TECH role settings
@@ -1745,6 +1747,7 @@ namespace RoleTech
 		}
 
 		Team::Donation::OnConstructorBuilt(unit);   // a requested constructor goes to its requester; the rest are ours
+        TechAirFoundry::Added(unit);
         FrontlineEngineering::Added(unit);
 		if (Team::IsT2Constructor(d))
 		{
@@ -1754,6 +1757,7 @@ namespace RoleTech
 
 	void Tech_BuilderAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{ /* other bookkeeping moved to Builder::AiUnitRemoved */
+        TechAirFoundry::Removed(unit);
         FrontlineEngineering::Removed(unit);
         if (unit !is null) {
             EcoPlanner::conversionReasons.delete("" + unit.id);

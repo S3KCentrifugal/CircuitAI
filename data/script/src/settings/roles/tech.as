@@ -4,6 +4,7 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tech {
+            int AirFactoryAssistCount = 6; // Air Foundry; JSON tech_production/air_foundry_count overrides at init.
             bool RushBootstrapEnabled = true;
             float RushBootstrapLocalRadius = 800.f;
             float RushBootstrapMaxThreat = 0.f;

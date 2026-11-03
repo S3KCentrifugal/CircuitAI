@@ -13,6 +13,8 @@
 #include "../../systems/production/front_opener.as"
 #include "../../systems/combat/land_siege.as"
 #include "../../systems/construction/front_geothermal.as"
+#include "../../systems/construction/front_layout.as"
+#include "../../systems/production/front_factory_support.as"
 #include "../../systems/construction/commander_front.as"
 // Builder state and helpers for enqueueing structures like nanos
 #include "../../manager/builder.as"
@@ -452,10 +454,14 @@ namespace RoleFront {
     string Front_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
         if(isStart) {
             if(Global::Map::NearestMapStartPosition !is null) {
-                return FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                const string selected=FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                FrontLayout::Plan(selected,Global::AISettings::Side);
+                return selected;
             } else {
                 GenericHelpers::LogUtil("[Front_SelectFactoryHandler] nearestMapPosition is null", 2);
-                return FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                const string selected=FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                FrontLayout::Plan(selected,Global::AISettings::Side);
+                return selected;
             }
         }
    
@@ -465,6 +471,7 @@ namespace RoleFront {
     // Factory unit lifecycle hooks (Front role)
     void Front_FactoryAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
     {
+        FrontFactorySupport::Added(unit);
         if (unit is null) {
             GenericHelpers::LogUtil("[FRONT] FactoryAiUnitAdded: unit=<null>", 2);
             return;
@@ -472,6 +479,8 @@ namespace RoleFront {
 
         if (usage != Unit::UseAs::FACTORY)
 		return;
+
+        FrontLayout::Adopt(unit);
 
         const CCircuitDef@ facDef = unit.circuitDef;
         string factoryName = (facDef is null ? "" : facDef.GetName());
@@ -498,6 +507,7 @@ namespace RoleFront {
 
     void Front_FactoryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
     {
+        FrontFactorySupport::Removed(unit);
         //GenericHelpers::LogUtil("[FRONT] FactoryAiUnitRemoved id=" + (unit is null ? -1 : unit.id) + " usage=" + usage, 3);
         FrontOpener::FactoryRemoved(unit);
     }
@@ -697,6 +707,7 @@ namespace RoleFront {
 
     void Front_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        FrontFactorySupport::Added(unit);
 		//LogUtil("BUILDER::AiUnitAdded:" + unit.circuitDef, 2);
 		const CCircuitDef@ cdef = unit.circuitDef;
 		if (usage != Unit::UseAs::BUILDER || cdef.IsRoleAny(Unit::Role::COMM.mask))
@@ -721,6 +732,7 @@ namespace RoleFront {
 
     void Front_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        FrontFactorySupport::Removed(unit);
 		if (energizer1 is unit)
 			@energizer1 = null;
 		else if (energizer2 is unit)
@@ -838,10 +850,16 @@ namespace RoleFront {
         bool allowFirstNanoByIncome = (metalIncome > Global::RoleSettings::Front::NanoMinIncomeForFirst && existingNanos < 1);
 
         if (allowByReserves || allowFirstNanoByIncome) {
-            CCircuitUnit@ targetFactory = Factory::SelectFactoryNeedingNano();
+            CCircuitUnit@ targetFactory = FrontFactorySupport::Active()
+                ? FrontFactorySupport::FactoryNeedingSupport() : Factory::SelectFactoryNeedingNano();
             if (targetFactory !is null && (!baseOnly || MapHelpers::SqDist(targetFactory.GetPos(ai.frame), Global::Map::StartPos)
                 <= Global::RoleSettings::Front::BaseSupportRadius * Global::RoleSettings::Front::BaseSupportRadius)) {
-                IUnitTask@ tNano = Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::HIGH);
+                // FRONT uses completed reachable power and live queued tasks,
+                // not the legacy lifetime enqueue counter (which survives loss).
+                IUnitTask@ tNano = FrontFactorySupport::Active() && FrontFactorySupport::OwnsFactory(targetFactory)
+                    ? Builder::EnqueueT1Nano(UnitHelpers::GetSideForUnitName(targetFactory.circuitDef.GetName()),
+                        targetFactory.GetPos(ai.frame),SQUARE_SIZE*24,300*SECOND,Task::Priority::HIGH)
+                    : Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::HIGH);
                 if (tNano !is null) return tNano;
             }
         }

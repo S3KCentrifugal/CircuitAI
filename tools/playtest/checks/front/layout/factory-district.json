@@ -1,0 +1,35 @@
+{
+  "stop_minute": 3,
+  "expect": [
+    {
+      "key": "front district",
+      "pattern": "\\[FrontLayout\\] reserved capacity=",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "reserved factory served",
+      "pattern": "RESERVE: served (armlab|corlab|leglab|armvp|corvp|legvp) at",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "connected factory corridor",
+      "pattern": "\\[FactoryCorridor\\] def=.* lane=0 segments=[1-9]",
+      "scope": "any",
+      "by_minute": 3
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

@@ -394,9 +394,9 @@ namespace CoverageLanes {
         return payload;
     }
     void Claim(const array<AIFloat3>& in points) {
-        if(!claim)return;
         array<AIFloat3>@ thin=Thin(points);
-        aiEconomyMgr.SetMexCorridor(ai.teamId,thin,halfWidth);
+        aiTerrainMgr.SetFactoryLane(ai.teamId,thin);
+        if(claim)aiEconomyMgr.SetMexCorridor(ai.teamId,thin,halfWidth);
         published=thin;
         rosterSeen=Team::Roster::Count();
         AiSendMessage(EncodeCorridor(points));
@@ -404,6 +404,7 @@ namespace CoverageLanes {
     void Unclaim() {
         if(published.length()==0)return;
         array<AIFloat3> empty;
+        aiTerrainMgr.SetFactoryLane(ai.teamId,empty);
         aiEconomyMgr.SetMexCorridor(ai.teamId,empty,halfWidth);
         published.resize(0);
         AiSendMessage(EncodeCorridor(empty));
@@ -588,6 +589,7 @@ namespace CoverageLanes {
                 points.insertLast(AIFloat3(x,0,z));
             }
         }
+        aiTerrainMgr.SetFactoryLane(team,points);
         if(claim)aiEconomyMgr.SetMexCorridor(team,points,width>0.f?width:halfWidth);
         GenericHelpers::LogUtil("[CoverageLane] corridor from team "+team+" points="+points.length()+(claim?"":" (claim off)"),1);
         return true;
@@ -623,8 +625,43 @@ namespace CoverageLanes {
         PublishWidget();PublishStrategy();
         Unclaim();
     }
+    int factoryFallbackRevision=-1, factoryFallbackNext=0, factoryFallbackClass=-1;
+    bool factoryFallbackPublished=false;
+    void FactoryFallback() {
+        if(frontPublished || ai.frame<factoryFallbackNext)return;
+        factoryFallbackNext=ai.frame+10*SECOND;
+        if(!Team::Roster::IsComplete())return;
+        const bool isolatedFront=Global::AISettings::Role==AiRole::FRONT && Lanes::EnemyStarts().length()==0;
+        array<Team::Roster::Entry@>@ fronts=Team::Roster::WithRole(AiRole::FRONT);
+        if(!isolatedFront && (Global::AISettings::Role==AiRole::FRONT || fronts.length()>0)) {
+            if(factoryFallbackPublished) {
+                array<AIFloat3> empty;aiTerrainMgr.SetFactoryLane(ai.teamId,empty);
+                factoryFallbackPublished=false;factoryFallbackRevision=-1;
+            }
+            return;
+        }
+        // A complete roster with no FRONT (e.g. a solo TECH game) cannot
+        // supply an allied lane. Use a terrain-validated home-to-centre route;
+        // never fabricate a straight-line connection or silently disable admission.
+        const int revision=aiBattle.CorridorRevision();
+
+        const int cls=UnitHelpers::IsT1HoverPlant(Global::AISettings::StartFactory)
+            ? Lanes::HOVER : ClassOfFactory(Global::AISettings::StartFactory);
+        if(factoryFallbackRevision==revision && factoryFallbackClass==cls)return;
+        factoryFallbackRevision=revision;factoryFallbackClass=cls;
+        // Starts and map centres may land in an impassable coarse terrain cell.
+        // Reuse the bounded endpoint projection used by normal FRONT lanes.
+        const AIFloat3 from=Nearby(Global::Map::StartPos,cls),to=Nearby(LayoutHelpers::TerrainCentre(),cls);
+        if(from.x<0 || to.x<0)return;
+        array<AIFloat3>@ points=aiBattle.GetTerrainRoute(from,to,cls,1.f,1.f,0.f,0.f);
+        if(points !is null && points.length()>1) {
+            aiTerrainMgr.SetFactoryLane(ai.teamId,points);factoryFallbackPublished=true;
+            GenericHelpers::LogUtil("[FactoryCorridor] fallback lane class="+cls+" points="+points.length(),1);
+        }
+    }
     void Tick() {
         Load();
+        FactoryFallback();
         if(!enabled || Global::AISettings::Role!=AiRole::FRONT) {
             if(frontPublished)Clear();
             return;

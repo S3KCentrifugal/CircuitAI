@@ -4,6 +4,12 @@
 namespace Global {
 namespace RoleSettings {
 namespace Front {
+            bool FactoryLayoutsEnabled = true;
+            int FactorySupportRows = 4; // reserved growth, not an instruction to build all turrets
+            float FactoryUtilityBlastMargin = 32.f;
+            float FactoryReservationTravelSeconds = 3.0f;
+            float FactoryProductionBudgetShare = 0.65f;
+            float FactoryT1BudgetShare = 0.6f;
             float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
             bool GeothermalEnabled = true;
             uint GeothermalBuilders = 2;
