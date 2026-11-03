@@ -104,6 +104,26 @@ void test_overnuke_salvo_holds_until_stocked_then_fires_the_roll()
     over.Release(12);
     assert(over.Salvo() && over.Goal() == 12);
 }
+void test_probe_clusters_need_unsigned_ghosts_and_pick_the_biggest_group()
+{
+    // Five ghosts of a jammed base, two more far away, one with a radar dot on it.
+    std::vector<Ghost> ghosts = {
+        {{1000,1000}, 100}, {{1200,1000}, 100}, {{1000,1200}, 100}, {{1150,1150}, 300}, {{900,1100}, 50},
+        {{5000,5000}, 100}, {{5200,5000}, 100},
+        {{3000,3000}, 900},
+    };
+    const std::vector<Point> contacts = {{3100,3000}, {9000,9000}};
+    auto quiet = UnsignedGhosts(ghosts, contacts, 400);
+    assert(quiet.size() == 7);  // the signed one is out
+    auto clusters = ProbeClusters(quiet, 700, 3);
+    assert(clusters.size() == 1);  // the pair at 5000 is below 3
+    assert(clusters[0].count == 5 && clusters[0].members.size() == 5);
+    assert(std::fabs(clusters[0].center.x - 1050) < 1 && std::fabs(clusters[0].center.z - 1090) < 1);
+    auto pairs = ProbeClusters(quiet, 700, 2);
+    assert(pairs.size() == 2 && pairs[1].count == 2);
+    assert(UnsignedGhosts(ghosts, {}, 400).size() == ghosts.size());
+    assert(ProbeClusters({}, 700, 3).empty());
+}
 int main()
 {
     test_sensors_towers_outrank_mobile_and_radar();
@@ -114,5 +134,6 @@ int main()
     test_old_shots_survive_new_target_and_dead_unit_history_is_pruned();
     test_overnuke_counts_scouts_every_ten_and_blocks_the_finished_target();
     test_overnuke_salvo_holds_until_stocked_then_fires_the_roll();
-    std::cout << "strategic targeting: eight suites passed\n";
+    test_probe_clusters_need_unsigned_ghosts_and_pick_the_biggest_group();
+    std::cout << "strategic targeting: nine suites passed\n";
 }

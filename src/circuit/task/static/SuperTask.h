@@ -123,6 +123,11 @@ private:
 	float StockedShotFloor(CCircuitUnit* unit, CCircuitDef* cdef, int frame, float shotCost);
 	// Juno: the highest-priority sensor/EW target in range.
 	bool SelectPulseTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	// Juno probing shot (owner 2026-11-03): the centre of a cluster of ghost
+	// images our radar covers but reads no signature from (CMilitaryManager::GetProbeClusters).
+	bool SelectProbeTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	bool probeAim = false;           // the current aim is a probe (noted in the probe history at launch)
+	bool probeOrderChecked = false;  // a commander-group probe order was looked up for this Juno
 	// Juno fallback: ground we cover with radar but read nothing from, which
 	// is where a jammer that hides itself from radar has to be.
 	bool SelectSuspectedJammer(CCircuitUnit* unit, CCircuitDef* cdef);

@@ -146,6 +146,22 @@ void CSuperTask::Update()
 		return;
 	}
 
+	// Owner 2026-11-03: a Juno the commander group built to probe a jammed
+	// ghost cluster aims its first pulse at the cluster's centre (it fires the
+	// moment the pulse is stocked); OnLaunch then returns it to the targeting below.
+	if (!probeOrderChecked && IsPulse(cdef)) {
+		probeOrderChecked = true;
+		AIFloat3 aim;
+		if (circuit->GetMilitaryManager()->TakeProbeOrder(position, aim)) {
+			SetTarget(nullptr);
+			targetPos = aim;
+			isTargetOverride = true;
+			probeAim = true;
+			circuit->LOG("PROBE %s(%i): commander group probe Juno, first pulse at (%.0f,%.0f)",
+					cdef->GetDef()->GetName(), unit->GetId(), aim.x, aim.z);
+		}
+	}
+
 	if (isTargetOverride) {
 		ExecuteAttack(unit);
 		return;
@@ -184,8 +200,12 @@ void CSuperTask::Update()
 		// A known jammer or radar always wins: its position is certain, so a
 		// target deep behind the line is still worth the shot. Only when nothing
 		// is known does the weapon fall back to inferring one from a radar hole.
+		// Owner 2026-11-03: the probing shot at a jammed ghost cluster comes
+		// after every known radar/jammer and before the radar-hole inference.
+		probeAim = false;
 		const bool hasTarget = isPulse
-				? (SelectPulseTarget(unit, cdef) || SelectSuspectedJammer(unit, cdef) || SelectFogTarget(unit, cdef))
+				? (SelectPulseTarget(unit, cdef) || SelectProbeTarget(unit, cdef)
+					|| SelectSuspectedJammer(unit, cdef) || SelectFogTarget(unit, cdef))
 				: SelectEmpTarget(unit, cdef);
 		if (hasTarget) {
 			ExecuteAttack(unit);
@@ -786,6 +806,33 @@ bool CSuperTask::SelectPulseTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	}, 0.f, false, true, true);
 }
 
+bool CSuperTask::SelectProbeTarget(CCircuitUnit* unit, CCircuitDef* cdef)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+	if (!militaryMgr->GetPulseInfo().probe) return false;
+	const int frame = circuit->GetLastFrame();
+	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	const strategic::Ledger& history = circuit->GetAllyTeam()->GetProbeHistory();
+	for (const strategic::ProbeCluster& c : militaryMgr->GetProbeClusters()) {  // best first
+		AIFloat3 p(c.center.x, 0.f, c.center.z);
+		if (position.SqDistance2D(p) >= maxSqRange) continue;
+		if (history.Blocked(c.center, -1, frame, false)) continue;  // probed recently, by us or an ally
+		if (!CanAimStrategic(unit, p)) continue;  // another Juno's pending or launched pulse
+		SetTarget(nullptr);
+		const bool isMoved = (targetPos.SqDistance2D(p) > SQUARE(1.f));
+		targetPos = p;
+		targetPos.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
+		probeAim = true;
+		if (isMoved) {
+			circuit->LOG("PROBE %s(%i): probing shot at jammed ghosts=%i metal=%.0f at (%i,%i)",
+					cdef->GetDef()->GetName(), unit->GetId(), c.count, c.metal, int(p.x), int(p.z));
+		}
+		return true;
+	}
+	return false;
+}
+
 bool CSuperTask::IsPulse(CCircuitDef* cdef) const
 {
 	const auto& p = manager->GetCircuit()->GetMilitaryManager()->GetPulseInfo();
@@ -1366,7 +1413,12 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	} else {
 		const auto& policy = circuit->GetMilitaryManager()->GetPulseInfo();
 		circuit->GetAllyTeam()->GetPulseClaims().Add(unit->GetId(), {aim.x, aim.z}, d->GetAoe(), frame, policy.coverageFrames, false);
-		circuit->LOG("PULSE: launched from %s(%i) at (%.0f, %.0f) (%s)", d->GetDef()->GetName(), unit->GetId(), aim.x, aim.z, how);
+		if (probeAim && (policy.probeRepeatFrames > 0)) {
+			circuit->GetAllyTeam()->GetProbeHistory().Add(-1, {aim.x, aim.z}, policy.probeRadius, frame, policy.probeRepeatFrames, false);
+		}
+		circuit->LOG("PULSE: launched from %s(%i) at (%.0f, %.0f) (%s)%s", d->GetDef()->GetName(), unit->GetId(), aim.x, aim.z, how,
+				probeAim ? " probe" : "");
+		probeAim = false;
 	}
 	// Attack-ground persists after launch; stop it before another stocked shot
 	// can fire without passing the updated ledger. Keep the aim for event users.

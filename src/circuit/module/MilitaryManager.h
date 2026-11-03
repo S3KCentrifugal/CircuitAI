@@ -163,8 +163,30 @@ public:
 		float holeRadius = 500.f;        // a probe with no contact inside this is a hole
 		float holeMinEnemyInfl = 0.05f;  // only where we believe the enemy operates
 		int holeProbes = 8;              // probe directions per known contact
+		/*
+		 * Probing shot (owner 2026-11-03). Ghost images of enemy structures
+		 * inside our radar coverage, out of LOS, with no radar signature
+		 * (no contact within probeClearRadius), are probably jammed. A cluster
+		 * of probeMinGhosts or more is aimed at its centre, after every known
+		 * radar/jammer and before the radar-hole inference. A spot probed once
+		 * is not probed again for probeRepeatFrames (ally team).
+		 */
+		bool probe = true;
+		int probeMinGhosts = 3;
+		float probeRadius = 700.f;       // cluster radius: the pulse's blast radius
+		float probeClearRadius = 400.f;  // a contact this close is the image's signature
+		int probeRepeatFrames = 600 * FRAMES_PER_SEC;
+		int probeRefreshFrames = 5 * FRAMES_PER_SEC;
 	};
 	const SPulseInfo& GetPulseInfo() const { return pulseInfo; }
+	// Jammed-ghost clusters, best first; recomputed at most every probeRefreshFrames.
+	const std::vector<strategic::ProbeCluster>& GetProbeClusters();
+	// The commander group's probe Juno (owner 2026-11-03): its build site and
+	// the aim its first pulse goes to. A new Juno within 400 of a live order's
+	// site takes it once (TakeProbeOrder), with the aim refreshed to the
+	// nearest current cluster centre within probeRadius.
+	void AddProbeOrder(const springai::AIFloat3& site, const springai::AIFloat3& aim, int expires);
+	bool TakeProbeOrder(const springai::AIFloat3& junoPos, springai::AIFloat3& aim);
 
 	/*
 	 * EMP-weapon target policy. A paralyzer deals no health damage: whether a
@@ -685,6 +707,10 @@ private:
 	} threatRangeScaling;
 
 	SPulseInfo pulseInfo;
+	std::vector<strategic::ProbeCluster> probeClusters;
+	int probeNextFrame = 0;
+	struct SProbeOrder { springai::AIFloat3 site, aim; int expires; };
+	std::vector<SProbeOrder> probeOrders;
 	SEmpInfo empInfo;
 	SBomberInfo bomberInfo;
 	SStockInfo stockInfo;

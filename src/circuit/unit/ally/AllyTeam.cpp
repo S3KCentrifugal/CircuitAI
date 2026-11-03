@@ -196,6 +196,7 @@ void CAllyTeam::UpdateFriendlyUnits()
 	// Launched missiles still cover their area if the firing Juno dies. Pending
 	// claims are released by RemoveAssignee, with the timeout as a safety net.
 	pulseClaims.Prune(lastUpdate, [](int) { return true; });
+	probeHistory.Prune(lastUpdate, [](int) { return true; });
 	nuclearHistory.Prune(lastUpdate, alive);
 }
 

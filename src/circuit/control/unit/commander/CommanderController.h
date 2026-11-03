@@ -257,6 +257,12 @@ struct CommanderGroupConfig {
     float lightFloor=2; // owner 2026-11-02: light towers kept within radius, ahead of sensors and nanos (0 off)
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
+    // Owner 2026-11-03: probe Juno. 3+ jammed ghost images (in our radar, no
+    // signature) within junoPorcRange of our forward-most porc, and the
+    // junoSeconds minimum income above junoMetal / junoEnergy: the group's T1
+    // constructor builds a Juno junoBehind behind the porc nearest them.
+    float junoProbe=0,junoMetal=45,junoEnergy=1200,junoSeconds=10,junoPorcRange=1200;
+    float junoBehind=250,junoHoldSeconds=180,junoMax=2;
 };
 struct CommanderFrontConfig {
     float workers=2;
@@ -427,6 +433,12 @@ private:
     bool groupJobCommitted=false;
     int groupLightNext=0,groupLightCount=0; // light-floor census, once per group/second
     IUnitTask* GroupLightFloor(CCircuitUnit* unit,CCircuitUnit* anchor,int frame);
+    // Probe Juno (owner 2026-11-03): one order at a time, outside the shared group job slot.
+    IUnitTask* GroupJunoProbe(CCircuitUnit* unit,int frame);
+    IUnitTask* junoJob=nullptr; // borrowed until TaskFinished
+    int junoNext=0,junoHoldUntil=0;
+    std::array<float,60> junoMetalHist{},junoEnergyHist{}; // per-second income samples, ring
+    int junoHistCount=0,junoHistIdx=0;
     unsigned groupNanoOwed=0;
     int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0,groupProjectUntil=-1;
     bool GroupCanBuild(CCircuitDef* def,CCircuitUnit* anchor) const;

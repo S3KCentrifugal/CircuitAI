@@ -47,6 +47,8 @@
 #include "terrain/path/PathFinder.h"
 #include "terrain/path/QueryPathMulti.h"
 #include "unit/enemy/EnemyUnit.h"
+#include "unit/enemy/EnemyManager.h"
+#include "map/MapManager.h"
 #include "CircuitAI.h"
 #include "util/GameAttribute.h"
 #include "util/Utils.h"
@@ -477,6 +479,12 @@ void CMilitaryManager::ReadConfig()
 		pulseInfo.scatter = pulse.get("scatter", true).asBool();
 		pulseInfo.scatterStep = std::max(128.f, pulse.get("scatter_step", 384.f).asFloat());
 		pulseInfo.scatterDepth = std::max(0.f, pulse.get("scatter_depth", 192.f).asFloat());
+		pulseInfo.probe = pulse.get("probe", true).asBool();
+		pulseInfo.probeMinGhosts = std::max(1, pulse.get("probe_min_ghosts", 3).asInt());
+		pulseInfo.probeRadius = std::max(64.f, pulse.get("probe_radius", 700.f).asFloat());
+		pulseInfo.probeClearRadius = std::max(0.f, pulse.get("probe_clear_radius", 400.f).asFloat());
+		pulseInfo.probeRepeatFrames = std::max(0, pulse.get("probe_repeat_seconds", 600).asInt()) * FRAMES_PER_SEC;
+		pulseInfo.probeRefreshFrames = std::max(1, pulse.get("probe_refresh_seconds", 5).asInt()) * FRAMES_PER_SEC;
 		pulseInfo.targetClasses.clear();
 		pulseInfo.unitDefs.clear();
 		Json::Value names = pulse["units"];
@@ -2372,6 +2380,84 @@ void CMilitaryManager::UpdateDebugGoal()
 strategic::Overnuke& CMilitaryManager::GetOvernuke()
 {
 	return circuit->GetAllyTeam()->GetOvernuke();
+}
+
+const std::vector<strategic::ProbeCluster>& CMilitaryManager::GetProbeClusters()
+{
+	const int frame = circuit->GetLastFrame();
+	if (!pulseInfo.isEnabled || !pulseInfo.probe) {
+		probeClusters.clear();
+		return probeClusters;
+	}
+	if (frame < probeNextFrame) {
+		return probeClusters;
+	}
+	probeNextFrame = frame + pulseInfo.probeRefreshFrames;
+	// One pass over the enemy units: observed contacts (any, identified or a
+	// bare dot) are the signatures; identified structure images out of radar
+	// and LOS whose spot our radar covers and our LOS does not are the ghosts.
+	CMapManager* mapMgr = circuit->GetMapManager();
+	std::vector<strategic::Ghost> ghosts;
+	std::vector<strategic::Point> contacts;
+	int imagesOut = 0;
+	for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
+		const CEnemyUnit* e = kv.second;
+		const auto status = e->GetData().losStatus;
+		if (status & (SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD)) continue;
+		const AIFloat3& p = e->GetPos();
+		if (!std::isfinite(p.x) || !std::isfinite(p.z) || (p.x < 0.f) || (p.z < 0.f)) continue;
+		if (e->IsInRadarOrLOS()) {
+			contacts.push_back({p.x, p.z});
+			continue;
+		}
+		const CCircuitDef* d = e->GetCircuitDef();
+		if ((d == nullptr) || d->IsMobile() || d->IsAbleToFly() || e->IsIgnore()
+			|| (status & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::NEUTRAL))) continue;
+		if (!mapMgr->IsInRadar(p) || mapMgr->IsInLOS(p)) {
+			++imagesOut;
+			continue;
+		}
+		ghosts.push_back({{p.x, p.z}, d->GetCostM()});
+	}
+	const auto quiet = strategic::UnsignedGhosts(ghosts, contacts, pulseInfo.probeClearRadius);
+	const size_t before = probeClusters.size();
+	probeClusters = strategic::ProbeClusters(quiet, pulseInfo.probeRadius, pulseInfo.probeMinGhosts);
+	if ((probeClusters.size() != before) || (!probeClusters.empty() && (frame / pulseInfo.probeRefreshFrames) % 12 == 0)) {
+		circuit->LOG("PROBE: clusters=%zu ghostsInRadar=%zu unsigned=%zu imagesOutOfRadar=%i contacts=%zu best=%i at (%.0f,%.0f)",
+				probeClusters.size(), ghosts.size(), quiet.size(), imagesOut, contacts.size(),
+				probeClusters.empty() ? 0 : probeClusters[0].count,
+				probeClusters.empty() ? -1.f : probeClusters[0].center.x, probeClusters.empty() ? -1.f : probeClusters[0].center.z);
+	}
+	return probeClusters;
+}
+
+void CMilitaryManager::AddProbeOrder(const AIFloat3& site, const AIFloat3& aim, int expires)
+{
+	const int frame = circuit->GetLastFrame();
+	probeOrders.erase(std::remove_if(probeOrders.begin(), probeOrders.end(),
+			[frame](const SProbeOrder& o) { return o.expires <= frame; }), probeOrders.end());
+	probeOrders.push_back({site, aim, expires});
+}
+
+bool CMilitaryManager::TakeProbeOrder(const AIFloat3& junoPos, AIFloat3& aim)
+{
+	const int frame = circuit->GetLastFrame();
+	for (auto it = probeOrders.begin(); it != probeOrders.end(); ++it) {
+		if ((it->expires <= frame) || (it->site.SqDistance2D(junoPos) > SQUARE(400.f))) continue;
+		aim = it->aim;
+		// The images may have shifted while the Juno was built: the nearest
+		// current cluster within a blast radius of the old aim wins.
+		float bestSq = SQUARE(pulseInfo.probeRadius);
+		for (const strategic::ProbeCluster& c : GetProbeClusters()) {
+			const AIFloat3 p(c.center.x, 0.f, c.center.z);
+			const float sq = p.SqDistance2D(it->aim);
+			if (sq <= bestSq) { bestSq = sq; aim = p; }
+		}
+		aim.y = circuit->GetMap()->GetElevationAt(aim.x, aim.z);
+		probeOrders.erase(it);
+		return true;
+	}
+	return false;
 }
 
 springai::AIFloat3 CMilitaryManager::GetOvernukePos() const

@@ -5,6 +5,9 @@
 #include "control/unit/commander/CommanderController.h"
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
+#include "module/MilitaryManager.h"
+#include "unit/enemy/EnemyManager.h"
+#include "spring/SpringMap.h"
 #include "terrain/BattleAnalysis.h"
 #include "terrain/TerrainManager.h"
 #include "map/ThreatMap.h"
@@ -276,6 +279,11 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
     for(auto& entry:states) entry.value->work.Retire(task);
+    if(task==junoJob) {
+        junoJob=nullptr;
+        ai->LOG("[CommanderGroup] juno_probe_end done=%i",int(done));
+        return;
+    }
     if(task!=groupJob) return;
     groupJob=nullptr; // manager still owns task during this callback
     defenseNext=defenseOfferNext=defenseDecisionNext=0;
@@ -615,6 +623,108 @@ IUnitTask* CCommanderController::GroupLightFloor(CCircuitUnit* unit,CCircuitUnit
     groupJobCommitted=true; // an owner floor, not a discretionary offer
     return task;
 }
+// Owner 2026-11-03: "If several ghost images are within range of front radar,
+// and within 1200 elmos of the forward-most living porc, but no radar
+// signatures of them are found nearby those images, build a juno at the back
+// of the nearest porc (protected by porc) if above 45 metal per second and
+// 1200 energy per second (minimum last 10 seconds)." The images are the
+// military manager's probe clusters (identified enemy structure images inside
+// our radar coverage, out of LOS, no contact within the clear radius). The
+// builder is any group seat that can build a Juno (in practice the group's T1
+// constructor). The order is registered with the military manager, so the
+// Juno's super task aims its first pulse at the cluster's centre
+// (CSuperTask::Update, TakeProbeOrder), then returns to normal targeting.
+// Cost: a 5 s gate; one pass over our own units for the porc.
+IUnitTask* CCommanderController::GroupJunoProbe(CCircuitUnit* unit,int frame) {
+    if(cfg->group.junoProbe<=0 || junoJob || frame<junoNext || frame<junoHoldUntil) return nullptr;
+    auto* military=ai->GetMilitaryManager();
+    const auto& pulse=military->GetPulseInfo();
+    if(!pulse.isEnabled) return nullptr;
+    // The builder's Juno: the first pulse def it can build (each side has one).
+    CCircuitDef* def=nullptr;
+    int junos=0;
+    for(int id:pulse.unitDefs) {
+        auto* d=ai->GetCircuitDefSafe(id);
+        if(!d) continue;
+        junos+=d->GetCount();
+        if(!def && unit->GetCircuitDef()->CanBuild(d) && d->IsAvailable(frame)) def=d;
+    }
+    if(!def) return nullptr;  // not a Juno builder: the gate stays open for the one that is
+    junoNext=frame+5*FRAMES_PER_SEC;
+    // The minimum of the last junoSeconds per-second samples (UpdateCommanderGroup).
+    const int window=std::max(1,int(cfg->group.junoSeconds));
+    if(junoHistCount<window) return nullptr;
+    float minM=std::numeric_limits<float>::max(),minE=std::numeric_limits<float>::max();
+    for(int i=0;i<window;++i) {
+        const int k=(junoHistIdx-1-i+int(junoMetalHist.size()))%int(junoMetalHist.size());
+        minM=std::min(minM,junoMetalHist[k]);minE=std::min(minE,junoEnergyHist[k]);
+    }
+    if(minM<cfg->group.junoMetal || minE<cfg->group.junoEnergy) return nullptr;
+    if(junos>=int(cfg->group.junoMax)) return nullptr;
+    for(auto* task:ai->GetBuilderManager()->GetTasks(BT::DEFENCE))
+        if(!task->IsDead() && task->GetBuildDef() && pulse.unitDefs.count(task->GetBuildDef()->GetId())) return nullptr;
+    const auto& clusters=military->GetProbeClusters();
+    if(clusters.empty()) return nullptr;
+    // Our living porc: finished statics with a surface-to-land weapon of line
+    // range (Junos, LRPCs and silos left out), and the forward-most of them.
+    auto* battle=ai->GetBattle();
+    const bool lane=battle->GetFrontLaneLength()>0;
+    const AIFloat3 enemy=ai->GetEnemyManager()->GetEnemyPos();
+    std::vector<AIFloat3> porc;
+    AIFloat3 forward=-RgtVector;
+    float best=-std::numeric_limits<float>::max();
+    for(const auto& kv:ai->GetTeamUnits()) {
+        CCircuitUnit* u=kv.second;
+        CCircuitDef* d=u?u->GetCircuitDef():nullptr;
+        if(!d || d->IsMobile() || !u->IsFinished() || !d->HasSurfToLand() || pulse.unitDefs.count(d->GetId())) continue;
+        const float range=d->GetMaxRange(CCircuitDef::RangeType::LAND);
+        if(range<=0 || range>1500) continue;
+        const auto p=u->GetPos(frame);
+        porc.push_back(p);
+        const float ahead=lane?battle->GetFrontLaneProgress(p):-std::sqrt(p.SqDistance2D(enemy));
+        if(ahead>best) {best=ahead;forward=p;}
+    }
+    if(!OnMap(forward)) return nullptr;
+    const auto& history=ai->GetAllyTeam()->GetProbeHistory();
+    const float sqPorc=SQUARE(cfg->group.junoPorcRange);
+    for(const auto& c:clusters) {
+        int nearGhosts=0;
+        for(const auto& m:c.members) if(AIFloat3(m.x,0,m.z).SqDistance2D(forward)<=sqPorc) ++nearGhosts;
+        if(nearGhosts<pulse.probeMinGhosts) continue;
+        const AIFloat3 aim(c.center.x,ai->GetMap()->GetElevationAt(c.center.x,c.center.z),c.center.z);
+        if(history.Blocked(c.center,-1,frame,false)
+            || ai->GetAllyTeam()->GetPulseClaims().Blocked(c.center,-1,frame,false,false)) continue; // a Juno is on it
+        // The porc nearest the images; the Juno goes behind it, away from them.
+        AIFloat3 guard=forward;
+        float bestSq=guard.SqDistance2D(aim);
+        for(const auto& p:porc) if(p.SqDistance2D(aim)<bestSq) {bestSq=p.SqDistance2D(aim);guard=p;}
+        AIFloat3 back=guard-aim; back.y=0;
+        const float len=std::sqrt(back.x*back.x+back.z*back.z);
+        if(len>1.f) back=back*(cfg->group.junoBehind/len); else back=AIFloat3(0,0,0);
+        AIFloat3 site=guard+back;
+        CTerrainManager::CorrectPosition(site);
+        CTerrainManager::TerrainPredicate admit=[&](const AIFloat3& p) {
+            return ai->GetThreatMap()->GetThreatAt(unit,p)<=cfg->front.threat
+                && !KeepOutBlocks(unit,p)
+                && ai->GetTerrainManager()->CanReachAtSafe2(unit,p,unit->GetCircuitDef()->GetBuildDistance());
+        };
+        const AIFloat3 at=ai->GetTerrainManager()->FindBuildSite(def,site,300.f,0,admit);
+        if(!OnMap(at)) {
+            ai->LOG("[CommanderGroup] juno_probe_nosite unit=%i ghosts=%i near=%i porc=(%.0f,%.0f) x=%.0f z=%.0f",
+                unit->GetId(),c.count,nearGhosts,guard.x,guard.z,site.x,site.z);
+            continue;
+        }
+        auto* task=ai->GetBuilderManager()->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,at,0.f,true,180*FRAMES_PER_SEC));
+        if(!task) return nullptr;
+        military->AddProbeOrder(at,aim,frame+20*60*FRAMES_PER_SEC);
+        junoJob=task;
+        junoHoldUntil=frame+int(cfg->group.junoHoldSeconds*FRAMES_PER_SEC);
+        ai->LOG("[CommanderGroup] juno_probe unit=%i def=%s ghosts=%i near=%i metal=%.0f minM=%.1f minE=%.0f porc=(%.0f,%.0f) x=%.0f z=%.0f aim=(%.0f,%.0f)",
+            unit->GetId(),def->GetDef()->GetName(),c.count,nearGhosts,c.metal,minM,minE,guard.x,guard.z,at.x,at.z,aim.x,aim.z);
+        return task;
+    }
+    return nullptr;
+}
 IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     if(!unit || !role.frontDuty || (!IsGroupMember(unit->GetId()) && !Handles(unit)) || !unit->IsFinished()) return nullptr;
     auto* current=unit->GetTask();
@@ -628,6 +738,14 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     const auto center=anchor->GetPos(frame);
     const bool builder=unit->GetCircuitDef()->IsBuilder();
     const bool nearby=unit->GetPos(frame).SqDistance2D(center)<=SQUARE(cfg->group.radius);
+    // Owner 2026-11-03: the probe Juno keeps its builder until it is done.
+    if(builder && junoJob) {
+        if(current==junoJob) return current;
+        if(junoJob->CanAssignTo(unit) && unit->GetCircuitDef()->CanBuild(static_cast<IBuilderTask*>(junoJob)->GetBuildDef())
+            && unit->GetPos(frame).SqDistance2D(static_cast<IBuilderTask*>(junoJob)->GetPosition())<=SQUARE(cfg->group.radius*2)) return junoJob;
+    }
+    if(builder && !junoJob)
+        if(auto* task=GroupJunoProbe(unit,frame)) return task;
     if(builder && groupJob && GroupProjectAllowed(unit,groupJob)) {
         // Retention is checked before the worker proximity gate. A constructor
         // travelling to its reserved site must not bounce back into follow.
@@ -669,6 +787,12 @@ void CCommanderController::UpdateCommanderGroup() {
     const int frame=ai->GetLastFrame();
     if(frame<groupNext || !role.frontDuty) return;
     groupNext=frame+FRAMES_PER_SEC;
+    { // probe Juno income window, one sample a second
+        auto* eco=ai->GetEconomyManager();
+        junoMetalHist[junoHistIdx]=eco->GetAvgMetalIncome();junoEnergyHist[junoHistIdx]=eco->GetAvgEnergyIncome();
+        junoHistIdx=(junoHistIdx+1)%int(junoMetalHist.size());
+        junoHistCount=std::min(junoHistCount+1,int(junoMetalHist.size()));
+    }
     auto* anchor=GroupCommander();
     const int anchorId=anchor?anchor->GetId():-1;
     // Only shields can use the remote-plasma lane exception. Refresh its

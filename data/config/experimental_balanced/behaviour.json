@@ -134,7 +134,17 @@
             "coverage_seconds": 90,
             "scatter": true,
             "scatter_step": 384,
-            "scatter_depth": 192
+            "scatter_depth": 192,
+            // Probing shot (owner 2026-11-03): ghost images of enemy structures inside our radar
+            // coverage, out of LOS, with no radar contact within probe_clear_radius are probably
+            // jammed; a cluster of probe_min_ghosts or more (within probe_radius of its centre) is
+            // shot at its centre after every known radar/jammer, before the radar-hole inference.
+            // A probed spot is not probed again by any ally for probe_repeat_seconds.
+            "probe": true,
+            "probe_min_ghosts": 3,
+            "probe_radius": 700,
+            "probe_clear_radius": 400,
+            "probe_repeat_seconds": 600
 		},
 
 		// EMP weapons (Paralyzer). A paralyzer deals no health damage, so a shot

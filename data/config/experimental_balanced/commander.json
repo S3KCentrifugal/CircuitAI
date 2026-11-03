@@ -73,6 +73,17 @@
 		"commander_group_sensor_defense_band": 3,
 		// owner 2026-11-02: at least this many LLT/Beamer/Twin Guard/LHT/HLT within the group radius, before sensors and nanos
 		"commander_group_light_floor": 2,
+		// owner 2026-11-03: probe Juno. 3+ jammed ghost images (pulse probe_*) within juno_porc_range of our
+		// forward-most porc and the juno_seconds minimum income above juno_metal / juno_energy: the group's
+		// T1 constructor builds a Juno juno_behind behind the porc nearest them; its first pulse goes to their centre.
+		"commander_group_juno_probe": 1,
+		"commander_group_juno_metal": 45,
+		"commander_group_juno_energy": 1200,
+		"commander_group_juno_seconds": 10,
+		"commander_group_juno_porc_range": 1200,
+		"commander_group_juno_behind": 250,
+		"commander_group_juno_hold_seconds": 180,
+		"commander_group_juno_max": 2,
 		"commander_group_jammer_outage": 60,
 		"commander_group_jammer_income": 25,
 		"commander_group_defence_metal": 50,

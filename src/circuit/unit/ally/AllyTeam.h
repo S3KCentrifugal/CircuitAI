@@ -144,6 +144,8 @@ public:
     void NuclearWarning(int frame) { nuclearWarning=std::max(nuclearWarning,frame); }
     int LastNuclearWarning() const { return nuclearWarning; }
 	strategic::Ledger& GetNuclearHistory() { return nuclearHistory; }
+	// Probing shots (owner 2026-11-03): spots a Juno probed, so no ally probes them again for a while.
+	strategic::Ledger& GetProbeHistory() { return probeHistory; }
 	// One overnuke per ally team (owner 2026-11-01): every allied BARb's silos, FRONT's
 	// grid included, count towards the breakpoints and fire at the same target.
 	strategic::Overnuke& GetOvernuke() { return overnuke; }
@@ -154,7 +156,7 @@ private:
     int nuclearWarning=-1000000;
 public:
 private:
-	strategic::Ledger pulseClaims, nuclearHistory;
+	strategic::Ledger pulseClaims, nuclearHistory, probeHistory;
 	strategic::Overnuke overnuke;
 	allied_layout::Reservations layoutReservations;
 	metal_field::Claims metalClaims;
