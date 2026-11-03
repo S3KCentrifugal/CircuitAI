@@ -351,7 +351,8 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
  *  2) fires `volleys` at ghost images of that porc, same rule;
  *  3) closes to snipe_range_fraction of its own range of the threat and fires
  *     `volleys` at it (ghost: at its last seen spot);
- *  4) if radar or LOS then shows it alive, fires `volleys` more.
+ *  4) if it is then live (radar or LOS now), attacks it until dead; if it
+ *     turns back into a ghost, `volleys` more (owner 02:06Z).
  * Then the ordinary controller has the unit back; that threat is left alone
  * by this unit for repeat_seconds. Returns true while it owns the unit.
  * Owner 2026-11-03 01:36Z: Pulsar, Bulwark and Bastion ("direct_threats") are
@@ -847,27 +848,41 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.ghostDone.insert(st.threat);  // not again while it stays a ghost
 			return finish("not seen alive after the volleys");
 		}
-		circuit->LOG("SNIPE: %s %i sees %s %i alive, fires %i more", cdef->GetDef()->GetName(), unit->GetId(),
-				SnipeName(threat), st.threat, info.volleys);
+		circuit->LOG("SNIPE: %s %i sees %s %i live, attacks it until dead", cdef->GetDef()->GetName(), unit->GetId(),
+				SnipeName(threat), st.threat);
 		st.stage = 4;
 		st.volleys = 0;
+		st.targetGhost = false;
 		st.stageFrame = frame;
 		st.orderKey = -1;
 	}
 	if (st.stage == 4) {
-		if (st.volleys >= info.volleys) {
+		// Owner 02:06Z: live (radar or LOS now) after the ghost volleys: attacked
+		// until dead ("gone" ends it). Back to a ghost: `volleys` more, then done
+		// and not again while it stays a ghost.
+		if (!threatSeen && !st.targetGhost) {
+			st.targetGhost = true;
+			st.volleys = 0;
+			circuit->LOG("SNIPE: %s %i lost %s %i to a ghost again, fires %i more", cdef->GetDef()->GetName(),
+					unit->GetId(), SnipeName(threat), st.threat, info.volleys);
+		} else if (threatSeen && st.targetGhost) {
+			st.targetGhost = false;  // live again: until dead
+		}
+		if (st.targetGhost && (st.volleys >= info.volleys)) {
 			stop();
-			return finish("confirm volleys fired");
+			st.ghostDone.insert(st.threat);
+			return finish("ghost volleys fired after it went dark again");
 		}
 		if (frame - std::max(st.stageFrame, st.lastVolley) > info.stageFrames) {
 			return finish("confirm: no volley, gives up");
 		}
 		const float snipeRange = range * info.snipeFraction;
 		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
-		if (move && (st.orderKey != -3 - st.threat)) {
+		const int key = -3 - st.threat * 2 - (threatSeen ? 0 : 1);  // re-aims at once on live <-> ghost
+		if (move && (st.orderKey != key)) {
 			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot);
 		}
-		issue(threat, !threatSeen, move, -3 - st.threat);
+		issue(threat, !threatSeen, move, key);
 		return true;
 	}
 	return false;
