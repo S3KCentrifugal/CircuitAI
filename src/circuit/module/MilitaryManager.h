@@ -360,7 +360,12 @@ public:
 		// Go in when every unit on the threat has gathered, or min_group have and
 		// settled for group_settle_seconds; past group_wait_seconds without
 		// min_group, give the threat up (repeat_seconds).
-		int minGroup = 4;
+		int minGroup = 3;
+		// Test rounds 3-7: 1200-range units (Thanatos, Arbiter) standing at 99%
+		// inside a 1390-1400 reach died nearly every time. Units with less range
+		// than this do the prep porc only and never close in on a threat whose
+		// reach is beyond their snipe spot (0: everyone closes in).
+		float closeMinRange = 1290.f;
 		int groupSettleFrames = 10 * 30;
 	};
 	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.

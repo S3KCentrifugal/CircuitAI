@@ -717,7 +717,8 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 60.f));
 		artySnipeInfo.holdMargin = std::max(0.f, snipeArtyCfg.get("hold_margin", 150.f).asFloat());
 		artySnipeInfo.groupWaitFrames = seconds("group_wait_seconds", 240.f);
-		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 4).asInt());
+		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 3).asInt());
+		artySnipeInfo.closeMinRange = std::max(0.f, snipeArtyCfg.get("close_in_min_range", 1290.f).asFloat());
 		artySnipeInfo.groupSettleFrames = seconds("group_settle_seconds", 10.f);
 		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()
 				&& (!artySnipeInfo.threats.empty() || !artySnipeInfo.directThreats.empty());

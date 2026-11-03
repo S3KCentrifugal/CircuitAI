@@ -253,7 +253,9 @@
 			"repeat_seconds": 60,
 			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
 			"group_wait_seconds": 240,    // ... and go in together when all on that threat are there (settled 10 s); past this,
-			"min_group": 4,               // with min_group gathered; fewer: the threat is given up for repeat_seconds
+			"min_group": 3,               // with min_group gathered; fewer: the threat is given up for repeat_seconds
+			"close_in_min_range": 1290,   // owner option 2026-11-03: below this range (Thanatos 1200, Arbiter 1210) prep porc
+			                              // only, no close-in on a threat that outranges the snipe spot
 			"group_settle_seconds": 10,
 			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
 		},
