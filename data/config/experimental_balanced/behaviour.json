@@ -262,8 +262,10 @@
 		"artillery_snipe": {
 			"enabled": true,
 			"units": ["leghrk", "corhrk", "legavroc", "corvroc", "armmerl"],   // Thanatos, Arbiter, Boreas, Negotiator, Ambassador
-			"threats": ["cortoast", "armamb", "legacluster"],                   // Persecutor, Rattlesnake, Eviscerator
-			"direct_threats": ["armanni", "cordoom", "legbastion"],             // Pulsar, Bulwark, Bastion
+			// Test 2026-11-03: Pulsar (1400) outranges all five, so as a direct threat they walked into it one by one;
+			// it gets the Persecutor treatment (prep porc, gather, go in together, from 99% range).
+			"threats": ["cortoast", "armamb", "legacluster", "armanni"],        // Persecutor, Rattlesnake, Eviscerator, Pulsar
+			"direct_threats": ["cordoom", "legbastion"],                        // Bulwark, Bastion
 			"porc": ["armanni", "cordoom", "legbastion",          // Pulsar, Bulwark, Bastion
 				"armhlt", "corhlt", "corhllt", "armbeamer", "legmg",   // Overwatch, Warden, Twin Guard, Beamer, Cacophony
 				"armflak", "corflak", "legflak",                   // Arbalest, Birdshot, Pluto (T2 flak)
@@ -274,7 +276,7 @@
 				"legbombard", "leghive", "cormexp",                // Bombardier, Hive, Advanced Exploiter
 				"armkraken", "corfdoom", "armfhlt", "corfhlt"],    // naval: Gorgon, Devastator, Manta, Coral
 			"avoid_other_porc": true,     // prep firing spots also outside other armed porc's reach (the target excepted)
-			"threat_margin": 250,         // elmos past a structure's weapon range that still counts as inside (test: 100 let units slide in)
+			"threat_margin": 100,         // elmos past a structure's weapon range that still counts as inside (250 left 1200-range units no prep spot)
 			"trigger_distance": 700,      // starts when within reach + this of a threat
 			"porc_radius": 1600,          // prep porc within this of the threat
 			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
@@ -284,7 +286,9 @@
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
 			"repeat_seconds": 60,
 			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
-			"group_wait_seconds": 30,     // ... and go in together once all are there, or after this
+			"group_wait_seconds": 60,     // ... and go in together when all on that threat are there, or min_group are and
+			"min_group": 4,               // have waited group_settle_seconds; fewer than min_group after group_wait_seconds:
+			"group_settle_seconds": 10,   // the threat is given up for repeat_seconds
 			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]

@@ -408,7 +408,7 @@ public:
 		std::unordered_set<CCircuitDef::Id> directThreats;
 		std::unordered_set<CCircuitDef::Id> porc;     // prep targets
 		bool avoidOtherPorc = true;   // prep spots also outside other armed porc
-		float threatMargin = 250.f;   // elmos past a structure's weapon range
+		float threatMargin = 100.f;   // elmos past a structure's weapon range
 		float triggerDistance = 700.f;
 		float porcRadius = 1600.f;    // prep porc within this of the threat
 		float prepFraction = 0.99f;
@@ -423,7 +423,13 @@ public:
 		// it and go in together, once every unit on that threat is there or
 		// after group_wait_seconds.
 		float holdMargin = 150.f;
-		int groupWaitFrames = 30 * 30;
+		int groupWaitFrames = 60 * 30;
+		// Test round 2: gatherers went in alone while others were still on prep.
+		// Go in when every unit on the threat has gathered, or min_group have and
+		// settled for group_settle_seconds; past group_wait_seconds without
+		// min_group, give the threat up (repeat_seconds).
+		int minGroup = 4;
+		int groupSettleFrames = 10 * 30;
 	};
 	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
 	struct SArtySnipeState {

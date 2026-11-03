@@ -732,7 +732,7 @@ void CMilitaryManager::ReadConfig()
 		readDefs("direct_threats", artySnipeInfo.directThreats);
 		readDefs("porc", artySnipeInfo.porc);
 		artySnipeInfo.avoidOtherPorc = snipeArtyCfg.get("avoid_other_porc", true).asBool();
-		artySnipeInfo.threatMargin = std::max(0.f, snipeArtyCfg.get("threat_margin", 250.f).asFloat());
+		artySnipeInfo.threatMargin = std::max(0.f, snipeArtyCfg.get("threat_margin", 100.f).asFloat());
 		artySnipeInfo.triggerDistance = std::max(0.f, snipeArtyCfg.get("trigger_distance", 700.f).asFloat());
 		artySnipeInfo.porcRadius = std::max(0.f, snipeArtyCfg.get("porc_radius", 1600.f).asFloat());
 		artySnipeInfo.prepFraction = utils::clamp(snipeArtyCfg.get("prep_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
@@ -746,7 +746,9 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.repeatFrames = seconds("repeat_seconds", 60.f);
 		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 60.f));
 		artySnipeInfo.holdMargin = std::max(0.f, snipeArtyCfg.get("hold_margin", 150.f).asFloat());
-		artySnipeInfo.groupWaitFrames = seconds("group_wait_seconds", 30.f);
+		artySnipeInfo.groupWaitFrames = seconds("group_wait_seconds", 60.f);
+		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 4).asInt());
+		artySnipeInfo.groupSettleFrames = seconds("group_settle_seconds", 10.f);
 		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()
 				&& (!artySnipeInfo.threats.empty() || !artySnipeInfo.directThreats.empty());
 	}
