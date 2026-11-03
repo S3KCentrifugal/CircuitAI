@@ -919,6 +919,12 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 						}
 					}
 					if (!placed) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot, rangeOf(threat, holdRadius));
+					// Diagnostic (test round 7: no unit used a far-side spot): once per gather order.
+					circuit->LOG("SNIPE: %s %i spot for %s %i: snipe %s (%.0f, %.0f), hold %s (%.0f, %.0f), unit at (%.0f, %.0f)",
+							cdef->GetDef()->GetName(), unit->GetId(), SnipeName(threat), st.threat,
+							st.hasSnipeSpot ? "strict" : "none", st.hasSnipeSpot ? st.snipeSpot.x : 0.f,
+							st.hasSnipeSpot ? st.snipeSpot.z : 0.f, placed ? "on its line" : "fallback",
+							st.spot.x, st.spot.z, pos.x, pos.z);
 				}
 				if ((st.orderKey != -5 - st.threat) || (frame >= st.orderUntil)) {
 					st.orderKey = -5 - st.threat;
