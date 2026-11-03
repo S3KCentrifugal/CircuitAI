@@ -735,16 +735,16 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.threatMargin = std::max(0.f, snipeArtyCfg.get("threat_margin", 100.f).asFloat());
 		artySnipeInfo.triggerDistance = std::max(0.f, snipeArtyCfg.get("trigger_distance", 700.f).asFloat());
 		artySnipeInfo.porcRadius = std::max(0.f, snipeArtyCfg.get("porc_radius", 1600.f).asFloat());
-		artySnipeInfo.prepFraction = utils::clamp(snipeArtyCfg.get("prep_range_fraction", 0.95f).asFloat(), 0.5f, 1.f);
+		artySnipeInfo.prepFraction = utils::clamp(snipeArtyCfg.get("prep_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
 		artySnipeInfo.snipeFraction = utils::clamp(snipeArtyCfg.get("snipe_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
 		artySnipeInfo.volleys = std::max(1, snipeArtyCfg.get("volleys", 3).asInt());
-		artySnipeInfo.visibleMaxVolleys = std::max(1, snipeArtyCfg.get("visible_max_volleys", 6).asInt());
+		artySnipeInfo.visibleMaxVolleys = std::max(0, snipeArtyCfg.get("visible_max_volleys", 0).asInt());
 		auto seconds = [&](const char* key, float def) {
 			return int(std::max(0.f, snipeArtyCfg.get(key, def).asFloat()) * FRAMES_PER_SEC);
 		};
 		artySnipeInfo.confirmFrames = seconds("confirm_delay_seconds", 3.f);
 		artySnipeInfo.repeatFrames = seconds("repeat_seconds", 60.f);
-		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 90.f));
+		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 60.f));
 		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()
 				&& (!artySnipeInfo.threats.empty() || !artySnipeInfo.directThreats.empty());
 	}

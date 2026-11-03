@@ -251,10 +251,12 @@
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
 		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of
 		// these "threats" (seen, radar dot or ghost image), the unit 1) attacks seen / radar "porc" near it that can be
-		// hit from outside every threat's reach (+threat_margin), until dead (visible_max_volleys at most), 2) fires
+		// hit from outside every threat's reach (+threat_margin), from 99% range until dead, 2) fires
 		// `volleys` at ghost images of that porc, same rule, 3) closes to snipe_range_fraction of its own range and
 		// fires `volleys` at the threat, 4) if radar or LOS shows it alive, `volleys` more. Then its ordinary
 		// controller has it back, and that threat is left alone by this unit for repeat_seconds.
+		// Owner 01:43Z: seen porc is shot until dead, unless a slow commander or slow heavy unit (artillery_commander
+		// rules) is in current weapon range: that comes first, and the sequence waits.
 		// "direct_threats" (owner 01:36Z: Pulsar, Bulwark, Bastion) skip steps 1-2: attacked from
 		// snipe_range_fraction before going into their reach, seen ones until dead, ghosts as in 3-4. DLL feature.
 		"artillery_snipe": {
@@ -275,13 +277,13 @@
 			"threat_margin": 100,         // elmos past a structure's weapon range that still counts as inside
 			"trigger_distance": 700,      // starts when within reach + this of a threat
 			"porc_radius": 1600,          // prep porc within this of the threat
-			"prep_range_fraction": 0.95,  // prep firing spots at this fraction of own range
+			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
 			"snipe_range_fraction": 0.99,
 			"volleys": 3,
-			"visible_max_volleys": 6,
+			"visible_max_volleys": 0,     // owner 01:43Z: seen porc until dead (0 = no cap)
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
 			"repeat_seconds": 60,
-			"stage_max_seconds": 90
+			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base
