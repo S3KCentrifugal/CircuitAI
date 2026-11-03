@@ -551,6 +551,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			for (int k = 0; k < 24; ++k) {
 				const float off = ((k + 1) / 2) * (3.14159265f / 12.f) * ((k % 2 == 0) ? 1.f : -1.f);
 				AIFloat3 c(tp.x + std::cos(base + off) * snipeR, 0.f, tp.z + std::sin(base + off) * snipeR);
+				const float cap = std::max(0.f, pos.distance2D(tp) - snipeR)
+					+ t->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);  // owner 02:49Z detour cap
+				if (pos.SqDistance2D(c) > SQUARE(cap)) continue;
 				// The spot and the straight walk to it (test round 4: a Pulsar spot
 				// existed only behind it, reached through the Persecutor's reach).
 				bool ok = true;
@@ -683,8 +686,15 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	// degrees either side of the line to the unit, two rings. strict: every
 	// spot and the walk to it must be safe (except `except`); otherwise the
 	// safest-first fallback is the straight approach.
-	auto findSpot = [&](const AIFloat3& aim, float radius, int except, bool strict, AIFloat3& out) {
+	// Owner 02:49Z: no detour longer than the aimed porc's own weapon range: a
+	// spot counts only within (straight distance to firing range) + that range.
+	auto rangeOf = [](const CEnemyUnit* e, float fallback) {
+		const float r = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
+		return (r > 0.f) ? r : fallback;
+	};
+	auto findSpot = [&](const AIFloat3& aim, float radius, int except, bool strict, AIFloat3& out, float porcRange) {
 		float base = std::atan2(pos.z - aim.z, pos.x - aim.x);
+		const float maxWalk = std::max(0.f, pos.distance2D(aim) - radius) + porcRange;
 		bool found = false;
 		float bestSq = std::numeric_limits<float>::max();
 		for (float ring : {1.f, 0.85f}) {
@@ -693,8 +703,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				AIFloat3 c(aim.x + std::cos(base + off) * radius * ring, 0.f, aim.z + std::sin(base + off) * radius * ring);
 				CTerrainManager::CorrectPosition(c);
 				if (!terrain->CanMoveToPos(unit->GetArea(), c)) continue;
-				if (!safeAt(c, except, false) || !walkSafe(pos, c, except)) continue;
 				const float sq = pos.SqDistance2D(c);
+				if (sq > SQUARE(maxWalk)) continue;
+				if (!safeAt(c, except, false) || !walkSafe(pos, c, except)) continue;
 				if (sq < bestSq) { bestSq = sq; out = c; found = true; }
 			}
 		}
@@ -803,7 +814,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				AIFloat3 spot;
 				if ((pos.SqDistance2D(e->GetPos()) <= SQUARE(prepRadius)) && safeAt(pos, e->GetId(), false)) {
 					spot = pos;  // already a safe firing spot
-				} else if (!findSpot(e->GetPos(), prepRadius, e->GetId(), true, spot)) {
+				} else if (!findSpot(e->GetPos(), prepRadius, e->GetId(), true, spot, rangeOf(e, prepRadius))) {
 					continue;  // cannot be shot from outside the threats' reach
 				}
 				const float sq = pos.SqDistance2D(spot);
@@ -865,7 +876,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.atHold = at;
 			if (!at) {
 				st.holdSince = -1;
-				if (st.orderKey != -5 - st.threat) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot);
+				if (st.orderKey != -5 - st.threat) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot, rangeOf(threat, holdRadius));
 				if ((st.orderKey != -5 - st.threat) || (frame >= st.orderUntil)) {
 					st.orderKey = -5 - st.threat;
 					st.orderUntil = frame + FRAMES_PER_SEC * 8;
@@ -946,7 +957,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		const float snipeRange = range * info.snipeFraction;
 		if (st.orderKey != -2 - st.threat) {
 			// Firing spot once per stage: outside other threats if possible.
-			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot);
+			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
 		}
 		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
 		issue(threat, !threatSeen, move, -2 - st.threat);
@@ -992,7 +1003,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		const bool move = pos.SqDistance2D(threat->GetPos()) > SQUARE(snipeRange + 16.f);
 		const int key = -3 - st.threat * 2 - (threatSeen ? 0 : 1);  // re-aims at once on live <-> ghost
 		if (move && (st.orderKey != key)) {
-			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot);
+			findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
 		}
 		issue(threat, !threatSeen, move, key);
 		return true;
