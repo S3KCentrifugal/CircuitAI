@@ -371,6 +371,9 @@ public:
 		// half-disc (facing the group's hold point) and another heavy's share
 		// more than this fraction of the smaller one; then go in only with 3+.
 		float doubleHeavyOverlap = 0.5f;
+		// Owner 2026-11-03 21:58Z: at the double-heavy go-in, Boreas/Negotiator/
+		// Ambassador within this of the hold point or a gathered member join.
+		float recruitRadius = 500.f;
 	};
 	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
 	struct SArtySnipeState {
