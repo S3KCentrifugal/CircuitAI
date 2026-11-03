@@ -559,6 +559,13 @@ public:
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
 		int goFrame = -1;       // stage 2: when it left the gathering spot
+		// Owner 2026-11-03 21:04Z synced volley: a gathered group walks in with
+		// fire held and all open fire in one frame (see ArtySnipeStep stage 2).
+		bool syncWait = false;  // stage 2: walking in, waiting for the group's volley
+		bool atSpot = false;    // stage 2: within 99% snipe range of the threat
+		bool fireHeld = false;  // fire state set to hold by the snipe (restore on exit)
+		float lastHp = -1.f;    // health percent last call (being hit releases the volley)
+		int hitFrame = -1;
 		int dhLoggedFor = -1;   // threat whose double-heavy share was last logged
 		bool atHold = false;    // stage 2: waiting at the gathering spot
 		int holdSince = -1;
