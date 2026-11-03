@@ -432,8 +432,8 @@ float HalfDiscShare(const AIFloat3& pA, float rA, const AIFloat3& pB, float rB, 
 	return float(inside) / float(NR * NA);
 }
 
-// The highest weapon-range half-disc share of aimed ghost heavy `t` with any
-// other ghost heavy (threats + direct threats) within both ranges; `with`
+// The highest weapon-range half-disc share of aimed heavy `t` with any other
+// live or ghost heavy (threats + direct threats) within both ranges; `with`
 // gets that heavy. Shares cached per pair for 10 s. O(known enemies + 480 per
 // new pair).
 float DoubleHeavyShare(CMilitaryManager* military, CEnemyManager* enemyMgr, const CEnemyUnit* t,
@@ -442,14 +442,12 @@ float DoubleHeavyShare(CMilitaryManager* military, CEnemyManager* enemyMgr, cons
 	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
 	float best = 0.f;
 	with = nullptr;
-	// Owner 2026-11-03 21:55Z: only ghost pairs count; a live (radar or LOS)
-	// target or partner is not in the pair test at all.
-	if (t->IsInRadarOrLOS()) return 0.f;
+	// Owner 2026-11-03 21:58Z: any two heavies, live or ghost, count.
 	const float rT = t->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
 	auto& cache = military->GetArtySnipeOverlaps();
 	for (const auto& kv : enemyMgr->GetEnemyUnits()) {
 		const CEnemyUnit* e = kv.second;
-		if ((e == t) || (e->GetCircuitDef() == nullptr) || e->IsHidden() || e->IsDead() || e->IsInRadarOrLOS()) continue;
+		if ((e == t) || (e->GetCircuitDef() == nullptr) || e->IsHidden() || e->IsDead()) continue;
 		const CCircuitDef::Id hid = e->GetCircuitDef()->GetId();
 		if ((info.threats.count(hid) == 0) && (info.directThreats.count(hid) == 0)) continue;
 		const float rH = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
@@ -655,8 +653,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		std::vector<AIFloat3> triggered;
 		for (size_t i = 0; i < allThreats.size(); ++i) {
 			const CEnemyUnit* e = enemyMgr->GetEnemyUnit(allIds[i]);
-			// Owner 21:12Z: only ghosts start or widen a snipe.
-			if ((e == nullptr) || e->IsInRadarOrLOS() || (st.ghostDone.count(allIds[i]) > 0)) continue;
+			if ((e == nullptr) || (!e->IsInRadarOrLOS() && (st.ghostDone.count(allIds[i]) > 0))) continue;
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
 			if (pos.SqDistance2D(allThreats[i].first) < SQUARE(trigger)) triggered.push_back(allThreats[i].first);
 		}
@@ -701,10 +698,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// Owner 2026-11-03 20:54Z: only a fresh LOS sighting resets a ghost's
 			// volleys; a radar dot does not.
 			if (e->IsInLOS()) st.ghostDone.erase(e->GetId());
-			// Owner 2026-11-03 21:12Z: live heavy porc (radar or LOS) is left to the
-			// ordinary controller; only a ghost starts the snipe.
-			if (e->IsInRadarOrLOS()) continue;
-			if (st.ghostDone.count(e->GetId()) > 0) continue;  // its ghost already had the volleys
+			// Owner 2026-11-03 21:58Z: live or ghost, a heavy only starts a sequence
+			// through a pair above double_heavy_overlap (checked below); a single
+			// one is left to the default target choice.
+			if (!e->IsInRadarOrLOS() && (st.ghostDone.count(e->GetId()) > 0)) continue;  // its ghost already had the volleys
 			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
 			float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
@@ -742,10 +739,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		if (best == nullptr) {
 			return false;
 		}
-		// Owner 2026-11-03 21:36Z: the default target choice is the baseline (a
-		// single ghost is one of its targets); only a ghost heavy sharing more
-		// than double_heavy_overlap with another heavy starts a sequence, and
-		// that goes straight to the gather (no prep porc).
+		// Owner 2026-11-03 21:36Z / 21:58Z: the default target choice is the
+		// baseline (a single ghost is one of its targets); only a heavy, live or
+		// ghost, sharing more than double_heavy_overlap with another live or
+		// ghost heavy starts a sequence, straight to the gather (no prep porc).
 		{
 			const CEnemyUnit* with = nullptr;
 			const float share = DoubleHeavyShare(military, enemyMgr, best, pos, frame, with);
@@ -1208,6 +1205,56 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					)
 				}
 				return true;  // others still on their way or on prep porc
+			}
+			// Owner 2026-11-03 21:58Z recruitment: when the group leaves, every
+			// Boreas/Negotiator/Ambassador of this AI within recruit_radius of
+			// the hold point or of a gathered member, not already on this
+			// threat, joins it (pulled off its default target) and the synced
+			// volley. O(team units x group) once per go-in.
+			if (going == 0) {
+				std::vector<AIFloat3> anchors{st.spot};
+				for (const auto& kv : military->GetArtySnipeStates()) {
+					const CMilitaryManager::SArtySnipeState& o = kv.second;
+					if ((o.threat != st.threat) || (o.stage != 2) || !o.atHold) continue;
+					CCircuitUnit* m = circuit->GetTeamUnit(kv.first);
+					if (m != nullptr) anchors.push_back(m->GetPos(frame));
+				}
+				std::vector<int> recruits;
+				for (const auto& kv : circuit->GetTeamUnits()) {
+					CCircuitUnit* r = kv.second;
+					const CCircuitDef* rdef = r->GetCircuitDef();
+					if ((info.defs.count(rdef->GetId()) == 0)
+						|| (rdef->GetMaxRange(CCircuitDef::RangeType::LAND) < info.closeMinRange)) continue;
+					auto sit = military->GetArtySnipeStates().find(r->GetId());
+					if ((sit != military->GetArtySnipeStates().end()) && (sit->second.threat == st.threat)
+						&& (sit->second.stage != 0)) continue;
+					const AIFloat3 rp = r->GetPos(frame);
+					for (const AIFloat3& a : anchors) {
+						if (rp.SqDistance2D(a) <= SQUARE(info.recruitRadius)) { recruits.push_back(r->GetId()); break; }
+					}
+				}
+				for (const int id : recruits) {
+					CMilitaryManager::SArtySnipeState& rs = military->GetArtySnipeState(id, frame);
+					rs.stage = 2;
+					rs.threat = st.threat;
+					rs.direct = st.direct;
+					rs.target = -1;
+					rs.volleys = 0;
+					rs.stageFrame = frame;
+					rs.lastCall = frame;
+					rs.orderKey = -1;
+					rs.go = true;
+					rs.goFrame = frame;
+					rs.syncWait = true;
+					rs.atSpot = false;
+					rs.hitFrame = -1;
+					rs.hasSnipeSpot = false;
+					rs.spotFor = -1;
+					rs.holding = false;
+					rs.ghostAim = -1;
+				}
+				circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i", cdef->GetDef()->GetName(), unit->GetId(),
+						int(recruits.size()), info.recruitRadius, SnipeName(threat), st.threat);
 			}
 			st.go = true;
 			st.goFrame = frame;
