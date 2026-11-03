@@ -278,15 +278,15 @@ public:
 		// Antinuke cover (owner 2026-10-31, restored 2026-11-02): each known enemy
 		// interceptor (any def with an interceptor weapon: Protector, Fortitude,
 		// Aegis, Rampart, mobile and ship antinukes) whose coverage holds an aim
-		// point cuts the aim point's metal value linearly:
-		// value x max(antinukeFloor, 1 - drop x covering).
-		float antinukeDropOrdinary = 0.5f;   // an ordinary shot
+		// point multiplies the aim point's metal value by a factor (owner 2026-11-03):
+		// value x max(antinukeFloor, factor ^ covering), e.g. 0.70, 0.49, 0.343.
+		float antinukeFactorOrdinary = 0.70f;  // an ordinary shot
 		// value each target by what the blast's falloff does to it (CSuperTask::ChainKill)
 		bool blastKill = true;
 		// blast distance is measured to the target's collision volume (CollisionVolumes.h); a def missing
 		// from that table: centre distance - def radius x this (0.86: the best single fit, 2026-11-02)
 		float volumeFactor = 0.86f;
-		float antinukeDropOvernuke = 0.15f;  // an overnuke target (the salvo is meant to saturate)
+		float antinukeFactorOvernuke = 0.85f;  // an overnuke target (the salvo is meant to saturate)
 		float antinukeFloor = 0.05f;
 		float coveredMargin = 64.f;  // added to each coverage radius
 	};

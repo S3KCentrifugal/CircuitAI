@@ -845,7 +845,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	const int frame = circuit->GetLastFrame();
 	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
 	const float floor = StockedShotFloor(unit, cdef, frame, cdef->GetWeaponDef()->GetCostMShot());
-	float coverDrop = policy.antinukeDropOrdinary;  // overnuke: antinukeDropOvernuke, set below
+	float coverFactor = policy.antinukeFactorOrdinary;  // overnuke: antinukeFactorOvernuke, set below
 	auto scan = [&]() {
 		const auto interceptors = KnownInterceptors();
 		const bool found = SelectAreaTarget(unit, cdef, "NUCLEAR", SQUARE(cdef->GetAoe()), 1, 0,
@@ -853,9 +853,9 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 				if (!strategic::NuclearTarget(d->IsMobile(), true, policy.structuresOnly)) return false;
 				rank = 0; value = e.cost; return true;
 			}, floor, true, true, false, true,
-			[&policy, &interceptors, &coverDrop](const AIFloat3& pos) {
+			[&policy, &interceptors, &coverFactor](const AIFloat3& pos) {
 				const int n = CountInterceptorCover(interceptors, pos);
-				return (n <= 0) ? 1.f : std::max(policy.antinukeFloor, 1.f - coverDrop * float(n));
+				return (n <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(n)));
 			},
 			[&interceptors](const std::vector<AIFloat3>& targets) {
 				return CoverEdgeAims(interceptors, targets);
@@ -866,7 +866,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 			coverLogPos = targetPos;
 			circuit->LOG("NUCLEAR %s(%i): aim (%i,%i) antinukes covering=%i of %zu known, value x%.2f",
 					cdef->GetDef()->GetName(), unit->GetId(), int(targetPos.x), int(targetPos.z), cover,
-					interceptors.size(), (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, 1.f - coverDrop * float(cover)));
+					interceptors.size(), (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(cover))));
 			}
 		}
 		// nuke rush scouting (team/nuke_recon.as) sends AIR to the latest aim
@@ -876,7 +876,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	strategic::Overnuke& over = circuit->GetMilitaryManager()->GetOvernuke();
 	const int silos = CountNukeSilos();
 	if ((policy.overnukeSilos > 0) && (silos >= policy.overnukeSilos)) {
-		coverDrop = policy.antinukeDropOvernuke;
+		coverFactor = policy.antinukeFactorOvernuke;
 	}
 	if ((policy.overnukeSilos <= 0) || (silos < policy.overnukeSilos)) {
 		if (over.Active()) {
@@ -940,7 +940,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
  * role list, so Legion's Rampart - a geothermal with an antinuke - counts)
  * whose coverage holds it. Enemy stockpiles are unknown: every known
  * interceptor counts as armed. Mobile ones count only while in radar or LOS.
- * Each one cuts the aim point's metal value linearly (SNuclearInfo).
+ * Each one multiplies the aim point's metal value by nuclear.antinuke_factor (SNuclearInfo).
  */
 std::vector<std::pair<AIFloat3, float>> CSuperTask::KnownInterceptors()
 {
