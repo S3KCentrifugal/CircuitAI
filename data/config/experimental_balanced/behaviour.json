@@ -216,7 +216,7 @@
 		// these "threats" (seen, radar dot or ghost image), the unit 1) attacks seen / radar "porc" near it that can be
 		// hit from outside every threat's reach (+threat_margin), from 99% range until dead, 2) fires
 		// `volleys` at ghost images of that porc, same rule, 3) closes to snipe_range_fraction of its own range and
-		// fires `volleys` at the threat, 4) if radar or LOS shows it alive, `volleys` more. Then its ordinary
+		// fires `volleys` at the threat, 4) if it is live (radar/LOS now), until dead; ghost again: `volleys` more. Then its ordinary
 		// controller has it back, and that threat is left alone by this unit for repeat_seconds.
 		// Owner 01:43Z: seen porc is shot until dead, unless a slow commander or slow heavy unit (artillery_commander
 		// rules) is in current weapon range: that comes first, and the sequence waits.
