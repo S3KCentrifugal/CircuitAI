@@ -377,6 +377,42 @@ bool SnipeAlive(const CEnemyUnit* e)
 	return (e->GetData().losStatus & SEnemyData::LosMask::DYING) == 0;
 }
 
+// Owner 2026-11-03 20:53Z: share of two weapon-range half-discs, each centred
+// on its porc with the flat edge through the porc, perpendicular to the line
+// from the porc to `face` (our group's hold point): area of the intersection
+// over the smaller half-disc's area. 20 x 24 = 480 area-uniform polar samples
+// over the smaller half-disc; O(480).
+float HalfDiscShare(const AIFloat3& pA, float rA, const AIFloat3& pB, float rB, const AIFloat3& face)
+{
+	const bool aSmall = rA <= rB;
+	const AIFloat3& pS = aSmall ? pA : pB;
+	const AIFloat3& pL = aSmall ? pB : pA;
+	const float rS = aSmall ? rA : rB;
+	const float rL = aSmall ? rB : rA;
+	if ((rS <= 0.f) || (pS.SqDistance2D(pL) > SQUARE(rS + rL))) return 0.f;
+	auto axis = [&face](const AIFloat3& p, float& ax, float& az) {
+		ax = face.x - p.x; az = face.z - p.z;
+		const float len = std::sqrt(ax * ax + az * az);
+		if (len < 1.f) { ax = 1.f; az = 0.f; } else { ax /= len; az /= len; }
+	};
+	float sx, sz, lx, lz;
+	axis(pS, sx, sz);
+	axis(pL, lx, lz);
+	const float base = std::atan2(sz, sx);
+	constexpr int NR = 20, NA = 24;
+	int inside = 0;
+	for (int i = 0; i < NR; ++i) {
+		const float r = rS * std::sqrt((i + 0.5f) / NR);
+		for (int j = 0; j < NA; ++j) {
+			const float a = base - 1.5707963f + 3.14159265f * (j + 0.5f) / NA;
+			const float px = pS.x + r * std::cos(a), pz = pS.z + r * std::sin(a);
+			const float dx = px - pL.x, dz = pz - pL.z;
+			if ((dx * dx + dz * dz <= rL * rL) && (dx * lx + dz * lz >= 0.f)) ++inside;
+		}
+	}
+	return float(inside) / float(NR * NA);
+}
+
 const char* SnipeName(const CEnemyUnit* e)
 {
 	return (e != nullptr && e->GetCircuitDef() != nullptr) ? e->GetCircuitDef()->GetDef()->GetName() : "?";
@@ -592,8 +628,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const CCircuitDef::Id eid = e->GetCircuitDef()->GetId();
 			const bool direct = info.threats.count(eid) == 0;
 			if (direct && (info.directThreats.count(eid) == 0)) continue;
-			if (e->IsInRadarOrLOS()) st.ghostDone.erase(e->GetId());
-			else if (st.ghostDone.count(e->GetId()) > 0) continue;  // its ghost already had the volleys
+			// Owner 2026-11-03 20:54Z: only a fresh LOS sighting resets a ghost's
+			// volleys; a radar dot does not.
+			if (e->IsInLOS()) st.ghostDone.erase(e->GetId());
+			else if (!e->IsInRadarOrLOS() && (st.ghostDone.count(e->GetId()) > 0)) continue;  // its ghost already had the volleys
 			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
 			float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
@@ -860,8 +898,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					continue;
 				}
 				const bool seen = e->IsInRadarOrLOS();
-				if (seen) st.ghostDone.erase(e->GetId());
-				else if (st.ghostDone.count(e->GetId()) > 0) continue;
+				if (e->IsInLOS()) st.ghostDone.erase(e->GetId());  // owner 20:54Z: LOS only
+				else if (!seen && (st.ghostDone.count(e->GetId()) > 0)) continue;
 				if (bestSeen && !seen) continue;
 				AIFloat3 spot;
 				if ((pos.SqDistance2D(e->GetPos()) <= SQUARE(prepRadius)) && safeAt(pos, e->GetId(), false)) {
@@ -1019,6 +1057,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 						d, SnipeName(threat), st.threat);
 			}
 			int members = 0, gathered = 0, going = 0;
+			int firstGo = std::numeric_limits<int>::max();  // when the group already going in left
 			int settledSince = st.holdSince;  // when the last gatherer arrived
 			for (const auto& kv : military->GetArtySnipeStates()) {
 				const CMilitaryManager::SArtySnipeState& o = kv.second;
@@ -1026,6 +1065,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				++members;
 				if ((o.stage >= 2) && o.go) {
 					++going;
+					firstGo = std::min(firstGo, o.goFrame);
 				} else if ((o.stage == 2) && o.atHold) {
 					++gathered;
 					settledSince = std::max(settledSince, o.holdSince);
@@ -1039,10 +1079,56 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const bool allGathered = (gathered >= members);
 			const bool settled = (frame - settledSince >= info.groupSettleFrames);
 			const bool waitOver = (frame - st.holdSince >= info.groupWaitFrames);
-			const bool go = (going > 0) || (allGathered && (settled || members == 1)) || (waitOver && (gathered >= need));
+			// Owner 2026-11-03 20:53Z: double heavy. Every other live or ghost heavy
+			// (threats + direct threats) within both weapon ranges of the aimed one:
+			// weapon-range half-discs facing the hold point; a share above
+			// double_heavy_overlap is double heavy. Shares cached per pair ~10 s.
+			// O(known enemies + 480 per new pair).
+			float dhShare = 0.f;
+			const CEnemyUnit* dhWith = nullptr;
+			{
+				const float rT = threat->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
+				const AIFloat3 face = (st.spotFor == st.threat) ? st.spot : pos;
+				auto& cache = military->GetArtySnipeOverlaps();
+				for (const auto& kv : enemyMgr->GetEnemyUnits()) {
+					const CEnemyUnit* e = kv.second;
+					if ((e->GetId() == st.threat) || !SnipeAlive(e)) continue;
+					const CCircuitDef::Id hid = e->GetCircuitDef()->GetId();
+					if ((info.threats.count(hid) == 0) && (info.directThreats.count(hid) == 0)) continue;
+					const float rH = e->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND);
+					if (e->GetPos().SqDistance2D(threat->GetPos()) > SQUARE(rT + rH)) continue;
+					const uint64_t key = (uint64_t(uint32_t(st.threat)) << 32) | uint32_t(e->GetId());
+					auto it = cache.find(key);
+					float share;
+					if ((it != cache.end()) && (frame - it->second.second < FRAMES_PER_SEC * 10)) {
+						share = it->second.first;
+					} else {
+						share = HalfDiscShare(threat->GetPos(), rT, e->GetPos(), rH, face);
+						cache[key] = {share, frame};
+					}
+					if (share > dhShare) { dhShare = share; dhWith = e; }
+				}
+			}
+			const bool doubleHeavy = (dhWith != nullptr) && (dhShare > info.doubleHeavyOverlap);
+			if ((dhWith != nullptr) && (st.dhLoggedFor != st.threat)) {
+				st.dhLoggedFor = st.threat;
+				circuit->LOG("SNIPE: %s %i on %s %i: %s %.2f with %s %i", cdef->GetDef()->GetName(), unit->GetId(),
+						SnipeName(threat), st.threat, doubleHeavy ? "double heavy" : "single heavy, overlap",
+						dhShare, SnipeName(dhWith), dhWith->GetId());
+			}
+			// Double heavy (port of the cluster-branch 5e482338 rule): at least 3
+			// gathered, the whole gathered group goes in together (they join within
+			// 5 s of the first leaving); no lone or late single; fewer than 3 after
+			// group_wait gives the threat up. Otherwise exactly as before.
+			const int doubleMin = 3;
+			const bool groupLeaving = (going > 0) && (frame - firstGo <= FRAMES_PER_SEC * 5)
+				&& (gathered + going >= doubleMin);
+			const bool go = doubleHeavy
+				? (groupLeaving || ((gathered >= doubleMin) && ((allGathered && settled) || waitOver)))
+				: ((going > 0) || (allGathered && (settled || members == 1)) || (waitOver && (gathered >= need)));
 			if (!go) {
 				if (waitOver) {
-					return finish("too few gathered to go in");
+					return finish(doubleHeavy ? "double heavy, fewer than 3 gathered" : "too few gathered to go in");
 				}
 				if (st.orderKey != -6 - st.threat) {
 					st.orderKey = -6 - st.threat;
@@ -1053,11 +1139,13 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				return true;  // others still on their way or on prep porc
 			}
 			st.go = true;
+			st.goFrame = frame;
 			st.stageFrame = frame;
 			st.volleys = 0;
 			st.orderKey = -1;
-			circuit->LOG("SNIPE: %s %i goes in on %s %i: %i gathered, %i going, %i on it", cdef->GetDef()->GetName(),
-					unit->GetId(), SnipeName(threat), st.threat, gathered, going, members);
+			circuit->LOG("SNIPE: %s %i goes in on %s %i: %i gathered, %i going, %i on it%s", cdef->GetDef()->GetName(),
+					unit->GetId(), SnipeName(threat), st.threat, gathered, going, members,
+					doubleHeavy ? " (double heavy)" : "");
 		}
 	}
 	if (st.stage == 2) {
