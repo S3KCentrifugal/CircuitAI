@@ -408,15 +408,14 @@ namespace Front {
             // Forward agitators and special porc (owner, 2026-11-01; systems/construction/front_agitator.as).
             // Agitator: at our most forward mex or static land gun that stands AgitatorMapShare or more of the
             // map toward the enemy (along the ally-start -> enemy-start axis, map edge to map edge), when the
-            // metal bank reached AgitatorMetalShare of storage in the last AgitatorMetalWindowSeconds, a FRONT
+            // bank holds AgitatorMinMetalStock metal and the 10 s minimum income is AgitatorMinMetalIncome or more, a FRONT
             // constructor builds the faction's T1 area-control plasma artillery there.
             // SpecialPorc: the T2 pop-up plasma artillery at the same spots, by T2 constructors, while the bank is
             // above SpecialPorcMetalShare, the 10 s minimum metal income above SpecialPorcMinMetalIncome and a T2 lab stands.
             // Both off here; experimental_balanced turns them on. Log [FRONT][Agitator], [FRONT][SpecialPorc].
             bool Agitator = false;
             array<string> AgitatorUnits = { "armguard", "corpun", "legcluster" };   // Gauntlet, Agitator, Amputator
-            float AgitatorMetalShare = 0.5f;               // owner 2026-11-02: was 0.8
-            int AgitatorMetalWindowSeconds = 120;
+            float AgitatorMinMetalStock = 1000.0f;     // metal stockpiled now (owner 2026-11-03; replaced 80% then 50% of storage in the last 120 s)
             float AgitatorMinMetalIncome = 35.0f;      // and the 10 s minimum metal income at least this (owner 2026-11-02; Agitator / Gauntlet / Amputator)
             float AgitatorMapShare = 0.4f;
             float AgitatorAdvance = 500.0f;            // a further agitator waits for a spot this much further forward (elmos, lane axis)

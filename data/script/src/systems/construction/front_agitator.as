@@ -8,8 +8,9 @@
 // "Area Control Plasma Artillery" of each faction (AgitatorUnits). A builder takes its own faction's gun
 // first, then any other it can build (traded constructors).
 //
-// Metal: the bank stood at AgitatorMetalShare (0.5; was 0.8 until 2026-11-02) of storage or more at some sample in the last
-// AgitatorMetalWindowSeconds (120). Sampled on every economy update and every ask.
+// Metal (owner 2026-11-03): at least AgitatorMinMetalStock (1000) metal stockpiled right now, and the 10 s minimum
+// metal income at least AgitatorMinMetalIncome (35). Replaces the old percent-of-storage gate (80%, then 50%,
+// in the last 120 s).
 //
 // Spot: our finished mexes (T1 or T2) and finished static land guns ("porc"; any non-mobile unit with a
 // surface-to-land weapon, the agitators themselves left out), whose map share is AgitatorMapShare (0.4)
@@ -63,7 +64,6 @@ namespace FrontAgitator {
     array<Kind@> kinds;
     array<CCircuitDef@> t2Labs;
     int lastScan = -100000;
-    int lastHigh = -1;        // last frame the bank stood at AgitatorMetalShare or more
     bool defsDone = false;
 
     bool AgitatorOn() { return Global::RoleSettings::Front::Agitator; }
@@ -76,7 +76,7 @@ namespace FrontAgitator {
         for (int k = 0; k < KINDS; ++k) kinds.insertLast(Kind());
         t2Labs.resize(0);
         prepNanos.resize(0); prepLlts.resize(0); committedSpot = -1;
-        lastScan = -100000; lastHigh = -1;
+        lastScan = -100000;
         defsDone = false;
     }
 
@@ -137,9 +137,7 @@ namespace FrontAgitator {
     // Front_EconomyUpdate and every ask
     void Sample() {
         if (!On()) return;
-        const float storage = aiEconomyMgr.metal.storage;
-        if (storage > 0.0f && aiEconomyMgr.metal.current >= storage * Global::RoleSettings::Front::AgitatorMetalShare)
-            lastHigh = ai.frame;
+        // nothing to sample since 2026-11-03: the agitator gate reads the bank as it stands
     }
 
     bool T2LabLiving() {
@@ -154,9 +152,9 @@ namespace FrontAgitator {
             const float ami = Economy::GetMinMetalIncomeLast10s();
             if (ami < Global::RoleSettings::Front::AgitatorMinMetalIncome)
                 return "10 s minimum metal income +" + int(ami) + " below +" + int(Global::RoleSettings::Front::AgitatorMinMetalIncome);
-            if (lastHigh >= 0 && ai.frame - lastHigh <= Global::RoleSettings::Front::AgitatorMetalWindowSeconds * SECOND) return "";
-            return "metal bank not at " + int(Global::RoleSettings::Front::AgitatorMetalShare * 100.0f) + "% in the last "
-                + Global::RoleSettings::Front::AgitatorMetalWindowSeconds + " s";
+            // owner 2026-11-03: at least AgitatorMinMetalStock (1000) metal stockpiled, instead of a percent of storage
+            if (aiEconomyMgr.metal.current >= Global::RoleSettings::Front::AgitatorMinMetalStock) return "";
+            return "metal bank " + int(aiEconomyMgr.metal.current) + " below " + int(Global::RoleSettings::Front::AgitatorMinMetalStock);
         }
         const float storage = aiEconomyMgr.metal.storage;
         if (storage <= 0.0f || aiEconomyMgr.metal.current <= storage * Global::RoleSettings::Front::SpecialPorcMetalShare)
@@ -414,7 +412,7 @@ namespace FrontAgitator {
             if (k == AGITATOR) committedSpot = (what is d) ? -1 : s.id;
             kd.lastWhy = "";
             const string why = (k == AGITATOR)
-                ? "bank hit " + int(Global::RoleSettings::Front::AgitatorMetalShare * 100.0f) + "% " + ((ai.frame - lastHigh) / SECOND) + " s ago"
+                ? "bank " + int(aiEconomyMgr.metal.current) + ", 10 s min income +" + int(Economy::GetMinMetalIncomeLast10s())
                 : "bank " + int(100.0f * aiEconomyMgr.metal.current / AiMax(1.0f, aiEconomyMgr.metal.storage)) + "%, 10 s min income +"
                     + int(Economy::GetMinMetalIncomeLast10s()) + ", T2 lab standing";
             GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] " + u.circuitDef.GetName() + " " + u.id + " orders " + what.GetName() + step + " at front "
