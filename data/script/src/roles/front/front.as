@@ -574,6 +574,8 @@ namespace RoleFront {
         if (builder is null) return null; // Defensive check
 
         if(UnitHelpers::IsCommander(builder.circuitDef)) {
+            IUnitTask@ startFactory=Front_StartFactoryTakeover(builder);
+            if(startFactory !is null) return startFactory;
             IUnitTask@ frontWork=CommanderFront::Work(builder);
             if(frontWork !is null) return frontWork;
         }
@@ -656,6 +658,34 @@ namespace RoleFront {
         }
         // Fallback to cached default task
         return defaultTask;
+    }
+
+    // D-461: native creates the start factory only once energy income covers
+    // it; short of that it queues an energy task and holds the factory until
+    // an energy task finishes. The commander, the only builder, kept taking
+    // CommanderFront mex work, so nobody built the energy and no factory was
+    // queued for six minutes (played: Tartar Steppe team 3, Glitters team 7,
+    // Smolders teams 3 and 12). After StartFactoryTakeoverSeconds with no
+    // factory standing, the commander takes the queued start factory, else the
+    // queued energy that gates it. FindQueuedTask keeps native's safe-reach
+    // test. O(factory + energy tasks), only until the first factory stands.
+    string g_frontStartFactoryTakeoverLogged = "";
+    IUnitTask@ Front_StartFactoryTakeover(CCircuitUnit@ comm)
+    {
+        const float after = Global::RoleSettings::Front::StartFactoryTakeoverSeconds;
+        if (after <= 0.f || ai.frame < int(after * SECOND) || aiFactoryMgr.GetFactoryCount() > 0) return null;
+        string what = "start factory";
+        IUnitTask@ task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::FACTORY));
+        if (task is null) {
+            what = "energy holding the start factory";
+            @task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::ENERGY));
+        }
+        if (task is null) return null;
+        if (g_frontStartFactoryTakeoverLogged != what) {
+            g_frontStartFactoryTakeoverLogged = what;
+            GenericHelpers::LogUtil("[FRONT] commander " + comm.id + " takes the queued " + what + " after " + int(after) + " s with no factory standing", 1);
+        }
+        return task;
     }
 
     /******************************************************************************

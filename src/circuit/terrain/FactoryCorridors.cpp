@@ -370,7 +370,11 @@ bool CFactoryCorridors::EnsureImpl(CCircuitDef* def, const AIFloat3& position, i
 		}
 		return false;
 	}
-	if (ProbeBudget(background) <= 0) return false;
+	// KI-745 item 3: a spent frame budget is "not probed yet", not "no
+	// route". A plan may keep the site, as it does before any lane exists;
+	// construction admission (planning false) probes it again. Played: FRONT
+	// T2 extension previews of 12 sites failed after the 4th probe.
+	if (ProbeBudget(background) <= 0) return planning;
 	++(background ? backgroundProbesUsed : liveProbesUsed);
 	const auto fail = [&]() {
 		if (record) { record->retry = frame + kRetryFrames; return false; }

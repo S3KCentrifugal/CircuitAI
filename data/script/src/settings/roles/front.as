@@ -10,6 +10,9 @@ namespace Front {
             // D-459: the opening builder's walking budget when FRONT plans
             // its first district; later factories keep their district slot.
             float FactoryTravelSeconds = 3.0f;
+            // D-461: with no factory standing after this many seconds, the
+            // commander takes the queued start factory itself. 0 disables.
+            float StartFactoryTakeoverSeconds = 60.0f;
             float FactoryProductionBudgetShare = 0.65f;
             float FactoryT1BudgetShare = 0.6f;
             float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
