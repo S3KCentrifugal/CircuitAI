@@ -342,13 +342,13 @@ public:
 		float threatMargin = 100.f;   // elmos past a structure's weapon range
 		float triggerDistance = 700.f;
 		float porcRadius = 1600.f;    // prep porc within this of the threat
-		float prepFraction = 0.95f;
+		float prepFraction = 0.99f;
 		float snipeFraction = 0.99f;
 		int volleys = 3;
-		int visibleMaxVolleys = 6;
+		int visibleMaxVolleys = 0;    // 0: seen porc until dead (owner 01:43Z)
 		int confirmFrames = 3 * 30;
 		int repeatFrames = 60 * 30;
-		int stageFrames = 90 * 30;
+		int stageFrames = 60 * 30;    // a stage/target with no volley this long is given up
 	};
 	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
 	struct SArtySnipeState {
@@ -362,7 +362,8 @@ public:
 		int lastVolley = -1, reload = -1, fireSeen = -2;
 		int orderKey = -1, orderUntil = -1;
 		int lastCall = -1;
-		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
+		int nextScan = -1;
+		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted      // stage 0: threat scans at most every 0.5 s per unit
 		springai::AIFloat3 spot;
 		std::unordered_map<int, int> skipUntil;  // enemy id -> frame (done prep targets, sniped threats)
 	};
