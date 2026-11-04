@@ -243,7 +243,7 @@
 				"armkraken", "corfdoom", "armfhlt", "corfhlt"],    // naval: Gorgon, Devastator, Manta, Coral
 			"avoid_other_porc": true,     // prep firing spots also outside other armed porc's reach (the target excepted)
 			"threat_margin": 100,         // elmos past a structure's weapon range that still counts as inside (250 left 1200-range units no prep spot)
-			"trigger_distance": 700,      // starts when within reach + this of a threat
+			"trigger_distance": 0,        // owner 2026-11-04: trigger at reach (weapon range + threat_margin) only; was 700
 			"porc_radius": 1600,          // prep porc within this of the threat
 			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
 			"snipe_range_fraction": 0.99,
