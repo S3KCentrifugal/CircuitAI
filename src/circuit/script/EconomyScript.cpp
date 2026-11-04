@@ -36,11 +36,18 @@ static IUnitTask* EnqueueWorkerEnergy(CEconomyManager* economy, CCircuitUnit* bu
 // Explicit script opt-in. BAR permits an advanced geo over an owned T1 geo;
 // its upgrade gadget retires/refunds the old unit on completion. Never reclaim
 // the source here. Scan immutable vent positions, then only local occupants.
-static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builder,
-        CCircuitDef* definition, const AIFloat3& center, float radius)
+// D-465: airOnly serves only vents no ground claimant reaches (an AIR air
+// constructor's theatre vents); those may lie inside an ally's zone, which
+// that ally cannot build. Ground builders additionally need a 3D build stance
+// (CanReachMex): CanReachAtSafe alone accepted a vent on a cliff-ringed
+// plateau next to a connected sector (KI-640), and the builder stalled below.
+static IUnitTask* EnqueueGeo(CEconomyManager* economy, CCircuitUnit* builder,
+        CCircuitDef* definition, const AIFloat3& center, float radius, bool airOnly)
 {
     if (!builder || !definition || radius <= 0.f || !definition->GetDef()->IsNeedGeo()
         || !builder->GetCircuitDef()->CanBuild(definition)) return nullptr;
+    const bool flying = builder->GetCircuitDef()->IsAbleToFly();
+    if (airOnly && !flying) return nullptr;
     auto* circuit = economy->GetCircuit();
     auto* manager = circuit->GetBuilderManager();
     auto* terrain = circuit->GetTerrainManager();
@@ -52,8 +59,10 @@ static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builde
     for (size_t index = 0; index < sites.size(); ++index) {
         const auto& position = sites[index];
         const float distance = position.SqDistance2D(center);
-        if (distance > best || terrain->IsZoneAlly(position)
+        if (distance > best || (!airOnly && terrain->IsZoneAlly(position))
             || !terrain->CanReachAtSafe(builder, position, builder->GetCircuitDef()->GetBuildDistance())
+            || (!flying && !economy->CanReachMex(builder, position))
+            || (airOnly && !economy->IsGeoAirOnly(position))
             || !terrain->CanBeBuiltAtSafe(definition, position)
             || terrain->IsAllyLayoutBlocked(definition, position, UNIT_NO_FACING)) continue;
         bool occupied = false;
@@ -78,6 +87,20 @@ static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builde
     return manager->Enqueue(TaskB::Spot(IBuilderTask::BuildType::GEO,
         IBuilderTask::Priority::HIGH, definition, sites[chosen], chosen));
 }
+
+static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builder,
+        CCircuitDef* definition, const AIFloat3& center, float radius)
+{
+    return EnqueueGeo(economy, builder, definition, center, radius, false);
+}
+
+static IUnitTask* EnqueueAirGeo(CEconomyManager* economy, CCircuitUnit* builder,
+        CCircuitDef* definition, const AIFloat3& center, float radius)
+{
+    return EnqueueGeo(economy, builder, definition, center, radius, true);
+}
+
+static bool IsGeoAirOnly(CEconomyManager* economy, const AIFloat3& pos) { return economy->IsGeoAirOnly(pos); }
 
 static void CEconomyManager_SetEnergyCondition(CEconomyManager* mgr, const CCircuitDef* cdef, int limit, float mi, float ei)
 {
@@ -226,6 +249,8 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterGlobalProperty("CEconomyManager aiEconomyMgr", manager); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueWorkerEnergy(CCircuitUnit@)", asFUNCTION(EnqueueWorkerEnergy), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueLocalGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueLocalGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueAirGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueAirGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsGeoAirOnly(const AIFloat3& in)", asFUNCTION(IsGeoAirOnly), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMetalMap() const", asMETHOD(CEconomyManager, IsMetalMap), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEffectiveUnitLimit() const", asMETHOD(CEconomyManager, GetEffectiveUnitLimit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetFieldMexCount(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetFieldMexCount), asCALL_THISCALL); ASSERT(r >= 0);

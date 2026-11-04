@@ -61,6 +61,13 @@ namespace Air {
             float TheatreMexMetal = 6.0f;      // metal income before a con air leaves the home area for one (AIR sits near 7 for the first ten minutes of an 8v8)
             float TheatreMexRadius = 5000.0f;  // from the start
             float TheatreMexThreat = 0.5f;     // skip a spot whose enemy clock has passed while air threat there exceeds this
+            // D-465: AIR owns geothermal vents no allied ground start reaches
+            // (plateaus, islands): a con air builds one within TheatreGeoRadius
+            // of the start once metal income reaches TheatreGeoMetal. A search
+            // that finds none is retried after TheatreGeoRetrySeconds.
+            float TheatreGeoMetal = 10.0f;
+            float TheatreGeoRadius = 5000.0f;
+            float TheatreGeoRetrySeconds = 10.0f;
             float HomeEconomyRadius = 2400.0f;
             float HomeDefenceRadius = 1500.0f;
             float AntiNukeCoreRadius = 800.0f;

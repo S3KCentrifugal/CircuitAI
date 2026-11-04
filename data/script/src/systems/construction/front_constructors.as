@@ -1,13 +1,35 @@
 #include "../../helpers/math/front_constructor_math.as"
+#include "front_eco_blocks.as"
 // Stable FRONT seats, assigned in completion order rather than engine unit-ID
 // order. A casualty opens only its own seat; surviving workers never reshuffle.
 namespace FrontConstructors {
     const int SUPPORT = FrontConstructorMath::SUPPORT, EXPANSION = FrontConstructorMath::EXPANSION,
-        COMMANDER = FrontConstructorMath::COMMANDER, ENERGY = FrontConstructorMath::ENERGY;
+        COMMANDER = FrontConstructorMath::COMMANDER, ENERGY = FrontConstructorMath::ENERGY,
+        CONVERTER = FrontConstructorMath::CONVERTER;
     // Preserve persisted seat IDs; admission order adds energy before expansion.
 
-    array<int> seats = {-1, -1, -1, -1};
-    array<bool> filled = {false, false, false, false};
+    array<int> seats = {-1, -1, -1, -1, -1};
+    array<bool> filled = {false, false, false, false, false};
+    // D-463: where the energy seat's own factory stood (geothermal search
+    // centre), and the one-way release of the converter seat.
+    AIFloat3 energyHome = AIFloat3(-1.f, 0.f, -1.f);
+    bool converterReleased = false;
+    // D-463: the energy seat's last geothermal site, how many orders there
+    // ended without a geothermal, and the frame before which it does not try
+    // geothermal again. The same site offered again means the last order
+    // failed (a finished geo occupies its vent and is never offered).
+    int geoSiteX = -1, geoSiteZ = -1, geoFails = 0, geoRetryFrame = 0, geoOrderFrame = 0;
+    void GeoFailed(const string &in why) {
+        ++geoFails;
+        aiTerrainMgr.SetLayoutInt("front.constructor.geo_fails", geoFails);
+        geoRetryFrame = ai.frame + FrontConstructorMath::GeoBackoffFrames(geoFails,
+            int(Global::RoleSettings::Front::EnergySeatGeoRetrySeconds * SECOND));
+        GenericHelpers::LogUtil("[FrontConstructors] energy geothermal " + why + " at " + geoSiteX + "," + geoSiteZ
+            + " fails=" + geoFails + (geoFails >= Global::RoleSettings::Front::EnergySeatGeoAttempts
+            ? " giving up geothermal" : " retry after " + ((geoRetryFrame - ai.frame) / SECOND) + " s"), 1);
+        geoSiteX = -1; geoSiteZ = -1;
+    }
+    int convertersAllowed = -1;   // mod option, read once: -1 unknown, 0 no, 1 yes
     IUnitTask@ openingNano = null;
     int openingTurret = -1;
     bool loaded = false;
@@ -19,6 +41,10 @@ namespace FrontConstructors {
             seats[i] = aiTerrainMgr.GetLayoutInt("front.constructor." + i, -1);
             filled[i] = aiTerrainMgr.GetLayoutInt("front.constructor.filled." + i, 0) != 0;
         }
+        energyHome = AIFloat3(float(aiTerrainMgr.GetLayoutInt("front.constructor.energy_home.x", -1)), 0.f,
+            float(aiTerrainMgr.GetLayoutInt("front.constructor.energy_home.z", -1)));
+        converterReleased = aiTerrainMgr.GetLayoutInt("front.constructor.converter_released", 0) != 0;
+        geoFails = aiTerrainMgr.GetLayoutInt("front.constructor.geo_fails", 0);
     }
     void Save(int seat) {
         aiTerrainMgr.SetLayoutInt("front.constructor." + seat, seats[seat]);
@@ -34,7 +60,7 @@ namespace FrontConstructors {
     bool IsBase(int id) { Load(); return id >= 0 && seats[SUPPORT] == id; }
     int Missing() {
         Load();
-        return FrontConstructorMath::Missing(seats);
+        return FrontConstructorMath::Missing(seats, ConverterWanted());
     }
     bool OnAdded(CCircuitUnit@ unit) {
         if (Global::AISettings::Role != AiRole::FRONT || !Eligible(unit)) return false;
@@ -45,9 +71,10 @@ namespace FrontConstructors {
         if (seat < 0) {
             seat = Missing();
             if (seat >= 0) { seats[seat] = unit.id; filled[seat] = true; Save(seat); }
+            if (seat == ENERGY) RecordEnergyHome(unit);
             GenericHelpers::LogUtil("[FrontConstructors] assigned unit=" + unit.id + " seat=" + seat, 1);
         }
-        if (seat == SUPPORT || seat == ENERGY) unit.AddAttribute(Unit::Attr::BASE.type);
+        if (seat == SUPPORT || seat == ENERGY || seat == CONVERTER) unit.AddAttribute(Unit::Attr::BASE.type);
         else unit.DelAttribute(Unit::Attr::BASE.type);
         return true; // bypass generic primary/secondary/guard reassignment
     }
@@ -62,7 +89,8 @@ namespace FrontConstructors {
         if (seat < 0) return null;
         // Preserve two constructors/scout/raiders/expansion opening order. Once
         // a seat has existed, replacing it precedes all optional production.
-        if (!FrontConstructorMath::RecruitAllowed(seat,filled[seat],RoleFront::g_frontPostRaidConstructorQueued,commanderEnabled)) return null;
+        if (!FrontConstructorMath::RecruitAllowed(seat,filled[seat],RoleFront::g_frontPostRaidConstructorQueued,
+            commanderEnabled,ConverterWanted())) return null;
         // Hold our one recruit through frame construction; the shared pending
         // index counts only unstarted orders. Release the handle on completion
         // or cancellation, without retaining an engine unit across callbacks.
@@ -180,10 +208,197 @@ namespace FrontConstructors {
         }
         return AssistFactory(unit);
     }
+    // D-463: the position of the factory that produced the energy seat, kept
+    // so a lost factory does not move the geothermal search. A constructor
+    // with no producer (gift, commander-built) searches from the start.
+    void RecordEnergyHome(CCircuitUnit@ unit) {
+        CCircuitUnit@ factory = ai.GetTeamUnit(unit.GetProducerId());
+        energyHome = factory is null ? Global::Map::StartPos : factory.GetPos(ai.frame);
+        aiTerrainMgr.SetLayoutInt("front.constructor.energy_home.x", int(energyHome.x));
+        aiTerrainMgr.SetLayoutInt("front.constructor.energy_home.z", int(energyHome.z));
+    }
+    AIFloat3 EnergyHome() {
+        Load();
+        return energyHome.x < 0.f ? Global::Map::StartPos : energyHome;
+    }
+    string Prefix(CCircuitUnit@ unit) {
+        const string side = UnitHelpers::GetSideForUnitName(unit.circuitDef.GetName());
+        return side == "armada" ? "arm" : side == "cortex" ? "cor" : "leg";
+    }
+    // Played (Supreme Isthmus team 2): an unstarted order held the seat 7.6
+    // minutes with no energy built. Our own order that has not started within
+    // EnergySeatGeoOrderSeconds counts as a failure.
+    bool AbortStaleGeo(IBuilderTask@ task) {
+        if (task is null || task.IsDead() || task.target !is null
+            || task.GetBuildType() != int(Task::BuildType::GEO)) return false;
+        const AIFloat3 at = task.GetBuildPos();
+        if (int(at.x) != geoSiteX || int(at.z) != geoSiteZ
+            || ai.frame - geoOrderFrame <= int(Global::RoleSettings::Front::EnergySeatGeoOrderSeconds * SECOND)) return false;
+        aiBuilderMgr.AbortTask(task);
+        GeoFailed("not started in " + int(Global::RoleSettings::Front::EnergySeatGeoOrderSeconds) + " s");
+        return true;
+    }
+    // Played (Scylla and Charybdis 8v8, owner's game): a constructor stuck
+    // below a plateau vent is never idle, so its builder ask, where the
+    // deadline used to live, never came. FRONT's once-a-second update checks
+    // the energy seat's own task instead: O(1), no unit scan.
+    void Watch() {
+        if (Global::AISettings::Role != AiRole::FRONT) return;
+        Load();
+        CCircuitUnit@ unit = ai.GetTeamUnit(seats[ENERGY]);
+        if (unit is null) return;
+        IBuilderTask@ task = cast<IBuilderTask>(unit.task);
+        if (task is null || task.GetBuildType() != int(Task::BuildType::GEO)) return;
+        // INV-251: ground construction never holds an air-only geothermal vent.
+        if (aiEconomyMgr.IsGeoAirOnly(task.GetBuildPos()))
+            Invariants::Violation("INV-251", "front-geo", "FRONT energy seat " + unit.id + " holds a geothermal order on an air-only vent at "
+                + int(task.GetBuildPos().x) + "," + int(task.GetBuildPos().z));
+        AbortStaleGeo(task);
+    }
+    bool Started(IBuilderTask@ task) {
+        return task !is null && !task.IsDead() && task.target !is null
+            && task.GetBuildType() < int(Task::BuildType::REPAIR) && Local(task);
+    }
+    // D-466: the owner's base mexes come before any energy. EnqueueMexWithin
+    // (allyAware) hands back an untaken queued mex task in the radius before
+    // opening a spot, and opens only spots this AI may take (mex ownership in
+    // the window, the allied zone after), reachable in 3D (CanReachMex).
+    // Null once none remain, so the seat moves on to energy.
+    // Played (Supreme Isthmus team 6): two base spots re-ordered every 3 to
+    // 10 s for two minutes while an energy constructor died there. A live
+    // order is kept (returned above), and a built mex closes its spot, so a
+    // spot we ordered before that is offered again failed: skip it, longer
+    // each time, then for good. A few base spots: O(spots) per ask.
+    array<AIFloat3> mexOrdered;
+    array<int> mexFails, mexSkipUntil;
+    array<bool> mexRetry;   // the skip ran out: the next offer is a real retry
+    IUnitTask@ EnergyMex(CCircuitUnit@ unit, IBuilderTask@ current) {
+        if (current !is null && !current.IsDead() && current.GetBuildType() == int(Task::BuildType::MEX)) return current;
+        array<AIFloat3> avoid;
+        for (uint i = 0; i < mexOrdered.length(); ++i)
+            if (!FrontConstructorMath::GeoAllowed(mexFails[i], Global::RoleSettings::Front::EnergySeatMexAttempts,
+                ai.frame, mexSkipUntil[i])) avoid.insertLast(mexOrdered[i]);
+        IUnitTask@ task = aiEconomyMgr.EnqueueMexAvoiding(unit, Global::Map::StartPos,
+            Global::RoleSettings::Front::EnergySeatMexRadius, true, avoid);
+        if (task is null) return null;
+        const AIFloat3 site = cast<IBuilderTask>(task).GetBuildPos();
+        int index = -1;
+        for (uint i = 0; i < mexOrdered.length(); ++i)
+            if (int(mexOrdered[i].x) == int(site.x) && int(mexOrdered[i].z) == int(site.z)) index = int(i);
+        if (index < 0) {
+            mexOrdered.insertLast(site); mexFails.insertLast(0); mexSkipUntil.insertLast(0); mexRetry.insertLast(false);
+            GenericHelpers::LogUtil("[FrontConstructors] energy seat base mex builder=" + unit.id
+                + " site=" + int(site.x) + "," + int(site.z), 1);
+            return task;
+        }
+        if (mexRetry[index]) {
+            mexRetry[index] = false;
+            GenericHelpers::LogUtil("[FrontConstructors] energy seat base mex retry builder=" + unit.id
+                + " site=" + int(site.x) + "," + int(site.z), 1);
+            return task;
+        }
+        aiBuilderMgr.AbortTask(task);
+        ++mexFails[index];
+        mexRetry[index] = true;
+        mexSkipUntil[index] = ai.frame + FrontConstructorMath::GeoBackoffFrames(mexFails[index],
+            int(Global::RoleSettings::Front::EnergySeatMexRetrySeconds * SECOND));
+        GenericHelpers::LogUtil("[FrontConstructors] energy seat base mex failed at " + int(site.x) + "," + int(site.z)
+            + " fails=" + mexFails[index] + (mexFails[index] >= Global::RoleSettings::Front::EnergySeatMexAttempts
+            ? " skipping it for good" : " skip for " + ((mexSkipUntil[index] - ai.frame) / SECOND) + " s"), 1);
+        return null;
+    }
+    // Geothermal first: a free vent within EnergySeatGeoRadius of the seat's
+    // factory, or a GEO job already queued there. EnqueueLocalGeo keeps
+    // native's safe-reach, occupancy and allied-layout checks; it scans the
+    // map's few vent positions with a distance test first.
+    IUnitTask@ EnergyGeo(CCircuitUnit@ unit, IBuilderTask@ current) {
+        Load();
+        if (current !is null && !current.IsDead() && current.GetBuildType() == int(Task::BuildType::GEO)) {
+            if (AbortStaleGeo(current)) return null;
+            return current;
+        }
+        if (!FrontConstructorMath::GeoAllowed(geoFails, Global::RoleSettings::Front::EnergySeatGeoAttempts,
+            ai.frame, geoRetryFrame)) return null;
+        CCircuitDef@ geo = ai.GetCircuitDef(Prefix(unit) + "geo");
+        if (geo is null || !unit.circuitDef.CanBuild(geo) || !geo.IsAvailable(ai.frame)) return null;
+        const AIFloat3 home = EnergyHome();
+        const float radius = Global::RoleSettings::Front::EnergySeatGeoRadius;
+        IBuilderTask@ queued = cast<IBuilderTask>(aiBuilderMgr.FindQueuedTask(unit, int(Task::BuildType::GEO)));
+        if (queued !is null && MapHelpers::SqDist(queued.GetBuildPos(), home) <= radius * radius) return queued;
+        IUnitTask@ task = aiEconomyMgr.EnqueueLocalGeo(unit, geo, home, radius);
+        if (task is null) return null;
+        const AIFloat3 site = cast<IBuilderTask>(task).GetBuildPos();
+        if (int(site.x) == geoSiteX && int(site.z) == geoSiteZ) {
+            // Played (Supreme Isthmus team 6): one vent re-ordered ten times
+            // while two energy constructors died walking to it, and no wind
+            // was built meanwhile. Back off, longer each time, then give up.
+            aiBuilderMgr.AbortTask(task);
+            GeoFailed("failed");
+            return null;
+        }
+        geoSiteX = int(site.x); geoSiteZ = int(site.z); geoOrderFrame = ai.frame;
+        GenericHelpers::LogUtil("[FrontConstructors] energy geothermal builder=" + unit.id
+            + " site=" + geoSiteX + "," + geoSiteZ, 1);
+        return task;
+    }
+    // The wind turbine the seat builds on this map, or null when the map's
+    // average wind is not above EnergySeatWindAverage or it cannot build one.
+    CCircuitDef@ WindDef(CCircuitUnit@ unit) {
+        if (!FrontConstructorMath::Windy(ai.GetWindMin(), ai.GetWindMax(),
+            Global::RoleSettings::Front::EnergySeatWindAverage)) return null;
+        CCircuitDef@ wind = ai.GetCircuitDef(UnitHelpers::GetWindNameForSide(
+            UnitHelpers::GetSideForUnitName(unit.circuitDef.GetName())));
+        if (wind is null || !unit.circuitDef.CanBuild(wind) || !wind.IsAvailable(ai.frame)) return null;
+        if (Global::energyAllowed !is null && !Global::energyAllowed(wind.GetName())) return null;
+        return wind;
+    }
+    // A loose order near the start when no dense block can be reserved
+    // (layout disabled or no room); native placement finds the site.
+    IUnitTask@ LooseOrder(Task::BuildType type, CCircuitDef@ def) {
+        return aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, def, Global::Map::StartPos,
+            SQUARE_SIZE * 32, true, int(Global::RoleSettings::Front::EcoBlockOrderSeconds * SECOND)));
+    }
+    // D-463 energy seat, in order: finish a started local structure; (D-466)
+    // the AI's unbuilt base mexes; default work while energy income is above
+    // the release; a geothermal near its factory; wind turbines in a dense
+    // block on a windy map; native energy.
+    bool energyPolicyLogged = false;
     IUnitTask@ EnergyWork(CCircuitUnit@ unit) {
+        if (!energyPolicyLogged) {
+            energyPolicyLogged = true;
+            const AIFloat3 home = EnergyHome();
+            GenericHelpers::LogUtil("[FrontConstructors] energy seat policy wind=" + int(ai.GetWindMin()) + ".."
+                + int(ai.GetWindMax()) + " windy=" + (FrontConstructorMath::Windy(ai.GetWindMin(), ai.GetWindMax(),
+                Global::RoleSettings::Front::EnergySeatWindAverage) ? 1 : 0) + " geoHome=" + int(home.x) + ","
+                + int(home.z) + " converterSeat=" + (ConverterWanted() ? 1 : 0), 1);
+        }
         IBuilderTask@ current=cast<IBuilderTask>(unit.task);
+        if (Started(current)) return current;
+        IUnitTask@ mex = EnergyMex(unit, current);
+        if (mex !is null) return mex;
+        if (!FrontConstructorMath::EnergyHeld(Economy::GetMinEnergyIncomeLast10s(),
+            Global::RoleSettings::Front::EnergySeatReleaseIncome)) return aiBuilderMgr.DefaultMakeTask(unit);
+        IUnitTask@ geo = EnergyGeo(unit, current);
+        if (geo !is null) return geo;
+        CCircuitDef@ wind = WindDef(unit);
         if (current !is null && !current.IsDead() && Local(current)
-            && current.GetBuildType()==int(Task::BuildType::ENERGY)) return current;
+            && current.GetBuildType()==int(Task::BuildType::ENERGY)) {
+            if (wind is null || current.buildDef is wind) return current;
+            // INV-250: with wind slots open, a held energy seat builds wind.
+            FrontEcoBlocks::Load();
+            if (FrontEcoBlocks::Open(FrontEcoBlocks::WIND))
+                Invariants::Violation("INV-250", "front-energy", "held FRONT energy seat " + unit.id + " had a "
+                    + current.buildDef.GetName() + " job with wind block slots open");
+        }
+        if (wind !is null) {
+            IUnitTask@ task = FrontEcoBlocks::Order(FrontEcoBlocks::WIND, unit, wind, Task::BuildType::ENERGY,
+                Global::RoleSettings::Front::WindBlockColumns, Global::RoleSettings::Front::WindBlockRows);
+            if (task is null) @task = LooseOrder(Task::BuildType::ENERGY, wind);
+            if (task !is null) {
+                GenericHelpers::LogUtil("[FrontConstructors] energy wind builder=" + unit.id, 2);
+                return task;
+            }
+        }
         // Ask for energy explicitly: default planning can select factory assist
         // indefinitely. Native selection retains affordability/wind/cap policy
         // and filters definitions before enqueueing for this worker.
@@ -191,6 +406,67 @@ namespace FrontConstructors {
         if(energy is null) return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
         GenericHelpers::LogUtil("[FrontConstructors] energy work builder="+unit.id,1);
         return energy;
+    }
+    // D-463 converter seat. The BAR option unit_restrictions_noconverters
+    // marks converters modoption_blocked, which the AI does not read, so the
+    // option itself is checked (once; mod options are fixed for the game).
+    bool ConvertersAllowed() {
+        if (convertersAllowed < 0) {
+            convertersAllowed = 1;
+            dictionary@ options = aiSetupMgr.GetModOptions();
+            string value;
+            if (options !is null && options.get("unit_restrictions_noconverters", value)
+                && value.length() > 0 && value != "0" && value != "false") convertersAllowed = 0;
+        }
+        if (convertersAllowed == 0) return false;
+        CCircuitDef@ converter = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(Global::AISettings::Side));
+        return converter !is null && converter.maxThisUnit > 0;
+    }
+    // One-way: once metal income first exceeds the release, the seat is done.
+    bool ConverterReleased() {
+        Load();
+        if (!converterReleased && FrontConstructorMath::ConverterReleases(Economy::GetMinMetalIncomeLast10s(),
+            Global::RoleSettings::Front::ConverterSeatReleaseMetalIncome)) {
+            converterReleased = true;
+            aiTerrainMgr.SetLayoutInt("front.constructor.converter_released", 1);
+            GenericHelpers::LogUtil("[FrontConstructors] converter seat released: metal income above "
+                + int(Global::RoleSettings::Front::ConverterSeatReleaseMetalIncome), 1);
+        }
+        return converterReleased;
+    }
+    bool ConverterWanted() {
+        if (!Global::RoleSettings::Front::ConverterSeatEnabled || aiEconomyMgr.IsMetalMap()) return false;
+        return FrontConstructorMath::ConverterWanted(true, false, ConvertersAllowed(), ConverterReleased());
+    }
+    // D-463 converter seat, in order: finish a started local structure;
+    // default work once released; with energy to spare, the next T1
+    // converter in a dense block; else assist the energy seat.
+    IUnitTask@ ConverterWork(CCircuitUnit@ unit) {
+        IBuilderTask@ current=cast<IBuilderTask>(unit.task);
+        const bool released = ConverterReleased();
+        CCircuitDef@ converter = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(
+            UnitHelpers::GetSideForUnitName(unit.circuitDef.GetName())));
+        if (!released && converter !is null && current !is null && !current.IsDead()
+            && current.GetBuildType() < int(Task::BuildType::REPAIR) && current.buildDef !is converter)
+            Invariants::Violation("INV-250", "front-converter", "held FRONT converter seat " + unit.id + " had a "
+                + (current.buildDef is null ? "construction" : current.buildDef.GetName()) + " job");
+        if (Started(current)) return current;
+        if (released || converter is null || !unit.circuitDef.CanBuild(converter) || !converter.IsAvailable(ai.frame))
+            return aiBuilderMgr.DefaultMakeTask(unit);
+        if (current !is null && !current.IsDead() && Local(current)
+            && current.GetBuildType()==int(Task::BuildType::CONVERT)) return current;
+        if (!FrontConstructorMath::ConverterFunded(aiEconomyMgr.energy.current, aiEconomyMgr.energy.storage,
+            Global::RoleSettings::Front::ConverterSeatEnergyFill, aiEconomyMgr.isEnergyStalling)) {
+            CCircuitUnit@ energy = ai.GetTeamUnit(seats[ENERGY]);
+            if (energy !is null && energy !is unit) return GuardHelpers::AssignWorkerGuard(unit, energy, Task::Priority::NORMAL, true, 10 * SECOND);
+            return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+        }
+        IUnitTask@ task = FrontEcoBlocks::Order(FrontEcoBlocks::CONVERTER, unit, converter, Task::BuildType::CONVERT,
+            Global::RoleSettings::Front::ConverterBlockColumns, Global::RoleSettings::Front::ConverterBlockRows);
+        if (task is null) @task = LooseOrder(Task::BuildType::CONVERT, converter);
+        if (task is null) return aiBuilderMgr.Enqueue(TaskB::Wait(SECOND));
+        GenericHelpers::LogUtil("[FrontConstructors] converter work builder=" + unit.id, 2);
+        return task;
     }
     bool Local(IUnitTask@ task) {
         IBuilderTask@ build = cast<IBuilderTask>(task);
