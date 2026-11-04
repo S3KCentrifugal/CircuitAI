@@ -101,6 +101,10 @@ namespace FrontConstructors {
             aiEconomyMgr.isEnergyStalling, aiEconomyMgr.isEnergyFull);
         if (special !is null) return special;
         if (Local(normal)) return normal;
+        // owner, 2026-11-04: while recovering, retake mexes rather than patrol (a patrol repairs whatever it
+        // passes; front_recovery.as Work was never asked for the base seat)
+        IUnitTask@ recovery = FrontRecovery::Work(unit);
+        if (recovery !is null) return recovery;
         // Rejected fresh defaults are retired by the native default-task owner;
         // queued tasks belonging to other builders remain untouched.
         return aiBuilderMgr.Enqueue(TaskB::Patrol(Task::Priority::LOW, Global::Map::StartPos, 10 * SECOND));

@@ -206,6 +206,17 @@ namespace Front {
             int RecoveryExitSeconds = 30;
             float RecoveryMexRadius = 2500.0f;           // mex spots retaken within this of the start (then of the worker)
             int RecoveryMinT1Constructors = 3;           // the T1 factory makes this many constructors first
+            // Owner 2026-11-04 (AI 16, Ascendancy: the last constructor patrolled home and repaired a Recluse for 13 min,
+            // income +0..3): while recovering with no factory or fewer than RebuildMexes mexes, every T1 constructor
+            // (any seat) retakes the start mexes, builds wind/solar to RebuildEnergyIncome and restarts the start factory
+            bool Rebuild = true;
+            int RebuildMexes = 3;                        // mexes of ours (any tier) before the base counts as rebuilt
+            float RebuildHomeRadius = 1000.0f;           // the start mexes: spots this close to the start first
+            float RebuildEnergyIncome = 25.0f;           // wind/solar until energy income reaches this
+            float RebuildWindMin = 7.0f;                 // wind when (min + max wind) / 2 is at least this, else solar
+            float RebuildMetalIncome = 10.0f;            // mexes keep coming until metal income reaches this
+            float RebuildHomeThreat = 8.0f;              // the start counts as enemy-held above this surface threat
+            int RebuildStaleSeconds = 30;                // a rebuild energy/factory order not started by then is aborted
             bool EcoLadderLaterAdvFusionAtStart = false;  // second and later advanced fusions tried at the start before the eco anchor
             float EcoLadderGantryMetalIncome = 225.0f;    // the gantry waits for this metal income (owner, 2026-10-16; 225 since 2026-10-25)
             float EcoLadderFusionReclaimMargin = 1.0f;    // income without the fusion covers the pull (always once the second advanced fusion stands)

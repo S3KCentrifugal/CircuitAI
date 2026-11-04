@@ -2005,6 +2005,14 @@ namespace Builder {
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
             FrontEnergy::Update(); // before any group/base/default provider can enqueue energy
+            // owner, 2026-11-04: a FRONT that lost its base rebuilds it first - every T1 constructor of any
+            // seat retakes the start mexes, builds wind/solar and restarts the factory (front_recovery.as Rebuild);
+            // before the seat work, whose base-seat fallback patrolled home and repaired a Recluse (AI 16)
+            if (FrontConstructors::Eligible(u) && (u.task is null || !(u.task.IsExternalControlled()
+                || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT)))) {
+                IUnitTask@ rebuild = FrontRecovery::Rebuild(u);
+                if (rebuild !is null) return rebuild;
+            }
             // owner, 2026-11-02: a constructor on a tactical launcher order (or its frame repair) keeps it (front_tactical.as)
             if (FrontTactical::Owns(u)) return u.task;
             if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
