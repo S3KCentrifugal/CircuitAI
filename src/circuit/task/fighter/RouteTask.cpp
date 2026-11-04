@@ -215,6 +215,7 @@ void CRouteTask::Update()
 		if (locked != nullptr) {
 			nearest = locked;
 			nearestSq = SQUARE(lockDist);
+			ArtyLockHeld(circuit, unit, circuit->GetLastFrame());
 		} else if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
 			const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
 			for (const auto& kv : circuit->GetEnemyInfos()) {
