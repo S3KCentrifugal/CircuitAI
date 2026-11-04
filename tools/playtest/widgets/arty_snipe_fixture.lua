@@ -19,6 +19,7 @@ local frameNow=0
 local tracked={}    -- unitID -> {def,team,x,z}
 local deaths={}     -- list of strings
 local finished=false
+local seenProj
 local aiAlly
 
 local function echo(s) Spring.Echo("[ArtySnipe] "..s) end
@@ -55,6 +56,9 @@ function widget:UnitDamaged(u,ud,team,damage,para,wd,pid,attacker,attackerDef)
     local t=tracked[u]
     if not t or t.team~=myTeam then return end
     if t.def~="cortoast" and not (cfg.damage or {})[t.def] then return end
+    if cfg.protect and t.def==KEY and not t.selfd then
+        Spring.SendLuaRulesMsg(string.format("$dev$:sethealth %d:%.3f",u,100))   -- only the self-destruct may kill it
+    end
     local hp,maxhp=Spring.GetUnitHealth(u)
     local armored=Spring.GetUnitArmored(u)
     echo(string.format("dmg frame=%d id=%d def=%s damage=%.0f hpNow=%.0f maxhp=%.0f armored=%s attacker=%s attackerId=%s",frameNow,u,t.def,damage,hp or -1,maxhp or -1,
@@ -125,14 +129,27 @@ local function gameFrame(f)
     end
     if cfg.killAt and f==cfg.killAt then   -- the target dies out of the AI's sight: its ghost stays until the spot is seen
         local sel={}
-        for u,t in pairs(tracked) do if t.team==myTeam and t.def==KEY and not t.dead then sel[#sel+1]=u end end
+        for u,t in pairs(tracked) do if t.team==myTeam and t.def==KEY and not t.dead then sel[#sel+1]=u; t.selfd=true end end
         Spring.SelectUnitArray(sel)
         cmd("selfd")
         echo(string.format("self-destruct %s x%d",KEY,#sel))
     end
+    if cfg.revealAt and f==cfg.revealAt then give("armeyes",A,cfg.cx+350,cfg.cz); echo(string.format("AI camera at (%d,%d): the spot is seen",cfg.cx+350,cfg.cz)) end
     if cfg.losAgainAt and f==cfg.losAgainAt then cmd("globallos "..aiAlly); echo("global LOS on again for ally "..aiAlly) end
     if cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
+    -- every new projectile of the AI's tracked artillery (ghost-gone test: no shots after the spot is seen empty)
+    if cfg.killAt then
+        seenProj=seenProj or {}
+        for _,pid in ipairs(Spring.GetProjectilesInRectangle(0,0,Game.mapSizeX,Game.mapSizeZ,false,false) or {}) do
+            if not seenProj[pid] then
+                seenProj[pid]=true
+                local o=Spring.GetProjectileOwnerID(pid)
+                local t=o and tracked[o]
+                if t and t.team==A then echo(string.format("shot frame=%d owner=%d def=%s",f,o,t.def)) end
+            end
+        end
+    end
     if f%1800==0 then
         local alive=0
         for u,t in pairs(tracked) do if t.team==A and not t.dead then alive=alive+1 end end
