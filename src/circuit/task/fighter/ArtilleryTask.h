@@ -28,6 +28,9 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFl
 // (SArtySnipeInfo). True while it owns the unit; state lives in the military
 // manager so a task change keeps the sequence.
 bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
+// Owner 2026-11-04: true while an artillery snipe sequence owns the unit (route
+// tasks hold their orders for it, the squad keeps it).
+bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit);
 
 class CArtilleryTask final: public IFighterTask {
 public:

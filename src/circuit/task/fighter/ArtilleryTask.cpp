@@ -6,6 +6,7 @@
  */
 
 #include "task/fighter/ArtilleryTask.h"
+#include "task/fighter/RouteTask.h"
 #include "task/fighter/RangedEngagement.h"
 #include "task/RetreatTask.h"
 #include "map/ThreatMap.h"
@@ -167,7 +168,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	CEnemyInfo* bestTarget = FindTarget(unit, pos);
 
 	if (bestTarget != nullptr) {
-		unit->GetTravelAct()->StateWait();
+		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();  // audit 11-04: never null here, guarded anyway
 
 		// A commander can walk off: a short order so ATTACK never chases it out
 		// of the firing spot; the next Execute re-picks (a structure if it left).
@@ -201,7 +202,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		TRY_UNIT(circuit, unit,
 			if (ghost) {
 				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
-			} else if (!circuit->IsCheating()) {
+			} else if (!circuit->IsCheating() && (bestTarget->GetUnit() != nullptr)) {
 				unit->GetUnit()->Attack(bestTarget->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 			} else {
 				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
@@ -287,6 +288,81 @@ static bool GhostGone(CCircuitAI* circuit, int enemyId)
 		return true;
 	}
 	return !e->IsInLOS() && circuit->GetMapManager()->IsInLOS(e->GetPos());
+}
+
+/*
+ * Owner 2026-11-04 15:23Z: recruitment for the overlap sequence. Every
+ * Boreas/Negotiator/Ambassador of this AI (artillery_snipe units of at least
+ * close_in_min_range) within recruit_radius of an anchor (the gather/hold
+ * point, at go-in also every gathered member) joins threat `threatId`: stage
+ * 2, gathering (go false) or going in with the synced volley (go true). Only
+ * finished, living units in a task that runs ArtySnipeStep (CArtilleryTask, or
+ * a CRouteTask: FRONT squads, spam lanes) and not on a snipe already; a squad
+ * unit stays in its route task, whose route orders wait while the snipe owns
+ * it (ArtySnipeOwns), so the squad script keeps a valid handle. O(team units x
+ * anchors) per call: every 0.5 s per gathering unit, and once per go-in.
+ */
+static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& anchors, int threatId, bool direct,
+		bool go, int goFrame, int frame, int& squad)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
+	squad = 0;
+	std::vector<int> ids;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* r = kv.second;
+		if ((r == nullptr) || r->IsDead() || r->IsDestroying() || !r->IsFinished()) continue;
+		const CCircuitDef* rdef = r->GetCircuitDef();
+		if ((rdef == nullptr) || (info.defs.count(rdef->GetId()) == 0)
+			|| (rdef->GetMaxRange(CCircuitDef::RangeType::LAND) < info.closeMinRange)) continue;
+		IUnitTask* task = r->GetTask();
+		if (task == nullptr) continue;
+		const bool inRoute = (dynamic_cast<CRouteTask*>(task) != nullptr);
+		if (!inRoute && (dynamic_cast<CArtilleryTask*>(task) == nullptr)) continue;  // retreat, builder, ...: not ours
+		auto sit = military->GetArtySnipeStates().find(r->GetId());
+		if ((sit != military->GetArtySnipeStates().end()) && (sit->second.stage != 0)
+			&& (frame - sit->second.lastCall <= FRAMES_PER_SEC * 10)) continue;  // on a snipe already
+		const AIFloat3 rp = r->GetPos(frame);
+		bool close = false;
+		for (const AIFloat3& a : anchors) {
+			if (rp.SqDistance2D(a) <= SQUARE(info.recruitRadius)) { close = true; break; }
+		}
+		if (!close) continue;
+		ids.push_back(r->GetId());
+		if (inRoute) ++squad;
+	}
+	for (const int id : ids) {
+		CMilitaryManager::SArtySnipeState& rs = military->GetArtySnipeState(id, frame);
+		rs.stage = 2;
+		rs.threat = threatId;
+		rs.direct = direct;
+		rs.target = -1;
+		rs.volleys = 0;
+		rs.stageFrame = frame;
+		rs.lastCall = frame;
+		rs.orderKey = -1;
+		rs.go = go;
+		rs.goFrame = go ? goFrame : -1;
+		rs.syncWait = go;
+		rs.atHold = false;
+		rs.holdSince = -1;
+		rs.hitFrame = -1;
+		rs.hasSnipeSpot = false;
+		rs.spotFor = -1;
+		rs.holding = false;
+		rs.ghostAim = -1;
+		rs.ghostShots = 0;
+	}
+	return int(ids.size());
+}
+
+bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit)
+{
+	if ((circuit == nullptr) || (unit == nullptr)) return false;
+	const auto& states = circuit->GetMilitaryManager()->GetArtySnipeStates();
+	auto it = states.find(unit->GetId());
+	return (it != states.end()) && (it->second.stage != 0)
+		&& (circuit->GetLastFrame() - it->second.lastCall <= FRAMES_PER_SEC * 10);
 }
 
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame,
@@ -569,7 +645,7 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 			const int timeout = frame + FRAMES_PER_SEC * 5;
 			if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
 			TRY_UNIT(circuit, unit,
-				if (!circuit->IsCheating()) {
+				if (!circuit->IsCheating() && (hv->GetUnit() != nullptr)) {
 					unit->GetUnit()->Attack(hv->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 				} else {
 					unit->CmdAttackGround(hv->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
@@ -1165,6 +1241,17 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const bool at = !fresh && safeAt(pos, -1, true) && (d <= holdRadius + 250.f)
 				&& (pos.SqDistance2D(st.spot) <= SQUARE(300.f));
 			st.atHold = at;
+			// Owner 2026-11-04 15:23Z: from the first trigger on, every 0.5 s until
+			// the go-in, launchers within recruit_radius of the gather point join.
+			if (!fresh && (frame >= st.recruitScan)) {
+				st.recruitScan = frame + FRAMES_PER_SEC / 2;
+				int squad = 0;
+				const int n = RecruitArtillery(circuit, {st.spot}, st.threat, st.direct, false, -1, frame, squad);
+				if (n > 0) {
+					circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i (squad %i)", cdef->GetDef()->GetName(),
+							unit->GetId(), n, info.recruitRadius, SnipeName(threat), st.threat, squad);
+				}
+			}
 			if (!at) {
 				st.holdSince = -1;
 				if (fresh || (st.orderKey != -5 - st.threat)) {
@@ -1272,42 +1359,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					CCircuitUnit* m = circuit->GetTeamUnit(kv.first);
 					if (m != nullptr) anchors.push_back(m->GetPos(frame));
 				}
-				std::vector<int> recruits;
-				for (const auto& kv : circuit->GetTeamUnits()) {
-					CCircuitUnit* r = kv.second;
-					const CCircuitDef* rdef = r->GetCircuitDef();
-					if ((info.defs.count(rdef->GetId()) == 0)
-						|| (rdef->GetMaxRange(CCircuitDef::RangeType::LAND) < info.closeMinRange)) continue;
-					auto sit = military->GetArtySnipeStates().find(r->GetId());
-					if ((sit != military->GetArtySnipeStates().end()) && (sit->second.threat == st.threat)
-						&& (sit->second.stage != 0)) continue;
-					const AIFloat3 rp = r->GetPos(frame);
-					for (const AIFloat3& a : anchors) {
-						if (rp.SqDistance2D(a) <= SQUARE(info.recruitRadius)) { recruits.push_back(r->GetId()); break; }
-					}
-				}
-				for (const int id : recruits) {
-					CMilitaryManager::SArtySnipeState& rs = military->GetArtySnipeState(id, frame);
-					rs.stage = 2;
-					rs.threat = st.threat;
-					rs.direct = st.direct;
-					rs.target = -1;
-					rs.volleys = 0;
-					rs.stageFrame = frame;
-					rs.lastCall = frame;
-					rs.orderKey = -1;
-					rs.go = true;
-					rs.goFrame = frame;
-					rs.syncWait = true;
-					rs.atSpot = false;
-					rs.hitFrame = -1;
-					rs.hasSnipeSpot = false;
-					rs.spotFor = -1;
-					rs.holding = false;
-					rs.ghostAim = -1;
-				}
-				circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i", cdef->GetDef()->GetName(), unit->GetId(),
-						int(recruits.size()), info.recruitRadius, SnipeName(threat), st.threat);
+				int squad = 0;
+				const int n = RecruitArtillery(circuit, anchors, st.threat, st.direct, true, frame, frame, squad);
+				circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i (squad %i)", cdef->GetDef()->GetName(),
+						unit->GetId(), n, info.recruitRadius, SnipeName(threat), st.threat, squad);
 			}
 			st.go = true;
 			st.goFrame = frame;
@@ -1671,7 +1726,7 @@ void CArtilleryTask::ApplyTargetPath(const CQueryPathMulti* query)
 			FallbackSafePos(unit);
 		} else {
 			position = pPath->posPath.back();
-			unit->GetTravelAct()->SetPath(pPath);
+			if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->SetPath(pPath);
 		}
 	} else {
 		FallbackSafePos(unit);
@@ -1708,7 +1763,7 @@ void CArtilleryTask::ApplySafePos(const CQueryPathMulti* query)
 
 	const bool proceed = pPath->path.size() > 2;
 	if (proceed) {
-		unit->GetTravelAct()->SetPath(pPath);
+		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->SetPath(pPath);
 	} else {
 		Fallback(unit, proceed);
 	}
@@ -1720,7 +1775,7 @@ void CArtilleryTask::Fallback(CCircuitUnit* unit, bool proceed)
 		return;
 	}
 
-	if (unit->GetTravelAct()->GetState() == IAction::State::WAIT) {
+	if ((unit->GetTravelAct() == nullptr) || (unit->GetTravelAct()->GetState() == IAction::State::WAIT)) {
 		return;
 	}
 	unit->GetTravelAct()->StateWait();
