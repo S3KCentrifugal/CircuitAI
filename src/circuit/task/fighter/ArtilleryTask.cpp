@@ -41,6 +41,35 @@ namespace circuit {
 using namespace springai;
 
 static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e);
+static bool GhostGone(CCircuitAI* circuit, int enemyId);
+// Owner 2026-11-04 20:08Z: one ghost volley count per unit and ghost dark period.
+static int GhostNeedFor(const CMilitaryManager::SArtySnipeInfo& si, const CCircuitDef* d)
+{
+	const bool heavy = (d != nullptr) && ((si.threats.count(d->GetId()) > 0) || (si.directThreats.count(d->GetId()) > 0));
+	return heavy ? si.volleys : si.ghostVolleysOther;
+}
+static bool GhostDoneHas(const CMilitaryManager::SArtySnipeState& st, const CEnemyUnit* e)
+{
+	if (e == nullptr) return false;
+	auto it = st.ghostDone.find(e->GetId());
+	return (it != st.ghostDone.end()) && (it->second == e->GetDarkSince());
+}
+static void GhostDoneSet(CMilitaryManager::SArtySnipeState& st, const CEnemyUnit* e)
+{
+	if (e != nullptr) st.ghostDone[e->GetId()] = e->GetDarkSince();
+}
+static int& GhostCountRef(CMilitaryManager::SArtySnipeState& st, const CEnemyUnit* e)
+{
+	auto& c = st.ghostCount[e->GetId()];
+	if (c.first != e->GetDarkSince()) c = std::make_pair(e->GetDarkSince(), 0);
+	return c.second;
+}
+// A re-sighting (radar or LOS): its ghost counts start over.
+static void GhostSeen(CMilitaryManager::SArtySnipeState& st, int id)
+{
+	st.ghostDone.erase(id);
+	st.ghostCount.erase(id);
+}
 
 CArtilleryTask::CArtilleryTask(ITaskModule* mgr)
 		: IFighterTask(mgr, FightType::ARTY, 1.f)
@@ -195,6 +224,28 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		}
 	}
 
+	{
+		CMilitaryManager* gm = circuit->GetMilitaryManager();
+		const CMilitaryManager::SArtySnipeInfo& gsi = gm->GetArtySnipeInfo();
+		if (gsi.isEnabled && (gsi.defs.count(unit->GetCircuitDef()->GetId()) > 0)) {
+			CMilitaryManager::SArtySnipeState& g = gm->GetArtySnipeState(unit->GetId(), frame);
+			if (bestTarget == nullptr) {
+				g.ghostAim = -1;  // its volleys are not counted against an old aim
+			} else if (!bestTarget->IsInRadarOrLOS() && (g.ghostAim >= 0) && (g.ghostAim != bestTarget->GetId())) {
+				// Owner 2026-11-04 20:08Z: a ghost's volleys are not cut short by a
+				// re-pick of another ghost; it keeps the unfinished one while it
+				// stands, in range (a live pick still comes first).
+				CEnemyInfo* ga = circuit->GetEnemyInfo(g.ghostAim);
+				const float r = unit->GetCircuitDef()->GetMaxRange();
+				if ((ga != nullptr) && !ga->IsInRadarOrLOS() && !GhostGone(circuit, ga->GetId())
+					&& !GhostDoneHas(g, ga->GetData()) && (pos.SqDistance2D(ga->GetPos()) <= SQUARE(r)))
+				{
+					bestTarget = ga;
+				}
+			}
+		}
+	}
+
 	if (bestTarget != nullptr) {
 		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();  // audit 11-04: never null here, guarded anyway
 
@@ -216,15 +267,16 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 				gst.ghostShots = 0;
 			} else if (gst.ghostAim != bestTarget->GetId()) {
 				gst.ghostAim = bestTarget->GetId();
-				gst.ghostShots = 0;
 				// Owner 05:45Z: a heavy ghost gets `volleys`, any other ghost structure
-				// ghost_volleys_other (then waits for a fresh LOS sighting).
+				// ghost_volleys_other (then waits for a fresh sighting, radar or LOS).
+				// Owner 20:08Z: counted per dark period, kept across re-picks.
 				const CMilitaryManager::SArtySnipeInfo& si = military->GetArtySnipeInfo();
 				gst.ghostHeavy = (edef != nullptr) && ((si.threats.count(edef->GetId()) > 0) || (si.directThreats.count(edef->GetId()) > 0));
-				gst.ghostNeed = gst.ghostHeavy ? si.volleys : si.ghostVolleysOther;
-				circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f)", unit->GetCircuitDef()->GetDef()->GetName(),
+				gst.ghostNeed = GhostNeedFor(si, edef);
+				gst.ghostShots = GhostCountRef(gst, bestTarget->GetData());
+				circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f), volleys %i/%i", unit->GetCircuitDef()->GetDef()->GetName(),
 						unit->GetId(), (edef != nullptr) ? edef->GetDef()->GetName() : "?", bestTarget->GetId(),
-						bestTarget->GetPos().x, bestTarget->GetPos().z);
+						bestTarget->GetPos().x, bestTarget->GetPos().z, gst.ghostShots, gst.ghostNeed);
 			}
 		}
 		TRY_UNIT(circuit, unit,
@@ -684,6 +736,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	// reload sample alone missed an Ambassador's ghost volley and re-fired 21 s
 	// later as if idle. O(1) per call.
 	const int reload = weapon->GetReloadFrame();
+	const int prevShot = track.shot;
 	if (track.reload < 0) {
 		track.shot = (reload > frame) ? frame : -1;
 	} else if (reload > track.reload) {
@@ -694,6 +747,26 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	if (unit->GetFireFrame() > track.shot) {
 		track.shot = unit->GetFireFrame();
 		if (track.shot >= track.orderUntil - FRAMES_PER_SEC * 5) track.orderUntil = -1;
+	}
+	// Owner 2026-11-04 20:08Z: each ghost volley counts (per dark period); a heavy
+	// ghost is done after 3, any other after 1, until it is seen again.
+	CMilitaryManager* gfm = circuit->GetMilitaryManager();
+	CMilitaryManager::SArtySnipeState& gfs = gfm->GetArtySnipeState(unit->GetId(), frame);
+	if ((track.shot != prevShot) && (track.shot >= 0) && (track.target >= 0) && !track.counted
+		&& (track.orderFrame >= 0) && (track.shot >= track.orderFrame) && (track.shot - track.orderFrame <= FRAMES_PER_SEC * 6))
+	{
+		track.counted = true;
+		const CEnemyUnit* ge = circuit->GetEnemyManager()->GetEnemyUnit(track.target);
+		if ((ge != nullptr) && ge->NotInRadarAndLOS()) {
+			int& n = GhostCountRef(gfs, ge);
+			++n;
+			const int need = GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef());
+			if (n >= need) {
+				GhostDoneSet(gfs, ge);
+				circuit->LOG("ARTY: %s %i fired %i ghost volleys at %i, leaves it until seen", cdef->GetDef()->GetName(),
+						unit->GetId(), n, track.target);
+			}
+		}
 	}
 	const char* goneWhy = ((frame < track.orderUntil) && (track.target >= 0)) ? GhostGoneWhy(circuit, track.target) : nullptr;
 	if (goneWhy != nullptr) {
@@ -724,7 +797,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	for (const auto& kv : circuit->GetEnemyManager()->GetEnemyUnits()) {
 		const CEnemyUnit* e = kv.second;
 		const CCircuitDef* edef = (e != nullptr) ? e->GetCircuitDef() : nullptr;
-		if ((edef == nullptr) || !e->NotInRadarAndLOS() || e->IsIgnore() || e->IsBeingBuilt()
+		if ((edef == nullptr) || !e->NotInRadarAndLOS() || e->IsIgnore() || e->IsBeingBuilt() || GhostDoneHas(gfs, e)
 			|| (e->GetData().losStatus & (SEnemyData::LosMask::HIDDEN | SEnemyData::LosMask::DYING | SEnemyData::LosMask::DEAD))
 			|| edef->IsMobile() || edef->IsAbleToFly()
 			|| ((edef->GetCategory() & canTargetCat) == 0)
@@ -758,6 +831,8 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	const int timeout = frame + FRAMES_PER_SEC * 5;
 	track.orderUntil = timeout;
 	track.target = best->GetId();
+	track.orderFrame = frame;
+	track.counted = false;
 	TRY_UNIT(circuit, unit,
 		unit->CmdAttackGround(best->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 	)
@@ -1006,12 +1081,18 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// Owner 2026-11-03 21:36Z: a ghost picked by the default target
 			// choice gets `volleys` blind volleys, then is left until a fresh
 			// LOS sighting (CArtilleryTask::FindTarget / Execute).
-			if ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil) && (++st.ghostShots >= st.ghostNeed)) {
-				st.ghostDone.insert(st.ghostAim);
-				circuit->LOG("SNIPE: %s %i fired %i blind volleys (%s) at ghost %i, leaves it until seen", cdef->GetDef()->GetName(),
-						unit->GetId(), st.ghostShots, st.ghostHeavy ? "heavy" : "other", st.ghostAim);
-				st.ghostAim = -1;
-				st.ghostShots = 0;
+			const CEnemyUnit* ga = ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil))
+					? circuit->GetEnemyManager()->GetEnemyUnit(st.ghostAim) : nullptr;
+			if ((ga != nullptr) && ga->NotInRadarAndLOS()) {
+				int& n = GhostCountRef(st, ga);
+				st.ghostShots = ++n;
+				if (n >= st.ghostNeed) {
+					GhostDoneSet(st, ga);
+					circuit->LOG("SNIPE: %s %i fired %i blind volleys (%s) at ghost %i, leaves it until seen", cdef->GetDef()->GetName(),
+							unit->GetId(), n, st.ghostHeavy ? "heavy" : "other", st.ghostAim);
+					st.ghostAim = -1;
+					st.ghostShots = 0;
+				}
 			}
 		}
 	}
@@ -1077,7 +1158,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		std::vector<AIFloat3> triggered;
 		for (size_t i = 0; i < allThreats.size(); ++i) {
 			const CEnemyUnit* e = enemyMgr->GetEnemyUnit(allIds[i]);
-			if ((e == nullptr) || (!e->IsInRadarOrLOS() && (st.ghostDone.count(allIds[i]) > 0))) continue;
+			if ((e == nullptr) || (!e->IsInRadarOrLOS() && GhostDoneHas(st, e))) continue;
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
 			if (pos.SqDistance2D(allThreats[i].first) < SQUARE(trigger)) triggered.push_back(allThreats[i].first);
 		}
@@ -1119,13 +1200,13 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const CCircuitDef::Id eid = e->GetCircuitDef()->GetId();
 			const bool direct = info.threats.count(eid) == 0;
 			if (direct && (info.directThreats.count(eid) == 0)) continue;
-			// Owner 2026-11-03 20:54Z: only a fresh LOS sighting resets a ghost's
-			// volleys; a radar dot does not.
-			if (e->IsInLOS()) st.ghostDone.erase(e->GetId());
+			// Owner 2026-11-04 20:08Z: a re-sighting by radar or LOS resets a
+			// ghost's volleys (was LOS only).
+			if (e->IsInRadarOrLOS()) GhostSeen(st, e->GetId());
 			// Owner 2026-11-03 21:58Z: live or ghost, a heavy only starts a sequence
 			// through a pair above double_heavy_overlap (checked below); a single
 			// one is left to the default target choice.
-			if (!e->IsInRadarOrLOS() && (st.ghostDone.count(e->GetId()) > 0)) continue;  // its ghost already had the volleys
+			if (!e->IsInRadarOrLOS() && GhostDoneHas(st, e)) continue;  // its ghost already had the volleys
 			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
 			float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
@@ -1393,7 +1474,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				} else if (st.targetGhost && seen) {
 					st.targetGhost = false;  // shown again: shoot until dead
 				}
-				const int cap = st.targetGhost ? info.volleys : info.visibleMaxVolleys;  // 0: until dead
+				// owner 20:08Z: a ghost prep target gets 3 if heavy, else 1
+				const int cap = st.targetGhost ? GhostNeedFor(info, target->GetCircuitDef()) : info.visibleMaxVolleys;  // 0: until dead
 				if ((cap > 0) && (st.volleys >= cap)) why = st.targetGhost ? "ghost volleys fired" : "volley cap";
 				else if (st.drifts >= 2) why = "cannot be hit from outside the threats' reach";
 				else if (frame - std::max(st.targetFrame, st.lastVolley) > info.stageFrames) why = "no volley, gives up";
@@ -1402,7 +1484,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				circuit->LOG("SNIPE: %s %i prep %s %i %s (%i volleys)", cdef->GetDef()->GetName(), unit->GetId(),
 						SnipeName(target), st.target, why, st.volleys);
 				st.skipUntil[st.target] = frame + info.repeatFrames;
-				if (st.targetGhost) st.ghostDone.insert(st.target);  // a dead one stays a ghost: once is enough
+				if (st.targetGhost) GhostDoneSet(st, target);  // a dead one stays a ghost: once is enough
 				st.target = -1;
 				target = nullptr;
 			}
@@ -1425,8 +1507,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					continue;
 				}
 				const bool seen = e->IsInRadarOrLOS();
-				if (e->IsInLOS()) st.ghostDone.erase(e->GetId());  // owner 20:54Z: LOS only
-				else if (!seen && (st.ghostDone.count(e->GetId()) > 0)) continue;
+				if (seen) GhostSeen(st, e->GetId());  // owner 2026-11-04 20:08Z: radar or LOS resets
+				else if (GhostDoneHas(st, e)) continue;
 				if (bestSeen && !seen) continue;
 				AIFloat3 spot;
 				if ((pos.SqDistance2D(e->GetPos()) <= SQUARE(prepRadius)) && safeAt(pos, e->GetId(), false)) {
@@ -1812,7 +1894,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			return true;  // shells still landing
 		}
 		if (!threatSeen) {
-			st.ghostDone.insert(st.threat);  // not again while it stays a ghost
+			GhostDoneSet(st, threat);  // not again while it stays a ghost
 			return finish("not seen alive after the volleys");
 		}
 		circuit->LOG("SNIPE: %s %i sees %s %i live, attacks it until dead", cdef->GetDef()->GetName(), unit->GetId(),
@@ -1837,7 +1919,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 		if (st.targetGhost && (st.volleys >= info.volleys)) {
 			stop();
-			st.ghostDone.insert(st.threat);
+			GhostDoneSet(st, threat);
 			return finish("ghost volleys fired after it went dark again");
 		}
 		if (frame - std::max(st.stageFrame, st.lastVolley) > info.stageFrames) {
@@ -1905,14 +1987,14 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 				? &military->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame()) : nullptr;
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
-			if ((ghostSt != nullptr) && enemy->IsInLOS()) {
-				ghostSt->ghostDone.erase(enemy->GetId());  // a fresh sighting resets its blind volleys
+			if ((ghostSt != nullptr) && enemy->IsInRadarOrLOS()) {
+				GhostSeen(*ghostSt, enemy->GetId());  // a fresh sighting (radar or LOS) resets its blind volleys
 			}
 			const bool ghost = !enemy->IsInRadarOrLOS();
 			if (enemy->IsHidden()
 				|| (ghost && ((ghostSt == nullptr) || (enemy->GetCircuitDef() == nullptr) || enemy->GetCircuitDef()->IsMobile()
 					|| enemy->GetData()->IsDying() || enemy->GetData()->IsDead()
-					|| (ghostSt->ghostDone.count(enemy->GetId()) > 0)))
+					|| GhostDoneHas(*ghostSt, enemy->GetData())))
 				|| (notAW && (enemy->GetPos().y < -SQUARE_SIZE * 5)))
 			{
 				continue;

@@ -110,6 +110,10 @@ public:
 
 	void SetLastSeen(int frame) { lastSeen = frame; }
 	int GetLastSeen() const { return lastSeen; }
+	// Owner 2026-11-04 20:08Z: frame it last went out of both radar and LOS (a
+	// ghost's current dark period); any re-sighting, radar or LOS, starts a new one.
+	void SetDarkSince(int frame) { darkSince = frame; }
+	int GetDarkSince() const { return darkSince; }
 
 	void SetCost(float value) { data.cost = value; }
 	float GetCost() const { return data.cost; }
@@ -149,6 +153,7 @@ private:
 
 	int knownFrame;
 	int lastSeen;
+	int darkSince = -1;
 
 	springai::Weapon* shield;
 
