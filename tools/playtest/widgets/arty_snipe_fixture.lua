@@ -134,6 +134,9 @@ local function gameFrame(f)
         for u,t in pairs(tracked) do if t.team==myTeam and t.def==KEY and not t.dead then sel[#sel+1]=u; t.selfd=true end end
         Spring.SelectUnitArray(sel)
         cmd("selfd")
+        -- headless has no selection, so selfd alone does nothing there: the BAR dev
+        -- helper destroys it (attacker = itself, not the AI's ally team)
+        for _,u in ipairs(sel) do Spring.SendLuaRulesMsg(string.format("$dev$:destroyunits %d",u)) end
         echo(string.format("self-destruct %s x%d",KEY,#sel))
     end
     if cfg.revealAt and f==cfg.revealAt then give("armeyes",A,cfg.cx+350,cfg.cz); echo(string.format("AI camera at (%d,%d): the spot is seen",cfg.cx+350,cfg.cz)) end
