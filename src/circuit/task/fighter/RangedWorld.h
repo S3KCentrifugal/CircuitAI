@@ -84,8 +84,10 @@ public:
     // ghostRange (owner 2026-11-02): >0 also counts ghost porc whose ground
     // range is at most ghostRange; 0 keeps the observed-only predicate.
     bool Safe(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping=false, float press=0.f, float ghostRange=0.f) const;
-    float Danger(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f) const;
-    int DangerSign(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f) const;
+    // staticMargin < 0: margin for every contact (unchanged). Otherwise static
+    // contacts and ghosts use staticMargin, mobiles keep margin.
+    float Danger(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f, float staticMargin=-1.f) const;
+    int DangerSign(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f, float staticMargin=-1.f) const;
     const std::vector<Contact>& Ghosts() const { return ghosts; }
     // Ghost porc (indices into Ghosts()) whose hazard (+margin) reaches pos.
     void NearbyGhosts(const springai::AIFloat3& pos, float margin, float ghostRange, float press, std::vector<int>& result) const;

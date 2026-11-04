@@ -497,21 +497,24 @@ void CRangedWorld::NearbyGhosts(const AIFloat3& pos,float margin,float ghostRang
         if(hazard>0.f && pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) result.push_back(i);
     });
 }
-float CRangedWorld::Danger(const AIFloat3& pos,float margin,float press,float ghostRange) const
+float CRangedWorld::Danger(const AIFloat3& pos,float margin,float press,float ghostRange,float staticMargin) const
 {
     float danger=0.f;
-    enemies.Query(P(pos),largestRange+margin,[&](int i) {
+    const float fixedMargin=staticMargin<0.f?margin:staticMargin;
+    const float queryMargin=std::max(margin,fixedMargin);
+    enemies.Query(P(pos),largestRange+queryMargin,[&](int i) {
         const auto& c=contacts[i]; const float hazard=HazardFor(c,press); if(hazard<=0.f) return;
-        if(pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) danger+=c.cost;
+        const float m=c.mobile?margin:fixedMargin;
+        if(pos.SqDistance2D(c.pos)<std::pow(hazard+m,2.f)) danger+=c.cost;
     });
-    if(ghostRange>0.f && !ghosts.empty()) ghostHazards.Query(P(pos),largestGhostHazard+std::max(0.f,margin),[&](int i) {
+    if(ghostRange>0.f && !ghosts.empty()) ghostHazards.Query(P(pos),largestGhostHazard+std::max(0.f,fixedMargin),[&](int i) {
         const auto& c=ghosts[i]; if(c.groundRange>ghostRange) return;
         const float hazard=HazardFor(c,press); if(hazard<=0.f) return;
-        if(pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) danger+=c.cost;
+        if(pos.SqDistance2D(c.pos)<std::pow(hazard+fixedMargin,2.f)) danger+=c.cost;
     });
     return danger;
 }
-int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press,float ghostRange) const
+int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press,float ghostRange,float staticMargin) const
 {
     // Callers ask ==0 or >0, not a magnitude. Nonnegative finite contributions
     // permit existence short-circuiting without changing either comparison.
@@ -519,22 +522,24 @@ int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press,float 
     // represents NaN, for which both original comparisons are false.
     int result;
     if(!nonnegativeHazardCosts) {
-        const float value=Danger(pos,margin,press,ghostRange);
+        const float value=Danger(pos,margin,press,ghostRange,staticMargin);
         result=value>0.f?1:value==0.f?0:-1;
     } else {
+        const float fixedMargin=staticMargin<0.f?margin:staticMargin;
         const auto hit=[&](const Contact& c) {
             const float hazard=HazardFor(c,press);
+            const float m=(c.mobile && !c.ghost)?margin:fixedMargin;
             return hazard>0.f && c.cost>0.f
-                && pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f);
+                && pos.SqDistance2D(c.pos)<std::pow(hazard+m,2.f);
         };
-        result=enemies.Any(P(pos),largestRange+margin,[&](int i) { return hit(contacts[i]); }) ? 1 : 0;
+        result=enemies.Any(P(pos),largestRange+std::max(margin,fixedMargin),[&](int i) { return hit(contacts[i]); }) ? 1 : 0;
         // Ghost costs are filtered finite and nonnegative at Refresh.
         if(result==0 && ghostRange>0.f && !ghosts.empty()
-            && ghostHazards.Any(P(pos),largestGhostHazard+std::max(0.f,margin),[&](int i) {
+            && ghostHazards.Any(P(pos),largestGhostHazard+std::max(0.f,fixedMargin),[&](int i) {
                 return ghosts[i].groundRange<=ghostRange && hit(ghosts[i]); })) result=1;
     }
     if(verifyRangedQueries) {
-        const float value=Danger(pos,margin,press,ghostRange);
+        const float value=Danger(pos,margin,press,ghostRange,staticMargin);
         const int expected=value>0.f?1:value==0.f?0:-1;
         if(result!=expected) circuit->LOG("[INVARIANT] INV-161 ranged danger sign differs from ordered sum");
     }
