@@ -381,7 +381,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	if (best == nullptr) {
 		return false;
 	}
-	unit->GetTravelAct()->StateWait();
+	if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();  // route-task units (FRONT squads, spam lanes) have none
 	const int timeout = frame + FRAMES_PER_SEC * 5;
 	track.orderUntil = timeout;
 	track.target = best->GetId();
