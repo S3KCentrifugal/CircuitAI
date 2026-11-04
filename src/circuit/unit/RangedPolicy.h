@@ -32,6 +32,7 @@ struct RangedPolicy {
     float withdrawalLeadSeconds = 0.f;
     Mode mode = Mode::SKIRMISH;
     float rangeFraction = .95f;
+    int ghostVolleys = 0; // 0 disables idle ghost ground fire; per-unit, per dark period
     float spacing = 96.f;
     float safetyMargin = 48.f;
     float hysteresis = 48.f;

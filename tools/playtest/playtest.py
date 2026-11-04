@@ -242,7 +242,11 @@ def stage(args):
     shutil.copy2(dll_src, ai_dst / "SkirmishAI.dll")
     dbg = dll_src.with_suffix(".dbg")
     if dbg.exists():
-        stage_symbols(dbg, ai_dst / "SkirmishAI.dbg")
+        local_pool = os.environ.get("CIRCUIT_LOCAL_SYMBOL_POOL")
+        if local_pool:
+            stage_symbols(dbg, ai_dst / "SkirmishAI.dbg", pool=Path(local_pool))
+        else:
+            stage_symbols(dbg, ai_dst / "SkirmishAI.dbg")
 
     data_src = Path(args.data) if args.data else REPO / "data"
     for sub in ("config", "script"):
@@ -552,7 +556,8 @@ def launch(args):
     (d / 'playtest-stop.txt').unlink(missing_ok=True)
     log("launch: " + " ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=str(eng), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+                            creationflags=(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) |
+                                (getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0) if os.environ.get("BAR_PLAYTEST_LOW_PRIORITY") == "1" else 0)))
     handle = None
     try:
         handle = engine_process.EngineProcess(proc.pid)

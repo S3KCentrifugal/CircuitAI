@@ -356,6 +356,8 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     const int frame=ai->GetLastFrame();
     const auto pos=unit->GetPos(frame);
     auto* def=unit->GetCircuitDef(); const auto& policy=def->GetRangedPolicy();
+    // Preserve the per-dark-period budget even through a long retreat or live-target fight.
+    if (policy.ghostVolleys > 0) ai->GetMilitaryManager()->GetArtySnipeState(id,frame).lastCall = frame;
     const auto& group=world.PlanCohort(unit);
     const auto member=std::find(group.members.begin(),group.members.end(),id);
     if(member==group.members.end() || group.members.size()>size_t(policy.cohortSize)) {
@@ -726,6 +728,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     nextFrame=frame+8; // decision sampling, not an order/APM limit; damage/idle invalidates
     world.Refresh();
     auto* def=unit->GetCircuitDef(); const auto& policy=def->GetRangedPolicy();
+    // Preserve the per-dark-period budget even through a long retreat or live-target fight.
+    if (policy.ghostVolleys > 0) ai->GetMilitaryManager()->GetArtySnipeState(id,frame).lastCall = frame;
     const auto pos=unit->GetPos(frame);
     if(caps.weapons.empty()) return;
     // Discard already traversed waypoints. Validating a route back to its old
@@ -813,6 +817,9 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
     }
     if(report && !ghostNearby.empty()) ai->LOG("RANGED: ghost porc reach unit=%d ghosts=%u",id,unsigned(ghostNearby.size()));
+    if (policy.ghostVolleys > 0 && (closing || frame < withdrawalUntil) && ghostFire.target >= 0) {
+        GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false);
+    }
     if(!policy.holdFireline && (closing || frame<withdrawalUntil)) {
         if(closing && !(frame<withdrawalUntil && moving)) {
             AIFloat3 away=pos-closing->pos;
@@ -905,6 +912,19 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             if(value>bestScore || (value==bestScore && (best<0 || c.id<contacts[best].id))) {
                 best=i; bestWeapon=int(wi); bestScore=value; bestDamage=damage;
             }
+        }
+    }
+    // Idle ghost fire borrows the rocket-artillery accounting and wreck checks.
+    // Live LOS/radar contacts and the existing withdrawal branch always preempt it.
+    // The enemy scan runs only for opted-in idle units; no new per-frame index.
+    if (policy.ghostVolleys > 0) {
+        if (best >= 0 || otherInRange || spamInRange || closing || frame < withdrawalUntil) {
+            if (ghostFire.target >= 0) {
+                GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false);
+            }
+        } else if (GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys)) {
+            query.reset(); ++generation; moving=false; path.clear(); pathCursor=0;
+            return;
         }
     }
     // A priority target still fires on HOLD, so spam in reach always holds:

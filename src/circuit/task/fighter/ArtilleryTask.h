@@ -23,7 +23,7 @@ class CEnemyInfo;
 // a ghost volley order is issued or in flight (the caller leaves the unit be).
 struct SGhostFire { int reload = -1, shot = -1, orderUntil = -1, target = -1, orderFrame = -1; bool counted = false; };  // target: the ghost being fired on
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFloat3& pos, int frame,
-		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport);
+		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport, int volleyLimit = 0, bool allowFire = true);
 
 // Owner 2026-11-03: sequenced snipe of outranging artillery structures
 // (SArtySnipeInfo). True while it owns the unit; state lives in the military

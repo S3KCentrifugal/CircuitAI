@@ -357,6 +357,14 @@ void CCircuitUnit::CmdPatrolTo(const AIFloat3& pos, short options, int timeout)
 	unit->PatrolTo(pos, options, timeout);
 }
 
+void CCircuitUnit::CmdStationaryGroundTarget(const AIFloat3& pos)
+{
+    assert(geom::is_in_map(pos));
+    float params[] = {pos.x, pos.y, pos.z};
+    // BAR's coordinate priority target aims the weapon without an ATTACK move.
+    SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
+}
+
 void CCircuitUnit::CmdAttackGround(const AIFloat3& pos, short options, int timeout)
 {
 	assert(geom::is_in_map(pos));

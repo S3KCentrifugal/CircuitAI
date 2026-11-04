@@ -37,11 +37,11 @@ function widget:Initialize()
 end
 
 function widget:UnitCreated(u,ud,team)
-    if team~=myTeam and team~=A then return end
+    if team~=myTeam and team~=A and not (cfg.scoutWithdraw and team==2) then return end
     local d=UnitDefs[ud]
     if not d then return end
     local x,_,z=Spring.GetUnitPosition(u)
-    if team==A and not cfg.artyDefs[d.name] then return end
+    if team==A and not cfg.artyDefs[d.name] and not (cfg.scoutWithdraw and d.name=="armpeep") then return end
     if team==myTeam and d.canMove and not (cfg.extraDefs or {})[d.name] then return end
     tracked[u]={def=d.name,team=team,x=x,z=z}
     local dmg=team==myTeam and (cfg.damage or {})[d.name]
@@ -92,6 +92,17 @@ end
 local function gameFrame(f)
     frameNow=f
     if f==30 then cmd("cheat 1") end
+    if cfg.scoutWithdraw and f==330 then
+        give("armpeep",2,cfg.cx,cfg.cz)
+        cmd("team 2")
+        echo("scout reveals target with real LOS")
+    end
+    if cfg.scoutWithdraw and f>=450 and f%30==0 then
+        for _,u in ipairs(Spring.GetTeamUnitsByDefs(2,UnitDefNames.armpeep.id) or {}) do
+            Spring.GiveOrderToUnit(u,CMD.MOVE,{cfg.cx-4000,300,cfg.cz-4000},0)
+        end
+        echo("scout withdrawing")
+    end
     if f==50 then
         Spring.SelectUnitArray(Spring.GetTeamUnits(myTeam) or {})
         cmd("selfd")
@@ -100,11 +111,15 @@ local function gameFrame(f)
         if not cfg.hostBlind then cmd("globallos "..ally) end
     end
     if f==(cfg.losOnAt or 60) then cmd("globallos "..aiAlly); echo("global LOS on for ally "..aiAlly) end
-    if cfg.extraMove and f==(cfg.extraAt or cfg.placeAt or 300)+30 then   -- a mobile radar dot passing through range
+    if cfg.scoutWithdraw and cfg.extraMove and f==(cfg.extraAt or cfg.placeAt or 300)+1 then cmd("team "..myTeam) end
+    if cfg.extraMove and f==(cfg.extraAt or cfg.placeAt or 300)+30 then
+        -- Pick up units spawned outside the observer team's LOS before the temporary team switch.
+        for _,u in ipairs(Spring.GetTeamUnits(myTeam) or {}) do if not tracked[u] then widget:UnitCreated(u,Spring.GetUnitDefID(u),myTeam) end end   -- a mobile radar dot passing through range
         for u,t in pairs(tracked) do
             if t.team==myTeam and (cfg.extraDefs or {})[t.def] then Spring.GiveOrderToUnit(u,CMD.MOVE,{cfg.extraMove[1],0,cfg.extraMove[2]},0) end
         end
         echo(string.format("extra host units move to (%d,%d)",cfg.extraMove[1],cfg.extraMove[2]))
+        if cfg.scoutWithdraw then cmd("team 2") end
     end
     if f==(cfg.placeAt or 300) then
         for _,e in ipairs(cfg.porc) do give(e[1],myTeam,cfg.cx+e[2],cfg.cz+e[3]) end
@@ -147,7 +162,7 @@ local function gameFrame(f)
     end
     if cfg.revealAt and f==cfg.revealAt then give("armeyes",A,cfg.cx+350,cfg.cz); echo(string.format("AI camera at (%d,%d): the spot is seen",cfg.cx+350,cfg.cz)) end
     if cfg.losAgainAt and f==cfg.losAgainAt then cmd("globallos "..aiAlly); echo("global LOS on again for ally "..aiAlly) end
-    if cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
+    if not cfg.scoutWithdraw and cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
     if cfg.holdFire and f==(cfg.placeAt or 300)+10 then
         for u,t in pairs(tracked) do if t.team==myTeam then Spring.GiveOrderToUnit(u,CMD.FIRE_STATE,{0},0) end end
         echo("host porc set to hold fire")
@@ -162,7 +177,7 @@ local function gameFrame(f)
     end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
     -- every new projectile of the AI's tracked artillery (ghost-gone test: no shots after the spot is seen empty)
-    if cfg.killAt then
+    if cfg.killAt or cfg.scoutWithdraw then
         seenProj=seenProj or {}
         for _,pid in ipairs(Spring.GetProjectilesInRectangle(0,0,Game.mapSizeX,Game.mapSizeZ,false,false) or {}) do
             if not seenProj[pid] then
@@ -180,6 +195,19 @@ local function gameFrame(f)
                 if x then echo(string.format("pos frame=%d id=%d def=%s at=(%.0f,%.0f) dist=%.0f",f,u,t.def,x,z,math.sqrt((x-cfg.cx)^2+(z-cfg.cz)^2))) end
             end
         end
+    end
+    if cfg.scoutWithdraw and f%90==0 then
+        for u,t in pairs(tracked) do
+            if t.team==A and not t.dead then
+                local x,_,z=Spring.GetUnitPosition(u)
+                local q=Spring.GetUnitCommands(u,1) or {}
+                echo(string.format("sample frame=%d id=%d def=%s at=(%.0f,%.0f) reload=%s command=%s",f,u,t.def,x or -1,z or -1,tostring((cfg.artyDefs[t.def] and Spring.GetUnitWeaponState(u,1,"reloadFrame"))),tostring(q[1] and q[1].id)))
+
+            end
+        end
+    end
+    if cfg.protect and f%15==0 and (not cfg.killAt or f<cfg.killAt) then
+        for u,t in pairs(tracked) do if t.team==myTeam and t.def==KEY and not t.dead then Spring.SendLuaRulesMsg(string.format("$dev$:sethealth %d:100",u)) end end
     end
     if f%1800==0 then
         local alive=0

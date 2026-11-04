@@ -11,6 +11,7 @@ Pass: "CONFIG ... artillery snipe enabled", SNIPE start/prep/fired/done lines,
 no script errors; the RESULT line says whether the Persecutor died and which
 artillery died to what.
 """
+import os
 import argparse
 import json
 import re
@@ -64,20 +65,24 @@ def main():
     p.add_argument('--hold-fire', action='store_true', help='volley count test: the host porc is set to hold fire, so the artillery lives to fire every volley')
     p.add_argument('--host-blind', action='store_true', help='volley count test: the host gets no global LOS, so its porc cannot see (and shoot) the artillery; count volleys from the AI log')
     p.add_argument('--stage-only', action='store_true')
+    p.add_argument('--speed', type=float, default=10)
+    p.add_argument('--scout-withdraw', action='store_true', help='Real scout reveals the target then withdraws before artillery arrives')
     a = p.parse_args()
+    os.environ["BAR_PLAYTEST_LOW_PRIORITY"] = "1"
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
     minutes = a.minutes
     check = d / 'checks.json'
     check.write_text(json.dumps({'stop_minute': minutes, 'expect': [
+        {'key':'observer','pattern':r'\[ArtySnipe\] host team=', 'by_minute':0.1, 'scope':'any'},
         {'key': 'done', 'pattern': r'\[ArtySnipe\] DONE', 'by_minute': minutes, 'scope': 'any'}],
-        'forbid': [{'key': 'script', 'pattern': r': ERR\s+:|SCRIPT CRASH|Lib exception', 'scope': 'any'}]}, indent=2))
+        'forbid': [{'key': 'script', 'pattern': r': ERR\s+:|SCRIPT CRASH|Lib exception|\[ArtySnipe\] ERROR', 'scope': 'any'}]}, indent=2))
     cmd = [sys.executable, str(HERE / 'playtest.py')]
     stage = cmd + ['stage', '--dir', str(d), '--dll', a.dll, '--data', str(a.data), '--map', MAP,
                    '--map-file', str(ROOT / 'data/script/src/maps/full_metal_plate.as'),
                    '--role', 'FRONT', '--roles', 'FRONT', '--side', 'cortex', '--isolated',
-                   '--modoption', 'deathmode=neverend',
+                   '--modoption', 'deathmode=neverend', '--modoption', 'allowunitcontrolwidgets=1',
                    '--ai-option', 'profile=experimental_balanced',
-                   '--mode', 'fast', '--speed', '20', '--minutes', str(minutes), '--headless', '--lean-render',
+                   '--mode', 'fast', '--speed', str(a.speed), '--minutes', str(minutes), '--headless', '--lean-render',
                    '--extra-widget', str(HERE / 'widgets/arty_snipe_fixture.lua')]
     subprocess.run(stage, cwd=ROOT, check=True)
     script = d / 'script.txt'
@@ -91,6 +96,8 @@ def main():
                    r'\g<1>StartPosX=%d; StartPosZ=%d;' % HOST_START, s)
     if n != 1:
         raise ValueError('host team line changed in script.txt')
+    if a.scout_withdraw:
+        s = s[:s.rfind('}')] + '\n[TEAM2] { TeamLeader=0; AllyTeam=0; Side=armada; RgbColor=0.2 0.8 0.8; StartPosX=64; StartPosZ=64; }\n}\n'
     script.write_text(s, encoding='utf-8')
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     porc = PORC
@@ -117,6 +124,8 @@ def main():
         lua([tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.ai_extra.split(';') if e]), lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
         '{' + ''.join('%s=%s,' % tuple(kv.split(':')) for kv in a.damage.split(',') if kv) + '}',
         ('losOffAt=%d, ' % (a.los_off * 30)) if a.mode == 'ghost' else '', int(minutes))
+    if a.scout_withdraw:
+        conf = conf.replace('return {', 'return {scoutWithdraw=true,', 1).replace('losOnAt=60', 'losOnAt=-1')
     (d / 'LuaUI/Config/arty_snipe.lua').write_text(conf)
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'mode': a.mode, 'cluster': CLUSTER,
         'arty_at': at, 'porc': porc, 'arty': arty, 'radar': a.radar, }, indent=2))

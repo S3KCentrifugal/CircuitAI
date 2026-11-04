@@ -2,6 +2,7 @@
 #define CIRCUIT_RANGED_ENGAGEMENT_H
 #include "task/fighter/RangedWorld.h"
 #include "unit/RangedPolicy.h"
+#include "task/fighter/ArtilleryTask.h"
 #include <memory>
 
 namespace springai { class Weapon; }
@@ -38,6 +39,8 @@ private:
     int lastReload=-1, burstUntil=0, withdrawalUntil=0, failures=0;
     int lastProgressFrame=0, lastMoveFrame=-10000;
     int lastShotFrame=0, orientUntil=0;
+    SGhostFire ghostFire;
+    std::unordered_map<int, bool> ghostSupport;
     int traceFrame=-150;
     int homeHoldLogFrame=-150;
     bool fireOpen=false; int fireStateFrame=-10000; // individual fire_at_will: last state sent
