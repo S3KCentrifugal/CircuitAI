@@ -124,7 +124,7 @@ public:
     void Begin(Point p, float r, int roll, int frame = 0, bool stock = false)
     {
         pos = p; radius = std::max(0.f, r); goal = std::max(1, roll); fired = 0;
-        stocking = stock; since = frame; ++begun;
+        stocking = stock; since = frame; ++begun; untilEmpty = false;
     }
     // Front nukerush (owner 2026-11-04): the ally team's first overnuke rolls
     // firstMin..firstMax launches instead of the policy's roll; 0 = off.
@@ -140,14 +140,18 @@ public:
     int Since() const { return since; }
     // Open fire. A release short of the roll (timeout, a silo hit) fires only
     // what is stocked: the goal drops to it.
-    // fireAll (owner 2026-11-04): every missile stocked at the release goes, so
-    // the goal rises to the stock when the silos hold more than the roll.
+    // fireAll (owner 2026-11-04): the silos keep stocking while the salvo fires,
+    // so it has no fixed goal: every reaching silo fires until its stock is 0
+    // (the caller ends it with End() once their stock sums to 0), even past the
+    // roll - a salvo released at 8 may fire 12.
     void Release(int stocked, bool fireAll = false)
     {
         stocking = false;
+        if (fireAll) { untilEmpty = true; goal = UNTIL_EMPTY; return; }
         if (stocked > 0 && stocked < goal) goal = stocked;
-        if (fireAll && stocked > goal) goal = stocked;
     }
+    bool UntilEmpty() const { return Active() && untilEmpty; }
+    static constexpr int UNTIL_EMPTY = 1000000;
     // A better aim point found before the first launch (fresh scouting): the
     // salvo goes there instead, same roll.
     void Retarget(Point p) { if (Valid(p) && fired == 0) pos = p; }
@@ -176,7 +180,7 @@ private:
     Point pos{-1.f, -1.f};
     float radius = 0.f;
     int goal = 0, fired = 0, scouts = 0, begun = 0, firstMin = 0, firstMax = 0;
-    bool stocking = false;
+    bool stocking = false, untilEmpty = false;
     int since = 0;  // frame the target began, for the stock timeout
     Ledger done;
 };

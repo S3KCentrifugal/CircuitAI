@@ -974,10 +974,24 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 				&& strategic::NuclearTarget(e.cdef->IsMobile(), true, policy.structuresOnly)
 				&& (at.SqDistance2D(e.pos) < SQUARE(over.Radius()))) { structure = true; break; }
 		}
+		// Fire until empty (owner 2026-11-04): the salvo ends once every allied silo in
+		// reach holds no missile, however many it fired past the roll.
+		int stock = 0;
+		if (structure && over.UntilEmpty()) {
+			ForEachAllyNukeSilo(circuit, [&](CCircuitAI*, CSuperTask*, CCircuitUnit* silo) {
+				if (silo->GetPos(frame).SqDistance2D(at) < SQUARE(silo->GetCircuitDef()->GetMaxRange()))
+					stock += std::max(0, silo->GetUnit()->GetStockpile());
+			});
+		}
 		if (!structure) {
 			circuit->LOG("NUKE: overnuke at (%.0f, %.0f) ends at %i of %i launches: no target left there",
 					at.x, at.z, over.Fired(), over.Goal());
 			over.End(frame, policy.repeatFrames);
+		} else if (over.UntilEmpty() && (stock <= 0)) {
+			circuit->LOG("NUKE: overnuke salvo at (%.0f, %.0f) is empty after %i launches; the next target stocks",
+					at.x, at.z, over.Fired());
+			over.End(frame, policy.repeatFrames);
+			StopNukeSilos();
 		} else if (position.SqDistance2D(at) < SQUARE(cdef->GetMaxRange())) {
 			if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
 				return false;  // hold fire: the salvo is still stocking

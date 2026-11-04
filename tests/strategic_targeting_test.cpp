@@ -106,7 +106,11 @@ void test_overnuke_salvo_holds_until_stocked_then_fires_the_roll()
     // fire all (owner 2026-11-04): a release holding more than the roll fires everything
     over.Begin({8000,8000}, 1000, 8, 400, true);
     over.Release(13, true);
-    assert(over.Salvo() && over.Goal() == 13);
+    assert(over.Salvo() && over.UntilEmpty());
+    for (int i = 0; i < 15; ++i) assert(over.Count({8000,8000}, 500, 9000, 10));  // past the roll and the stock at release
+    assert(over.Active());
+    over.End(600, 9000);  // the caller: every reaching silo is empty
+    assert(!over.Active() && over.Goal() == 15);
     over.Begin({9000,9000}, 1000, 8, 400, true);
     over.Release(13);
     assert(over.Goal() == 8);
