@@ -301,7 +301,7 @@ namespace FrontSiloGrid {
         const bool tracked = pendingSlot >= 0 && pendingSlot < int(slots.length());
         if (pending !is null && !pending.IsDead()) {
             if (!tracked || ai.frame - pendingFrame < SlotStallSeconds * SECOND
-                    || aiTerrainMgr.GetReservationState(slots[pendingSlot]) != 0) return null;
+                    || aiTerrainMgr.GetReservationState(slots[pendingSlot]) >= 2) return null;   // 1 = claimed only, 2+ = framed or more
             GenericHelpers::LogUtil(Tag() + "[SiloGrid] grid slot " + pendingSlot + ": no frame after "
                 + ((ai.frame - pendingFrame) / SECOND) + " s; order aborted", 1);
             aiBuilderMgr.AbortTask(pending);
