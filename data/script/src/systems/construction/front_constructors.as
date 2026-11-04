@@ -259,6 +259,54 @@ namespace FrontConstructors {
         return task !is null && !task.IsDead() && task.target !is null
             && task.GetBuildType() < int(Task::BuildType::REPAIR) && Local(task);
     }
+    // D-466: the owner's base mexes come before any energy. EnqueueMexWithin
+    // (allyAware) hands back an untaken queued mex task in the radius before
+    // opening a spot, and opens only spots this AI may take (mex ownership in
+    // the window, the allied zone after), reachable in 3D (CanReachMex).
+    // Null once none remain, so the seat moves on to energy.
+    // Played (Supreme Isthmus team 6): two base spots re-ordered every 3 to
+    // 10 s for two minutes while an energy constructor died there. A live
+    // order is kept (returned above), and a built mex closes its spot, so a
+    // spot we ordered before that is offered again failed: skip it, longer
+    // each time, then for good. A few base spots: O(spots) per ask.
+    array<AIFloat3> mexOrdered;
+    array<int> mexFails, mexSkipUntil;
+    array<bool> mexRetry;   // the skip ran out: the next offer is a real retry
+    IUnitTask@ EnergyMex(CCircuitUnit@ unit, IBuilderTask@ current) {
+        if (current !is null && !current.IsDead() && current.GetBuildType() == int(Task::BuildType::MEX)) return current;
+        array<AIFloat3> avoid;
+        for (uint i = 0; i < mexOrdered.length(); ++i)
+            if (!FrontConstructorMath::GeoAllowed(mexFails[i], Global::RoleSettings::Front::EnergySeatMexAttempts,
+                ai.frame, mexSkipUntil[i])) avoid.insertLast(mexOrdered[i]);
+        IUnitTask@ task = aiEconomyMgr.EnqueueMexAvoiding(unit, Global::Map::StartPos,
+            Global::RoleSettings::Front::EnergySeatMexRadius, true, avoid);
+        if (task is null) return null;
+        const AIFloat3 site = cast<IBuilderTask>(task).GetBuildPos();
+        int index = -1;
+        for (uint i = 0; i < mexOrdered.length(); ++i)
+            if (int(mexOrdered[i].x) == int(site.x) && int(mexOrdered[i].z) == int(site.z)) index = int(i);
+        if (index < 0) {
+            mexOrdered.insertLast(site); mexFails.insertLast(0); mexSkipUntil.insertLast(0); mexRetry.insertLast(false);
+            GenericHelpers::LogUtil("[FrontConstructors] energy seat base mex builder=" + unit.id
+                + " site=" + int(site.x) + "," + int(site.z), 1);
+            return task;
+        }
+        if (mexRetry[index]) {
+            mexRetry[index] = false;
+            GenericHelpers::LogUtil("[FrontConstructors] energy seat base mex retry builder=" + unit.id
+                + " site=" + int(site.x) + "," + int(site.z), 1);
+            return task;
+        }
+        aiBuilderMgr.AbortTask(task);
+        ++mexFails[index];
+        mexRetry[index] = true;
+        mexSkipUntil[index] = ai.frame + FrontConstructorMath::GeoBackoffFrames(mexFails[index],
+            int(Global::RoleSettings::Front::EnergySeatMexRetrySeconds * SECOND));
+        GenericHelpers::LogUtil("[FrontConstructors] energy seat base mex failed at " + int(site.x) + "," + int(site.z)
+            + " fails=" + mexFails[index] + (mexFails[index] >= Global::RoleSettings::Front::EnergySeatMexAttempts
+            ? " skipping it for good" : " skip for " + ((mexSkipUntil[index] - ai.frame) / SECOND) + " s"), 1);
+        return null;
+    }
     // Geothermal first: a free vent within EnergySeatGeoRadius of the seat's
     // factory, or a GEO job already queued there. EnqueueLocalGeo keeps
     // native's safe-reach, occupancy and allied-layout checks; it scans the
@@ -310,9 +358,10 @@ namespace FrontConstructors {
         return aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, def, Global::Map::StartPos,
             SQUARE_SIZE * 32, true, int(Global::RoleSettings::Front::EcoBlockOrderSeconds * SECOND)));
     }
-    // D-463 energy seat, in order: finish a started local structure; default
-    // work while energy income is above the release; a geothermal near its
-    // factory; wind turbines in a dense block on a windy map; native energy.
+    // D-463 energy seat, in order: finish a started local structure; (D-466)
+    // the AI's unbuilt base mexes; default work while energy income is above
+    // the release; a geothermal near its factory; wind turbines in a dense
+    // block on a windy map; native energy.
     bool energyPolicyLogged = false;
     IUnitTask@ EnergyWork(CCircuitUnit@ unit) {
         if (!energyPolicyLogged) {
@@ -325,6 +374,8 @@ namespace FrontConstructors {
         }
         IBuilderTask@ current=cast<IBuilderTask>(unit.task);
         if (Started(current)) return current;
+        IUnitTask@ mex = EnergyMex(unit, current);
+        if (mex !is null) return mex;
         if (!FrontConstructorMath::EnergyHeld(Economy::GetMinEnergyIncomeLast10s(),
             Global::RoleSettings::Front::EnergySeatReleaseIncome)) return aiBuilderMgr.DefaultMakeTask(unit);
         IUnitTask@ geo = EnergyGeo(unit, current);

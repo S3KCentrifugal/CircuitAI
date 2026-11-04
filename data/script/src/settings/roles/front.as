@@ -31,6 +31,15 @@ namespace Front {
             // EnergySeatWindAverage it builds wind turbines in dense blocks,
             // else native's energy choice. While energy income (lowest of the
             // last 10 s) is above EnergySeatReleaseIncome it does default work.
+            // D-466: before any energy, the seat builds every unbuilt mex this
+            // AI owns within EnergySeatMexRadius of its start (native
+            // ownership and allied-territory rules, 3D reach).
+            float EnergySeatMexRadius = 1000.0f;
+            // A base mex order that ends without a mex (the same spot offered
+            // again) skips that spot EnergySeatMexRetrySeconds x failures;
+            // after EnergySeatMexAttempts failures the seat skips it for good.
+            float EnergySeatMexRetrySeconds = 60.0f;
+            int EnergySeatMexAttempts = 3;
             float EnergySeatGeoRadius = 900.0f;
             // A geothermal order that ends without a geothermal (re-offered at
             // the same vent) backs off EnergySeatGeoRetrySeconds x failures;
