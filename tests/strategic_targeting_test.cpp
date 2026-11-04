@@ -104,6 +104,17 @@ void test_overnuke_salvo_holds_until_stocked_then_fires_the_roll()
     over.Release(12);
     assert(over.Salvo() && over.Goal() == 12);
 }
+void test_overnuke_first_roll_applies_to_the_first_target_only()
+{
+    Overnuke over;
+    int lo = 10, hi = 25;
+    assert(!over.FirstRoll(lo, hi) && lo == 10 && hi == 25);  // off until set
+    over.SetFirstRoll(8, 14);
+    assert(over.FirstRoll(lo, hi) && lo == 8 && hi == 14);
+    over.Begin({3000,3000}, 1000, 11);
+    lo = 10; hi = 25;
+    assert(!over.FirstRoll(lo, hi) && lo == 10 && hi == 25 && over.Begun() == 1);
+}
 void test_probe_clusters_need_unsigned_ghosts_and_pick_the_biggest_group()
 {
     // Five ghosts of a jammed base, two more far away, one with a radar dot on it.
@@ -126,6 +137,7 @@ void test_probe_clusters_need_unsigned_ghosts_and_pick_the_biggest_group()
 }
 int main()
 {
+    test_overnuke_first_roll_applies_to_the_first_target_only();
     test_sensors_towers_outrank_mobile_and_radar();
     test_nuclear_mobile_including_t3_is_rejected();
     test_silo_history_is_local_and_expires_at_five_minutes();

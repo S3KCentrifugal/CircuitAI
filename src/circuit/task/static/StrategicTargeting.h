@@ -124,8 +124,17 @@ public:
     void Begin(Point p, float r, int roll, int frame = 0, bool stock = false)
     {
         pos = p; radius = std::max(0.f, r); goal = std::max(1, roll); fired = 0;
-        stocking = stock; since = frame;
+        stocking = stock; since = frame; ++begun;
     }
+    // Front nukerush (owner 2026-11-04): the ally team's first overnuke rolls
+    // firstMin..firstMax launches instead of the policy's roll; 0 = off.
+    void SetFirstRoll(int lo, int hi) { firstMin = std::max(0, lo); firstMax = std::max(firstMin, hi); }
+    bool FirstRoll(int& lo, int& hi) const
+    {
+        if ((begun > 0) || (firstMax <= 0)) return false;
+        lo = std::max(1, firstMin); hi = std::max(lo, firstMax); return true;
+    }
+    int Begun() const { return begun; }
     bool Stocking() const { return Active() && stocking; }
     bool Salvo() const { return Active() && !stocking; }
     int Since() const { return since; }
@@ -163,7 +172,7 @@ public:
 private:
     Point pos{-1.f, -1.f};
     float radius = 0.f;
-    int goal = 0, fired = 0, scouts = 0;
+    int goal = 0, fired = 0, scouts = 0, begun = 0, firstMin = 0, firstMax = 0;
     bool stocking = false;
     int since = 0;  // frame the target began, for the stock timeout
     Ledger done;

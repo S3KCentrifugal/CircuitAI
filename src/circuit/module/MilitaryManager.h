@@ -328,6 +328,8 @@ public:
 	void NoteOvernukeRound() { ++overnukeRounds; }
 	// One draw per key for the ally team (CAllyTeam::TeamRoll).
 	bool AllyTeamRoll(const std::string& key, float chance);
+	// The ally team's first overnuke rolls lo..hi launches (strategic::Overnuke::SetFirstRoll).
+	void SetOvernukeFirstRoll(int lo, int hi);
 	springai::AIFloat3 GetOvernukePos() const;
 	float GetOvernukeRadius() const;
 	// Nuke rush scouting (owner 2026-10-28): the latest aim point the nuclear

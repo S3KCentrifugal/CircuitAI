@@ -2611,6 +2611,11 @@ bool CMilitaryManager::AllyTeamRoll(const std::string& key, float chance)
 	return on;
 }
 
+void CMilitaryManager::SetOvernukeFirstRoll(int lo, int hi)
+{
+	circuit->GetAllyTeam()->GetOvernuke().SetFirstRoll(lo, hi);
+}
+
 float CMilitaryManager::GetOvernukeRadius() const
 {
 	return circuit->GetAllyTeam()->GetOvernuke().Radius();

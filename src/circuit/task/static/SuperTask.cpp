@@ -996,11 +996,12 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	// every allied BARb, the roll is overnuke_team_min..max. CountNukeSilos already counts them.
 	const int teamSilos = silos;
 	const bool teamRoll = (policy.overnukeTeamSilos > 0) && (teamSilos >= policy.overnukeTeamSilos);
-	const int lo = teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
-	const int hi = teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
+	int lo = teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
+	int hi = teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
+	const bool firstRoll = over.FirstRoll(lo, hi);  // front nukerush: the team's first salvo (script SetOvernukeFirstRoll)
 	const int roll = lo + rand() % (hi - lo + 1);
 	circuit->LOG("NUKE: overnuke roll %i..%i (%i silos across the allied AIs%s)", lo, hi, teamSilos,
-			teamRoll ? ", the team breakpoint" : "");
+			firstRoll ? ", the nukerush first salvo" : teamRoll ? ", the team breakpoint" : "");
 	over.Begin({targetPos.x, targetPos.z}, (policy.repeatRadius > 0.f) ? policy.repeatRadius : cdef->GetAoe(), roll,
 			frame, policy.overnukeStock);
 	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,

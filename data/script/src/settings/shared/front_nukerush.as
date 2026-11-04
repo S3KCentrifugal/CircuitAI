@@ -11,6 +11,14 @@ namespace FrontNukeRush {
     float EnergyIncome = 2000.0f;
     int MinSeconds = 20 * 60;
     int Limit = 6;                      // silos per AI from this program
+    // owner 2026-11-04: each finished advanced fusion of ours allows AfusSilos more,
+    // the first AfusFree AFUS adding none
+    int AfusSilos = 2;
+    int AfusFree = 0;
+    // owner 2026-11-04: the team's first overnuke salvo (3+ silos) rolls
+    // FirstSalvoMin..FirstSalvoMax launches; later targets keep behaviour.json's roll
+    int FirstSalvoMin = 8;
+    int FirstSalvoMax = 14;
     // a silo block stands no further toward the nearest enemy start than this
     // share of the way there from our own start
     float MaxForwardShare = 0.45f;

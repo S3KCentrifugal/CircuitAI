@@ -4,14 +4,16 @@
 // When it is on:
 // - every FRONT and AIR builds nuclear silos one at a time, from MinSeconds of
 //   game time while the 10 s minimum incomes stay at or above MetalIncome and
-//   EnergyIncome, up to Limit, in tight blocks side by side (FrontSiloGrid, the
+//   EnergyIncome, up to Limit (+ AfusSilos per finished advanced fusion of ours, owner
+//   2026-11-04), in tight blocks side by side (FrontSiloGrid, the
 //   FRONT silo grid: as few blocks as fit, 3x2 first), no further toward the
 //   nearest enemy start than MaxForwardShare of the way there, on ground the
 //   TECH / AIR layouts and lab corridors have not reserved (CanReserveArea);
 // - TECH builds them the same way, on the same income gate, once its first
 //   gantry is finished (t3rush plan: once its gantries have made TechT3RushUnits);
 // - the overnuke (3+ finished silos across every allied BARb, C++
-//   CSuperTask::SelectNuclearTarget) asks AIR for a scout package across the map
+//   CSuperTask::SelectNuclearTarget; the team's first salvo rolls FirstSalvoMin..Max,
+//   8-14, owner 2026-11-04) asks AIR for a scout package across the map
 //   when it begins, and again every time a salvo is fully launched and the next
 //   target starts stocking (OvernukeRecon::Rounds, team/nuke_recon.as).
 // Log [NukeRush].
@@ -27,12 +29,26 @@ namespace FrontNukeRush {
             const float chance = Global::FrontNukeRush::Chance;
             state = (chance > 0.0f && aiMilitaryMgr.AllyTeamRoll("front_nukerush", chance)) ? 1 : 0;
             GenericHelpers::LogUtil("[NukeRush] team roll " + int(chance * 100.0f + 0.5f) + "%: " + (state == 1 ? "ON" : "off"), 1);
+            if (state == 1 && Global::FrontNukeRush::FirstSalvoMax > 0)
+                aiMilitaryMgr.SetOvernukeFirstRoll(Global::FrontNukeRush::FirstSalvoMin, Global::FrontNukeRush::FirstSalvoMax);
         }
         return state == 1;
     }
 
     // the game-start draw, before any constructor asks
     void Tick() { On(); }
+
+    // the silo cap: Limit, plus AfusSilos per finished advanced fusion of ours past AfusFree
+    int SiloLimit()
+    {
+        int afus = 0;
+        array<string> names = UnitHelpers::GetAllAdvancedFusionReactors();
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+            if (d !is null) afus += d.count - aiBuilderMgr.GetUnfinishedCount(d);
+        }
+        return Global::FrontNukeRush::Limit + Global::FrontNukeRush::AfusSilos * AiMax(0, afus - Global::FrontNukeRush::AfusFree);
+    }
 
     int FinishedGantries()
     {

@@ -46,7 +46,7 @@ namespace FrontSiloGrid {
     array<int> slotWait;         // per slot: no order before this frame
     array<int> slotDeaths;       // per slot: quick deaths in a row
     int nextLog = -100000;
-    bool capsRaised = false;
+    int capsAt = 0;              // the silo cap last applied (the nukerush cap grows with our AFUS)
     array<int> slots;            // grid reservations, block by block, row by row in a block
     array<int> zones;            // one envelope zone per block
     AIFloat3 centre(-1.0f, 0.0f, -1.0f);
@@ -63,7 +63,7 @@ namespace FrontSiloGrid {
     float MetalGate() { return Rush() ? Global::FrontNukeRush::MetalIncome : Global::RoleSettings::Front::NukeMetalIncome; }
     float EnergyGate() { return Rush() ? Global::FrontNukeRush::EnergyIncome : Global::RoleSettings::Front::NukeEnergyIncome; }
     int SustainSeconds() { return Rush() ? 0 : Global::RoleSettings::Front::NukeSustainSeconds; }
-    int Limit() { return Rush() ? Global::FrontNukeRush::Limit : Global::RoleSettings::Front::NukeLimit; }
+    int Limit() { return Rush() ? FrontNukeRush::SiloLimit() : Global::RoleSettings::Front::NukeLimit; }
     const array<int>@ Shapes()
     {
         if (Rush()) return @Global::FrontNukeRush::Shapes;
@@ -307,7 +307,7 @@ namespace FrontSiloGrid {
                     + ", +" + int(ei) + " energy of " + int(EnergyGate()) + (rush ? " (nukerush)" : ""));
             return null;
         }
-        if (!capsRaised) {
+        if (limit > capsAt) {
             if (role == AiRole::FRONT && !rush) {
                 UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllNukeSilos(), limit);
             } else {
@@ -318,7 +318,7 @@ namespace FrontSiloGrid {
                     if (sd !is null && sd.maxThisUnit < limit) sd.maxThisUnit = limit;
                 }
             }
-            capsRaised = true;
+            capsAt = limit;
         }
         if (!d.IsAvailable(ai.frame)) { Held(d.GetName() + " not available"); return null; }
         // a block at a time: the first a SiloGridShapes shape that fits, the next round it once
