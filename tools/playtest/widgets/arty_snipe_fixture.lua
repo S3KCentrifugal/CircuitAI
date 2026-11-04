@@ -152,6 +152,14 @@ local function gameFrame(f)
             end
         end
     end
+    if cfg.killAt and f%150==0 then   -- lock test: the artillery must not walk forward while locked
+        for u,t in pairs(tracked) do
+            if t.team==A and not t.dead then
+                local x,_,z=Spring.GetUnitPosition(u)
+                if x then echo(string.format("pos frame=%d id=%d def=%s at=(%.0f,%.0f) dist=%.0f",f,u,t.def,x,z,math.sqrt((x-cfg.cx)^2+(z-cfg.cz)^2))) end
+            end
+        end
+    end
     if f%1800==0 then
         local alive=0
         for u,t in pairs(tracked) do if t.team==A and not t.dead then alive=alive+1 end end

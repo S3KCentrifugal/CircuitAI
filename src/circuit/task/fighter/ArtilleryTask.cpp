@@ -564,6 +564,12 @@ bool ArtyLockDrive(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInf
 	return true;
 }
 
+// A route task holding its lock through the range micro (KeepWeaponRange).
+void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
+{
+	circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame).lockLastHold = frame;
+}
+
 bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit)
 {
 	if ((circuit == nullptr) || (unit == nullptr)) return false;

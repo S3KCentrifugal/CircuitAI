@@ -36,6 +36,7 @@ bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit);
 CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, float& dist);
 void ArtyLockSet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e);
 bool ArtyLockDrive(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e, float dist);
+void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
 
 class CArtilleryTask final: public IFighterTask {
 public:
