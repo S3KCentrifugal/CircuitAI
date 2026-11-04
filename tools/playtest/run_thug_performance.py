@@ -52,7 +52,7 @@ def main():
     p.add_argument('--background-pid',type=int,action='append',default=[],
         help='Explicit existing user game: measure command/population controls only; CPU acceptance remains pending. Never stops that process.')
     a=p.parse_args()
-    for name in ('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_RANGED_TRACE'):
+    for name in ('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_RANGED_TRACE'):
         if name in os.environ:p.error('Unset diagnostic variable '+name)
     idle(a.background_pid)
     fixture=json.loads((HERE/'cases/shared/combat'/f'{a.case}.json').read_text())
