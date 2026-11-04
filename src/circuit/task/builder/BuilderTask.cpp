@@ -1061,6 +1061,15 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 	if (unit->IsAttrNoDisrupt()) {
 		return true;
 	}
+	// Drone AA (owner 2026-11-04): the tower is the answer to the drones over
+	// this builder, so the negative influence they bring must not hand it back
+	// to policy. Fixture (run_drone_aa.py, 11-04): both first orders were
+	// swapped away within seconds (commander to FRONT work, constructor to its
+	// FRONT seat) and timed out unbuilt. The task's own timeout and retreat
+	// still end it.
+	if (circuit->GetMilitaryManager()->IsDroneAATask(this)) {
+		return true;
+	}
 	// Crash (owner's game, 2026-10-23, Ascendancy, ~34:00): a re-evaluation that
 	// assigns a new task starts it at once, and its Start re-evaluates the same
 	// unit. When policy flips between two jobs (an interrupt guard and another
