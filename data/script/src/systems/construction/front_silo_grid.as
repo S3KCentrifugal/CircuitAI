@@ -38,10 +38,16 @@ namespace FrontSiloGrid {
     int searchFails = 0;         // a failed site search backs off: retry x 2^fails, at most SiloGridRetryMaxSeconds
     int nextOrder = 0;           // one order at a time: Builder's queued count lags the frame the order is made
     IUnitTask@ pending = null;   // the silo order in flight; the next waits until it is done or dead
-    // Slot backoff (owner 2026-11-03): an order that dies within SlotQuickDeathSeconds while its slot
-    // stays empty (played, All That Glitters: a lost silo's slot re-ordered every 11 s for 5 min, each
-    // order dead 1 s later) parks that slot for SlotBackoffSeconds, doubled per repeat up to SlotBackoffMaxSeconds.
-    const int SlotQuickDeathSeconds = 15, SlotBackoffSeconds = 120, SlotBackoffMaxSeconds = 600;
+    // Slot backoff (owner 2026-11-03): an order that dies while its slot stays empty (played, All That
+    // Glitters: a lost silo's slot re-ordered every 11 s for 5 min, each order dead 1 s later) parks
+    // that slot for SlotBackoffSeconds, doubled per repeat up to SlotBackoffMaxSeconds; the next order
+    // goes to another free slot. An order still alive with no frame after SlotStallSeconds is aborted
+    // and parks its slot too (played, Proving Grounds: one order lived 30 min unstarted and, one at a
+    // time, held every later silo), and so does a slot the order could not be pinned to.
+    const int SlotBackoffSeconds = 120, SlotBackoffMaxSeconds = 600, SlotStallSeconds = 120;
+    // a FRONT with no site within SiloGridMaxHomeDistance (played: an edge start, 0 sites for 28 min)
+    // searches further after 2 failed searches: x1.5, then x2
+    float homeReach = 1.0f;
     int pendingSlot = -1, pendingFrame = 0;
     array<int> slotWait;         // per slot: no order before this frame
     array<int> slotDeaths;       // per slot: quick deaths in a row
@@ -68,6 +74,15 @@ namespace FrontSiloGrid {
     {
         if (Rush()) return @Global::FrontNukeRush::Shapes;
         return @Global::RoleSettings::Front::SiloGridShapes;
+    }
+
+    void Park(int slot, const string &in why)
+    {
+        if (slotWait.length() < slots.length()) { slotWait.resize(slots.length()); slotDeaths.resize(slots.length()); }
+        const int wait = AiMin(SlotBackoffMaxSeconds, SlotBackoffSeconds * (1 << AiMin(slotDeaths[slot], 3)));
+        ++slotDeaths[slot];
+        slotWait[slot] = ai.frame + wait * SECOND;
+        GenericHelpers::LogUtil(Tag() + "[SiloGrid] grid slot " + slot + ": " + why + "; slot parked " + wait + " s", 1);
     }
 
     CCircuitDef@ SiloDef(CCircuitUnit@ u)
@@ -190,7 +205,7 @@ namespace FrontSiloGrid {
                     const float ang = 6.2831853f * (float(k) + 0.5f * float(ring % 2)) / float(spokes);
                     // a later block searches round the first, so the blocks stand together
                     const AIFloat3 c(origin0.x + cos(ang) * step * float(ring), 0.0f, origin0.z + sin(ang) * step * float(ring));
-                    if (MapHelpers::SqDist(c, home) > Global::RoleSettings::Front::SiloGridMaxHomeDistance * Global::RoleSettings::Front::SiloGridMaxHomeDistance) { ++far; continue; }
+                    if (MapHelpers::SqDist(c, home) > Global::RoleSettings::Front::SiloGridMaxHomeDistance * Global::RoleSettings::Front::SiloGridMaxHomeDistance * homeReach * homeReach) { ++far; continue; }
                     if (c.x < own || c.z < own || c.x >= AiTerrainWidth() - own || c.z >= AiTerrainHeight() - own) { ++offMap; continue; }
                     // the block's far edge counts: its centre's progress plus its own half size
                     if (rush && enemyD > 1.0f && ((c.x - home.x) * axisX + (c.z - home.z) * axisZ) + own > shareMax * enemyD) { ++pastShare; continue; }
@@ -281,25 +296,24 @@ namespace FrontSiloGrid {
         if (d is null || !u.circuitDef.CanBuild(d)) return null;
         const int sustained = Sustained();
         if (sustained < SustainSeconds() * SECOND) return null;
-        const int total = EconomyHelpers::GetNukeSiloCount(), queued = Builder::NukeSiloQueuedCount;
-        if (queued > 0 || ai.frame < nextOrder) return null;   // one at a time
         // one at a time over the grid too: Builder's queued count misses pinned BIG_GUN orders, and a
         // pinned slot reads free until it is served (played: "silo 1 of 8" on all eight slots, 10 s apart)
-        if (pending !is null && !pending.IsDead()) return null;
-        if (pending !is null && pendingSlot >= 0 && pendingSlot < int(slots.length())) {
-            if (slotWait.length() < slots.length()) { slotWait.resize(slots.length()); slotDeaths.resize(slots.length()); }
-            if (ai.frame - pendingFrame < SlotQuickDeathSeconds * SECOND && aiTerrainMgr.GetReservationState(slots[pendingSlot]) == 0) {
-                const int wait = AiMin(SlotBackoffMaxSeconds, SlotBackoffSeconds * (1 << AiMin(slotDeaths[pendingSlot], 3)));
-                ++slotDeaths[pendingSlot];
-                slotWait[pendingSlot] = ai.frame + wait * SECOND;
-                GenericHelpers::LogUtil(Tag() + "[SiloGrid] grid slot " + pendingSlot + ": the order died after "
-                    + ((ai.frame - pendingFrame) / SECOND) + " s; slot parked " + wait + " s", 1);
-            } else {
-                slotDeaths[pendingSlot] = 0;
-            }
+        const bool tracked = pendingSlot >= 0 && pendingSlot < int(slots.length());
+        if (pending !is null && !pending.IsDead()) {
+            if (!tracked || ai.frame - pendingFrame < SlotStallSeconds * SECOND
+                    || aiTerrainMgr.GetReservationState(slots[pendingSlot]) != 0) return null;
+            GenericHelpers::LogUtil(Tag() + "[SiloGrid] grid slot " + pendingSlot + ": no frame after "
+                + ((ai.frame - pendingFrame) / SECOND) + " s; order aborted", 1);
+            aiBuilderMgr.AbortTask(pending);
+        }
+        if (pending !is null && tracked) {
+            if (aiTerrainMgr.GetReservationState(slots[pendingSlot]) == 0) Park(pendingSlot, "the order ended after " + ((ai.frame - pendingFrame) / SECOND) + " s with no silo");
+            else if (uint(pendingSlot) < slotDeaths.length()) slotDeaths[pendingSlot] = 0;
         }
         @pending = null;
         pendingSlot = -1;
+        const int total = EconomyHelpers::GetNukeSiloCount(), queued = Builder::NukeSiloQueuedCount;
+        if (queued > 0 || ai.frame < nextOrder) return null;   // one at a time
         const float mi = Economy::GetMinMetalIncomeLast10s(), ei = Economy::GetMinEnergyIncomeLast10s();
         if (!EconomyHelpers::ShouldRushNuke(mi, ei, queued, total, limit, MetalGate(), EnergyGate())) {
             if (total < limit)
@@ -342,6 +356,11 @@ namespace FrontSiloGrid {
                 nextSearch = ai.frame + AiMin(Global::RoleSettings::Front::SiloGridRetryMaxSeconds,
                     Global::RoleSettings::Front::SiloGridRetrySeconds * (1 << AiMin(searchFails, 4))) * SECOND;
                 ++searchFails;
+                if (searchFails >= 2 && homeReach < 2.0f) {
+                    homeReach = AiMin(2.0f, homeReach + 0.5f);
+                    GenericHelpers::LogUtil(Tag() + "[SiloGrid] no site within reach: searching to x" + homeReach + " of "
+                        + int(Global::RoleSettings::Front::SiloGridMaxHomeDistance) + " from home", 1);
+                }
                 return null;
             }
             searchFails = 0;
@@ -356,7 +375,7 @@ namespace FrontSiloGrid {
             if (t is null) return null;
             if (!AiPinReservation(t, slots[s])) {
                 aiBuilderMgr.AbortTask(t);
-                Held("could not pin " + d.GetName() + " to grid slot " + s);
+                Park(int(s), "could not pin " + d.GetName());
                 return null;
             }
             nextOrder = ai.frame + 10 * SECOND;
