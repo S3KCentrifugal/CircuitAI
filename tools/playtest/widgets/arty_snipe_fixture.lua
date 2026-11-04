@@ -198,6 +198,10 @@ local function gameFrame(f)
     end
     if cfg.scoutWithdraw and f%90==0 then
         for u,t in pairs(tracked) do
+            if t.team==myTeam and t.def==KEY and not t.dead then
+                local state=Spring.GetUnitLosState(u,aiAlly) or {}
+                echo(string.format("target-sensors frame=%d id=%d los=%s radar=%s",f,u,tostring(state.los or false),tostring(state.radar or false)))
+            end
             if t.team==A and not t.dead then
                 local x,_,z=Spring.GetUnitPosition(u)
                 local q=Spring.GetUnitCommands(u,1) or {}
