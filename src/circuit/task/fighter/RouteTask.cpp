@@ -433,7 +433,7 @@ unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
 
 void CRouteTask::IssueDirect(CCircuitUnit* unit)
 {
-	if (sniping.count(unit) != 0) return;  // ArtySnipeStep owns it; resumes after
+	if ((sniping.count(unit) != 0) || ArtySnipeOwns(manager->GetCircuit(), unit)) return;  // ArtySnipeStep owns it (also right after a transfer); resumes after
 	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return;
@@ -459,7 +459,7 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 
 void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 {
-	if (sniping.count(unit) != 0) return;  // ArtySnipeStep owns it; resumes after
+	if ((sniping.count(unit) != 0) || ArtySnipeOwns(manager->GetCircuit(), unit)) return;  // ArtySnipeStep owns it (also right after a transfer); resumes after
     if (airControl && airTarget >= 0) {
         auto* circuit = manager->GetCircuit();
         auto* enemy = circuit->GetEnemyInfo(airTarget);

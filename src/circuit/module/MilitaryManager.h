@@ -391,6 +391,7 @@ public:
 		int orderKey = -1, orderUntil = -1;
 		int lastCall = -1;
 		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
+		int recruitScan = -1;   // stage 2 gathering: recruitment scans at most every 0.5 s
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
