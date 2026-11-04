@@ -262,6 +262,7 @@ bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,con
         cfg->group.radius,unit->GetCircuitDef()->GetBuildDistance(),unit->GetTask()==groupJob);
 }
 IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
+    if(task && task==junoJob) return task; // the probe Juno has its own slot, never the group job
     if(task) {
         // Re-adopting the same job (assist, maintenance) keeps its commitment.
         if(task!=groupJob) groupJobCommitted=false;
@@ -286,7 +287,6 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     if(task==junoJob) {
         junoJob=nullptr;
         ai->LOG("[CommanderGroup] juno_probe_end team=%i done=%i",ai->GetTeamId(),int(done));
-        return;
     }
     if(task!=groupJob) return;
     groupJob=nullptr; // manager still owns task during this callback
@@ -491,7 +491,7 @@ IUnitTask* CCommanderController::GroupLocalMaintenance(CCircuitUnit* unit,CCircu
         if(!worker || worker==unit) continue;
         auto* project=worker->GetTask();
         auto* build=dynamic_cast<IBuilderTask*>(project);
-        if(build && build->GetBuildDef() && !project->IsExternalControlled()
+        if(build && build->GetBuildDef() && project!=junoJob && !project->IsExternalControlled()
             && !project->IsEnemyReclaim() && GroupProjectAllowed(unit,project) && project->CanAssignTo(unit))
         {
             ai->LOG("[CommanderGroup] assist_adopt unit=%i anchor=%i def=%s",unit->GetId(),worker->GetId(),build->GetBuildDef()->GetDef()->GetName());
