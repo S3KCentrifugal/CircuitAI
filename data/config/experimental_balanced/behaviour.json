@@ -258,7 +258,7 @@
 			// radars/jammers or shields already in weapon range when nothing else is to shoot and they have not fired
 			// for ghost_idle_seconds. They never move toward a ghost.
 			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
-			"ghost_idle_seconds": 10
+			"ghost_idle_seconds": 20   // owner 2026-11-04: 20 s idle
 		},
 		// Owner 2026-11-03: tactical launchers (Paralyzer EMP, Catalyst, Perdition) shoot, before their ordinary pick,
 		// 1) primary: static shields (every faction's) and Pulsar / Bulwark / Bastion,
