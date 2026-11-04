@@ -211,7 +211,7 @@
 			// radars/jammers or shields already in weapon range when nothing else is to shoot and they have not fired
 			// for ghost_idle_seconds. They never move toward a ghost.
 			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
-			"ghost_idle_seconds": 10
+			"ghost_idle_seconds": 20   // owner 2026-11-04: 20 s idle
 		},
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
 		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of
