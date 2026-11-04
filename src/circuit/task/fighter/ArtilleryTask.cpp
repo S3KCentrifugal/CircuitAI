@@ -188,6 +188,11 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 			} else if (gst.ghostAim != bestTarget->GetId()) {
 				gst.ghostAim = bestTarget->GetId();
 				gst.ghostShots = 0;
+				// Owner 05:45Z: a heavy ghost gets `volleys`, any other ghost structure
+				// ghost_volleys_other (then waits for a fresh LOS sighting).
+				const CMilitaryManager::SArtySnipeInfo& si = military->GetArtySnipeInfo();
+				gst.ghostHeavy = (edef != nullptr) && ((si.threats.count(edef->GetId()) > 0) || (si.directThreats.count(edef->GetId()) > 0));
+				gst.ghostNeed = gst.ghostHeavy ? si.volleys : si.ghostVolleysOther;
 				circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f)", unit->GetCircuitDef()->GetDef()->GetName(),
 						unit->GetId(), (edef != nullptr) ? edef->GetDef()->GetName() : "?", bestTarget->GetId(),
 						bestTarget->GetPos().x, bestTarget->GetPos().z);
@@ -625,10 +630,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// Owner 2026-11-03 21:36Z: a ghost picked by the default target
 			// choice gets `volleys` blind volleys, then is left until a fresh
 			// LOS sighting (CArtilleryTask::FindTarget / Execute).
-			if ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil) && (++st.ghostShots >= info.volleys)) {
+			if ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil) && (++st.ghostShots >= st.ghostNeed)) {
 				st.ghostDone.insert(st.ghostAim);
-				circuit->LOG("SNIPE: %s %i fired %i blind volleys at ghost %i, leaves it until seen", cdef->GetDef()->GetName(),
-						unit->GetId(), st.ghostShots, st.ghostAim);
+				circuit->LOG("SNIPE: %s %i fired %i blind volleys (%s) at ghost %i, leaves it until seen", cdef->GetDef()->GetName(),
+						unit->GetId(), st.ghostShots, st.ghostHeavy ? "heavy" : "other", st.ghostAim);
 				st.ghostAim = -1;
 				st.ghostShots = 0;
 			}
