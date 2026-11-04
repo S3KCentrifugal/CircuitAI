@@ -352,6 +352,7 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 		rs.holding = false;
 		rs.ghostAim = -1;
 		rs.ghostShots = 0;
+		rs.recruited = true;
 	}
 	return int(ids.size());
 }
@@ -874,6 +875,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			}
 		}
 		st.stage = 2;
+		st.recruited = false;  // triggered itself
 		st.direct = bestDirect;
 		st.go = false;
 		st.atHold = false;
@@ -1245,7 +1247,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// the go-in, launchers within recruit_radius of the gather point or of this
 			// (triggered) unit join: the least-overlap gather point can be on the
 			// far side of the threat (test 11-04: two near-side Ambassadors missed).
-			if (!fresh && (frame >= st.recruitScan)) {
+			// Only a unit that triggered itself recruits (test 11-04: recruits that
+			// recruited chained the radius across the map).
+			if (!fresh && !st.recruited && (frame >= st.recruitScan)) {
 				st.recruitScan = frame + FRAMES_PER_SEC / 2;
 				int squad = 0;
 				const int n = RecruitArtillery(circuit, {st.spot, pos}, st.threat, st.direct, false, -1, frame, squad);
