@@ -219,7 +219,12 @@
 			"lock": true,
 			"lock_mobiles": false,
 			"lock_margin": 150,
-			"lock_step_in": 100
+			"lock_step_in": 100,
+			// Owner 2026-11-04 20:03Z: after the normal pick and before the idle ghost volley, an unidentified radar dot
+			// (type unknown) in weapon range is fired on until dead ("better safe than sorry"): nearest first, attacked by
+			// its unit handle, dropped when it dies, is identified (normal rules then), leaves radar or leaves range +
+			// lock_margin. Never walked toward; airborne dots and (for non-water weapons) underwater dots are skipped.
+			"radar_dots": true
 		},
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
 		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of
