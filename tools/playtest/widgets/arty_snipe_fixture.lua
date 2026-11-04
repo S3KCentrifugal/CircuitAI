@@ -123,6 +123,14 @@ local function gameFrame(f)
             end
         end
     end
+    if cfg.killAt and f==cfg.killAt then   -- the target dies out of the AI's sight: its ghost stays until the spot is seen
+        local sel={}
+        for u,t in pairs(tracked) do if t.team==myTeam and t.def==KEY and not t.dead then sel[#sel+1]=u end end
+        Spring.SelectUnitArray(sel)
+        cmd("selfd")
+        echo(string.format("self-destruct %s x%d",KEY,#sel))
+    end
+    if cfg.losAgainAt and f==cfg.losAgainAt then cmd("globallos "..aiAlly); echo("global LOS on again for ally "..aiAlly) end
     if cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
     if f%1800==0 then
