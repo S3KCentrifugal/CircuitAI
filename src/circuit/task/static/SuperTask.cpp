@@ -996,12 +996,14 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	// every allied BARb, the roll is overnuke_team_min..max. CountNukeSilos already counts them.
 	const int teamSilos = silos;
 	const bool teamRoll = (policy.overnukeTeamSilos > 0) && (teamSilos >= policy.overnukeTeamSilos);
-	int lo = teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
-	int hi = teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
+	// Third breakpoint (owner 2026-11-04): overnuke_tier3_silos and up roll overnuke_tier3_min..max
+	const bool tier3 = (policy.overnukeTier3Silos > 0) && (teamSilos >= policy.overnukeTier3Silos);
+	int lo = tier3 ? policy.overnukeTier3Min : teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
+	int hi = tier3 ? policy.overnukeTier3Max : teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
 	const bool firstRoll = over.FirstRoll(lo, hi);  // front nukerush: the team's first salvo (script SetOvernukeFirstRoll)
 	const int roll = lo + rand() % (hi - lo + 1);
 	circuit->LOG("NUKE: overnuke roll %i..%i (%i silos across the allied AIs%s)", lo, hi, teamSilos,
-			firstRoll ? ", the nukerush first salvo" : teamRoll ? ", the team breakpoint" : "");
+			firstRoll ? ", the nukerush first salvo" : tier3 ? ", the third breakpoint" : teamRoll ? ", the team breakpoint" : "");
 	over.Begin({targetPos.x, targetPos.z}, (policy.repeatRadius > 0.f) ? policy.repeatRadius : cdef->GetAoe(), roll,
 			frame, policy.overnukeStock);
 	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
@@ -1123,7 +1125,7 @@ bool CSuperTask::ReleaseSalvo(int frame, const std::function<bool ()>& scan)
 		over.Retarget({targetPos.x, targetPos.z});
 	}
 	targetPos = keep;
-	over.Release(stocked);
+	over.Release(stocked, policy.overnukeFireAll);
 	static const char* why[] = {"", "stocked", "timeout", "a silo hit"};
 	circuit->LOG("NUKE: overnuke salvo released (%s) after %is: %i stocked in %i silos, %i launches",
 			why[int(gate)], (frame - over.Since()) / FRAMES_PER_SEC, stocked, reaching, over.Goal());

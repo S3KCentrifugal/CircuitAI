@@ -140,10 +140,13 @@ public:
     int Since() const { return since; }
     // Open fire. A release short of the roll (timeout, a silo hit) fires only
     // what is stocked: the goal drops to it.
-    void Release(int stocked)
+    // fireAll (owner 2026-11-04): every missile stocked at the release goes, so
+    // the goal rises to the stock when the silos hold more than the roll.
+    void Release(int stocked, bool fireAll = false)
     {
         stocking = false;
         if (stocked > 0 && stocked < goal) goal = stocked;
+        if (fireAll && stocked > goal) goal = stocked;
     }
     // A better aim point found before the first launch (fresh scouting): the
     // salvo goes there instead, same roll.

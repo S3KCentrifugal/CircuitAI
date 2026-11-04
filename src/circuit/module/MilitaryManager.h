@@ -300,6 +300,13 @@ public:
 		int overnukeTeamSilos = 8;  // 0 = off
 		int overnukeTeamMin = 15;
 		int overnukeTeamMax = 30;
+		// Third breakpoint (owner 2026-11-04): from overnukeTier3Silos, overnukeTier3Min..Max.
+		int overnukeTier3Silos = 0;  // 0 = off
+		int overnukeTier3Min = 19;
+		int overnukeTier3Max = 25;
+		// owner 2026-11-04: a released salvo fires every missile the reaching silos hold,
+		// not only the roll; what they stock after waits for the next target.
+		bool overnukeFireAll = false;
 		// Antinuke cover (owner 2026-10-31, restored 2026-11-02): each known enemy
 		// interceptor (any def with an interceptor weapon: Protector, Fortitude,
 		// Aegis, Rampart, mobile and ship antinukes) whose coverage holds an aim
