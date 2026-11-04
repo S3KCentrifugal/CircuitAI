@@ -2289,20 +2289,29 @@ void CMilitaryManager::UpdateCommanderSnipe()
 		if (commSnipeInfo.defs.count(unit->GetCircuitDef()->GetId()) == 0) continue;
 		const int locked = unit->GetCommanderTarget();
 		IUnitTask* task = unit->GetTask();
-		// Owner 2026-10-27: a `ranged` hull's controller only picks targets its
-		// shell can reach from where it stands (terrain-checked trajectory) and
-		// weights commanders by commander_priority. This lock checks range only,
-		// so a T3 flat-trajectory gun (Astraeus) held a commander behind a ridge
-		// and never fired. O(1) per unit; the existing release path runs.
+		// Owner 2026-11-04: every listed unit and every T3 locks a commander in
+		// range, `ranged` hulls included (Fatboy, Catapult, Myrmidon). Only a
+		// flat gun (ranged + low_trajectory: Astraeus, Daedalus) must also pass
+		// the ranged controller's terrain test to the commander; a blocked shot
+		// is no lock, so its controller keeps shooting what it can hit.
+		// (2026-10-27 skipped every `ranged` hull, which cost Fatboys the lock.)
 		if (unit->IsDead() || task == nullptr || task->GetType() == IUnitTask::Type::NIL
-			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled()
-			|| unit->GetCircuitDef()->IsAttrRanged())
+			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled())
 		{
 			if (locked >= 0) unit->SetCommanderTarget(-1, frame);
 			continue;
 		}
-		const CCircuitDef* cdef = unit->GetCircuitDef();
+		CCircuitDef* cdef = unit->GetCircuitDef();
 		const AIFloat3& pos = unit->GetPos(frame);
+		const bool flatGun = cdef->IsAttrRanged() && cdef->GetRangedPolicy().lowTrajectory;
+		// One terrain walk (distance/32 samples) per weapon, only for a flat
+		// gun and only for a commander already inside reach.
+		const auto clearShot = [&](const AIFloat3& target) {
+			const auto& weapons = GetRangedWorld()->CapabilitiesFor(cdef).weapons;
+			return std::any_of(weapons.begin(), weapons.end(), [&](const auto& w) {
+				return rangedWorld->Trajectory(w, pos, target);
+			});
+		};
 		int best = -1;
 		float bestSq = std::numeric_limits<float>::max();
 		for (const SComm& c : comms) {
@@ -2312,6 +2321,7 @@ void CMilitaryManager::UpdateCommanderSnipe()
 			const float reach = range + (c.id == locked ? commSnipeInfo.releaseMargin : commSnipeInfo.acquireMargin);
 			const float sq = pos.SqDistance2D(c.pos);
 			if (sq > SQUARE(reach)) continue;
+			if (flatGun && !clearShot(c.pos)) continue;
 			// Hysteresis: the current lock wins while it stays in reach.
 			if (c.id == locked) { best = locked; break; }
 			if (sq < bestSq) { bestSq = sq; best = c.id; }
