@@ -767,13 +767,24 @@ void CCommanderController::WatchJunoJob(int frame) {
             auto* u=ai->GetTeamUnit(id);
             if(u && u->IsFinished() && u->GetCircuitDef()==build->GetBuildDef()) {why="built";break;}
         }
-        if(!why) {
+        if(!why && !target) {
+            // No frame yet: a builder that cannot build the Juno cannot start it.
+            const std::vector<CCircuitUnit*> assignees(junoJob->GetAssignees().begin(),junoJob->GetAssignees().end());
+            for(CCircuitUnit* u:assignees) {
+                if(!u || u->GetCircuitDef()->CanBuild(build->GetBuildDef()) || u->GetTask()!=junoJob) continue;
+                ai->LOG("[CommanderGroup] juno_probe_drop team=%i unit=%i def=%s",
+                    ai->GetTeamId(),u->GetId(),u->GetCircuitDef()->GetDef()->GetName());
+                u->GetManager()->AssignTask(u);
+                if(!junoJob) break;  // the hand-back retired the order (TaskFinished)
+            }
+        }
+        if(!why && junoJob) {
             if(junoJob->GetAssignees().empty()) {if(junoIdleSince<0) junoIdleSince=frame;}
             else junoIdleSince=-1;
             if(junoIdleSince>=0 && frame-junoIdleSince>60*FRAMES_PER_SEC) why="unassigned";
             else if(!target && frame-junoOrderFrame>240*FRAMES_PER_SEC) why="no_frame";
         }
-        if(!why && (frame-junoOrderFrame)%(10*FRAMES_PER_SEC)<FRAMES_PER_SEC) {
+        if(!why && junoJob && (frame-junoOrderFrame)%(10*FRAMES_PER_SEC)<FRAMES_PER_SEC) {
             // Who is (not) building it: the ordering constructor's current task.
             auto* u=ai->GetTeamUnit(junoUnit);
             auto* t=u?u->GetTask():nullptr;
@@ -783,7 +794,7 @@ void CCommanderController::WatchJunoJob(int frame) {
                 junoJob->GetAssignees().size(),int(target!=nullptr),u?std::sqrt(u->GetPos(frame).SqDistance2D(site)):-1.f);
         }
     }
-    if(!why) return;
+    if(!why || !junoJob) return;
     ai->LOG("[CommanderGroup] juno_probe_retire team=%i reason=%s",ai->GetTeamId(),why);
     IUnitTask* task=junoJob;
     if(!task->IsDead()) task->GetManager()->AbortTask(task); // dequeue -> TaskFinished
@@ -803,10 +814,22 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     const bool builder=unit->GetCircuitDef()->IsBuilder();
     const bool nearby=unit->GetPos(frame).SqDistance2D(center)<=SQUARE(cfg->group.radius);
     // Owner 2026-11-03: the probe Juno keeps its builder until it is done.
+    // Owner 2026-11-04: a seat that cannot build the Juno (commander, T2
+    // constructor) only helps once the frame stands (it can assist, not start
+    // it), and joins junoJob directly, never through groupJob; if the frame is
+    // lost it lets go (WatchJunoJob hands back any that are still on it).
     if(builder && junoJob) {
-        if(current==junoJob) return current;
-        if(junoJob->CanAssignTo(unit) && unit->GetCircuitDef()->CanBuild(static_cast<IBuilderTask*>(junoJob)->GetBuildDef())
-            && unit->GetPos(frame).SqDistance2D(static_cast<IBuilderTask*>(junoJob)->GetPosition())<=SQUARE(cfg->group.radius*2)) return junoJob;
+        auto* juno=static_cast<IBuilderTask*>(junoJob);
+        const bool canBuild=unit->GetCircuitDef()->CanBuild(juno->GetBuildDef());
+        const bool helps=juno->GetTarget()!=nullptr && unit->GetCircuitDef()->IsAbleToAssist();
+        if(current==junoJob && (canBuild || helps)) return current;
+        if(current!=junoJob && junoJob->CanAssignTo(unit) && (canBuild || helps)
+            && unit->GetPos(frame).SqDistance2D(juno->GetPosition())<=SQUARE(cfg->group.radius*2))
+        {
+            if(!canBuild) ai->LOG("[CommanderGroup] juno_probe_helper team=%i unit=%i def=%s",
+                ai->GetTeamId(),unit->GetId(),unit->GetCircuitDef()->GetDef()->GetName());
+            return junoJob;
+        }
     }
     if(builder && !junoJob)
         if(auto* task=GroupJunoProbe(unit,frame)) return task;
