@@ -163,6 +163,8 @@ public:
 	void SetMexOwnership(bool enabled, float seconds);
 	void SetMexAllyStart(int team, const springai::AIFloat3& pos, int commander);
 	bool CanReachMex(CCircuitUnit* builder, const springai::AIFloat3& pos);
+	// D-465: a geothermal vent no claimant ground start reaches (build stance, 3D).
+	bool IsGeoAirOnly(const springai::AIFloat3& pos);
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
 	bool IsMexOwnershipActive() const;
@@ -481,6 +483,7 @@ private:
 	std::uint64_t mexOwnerRevision = 0;
 	bool mexOwnersDirty = true;
 	float MexStartDistance(SMexStart& start, const springai::AIFloat3& pos);
+	void EnsureOwnMexStart();
 
 	// D-352 theatres. One terrain field per (class, seed set), rebuilt on a
 	// terrain publication; every number the rules read is broadcast roster

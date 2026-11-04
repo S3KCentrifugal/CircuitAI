@@ -225,6 +225,36 @@ namespace FrontConstructors {
         const string side = UnitHelpers::GetSideForUnitName(unit.circuitDef.GetName());
         return side == "armada" ? "arm" : side == "cortex" ? "cor" : "leg";
     }
+    // Played (Supreme Isthmus team 2): an unstarted order held the seat 7.6
+    // minutes with no energy built. Our own order that has not started within
+    // EnergySeatGeoOrderSeconds counts as a failure.
+    bool AbortStaleGeo(IBuilderTask@ task) {
+        if (task is null || task.IsDead() || task.target !is null
+            || task.GetBuildType() != int(Task::BuildType::GEO)) return false;
+        const AIFloat3 at = task.GetBuildPos();
+        if (int(at.x) != geoSiteX || int(at.z) != geoSiteZ
+            || ai.frame - geoOrderFrame <= int(Global::RoleSettings::Front::EnergySeatGeoOrderSeconds * SECOND)) return false;
+        aiBuilderMgr.AbortTask(task);
+        GeoFailed("not started in " + int(Global::RoleSettings::Front::EnergySeatGeoOrderSeconds) + " s");
+        return true;
+    }
+    // Played (Scylla and Charybdis 8v8, owner's game): a constructor stuck
+    // below a plateau vent is never idle, so its builder ask, where the
+    // deadline used to live, never came. FRONT's once-a-second update checks
+    // the energy seat's own task instead: O(1), no unit scan.
+    void Watch() {
+        if (Global::AISettings::Role != AiRole::FRONT) return;
+        Load();
+        CCircuitUnit@ unit = ai.GetTeamUnit(seats[ENERGY]);
+        if (unit is null) return;
+        IBuilderTask@ task = cast<IBuilderTask>(unit.task);
+        if (task is null || task.GetBuildType() != int(Task::BuildType::GEO)) return;
+        // INV-251: ground construction never holds an air-only geothermal vent.
+        if (aiEconomyMgr.IsGeoAirOnly(task.GetBuildPos()))
+            Invariants::Violation("INV-251", "front-geo", "FRONT energy seat " + unit.id + " holds a geothermal order on an air-only vent at "
+                + int(task.GetBuildPos().x) + "," + int(task.GetBuildPos().z));
+        AbortStaleGeo(task);
+    }
     bool Started(IBuilderTask@ task) {
         return task !is null && !task.IsDead() && task.target !is null
             && task.GetBuildType() < int(Task::BuildType::REPAIR) && Local(task);
@@ -236,16 +266,7 @@ namespace FrontConstructors {
     IUnitTask@ EnergyGeo(CCircuitUnit@ unit, IBuilderTask@ current) {
         Load();
         if (current !is null && !current.IsDead() && current.GetBuildType() == int(Task::BuildType::GEO)) {
-            // Played (Supreme Isthmus team 2): an unstarted order held the
-            // seat 7.6 minutes with no energy built. Our own order that has not
-            // started within EnergySeatGeoOrderSeconds counts as a failure.
-            const AIFloat3 at = current.GetBuildPos();
-            if (current.target is null && int(at.x) == geoSiteX && int(at.z) == geoSiteZ
-                && ai.frame - geoOrderFrame > int(Global::RoleSettings::Front::EnergySeatGeoOrderSeconds * SECOND)) {
-                aiBuilderMgr.AbortTask(current);
-                GeoFailed("not started in " + int(Global::RoleSettings::Front::EnergySeatGeoOrderSeconds) + " s");
-                return null;
-            }
+            if (AbortStaleGeo(current)) return null;
             return current;
         }
         if (!FrontConstructorMath::GeoAllowed(geoFails, Global::RoleSettings::Front::EnergySeatGeoAttempts,

@@ -1030,15 +1030,7 @@ int CEconomyManager::MexOwnerTeam(const springai::AIFloat3& pos)
 		auto* terrain = circuit->GetTerrainManager();
 		if (!std::isfinite(pos.x) || !std::isfinite(pos.z) || pos.x < 0 || pos.z < 0
 				|| pos.x >= terrain->GetTerrainWidth() || pos.z >= terrain->GetTerrainHeight()) return MEX_OWNER_UNKNOWN;
-		const int ownTeam = circuit->GetTeamId();
-		if (mexStarts.find(ownTeam) == mexStarts.end()) {
-			SMexStart own;
-			own.pos = circuit->GetSetupManager()->GetStartPos();
-			const auto* def = circuit->GetSetupManager()->GetCommChoice();
-			if (def) own.definition = def->GetId();
-			mexStarts.emplace(ownTeam, std::move(own));
-			mexOwnersDirty = true;
-		}
+		EnsureOwnMexStart();
 		const auto revision = terrain->GetAreaData()->heightRevision;
 		const auto& spots = circuit->GetMetalManager()->GetSpots();
 		if (mexOwnersDirty || mexOwnerRevision != revision || mexOwners.size() != spots.size()) {

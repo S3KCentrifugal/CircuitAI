@@ -192,6 +192,7 @@ namespace RoleFront {
     const int FRONT_DYNAMIC_QUOTA_DELAY_FRAMES = Global::RoleSettings::Front::DynamicQuotaDelaySeconds * SECOND;
 
     void Front_MainUpdate() {
+        FrontConstructors::Watch();   // D-465: stale geothermal orders of the energy seat, every second
         // Delay dynamic quota adjustments until 5 minutes into the game to avoid
         // early-game oscillations while armies and caches are still forming.
         if (ai.frame < FRONT_DYNAMIC_QUOTA_DELAY_FRAMES) {
