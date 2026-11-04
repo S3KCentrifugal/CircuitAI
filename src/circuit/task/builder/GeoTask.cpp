@@ -56,6 +56,11 @@ void CBGeoTask::Cancel()
 
 bool CBGeoTask::Execute(CCircuitUnit* unit)
 {
+	if ((unit == nullptr) || unit->IsDead() || IsDead() || (buildDef == nullptr)) return false;
+	// Owner 2026-11-04: no geothermal or advanced geothermal plant under threat
+	// or in reach of known (or ghost) enemy porc. Unstarted: dropped, the vent
+	// reopens; started frame: the constructor falls back. Mirrors mex safety.
+	if (DropIfUnsafe(unit, "execute")) return false;
 	executors.insert(unit);
 
 	CCircuitAI* circuit = manager->GetCircuit();
@@ -78,12 +83,16 @@ bool CBGeoTask::Execute(CCircuitUnit* unit)
     // Revalidate on execution, since ownership may change during travel.
     for (int id : circuit->GetCallback()->GetFriendlyUnitIdsIn(buildPos, 32.f, false)) {
         auto* friendly = circuit->GetFriendlyUnit(id);
-        if (friendly && friendly->GetCircuitDef()->GetDef()->IsNeedGeo()
+        if (friendly && friendly->GetCircuitDef() && friendly->GetCircuitDef()->GetDef()->IsNeedGeo()
             && friendly->GetUnit()->GetTeam() != circuit->GetTeamId()) {
             manager->AbortTask(this);
             return false;
         }
     }
+	if (!geom::is_valid(buildPos)) {  // cancelled meanwhile: nothing to build
+		manager->AbortTask(this);
+		return false;
+	}
 	if (!circuit->GetTerrainManager()->IsAllyLayoutBlocked(buildDef, buildPos, facing)
         && circuit->GetMap()->IsPossibleToBuildAt(buildDef->GetDef(), buildPos, facing)) {
 		TRY_UNIT(circuit, unit,

@@ -158,8 +158,9 @@ bool IBuilderTask::CanAssignTo(CCircuitUnit* unit) const
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	if (buildType == BuildType::MEXUP && economyMgr->IsMexNavigationEnabled()
 			&& !economyMgr->CanReachMex(unit, position)) return false;
-	// Owner 2026-11-02: mex upgrades (script NOW orders included) only where safe
-	if (buildType == BuildType::MEXUP
+	// Owner 2026-11-02: mex upgrades (script NOW orders included) only where safe.
+	// Owner 2026-11-04: geothermal and advanced geothermal plants too.
+	if (((buildType == BuildType::MEXUP) || (buildType == BuildType::GEO))
 			&& !economyMgr->IsMexSpotSafe(unit, geom::is_valid(buildPos) ? buildPos : position)) return false;
 	if (cost.metal < buildPower.metal * buildDef->GetGoalBuildTime(economyMgr->GetAvgMetalIncome())) {  // upper metal bound
 		return false;
@@ -888,24 +889,28 @@ bool IBuilderTask::DropIfUnsafe(CCircuitUnit* unit, const char* where)
 	// spot comes under the threat map or a known (or ghost) enemy structure's
 	// reach. An unstarted order is dropped (its spot reopens and is offered
 	// again once safe); a started frame is left, the constructor falls back.
-	if ((buildType != BuildType::MEX) && (buildType != BuildType::MEXUP)) return false;
+	// Owner 2026-11-04: the same for geothermal and advanced geothermal plants.
+	if ((buildType != BuildType::MEX) && (buildType != BuildType::MEXUP) && (buildType != BuildType::GEO)) return false;
+	if ((unit == nullptr) || unit->IsDead() || IsDead()) return false;
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	int why = 0;
-	const AIFloat3& spot = geom::is_valid(buildPos) ? buildPos : position;
-	if (economyMgr->IsMexSpotSafe(unit, spot, &why)) return false;
-	economyMgr->LogMexUnsafe(unit, spot, why, where);
-	if (target == nullptr) {
-		manager->AbortTask(this);
-	} else {
+	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;  // copy: Abort resets buildPos
+	if (!geom::is_valid(spot) || economyMgr->IsMexSpotSafe(unit, spot, &why)) return false;
+	economyMgr->LogMexUnsafe(unit, spot, why, where, (buildType == BuildType::GEO) ? "GEO" : "MEX");
+	// FallbackTask dequeues the unit's current task: only when that is this one,
+	// otherwise it would cancel whatever unrelated work the unit now holds.
+	if ((target != nullptr) && (unit->GetTask() == this)) {
 		manager->FallbackTask(unit);
+	} else {
+		manager->AbortTask(this);  // idempotent; Stop clears travel actions and path queries
 	}
-	return true;
+	return true;  // the task may be dead now: callers must not touch it again
 }
 
 bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
-	if ((buildType == BuildType::MEXUP) && DropIfUnsafe(unit, "reevaluate")) return false;
+	if (((buildType == BuildType::MEXUP) || (buildType == BuildType::GEO)) && DropIfUnsafe(unit, "reevaluate")) return false;
 
 	// FIXME: Replace const 1000.0f with build time?
 	CEconomyManager* ecoMgr = circuit->GetEconomyManager();
@@ -1050,6 +1055,9 @@ void IBuilderTask::UpdatePath(CCircuitUnit* unit)
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	const float range = IsExperimental() ? EngageRange(unit) : cdef->GetBuildDistance();  // D-064: the goal is the range circle
 	const AIFloat3& endPos = GetPosition();
+	if (!geom::is_valid(endPos)) {
+		return;  // a cancelled site (buildPos reset): no path to an invalid point
+	}
 	if (canAutoAbort && (target == nullptr)
 		&& !circuit->GetTerrainManager()->CanReachAtSafe(unit, endPos, range, cdef->GetPower()))
 	{
@@ -1090,6 +1098,11 @@ void IBuilderTask::ApplyPath(const CQueryPathSingle* query)
 {
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
+	// Owner 2026-11-04: a task dropped as unsafe (or the unit reassigned) while
+	// the path was computed must not walk the unit on to the abandoned site.
+	if ((unit == nullptr) || IsDead() || unit->IsDead() || (unit->GetTask() != this)) {
+		return;
+	}
 
 	ITravelAction* travelAct = unit->GetTravelAct();
 	if (travelAct == nullptr) {

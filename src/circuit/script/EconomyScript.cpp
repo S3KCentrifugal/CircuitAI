@@ -47,6 +47,7 @@ static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builde
         const auto& position = sites[index];
         const float distance = position.SqDistance2D(center);
         if (distance > best || terrain->IsZoneAlly(position)
+            || !economy->IsMexSpotSafe(builder, position)  // owner 2026-11-04: geo safety
             || !terrain->CanReachAtSafe(builder, position, builder->GetCircuitDef()->GetBuildDistance())
             || !terrain->CanBeBuiltAtSafe(definition, position)
             || terrain->IsAllyLayoutBlocked(definition, position, UNIT_NO_FACING)) continue;
@@ -57,7 +58,7 @@ static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builde
         if (occupied) continue;
         for (int id : circuit->GetCallback()->GetFriendlyUnitIdsIn(position, 32.f, false)) {
             auto* friendly = circuit->GetFriendlyUnit(id);
-            if (!friendly || !friendly->GetCircuitDef()->GetDef()->IsNeedGeo()) continue;
+            if (!friendly || !friendly->GetCircuitDef() || !friendly->GetCircuitDef()->GetDef()->IsNeedGeo()) continue;
             auto* owned = circuit->GetTeamUnit(id);
             if (!owned || !owned->IsFinished()
                 || economy->GetEnergyMake(owned->GetCircuitDef()) >= economy->GetEnergyMake(definition)) {

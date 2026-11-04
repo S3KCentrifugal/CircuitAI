@@ -2017,6 +2017,7 @@ IBuilderTask* CEconomyManager::UpdateGeoTasks(const AIFloat3& position, CCircuit
 		const float distSq = geos[i].SqDistance2D(position);
 		if (IsOpenGeoSpot(i) && (minDistSq > distSq)
 			&& !terrainMgr->IsZoneAlly(geos[i]) && terrainMgr->CanBeBuiltAtSafe(geoDef, geos[i])
+			&& IsMexSpotSafe(unit, geos[i])  // owner 2026-11-04: no geo under threat or enemy porc (null unit: task-time checks)
 			&& map->IsPossibleToBuildAt(geoDef->GetDef(), geos[i], UNIT_NO_FACING))  // lazy check for allies
 		{
 			minDistSq = distSq;

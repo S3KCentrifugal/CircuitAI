@@ -151,12 +151,12 @@ bool CEconomyManager::IsMexSpotSafe(CCircuitUnit* builder, const AIFloat3& pos, 
     return true;
 }
 
-void CEconomyManager::LogMexUnsafe(CCircuitUnit* builder, const AIFloat3& pos, int why, const char* where) {
+void CEconomyManager::LogMexUnsafe(CCircuitUnit* builder, const AIFloat3& pos, int why, const char* where, const char* kind) {
     ++mexUnsafeCount;
     const int frame = circuit->GetLastFrame();
     if (frame - mexUnsafeLogFrame < FRAMES_PER_SEC * 10) return;
     mexUnsafeLogFrame = frame;
-    circuit->LOG("MEX SAFETY: %s %i %s at (%.0f,%.0f): %s (%i refusals so far)",
+    circuit->LOG("%s SAFETY: %s %i %s at (%.0f,%.0f): %s (%i refusals so far)", kind ? kind : "MEX",
         builder ? builder->GetCircuitDef()->GetDef()->GetName() : "?", builder ? builder->GetId() : -1, where,
         pos.x, pos.z, why == 2 ? "enemy porc in range" : "threat map", mexUnsafeCount);
 }

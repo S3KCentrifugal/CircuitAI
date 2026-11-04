@@ -169,7 +169,7 @@ public:
 	// Commanders are exempt. why (optional): 1 threat map, 2 enemy porc.
 	bool IsMexSpotSafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int* why = nullptr);
 	// Log a refusal at most every 10 s per builder kind (diagnostic).
-	void LogMexUnsafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int why, const char* where);
+	void LogMexUnsafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int why, const char* where, const char* kind = "MEX");
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
 	bool IsMexOwnershipActive() const;
@@ -247,8 +247,10 @@ public:
 	void SetOpenMexSpot(int spotId, bool value);
 	bool IsUpgradingMexSpot(int spotId) const { return spotId >= 0 && std::size_t(spotId) < mexSpots.size() && mexSpots[spotId].isUp; }
 	void SetUpgradingMexSpot(int spotId, bool value) { if (spotId >= 0 && std::size_t(spotId) < mexSpots.size()) mexSpots[spotId].isUp = value; }
-	bool IsOpenGeoSpot(int spotId) const { return geoSpots[spotId].isOpen; }
-	void SetOpenGeoSpot(int spotId, bool value) { geoSpots[spotId].isOpen = value; }
+	// Owner 2026-11-04: script GEO tasks made with TaskB::Common carry spotId -1;
+	// an unchecked index wrote outside geoSpots on every such task's start/cancel.
+	bool IsOpenGeoSpot(int spotId) const { return (spotId >= 0) && (static_cast<size_t>(spotId) < geoSpots.size()) && geoSpots[spotId].isOpen; }
+	void SetOpenGeoSpot(int spotId, bool value) { if ((spotId >= 0) && (static_cast<size_t>(spotId) < geoSpots.size())) geoSpots[spotId].isOpen = value; }
 	bool IsUpgradingGeoSpot(int spotId) const { return geoSpots[spotId].isUp; }
 	void SetUpgradingGeoSpot(int spotId, bool value) { geoSpots[spotId].isUp = value; }
 	bool IsIgnorePull(const IBuilderTask* task) const;
