@@ -148,6 +148,10 @@ local function gameFrame(f)
     if cfg.revealAt and f==cfg.revealAt then give("armeyes",A,cfg.cx+350,cfg.cz); echo(string.format("AI camera at (%d,%d): the spot is seen",cfg.cx+350,cfg.cz)) end
     if cfg.losAgainAt and f==cfg.losAgainAt then cmd("globallos "..aiAlly); echo("global LOS on again for ally "..aiAlly) end
     if cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
+    if cfg.holdFire and f==(cfg.placeAt or 300)+10 then
+        for u,t in pairs(tracked) do if t.team==myTeam then Spring.GiveOrderToUnit(u,CMD.FIRE_STATE,{0},0) end end
+        echo("host porc set to hold fire")
+    end
     if cfg.aiRadar and cfg.radarAt and f==cfg.radarAt then give("armrad",A,cfg.aiRadar[1],cfg.aiRadar[2]); echo(string.format("AI radar tower at (%d,%d)",cfg.aiRadar[1],cfg.aiRadar[2])) end
     if cfg.radarOffAt and f==cfg.radarOffAt then   -- the target goes dark again
         local n=0
