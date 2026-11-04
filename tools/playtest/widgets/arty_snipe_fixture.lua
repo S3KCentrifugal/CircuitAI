@@ -97,7 +97,7 @@ local function gameFrame(f)
         cmd("selfd")
         -- the host (observer) sees the AI's artillery, so its deaths and killers are logged
         local _,_,_,_,_,ally=Spring.GetTeamInfo(myTeam,false)
-        cmd("globallos "..ally)
+        if not cfg.hostBlind then cmd("globallos "..ally) end
     end
     if f==(cfg.losOnAt or 60) then cmd("globallos "..aiAlly); echo("global LOS on for ally "..aiAlly) end
     if cfg.extraMove and f==(cfg.extraAt or cfg.placeAt or 300)+30 then   -- a mobile radar dot passing through range
@@ -156,7 +156,9 @@ local function gameFrame(f)
     if cfg.radarOffAt and f==cfg.radarOffAt then   -- the target goes dark again
         local n=0
         for _,u in ipairs(Spring.GetTeamUnitsByDefs(A,UnitDefNames.armrad.id) or {}) do Spring.SendLuaRulesMsg(string.format("$dev$:destroyunits %d",u)); n=n+1 end
-        echo(string.format("AI radar towers destroyed: %d",n))
+        -- a blind host cannot see the AI radar: a host jammer at the target hides it from radar instead
+        give("armjamt",myTeam,cfg.cx+120,cfg.cz)
+        echo(string.format("AI radar towers destroyed: %d; host jammer at (%d,%d)",n,cfg.cx+120,cfg.cz))
     end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
     -- every new projectile of the AI's tracked artillery (ghost-gone test: no shots after the spot is seen empty)

@@ -761,6 +761,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 			int& n = GhostCountRef(gfs, ge);
 			++n;
 			const int need = GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef());
+			circuit->LOG("ARTY: %s %i ghost volley %i/%i at %i", cdef->GetDef()->GetName(), unit->GetId(), n, need, track.target);
 			if (n >= need) {
 				GhostDoneSet(gfs, ge);
 				circuit->LOG("ARTY: %s %i fired %i ghost volleys at %i, leaves it until seen", cdef->GetDef()->GetName(),
@@ -1086,6 +1087,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			if ((ga != nullptr) && ga->NotInRadarAndLOS()) {
 				int& n = GhostCountRef(st, ga);
 				st.ghostShots = ++n;
+				circuit->LOG("SNIPE: %s %i ghost volley %i/%i at %i", cdef->GetDef()->GetName(), unit->GetId(), n, st.ghostNeed, st.ghostAim);
 				if (n >= st.ghostNeed) {
 					GhostDoneSet(st, ga);
 					circuit->LOG("SNIPE: %s %i fired %i blind volleys (%s) at ghost %i, leaves it until seen", cdef->GetDef()->GetName(),
