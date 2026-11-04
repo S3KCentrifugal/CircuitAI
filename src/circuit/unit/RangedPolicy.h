@@ -163,6 +163,18 @@ struct RangedPolicy {
     // press_static still applies (a pressed ghost counts only its death blast).
     // Individual (non-coordinated) controller only: cohorts ignore it.
     float ghostPorcRange = ranged_policy_defaults::GHOST_PORC_RANGE;
+    // Owner 2026-11-04 (Barrage vs Sentry): -1 = off (safety_margin everywhere).
+    // Otherwise the margin added to STATIC coverage (live porc and ghost porc)
+    // in site, path, staging, danger and escape tests of the individual
+    // controller. Mobile contacts keep safety_margin and the closing-speed
+    // escape. With static_margin set, a hull that drifts into static reach
+    // steps out just past it (16 elmos) instead of backing off 160+.
+    float staticMargin = -1.f;
+    // 0 = off. A firing-site move no longer than this, whose straight line is
+    // walkable and outside static coverage, is one direct MOVE instead of a
+    // grid path (grid nodes sit up to 45 elmos off the line and fail the
+    // coverage test when the site is a few elmos outside porc reach).
+    float directMoveRadius = 0.f;
     float assistMargin = 150.f; // ally counts as engaged within its ground range + margin + contact radius
     bool assistScreen = true;   // assist firing sites require an allied screen toward the target
 };

@@ -17,8 +17,9 @@ namespace FrontNukeRush {
     int AfusFree = 0;
     // owner 2026-11-04: the team's first overnuke salvo (3+ silos) rolls
     // FirstSalvoMin..FirstSalvoMax launches; later targets keep behaviour.json's roll
+    // owner 2026-11-04 17:40Z: off - behaviour.json's tiers (3+ silos 6-11, 8+ 12-18, 13+ 19-25) rule every salvo
     int FirstSalvoMin = 8;
-    int FirstSalvoMax = 14;
+    int FirstSalvoMax = 0;
     // a silo block stands no further toward the nearest enemy start than this
     // share of the way there from our own start
     float MaxForwardShare = 0.45f;

@@ -589,6 +589,10 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.overnukeTeamSilos = std::max(0, nuclear.get("overnuke_team_silos", 8).asInt());
 	nuclearInfo.overnukeTeamMin = std::max(1, nuclear.get("overnuke_team_min", 15).asInt());
 	nuclearInfo.overnukeTeamMax = std::max(nuclearInfo.overnukeTeamMin, nuclear.get("overnuke_team_max", 30).asInt());
+	nuclearInfo.overnukeTier3Silos = std::max(0, nuclear.get("overnuke_tier3_silos", 0).asInt());
+	nuclearInfo.overnukeTier3Min = std::max(1, nuclear.get("overnuke_tier3_min", 19).asInt());
+	nuclearInfo.overnukeTier3Max = std::max(nuclearInfo.overnukeTier3Min, nuclear.get("overnuke_tier3_max", 25).asInt());
+	nuclearInfo.overnukeFireAll = nuclear.get("overnuke_fire_all", false).asBool();
 	nuclearInfo.antinukeFactorOrdinary = std::min(1.f, std::max(0.f, nuclear.get("antinuke_factor", 0.70f).asFloat()));
 	nuclearInfo.antinukeFactorOvernuke = std::min(1.f, std::max(0.f, nuclear.get("antinuke_factor_overnuke", 0.85f).asFloat()));
 	nuclearInfo.antinukeFloor = std::min(1.f, std::max(0.f, nuclear.get("antinuke_floor", 0.05f).asFloat()));
@@ -598,9 +602,10 @@ void CMilitaryManager::ReadConfig()
 	circuit->LOG("CONFIG %s: nuclear antinuke factor=%.2f overnuke factor=%.2f (per covering antinuke) floor=%.2f margin=%.0f",
 			cfgName.c_str(), nuclearInfo.antinukeFactorOrdinary, nuclearInfo.antinukeFactorOvernuke,
 			nuclearInfo.antinukeFloor, nuclearInfo.coveredMargin);
-	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i team(silos=%i roll=%i..%i) scoutEvery=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
+	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i team(silos=%i roll=%i..%i) tier3(silos=%i roll=%i..%i) fireAll=%i scoutEvery=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
 			cfgName.c_str(), nuclearInfo.overnukeSilos, nuclearInfo.overnukeMin, nuclearInfo.overnukeMax,
 			nuclearInfo.overnukeTeamSilos, nuclearInfo.overnukeTeamMin, nuclearInfo.overnukeTeamMax,
+			nuclearInfo.overnukeTier3Silos, nuclearInfo.overnukeTier3Min, nuclearInfo.overnukeTier3Max, int(nuclearInfo.overnukeFireAll),
 			nuclearInfo.overnukeScoutEvery, int(nuclearInfo.overnukeStock), nuclearInfo.overnukeStockCap,
 			nuclearInfo.overnukeStockFrames / FRAMES_PER_SEC, nuclearInfo.overnukeFireBelowHealth);
 	if (!stockCfg.isNull()) {

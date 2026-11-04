@@ -103,6 +103,13 @@ void test_overnuke_salvo_holds_until_stocked_then_fires_the_roll()
     over.Begin({8000,8000}, 1000, 20, 400, true);
     over.Release(12);
     assert(over.Salvo() && over.Goal() == 12);
+    // fire all (owner 2026-11-04): a release holding more than the roll fires everything
+    over.Begin({8000,8000}, 1000, 8, 400, true);
+    over.Release(13, true);
+    assert(over.Salvo() && over.Goal() == 13);
+    over.Begin({9000,9000}, 1000, 8, 400, true);
+    over.Release(13);
+    assert(over.Goal() == 8);
 }
 void test_overnuke_first_roll_applies_to_the_first_target_only()
 {
