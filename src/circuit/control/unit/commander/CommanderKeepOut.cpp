@@ -44,6 +44,7 @@
 // at most eight goal candidates once a second while withdrawing.
 #include "control/unit/commander/CommanderController.h"
 #include "module/BuilderManager.h"
+#include "module/MilitaryManager.h"
 #include "module/EconomyManager.h"
 #include "control/core/ControlledTask.h"
 #include "setup/SetupManager.h"
@@ -344,7 +345,11 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         const bool recentDamage=s.lastDamage>=0 && frame-s.lastDamage<FRAMES_PER_SEC;
         const bool hitByDrone=frame-s.keep.droneHit<FRAMES_PER_SEC;
         const bool home=pos.SqDistance2D(ai->GetSetupManager()->GetBasePos())<SQUARE(BASE_RADIUS);
-        if(!home && (hitByDrone || (recentDamage && dronesInReach>0))) {
+        // Owner 2026-11-04: a commander on a drone AA tower (MilitaryManager
+        // drone AA) stays under the drones and finishes it.
+        const bool aaJob=ai->GetMilitaryManager()->IsDroneAATask(unit->GetTask());
+        if(aaJob) s.keep.droneUntil=-1;
+        else if(!home && (hitByDrone || (recentDamage && dronesInReach>0))) {
             if(frame>=s.keep.droneUntil)
                 ai->LOG("[CommanderSafety] unit=%i action=drone_fire hit=%i drones=%i hp=%.2f",
                     unit->GetId(),int(hitByDrone),dronesInReach,unit->GetHealthPercent());

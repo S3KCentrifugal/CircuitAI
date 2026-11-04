@@ -22,6 +22,7 @@
 #include <string>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <array>
 #include <type_traits>
 
@@ -899,6 +900,38 @@ private:
 
 	std::shared_ptr<IMainJob> defend;
 	std::vector<std::pair<springai::AIFloat3, BuildVector>> buildDefence;  // pos: defences
+
+	/*
+	 * Drone AA (owner 2026-11-04): when enemy drones (customparams.drone = 1,
+	 * e.g. a Legion Hive's) hit one of our structures, the nearest builders,
+	 * commanders included, build up to `count` light AA towers next to it,
+	 * outside known enemy gun porc reach (seen or ghost; mex safety list) and
+	 * preferably outside the drone carrier's own reach. Event driven: work
+	 * happens only on a drone hit, at most once per `interval` per AI.
+	 * Config: behaviour root "drone_aa" {enabled, count, units, interval,
+	 * pull_radius, cover_margin, carrier_margin, timeout}.
+	 */
+public:
+	bool IsDroneAATask(const IUnitTask* task) const { return (task != nullptr) && (droneAATasks.count(task) > 0); }
+	void DroneAATaskGone(const IUnitTask* task) { droneAATasks.erase(task); }
+private:
+	void ReadDroneAAConfig();
+	void DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker);
+	bool IsCarrierDef(CCircuitDef* cdef, float* reach);
+	struct SDroneAA {
+		bool enabled = true;
+		int count = 2;
+		std::vector<std::string> units;  // light AA per side, first buildable wins
+		int interval = 2 * FRAMES_PER_SEC;
+		float pullRadius = 1600.f;
+		float coverMargin = 150.f;  // a tower stands within its AA range minus this of the hit structure
+		float carrierMargin = 96.f;
+		int timeout = 90 * FRAMES_PER_SEC;
+	} droneAA;
+	int droneAANext = 0;
+	int droneAALogFrame = -1000;
+	std::unordered_set<const IUnitTask*> droneAATasks;
+	std::unordered_map<int, float> carrierReach;  // def id -> drone reach, < 0 when not a carrier
 };
 
 } // namespace circuit

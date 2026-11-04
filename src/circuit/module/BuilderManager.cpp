@@ -1379,6 +1379,7 @@ void CBuilderManager::AssignTask(CCircuitUnit* unit)
 void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 {
     circuit->GetCommanderController()->TaskFinished(task,done);
+	if (circuit->GetMilitaryManager() != nullptr) circuit->GetMilitaryManager()->DroneAATaskGone(task);  // drone AA keeps no pointer past dequeue
 	switch (task->GetType()) {
 		case IUnitTask::Type::BUILDER: {
 			IBuilderTask* taskB = static_cast<IBuilderTask*>(task);

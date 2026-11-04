@@ -180,6 +180,8 @@ public:
 	// Distance from pos to the nearest porc reach edge (negative: inside a
 	// reach). +inf without porc. Refreshes the porc list at most once a second.
 	float EnemyPorcClearance(const springai::AIFloat3& pos);
+	// Same, skipping the porc whose definition `skip` accepts (drone AA: carriers).
+	float EnemyPorcClearance(const springai::AIFloat3& pos, const std::function<bool (CCircuitDef*)>& skip);
 	void LogConPorc(const CCircuitUnit* unit, const springai::AIFloat3& pos, const char* where, const char* what);
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
@@ -493,7 +495,7 @@ private:
 		float porcMaxRange = 1800.f; // longer-ranged structures (LRPC) are not counted
 		float threat = 1.f;          // THREAT_MIN; builder's threat layer at the spot above this is unsafe
 	} mexSafety;
-	struct SMexPorc { springai::AIFloat3 pos; float reachSq; float reach; };
+	struct SMexPorc { springai::AIFloat3 pos; float reachSq; float reach; CCircuitDef* def; };
 	struct SConPorcSafety {
 		bool enabled = true;
 		std::unordered_set<std::string> units;

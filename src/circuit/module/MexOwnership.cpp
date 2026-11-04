@@ -127,7 +127,7 @@ void CEconomyManager::RefreshMexPorc() {
         const float range = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
         if (!(range > 0.f) || range > mexSafety.porcMaxRange) continue;
         const float reach = range + mexSafety.porcMargin;
-        mexPorc.push_back({p, reach * reach, reach});
+        mexPorc.push_back({p, reach * reach, reach, edef});
     }
 }
 
@@ -178,6 +178,17 @@ float CEconomyManager::EnemyPorcClearance(const AIFloat3& pos) {
     if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return best;
     RefreshMexPorc();
     for (const SMexPorc& porc : mexPorc) {
+        best = std::min(best, std::sqrt(porc.pos.SqDistance2D(pos)) - porc.reach);
+    }
+    return best;
+}
+
+float CEconomyManager::EnemyPorcClearance(const AIFloat3& pos, const std::function<bool (CCircuitDef*)>& skip) {
+    float best = std::numeric_limits<float>::infinity();
+    if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return best;
+    RefreshMexPorc();
+    for (const SMexPorc& porc : mexPorc) {
+        if (skip && skip(porc.def)) continue;
         best = std::min(best, std::sqrt(porc.pos.SqDistance2D(pos)) - porc.reach);
     }
     return best;

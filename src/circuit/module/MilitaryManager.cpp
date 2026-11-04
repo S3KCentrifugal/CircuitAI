@@ -358,6 +358,8 @@ void CMilitaryManager::ReadConfig()
 	const std::string& cfgName = circuit->GetSetupManager()->GetConfigName();
 	CCircuitDef::RoleName& roleNames = CCircuitDef::GetRoleNames();
 
+	ReadDroneAAConfig();
+
 	const Json::Value& responses = root["response"];
     // Content policy is explicit JSON, not a faction/unit-name fork. The tag
     // narrows recurring work to possible gadget children; the live rule is
@@ -1063,6 +1065,7 @@ int CMilitaryManager::UnitIdle(CCircuitUnit* unit)
 
 int CMilitaryManager::UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	DroneAAStrike(unit, attacker);  // owner 2026-11-04: light AA against drones hitting structures
 	auto search = damagedHandler.find(unit->GetCircuitDef()->GetId());
 	if (search != damagedHandler.end()) {
 		search->second(unit, attacker);
