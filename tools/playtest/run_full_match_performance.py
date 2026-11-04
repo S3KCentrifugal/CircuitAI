@@ -63,7 +63,7 @@ def main():
     # Native oracles deliberately repeat old work (and snapshot verification
     # rebuilds the legacy ally view). Presence, even value "0", enables them.
     # Reject contaminated timing rather than silently unsetting user intent.
-    oracles=('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_GUARD',
+    oracles=('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_VERIFY_GUARD',
              'CIRCUIT_VERIFY_ECONOMY_INDEX','CIRCUIT_VERIFY_POINT_ROUTES',
              'CIRCUIT_VERIFY_EMPTY_PACK','CIRCUIT_VERIFY_SEA_STATIC_INDEX')
     if any(name in os.environ for name in oracles) and not a.verify_indexes:

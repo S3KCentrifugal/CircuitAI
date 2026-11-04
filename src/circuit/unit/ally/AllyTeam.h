@@ -42,6 +42,7 @@ class CEnergyGrid;
 class CDefenceData;
 class CPathFinder;
 class CFactoryData;
+class CRangedObservation;
 
 class CAllyTeam final {
 public:
@@ -82,7 +83,7 @@ public:
 	const AllyStructures& GetFriendlyStructures();
 
 	const std::set<CEnemyUnit*>& GetDyingEnemies() const { return enemyManager->GetDyingEnemies(); }
-	void DyingEnemy(CEnemyUnit* enemy, int frame) { enemyManager->DyingEnemy(enemy, frame); }
+	void DyingEnemy(CEnemyUnit* enemy, int frame) { enemyManager->DyingEnemy(enemy, frame); ++enemyRevision; }
 	bool EnemyInLOS(CEnemyUnit* data, CCircuitAI* ai);
 	std::pair<CEnemyUnit*, bool> RegisterEnemyUnit(ICoreUnit::Id unitId, bool isInLOS, CCircuitAI* ai);
 	CEnemyUnit* RegisterEnemyUnit(springai::Unit* e, CCircuitAI* ai);
@@ -113,6 +114,13 @@ public:
 	const std::shared_ptr<CDefenceData>&   GetDefenceData()   const { return defence; }
 	const std::shared_ptr<CPathFinder>&    GetPathfinder()    const { return pathfinder; }
 	const std::shared_ptr<CFactoryData>&   GetFactoryData()   const { return factoryData; }
+	// D-462: the ranged combat picture shared by this ally team's AIs, created
+	// on first use. The revision counts every mutation of the shared enemy
+	// records (events, the authority's update, dying, fakes, decoys and an
+	// authority change) so a shared contact view rebuilds within a frame
+	// exactly when a private snapshot taken at that moment would differ.
+	const std::shared_ptr<CRangedObservation>& GetRangedObservation(CCircuitAI* reader);
+	unsigned GetEnemyRevision() const { return enemyRevision; }
 
 	void OccupyCluster(int clusterId, int teamId);
 	SClusterTeam GetClusterTeam(int clusterId);
@@ -184,6 +192,8 @@ private:
 	std::shared_ptr<CFactoryData> factoryData;
 
 	std::shared_ptr<CEnemyManager> enemyManager;
+	std::shared_ptr<CRangedObservation> rangedObservation;
+	unsigned enemyRevision = 0;
 
 	int uEnemyMark;
 };
