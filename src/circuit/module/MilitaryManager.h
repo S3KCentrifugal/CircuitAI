@@ -526,6 +526,9 @@ public:
 		float prepFraction = 0.99f;
 		float snipeFraction = 0.99f;
 		int volleys = 3;
+		// Owner 2026-11-04 05:45Z: blind volleys per unit at a ghost that is not a
+		// heavy (threats + direct threats get `volleys`).
+		int ghostVolleysOther = 1;
 		int visibleMaxVolleys = 0;    // 0: seen porc until dead (owner 01:43Z)
 		int confirmFrames = 3 * 30;
 		int repeatFrames = 60 * 30;
@@ -574,6 +577,8 @@ public:
 		int goFrame = -1;       // stage 2: when it left the gathering spot
 		int ghostAim = -1;      // default targeting: ghost being given its blind volleys
 		int ghostShots = 0;
+		int ghostNeed = 3;      // its volleys: `volleys` for a heavy, ghost_volleys_other otherwise
+		bool ghostHeavy = true;
 		// Owner 2026-11-03 21:04Z synced volley: a gathered group walks in with
 		// fire held and all open fire in one frame (see ArtySnipeStep stage 2).
 		bool syncWait = false;  // stage 2: walking in, waiting for the group's volley

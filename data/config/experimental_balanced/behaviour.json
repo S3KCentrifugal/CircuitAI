@@ -329,6 +329,7 @@
 			"porc_radius": 1600,          // prep porc within this of the threat
 			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
 			"snipe_range_fraction": 0.99,
+			"ghost_volleys_other": 1,     // owner 2026-11-04: blind volleys per unit at a ghost that is not a heavy (heavies: volleys)
 			"volleys": 3,
 			"visible_max_volleys": 0,     // owner 01:43Z: seen porc until dead (0 = no cap)
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
