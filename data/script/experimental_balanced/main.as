@@ -78,7 +78,7 @@ namespace Main {
 
 	void AiMain()
 	{
-		Global::FrontNukeRush::Chance = 0.20f; // owner 2026-11-03: front nukerush, one 20% draw at game start for the whole ally team (systems/team/front_nukerush.as)
+		Global::FrontNukeRush::Chance = 0.15f; // owner 2026-11-04 (0.20 from 2026-11-03): front nukerush, one 15% draw at game start for the whole ally team (systems/team/front_nukerush.as)
         ThugFireAtWill::Enabled = true;
         // Missing working-copy policy. Existing pending-all overrides retain precedence.
         Global::RoleSettings::Air::BankFunding = true; // AIR: bank funds energy/cons/T2 turrets; far mexes past a small home (owner 2026-10-17)

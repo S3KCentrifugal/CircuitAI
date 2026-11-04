@@ -1,7 +1,7 @@
 // Front nukerush (owner, 2026-11-03). One draw at game start for the whole ally
 // team (aiMilitaryMgr.AllyTeamRoll, the first allied BARb to ask draws it);
 // policy in systems/team/front_nukerush.as. Off (0) unless a profile sets it;
-// experimental_balanced / _hard / _terrible set 0.20.
+// experimental_balanced / _hard / _terrible set 0.15 (owner 2026-11-04; 0.20 before).
 namespace Global {
 namespace FrontNukeRush {
     float Chance = 0.0f;
@@ -11,7 +11,7 @@ namespace FrontNukeRush {
     float EnergyIncome = 2000.0f;
     int MinSeconds = 20 * 60;
     int Limit = 6;                      // silos per AI from this program
-    // owner 2026-11-04: each finished advanced fusion of ours allows AfusSilos more,
+    // owner 2026-11-04: TECH only - each finished advanced fusion of its own allows AfusSilos more,
     // the first AfusFree AFUS adding none
     int AfusSilos = 2;
     int AfusFree = 0;

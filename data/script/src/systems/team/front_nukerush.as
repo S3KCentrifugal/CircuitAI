@@ -1,11 +1,11 @@
-// Front nukerush (owner, 2026-11-03). One 20% draw at game start for the whole
+// Front nukerush (owner, 2026-11-03; 15% from 2026-11-04). One draw at game start for the whole
 // ally team (aiMilitaryMgr.AllyTeamRoll: the first allied BARb to ask draws it,
 // every ally reads the same answer; Global::FrontNukeRush::Chance, 0 = off).
 // When it is on:
 // - every FRONT and AIR builds nuclear silos one at a time, from MinSeconds of
 //   game time while the 10 s minimum incomes stay at or above MetalIncome and
-//   EnergyIncome, up to Limit (+ AfusSilos per finished advanced fusion of ours, owner
-//   2026-11-04), in tight blocks side by side (FrontSiloGrid, the
+//   EnergyIncome, up to Limit (TECH: + AfusSilos per finished advanced fusion of its own,
+//   owner 2026-11-04), in tight blocks side by side (FrontSiloGrid, the
 //   FRONT silo grid: as few blocks as fit, 3x2 first), no further toward the
 //   nearest enemy start than MaxForwardShare of the way there, on ground the
 //   TECH / AIR layouts and lab corridors have not reserved (CanReserveArea);
@@ -38,9 +38,11 @@ namespace FrontNukeRush {
     // the game-start draw, before any constructor asks
     void Tick() { On(); }
 
-    // the silo cap: Limit, plus AfusSilos per finished advanced fusion of ours past AfusFree
+    // the silo cap: Limit; TECH also AfusSilos per finished advanced fusion of ours past AfusFree
+    // (owner 2026-11-04: only TECH's silos grow with its AFUS; FRONT and AIR stay at Limit)
     int SiloLimit()
     {
+        if (Global::AISettings::Role != AiRole::TECH) return Global::FrontNukeRush::Limit;
         int afus = 0;
         array<string> names = UnitHelpers::GetAllAdvancedFusionReactors();
         for (uint i = 0; i < names.length(); ++i) {
