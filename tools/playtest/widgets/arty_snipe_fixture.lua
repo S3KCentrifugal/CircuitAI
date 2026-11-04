@@ -55,7 +55,7 @@ end
 function widget:UnitDamaged(u,ud,team,damage,para,wd,pid,attacker,attackerDef)
     local t=tracked[u]
     if not t or t.team~=myTeam then return end
-    if t.def~="cortoast" and not (cfg.damage or {})[t.def] then return end
+    if t.def~="cortoast" and t.def~=KEY and not (cfg.damage or {})[t.def] then return end
     if cfg.protect and t.def==KEY and not t.selfd then
         Spring.SendLuaRulesMsg(string.format("$dev$:sethealth %d:%.3f",u,100))   -- only the self-destruct may kill it
     end
@@ -103,6 +103,8 @@ local function gameFrame(f)
     if f==(cfg.placeAt or 300) then
         for _,e in ipairs(cfg.porc) do give(e[1],myTeam,cfg.cx+e[2],cfg.cz+e[3]) end
         echo(string.format("porc cluster at (%d,%d): %d units",cfg.cx,cfg.cz,#cfg.porc))
+    end
+    if f==(cfg.extraAt or cfg.placeAt or 300) then
         for _,e in ipairs(cfg.extra or {}) do give(e[1],myTeam,e[2],e[3]) end
         if cfg.extra and #cfg.extra>0 then echo(string.format("extra host units: %d",#cfg.extra)) end
     end

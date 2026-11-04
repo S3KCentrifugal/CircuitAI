@@ -15,6 +15,7 @@
 namespace circuit {
 class CCircuitAI;
 class CRangedEngagement;
+class CEnemyInfo;
 
 // Owner 2026-11-02: ghost porc fire (SArtyCommInfo::ghostDefs), shared by
 // the native artillery task and specialist routes (FRONT squads). Last shot is
@@ -31,6 +32,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
 // Owner 2026-11-04: true while an artillery snipe sequence owns the unit (route
 // tasks hold their orders for it, the squad keeps it).
 bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit);
+// Owner 2026-11-04 16:58Z: artillery target lock (native task and route range micro).
+CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, float& dist);
+void ArtyLockSet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e);
+bool ArtyLockDrive(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e, float dist);
 
 class CArtilleryTask final: public IFighterTask {
 public:

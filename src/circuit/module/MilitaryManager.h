@@ -418,8 +418,22 @@ public:
 		// for "ghost_idle_seconds". They never move toward a ghost.
 		std::unordered_set<CCircuitDef::Id> ghostDefs;
 		int ghostIdleFrames = 300;
+		// Owner 2026-11-04 16:58Z: target lock. A unit of `defs` keeps the
+		// identified (LOS or radar) enemy it shoots until it dies; within
+		// range + lockMargin it holds and re-attacks, farther out (a structure)
+		// it only steps in to range - lockStepIn, never the forward path or a
+		// route resume. Only commander / heavy priority breaks it (and resumes
+		// it after). lockMobiles: also lock other mobiles (default structures,
+		// commanders and heavies only).
+		bool lockEnabled = true;
+		bool lockMobiles = false;
+		float lockMargin = 150.f;
+		float lockStepIn = 100.f;
 	};
 	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
+	// Owner 2026-11-04 16:57Z: per enemy id, the last frame a wreck query ran
+	// and whether a wreck of it was seen at its ghost spot (ArtilleryTask).
+	std::unordered_map<int, std::pair<int, bool>>& GetWreckCache() { return wreckCache; }
 	/*
 	 * Owner 2026-11-03: tactical launcher priority ("launcher_priority").
 	 * Listed super weapons (Paralyzer armemp, Catalyst cortron, Perdition
@@ -572,6 +586,10 @@ public:
 		int lastCall = -1;
 		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
 		int recruitScan = -1;   // stage 2 gathering: recruitment scans at most every 0.5 s
+		int lockId = -1;        // owner 2026-11-04 16:58Z: locked target (enemy id), -1 none
+		int lockOrderUntil = -1;  // next re-issue of the lock's attack / step-in order
+		int lockLastHold = -1;  // last frame the lock drove the unit (resume log after a pause)
+		bool lockStepping = false;
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
@@ -843,6 +861,7 @@ private:
 	float nuclearLaunchRadius = 0.f;
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
+	std::unordered_map<int, std::pair<int, bool>> wreckCache;
 	SArtyCommInfo artyCommInfo;
 	SLauncherPrioInfo launcherPrioInfo;
 	std::vector<SSyncOrder> syncOrders;
