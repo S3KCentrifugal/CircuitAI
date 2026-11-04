@@ -1242,11 +1242,13 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				&& (pos.SqDistance2D(st.spot) <= SQUARE(300.f));
 			st.atHold = at;
 			// Owner 2026-11-04 15:23Z: from the first trigger on, every 0.5 s until
-			// the go-in, launchers within recruit_radius of the gather point join.
+			// the go-in, launchers within recruit_radius of the gather point or of this
+			// (triggered) unit join: the least-overlap gather point can be on the
+			// far side of the threat (test 11-04: two near-side Ambassadors missed).
 			if (!fresh && (frame >= st.recruitScan)) {
 				st.recruitScan = frame + FRAMES_PER_SEC / 2;
 				int squad = 0;
-				const int n = RecruitArtillery(circuit, {st.spot}, st.threat, st.direct, false, -1, frame, squad);
+				const int n = RecruitArtillery(circuit, {st.spot, pos}, st.threat, st.direct, false, -1, frame, squad);
 				if (n > 0) {
 					circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i (squad %i)", cdef->GetDef()->GetName(),
 							unit->GetId(), n, info.recruitRadius, SnipeName(threat), st.threat, squad);
