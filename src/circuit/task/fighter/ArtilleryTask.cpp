@@ -471,8 +471,9 @@ CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, floa
 		// a step in is only for a target just out of reach; after a retreat or a
 		// long pause (another task) the lock is stale: never walk back to it
 		else if (dist > range * 1.5f) why = "far away";
-		else if ((st.lockLastHold >= 0) && (frame - st.lockLastHold > FRAMES_PER_SEC * 30)) why = "not driven for 30 s";
+		else if ((st.lockSeen >= 0) && (frame - st.lockSeen > FRAMES_PER_SEC * 30)) why = "away for 30 s (retreat or another task)";
 	}
+	st.lockSeen = frame;
 	if (why == nullptr) return e;
 	circuit->LOG("ARTY: %s %i target %s %i %s, lock drops", cdef->GetDef()->GetName(), unit->GetId(),
 			(e != nullptr && e->GetCircuitDef() != nullptr) ? e->GetCircuitDef()->GetDef()->GetName() : "?", st.lockId, why);
@@ -502,6 +503,7 @@ void ArtyLockSet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo*
 	st.lockId = e->GetId();
 	st.lockOrderUntil = -1;
 	st.lockLastHold = frame;
+	st.lockSeen = frame;
 	st.lockStepping = false;
 	circuit->LOG("ARTY: %s %i locks on %s %i (%s) at %.0f", cdef->GetDef()->GetName(), unit->GetId(),
 			e->GetCircuitDef()->GetDef()->GetName(), e->GetId(), e->IsInLOS() ? "LOS" : "radar",
@@ -897,6 +899,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.fireHeld = false;  // a synced volley no longer waits: the unit's own fire state back
 		unit->TrySetFireState(cdef->GetFireState());
 	}
+	// Owner 2026-11-04 16:58Z: a lock goes stale only while the unit is out of
+	// artillery control (retreat, another task): every artillery update lands here.
+	if ((st.lockId >= 0) && (st.lockSeen >= 0) && (frame - st.lockSeen <= FRAMES_PER_SEC * 30)) st.lockSeen = frame;
 	st.lastCall = frame;
 
 	// Volleys: a rising main-weapon reload frame or the engine's weapon-fired

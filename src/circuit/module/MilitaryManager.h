@@ -590,6 +590,7 @@ public:
 		int lockOrderUntil = -1;  // next re-issue of the lock's attack / step-in order
 		int lockLastHold = -1;  // last frame the lock drove the unit (resume log after a pause)
 		bool lockStepping = false;
+		int lockSeen = -1;      // last frame the lock was evaluated (task Execute / route update)
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
