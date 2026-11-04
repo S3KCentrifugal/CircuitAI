@@ -446,6 +446,9 @@ private:
 
 public:
 	virtual void FallbackTask(CCircuitUnit* unit) override;
+	// Owner 2026-11-04: the unit alone leaves its task (others keep it) and
+	// patrols where it stands; nothing when the unit is gone or has no task.
+	void LeaveTask(CCircuitUnit* unit);
 
     void MarkUnfinishedUnit(CAllyUnit* target, IBuilderTask* task);
     // Called at unregister, before any later script can observe a dead unit.

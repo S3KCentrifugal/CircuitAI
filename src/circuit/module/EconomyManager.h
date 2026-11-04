@@ -22,6 +22,8 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace springai {
 	class Resource;
@@ -170,6 +172,15 @@ public:
 	bool IsMexSpotSafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int* why = nullptr);
 	// Log a refusal at most every 10 s per builder kind (diagnostic).
 	void LogMexUnsafe(CCircuitUnit* builder, const springai::AIFloat3& pos, int why, const char* where, const char* kind = "MEX");
+	// Construction vehicle porc safety (owner 2026-11-04): a T1/T2 construction
+	// vehicle (economy.con_porc_safety.units) takes no build, repair, guard or
+	// reclaim job whose spot lies in reach of a known enemy armed structure
+	// (seen, or a ghost not yet seen empty) - the porc list of mex safety.
+	bool IsConPorcGuarded(const CCircuitUnit* unit);
+	// Distance from pos to the nearest porc reach edge (negative: inside a
+	// reach). +inf without porc. Refreshes the porc list at most once a second.
+	float EnemyPorcClearance(const springai::AIFloat3& pos);
+	void LogConPorc(const CCircuitUnit* unit, const springai::AIFloat3& pos, const char* where, const char* what);
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
 	bool IsMexOwnershipActive() const;
@@ -482,7 +493,14 @@ private:
 		float porcMaxRange = 1800.f; // longer-ranged structures (LRPC) are not counted
 		float threat = 1.f;          // THREAT_MIN; builder's threat layer at the spot above this is unsafe
 	} mexSafety;
-	struct SMexPorc { springai::AIFloat3 pos; float reachSq; };
+	struct SMexPorc { springai::AIFloat3 pos; float reachSq; float reach; };
+	struct SConPorcSafety {
+		bool enabled = true;
+		std::unordered_set<std::string> units;
+		std::unordered_map<int, bool> byDef;  // circuit def id -> listed (cache)
+	} conPorcSafety;
+	int conPorcLogFrame = -1000;
+	int conPorcCount = 0;
 	std::vector<SMexPorc> mexPorc;
 	int mexPorcFrame = -1000;
 	int mexUnsafeLogFrame = -1000;

@@ -162,6 +162,7 @@ bool IBuilderTask::CanAssignTo(CCircuitUnit* unit) const
 	// Owner 2026-11-04: geothermal and advanced geothermal plants too.
 	if (((buildType == BuildType::MEXUP) || (buildType == BuildType::GEO))
 			&& !economyMgr->IsMexSpotSafe(unit, geom::is_valid(buildPos) ? buildPos : position)) return false;
+	if (IsPorcBlocked(unit)) return false;  // owner 2026-11-04: construction vehicles
 	if (cost.metal < buildPower.metal * buildDef->GetGoalBuildTime(economyMgr->GetAvgMetalIncome())) {  // upper metal bound
 		return false;
 	}
@@ -375,6 +376,8 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 
 	const float searchRadius = (siteRadius > 0.f) ? siteRadius : 200 * SQUARE_SIZE;
 	FindBuildSite(unit, pos, searchRadius);
+	// Owner 2026-11-04: the site search can move the build up to 1600 elmos
+	if (geom::is_valid(buildPos) && DropIfPorc(unit, "site")) return false;
 
 	if (geom::is_valid(buildPos)) {
         if(!circuit->GetCommanderController()->GroupMayBuild(unit,buildDef,buildPos)) return false;
@@ -736,6 +739,10 @@ CCircuitUnit* IBuilderTask::GetNextAssignee()
 
 void IBuilderTask::Update(CCircuitUnit* unit)
 {
+	if ((unit == nullptr) || unit->IsDead() || IsDead()) return;
+	// Owner 2026-11-04: construction vehicles leave any job inside porc reach,
+	// a started frame or an experimental engagement included.
+	if (DropIfPorc(unit, "update")) return;
     if(auto* repair=dynamic_cast<CBRepairTask*>(this); repair && repair->IsStationaryCommander(unit)) {
         repair->UpdateStationary(unit);return;
     }
@@ -890,7 +897,9 @@ bool IBuilderTask::DropIfUnsafe(CCircuitUnit* unit, const char* where)
 	// reach. An unstarted order is dropped (its spot reopens and is offered
 	// again once safe); a started frame is left, the constructor falls back.
 	// Owner 2026-11-04: the same for geothermal and advanced geothermal plants.
-	if ((buildType != BuildType::MEX) && (buildType != BuildType::MEXUP) && (buildType != BuildType::GEO)) return false;
+	if ((buildType != BuildType::MEX) && (buildType != BuildType::MEXUP) && (buildType != BuildType::GEO)) {
+		return DropIfPorc(unit, where);
+	}
 	if ((unit == nullptr) || unit->IsDead() || IsDead()) return false;
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	int why = 0;
@@ -903,6 +912,53 @@ bool IBuilderTask::DropIfUnsafe(CCircuitUnit* unit, const char* where)
 		manager->FallbackTask(unit);
 	} else {
 		manager->AbortTask(this);  // idempotent; Stop clears travel actions and path queries
+	}
+	return true;  // the task may be dead now: callers must not touch it again
+}
+
+bool IBuilderTask::IsPorcBlocked(CCircuitUnit* unit) const
+{
+	// Not a job with a place of its own: patrol (FallbackTask's rest at the
+	// unit's own spot), combat and wait.
+	if ((buildType == BuildType::PATROL) || (buildType == BuildType::COMBAT) || (buildType == BuildType::WAIT)) return false;
+	if (IsDead() || (manager == nullptr)) return false;
+	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
+	if ((economyMgr == nullptr) || !economyMgr->IsConPorcGuarded(unit)) return false;
+	// buildPos: the site, or the frame / reclaim target where one is set;
+	// position: the order's place (area reclaim centre, guard spot)
+	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;
+	if (!geom::is_valid(spot)) return false;
+	return economyMgr->EnemyPorcClearance(spot) < 0.f;
+}
+
+bool IBuilderTask::DropIfPorc(CCircuitUnit* unit, const char* where)
+{
+	// Owner 2026-11-04: "Stop any t2 vehicle or t1 vehicle from going into
+	// scouted porc range (visible or ghosts) to build anything", reclaim
+	// included. The unit leaves the job; the job stays for others (bots,
+	// commanders) unless it was this unit's alone. Guards (owner): the task or
+	// the unit may already be dead or reassigned (a cancelled task, a dropped
+	// move order); nothing is touched then.
+	if ((unit == nullptr) || unit->IsDead() || IsDead()) return false;
+	if (unit->GetTask() != this) return false;  // reassigned: not ours to drop
+	if (!IsPorcBlocked(unit)) return false;
+	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;  // copy: Abort resets buildPos
+	return LeavePorc(unit, spot, where);
+}
+
+bool IBuilderTask::LeavePorc(CCircuitUnit* unit, const AIFloat3& spot, const char* where)
+{
+	if ((unit == nullptr) || unit->IsDead() || IsDead() || (unit->GetTask() != this)) return false;
+	CCircuitAI* circuit = manager->GetCircuit();
+	const char* what = (buildDef != nullptr) ? buildDef->GetDef()->GetName()
+			: (buildType == BuildType::RECLAIM) ? "reclaim" : (buildType == BuildType::REPAIR) ? "repair"
+			: (buildType == BuildType::GUARD) ? "guard" : "task";
+	circuit->GetEconomyManager()->LogConPorc(unit, spot, where, what);
+	CBuilderManager* builderMgr = dynamic_cast<CBuilderManager*>(manager);
+	if ((units.size() > 1) && (builderMgr != nullptr)) {
+		builderMgr->LeaveTask(unit);  // others keep the job
+	} else {
+		manager->FallbackTask(unit);  // its own job: dropped, the unit patrols where it is
 	}
 	return true;  // the task may be dead now: callers must not touch it again
 }

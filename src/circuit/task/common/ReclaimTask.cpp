@@ -7,11 +7,15 @@
 
 #include "task/common/ReclaimTask.h"
 #include "module/TaskModule.h"
+#include "module/EconomyManager.h"
 #include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
+
+#include <algorithm>
+#include <cmath>
 
 namespace circuit {
 
@@ -49,11 +53,47 @@ IReclaimTask::~IReclaimTask()
 
 bool IReclaimTask::CanAssignTo(CCircuitUnit* unit) const
 {
-	return unit->GetCircuitDef()->IsAbleToReclaim() && (cost.metal > buildPower.metal * MAX_BUILD_SEC);
+	return unit->GetCircuitDef()->IsAbleToReclaim() && (cost.metal > buildPower.metal * MAX_BUILD_SEC)
+		&& !IsPorcBlocked(unit);  // owner 2026-11-04: construction vehicles
+}
+
+bool IReclaimTask::PorcSafeArea(CCircuitUnit* unit, AIFloat3& pos, float& reclRadius)
+{
+	// Owner 2026-11-04: "labels wrecks within porc range as not valid targets
+	// for t1 vehicle reclaim". Area reclaim walks feature to feature inside the
+	// circle, so the circle must not reach into any seen or ghost porc reach:
+	// it shrinks to the clearance of its centre. A map-wide reclaim (no radius)
+	// is centred on the unit instead. No safe circle left: the unit leaves.
+	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
+	if (!economyMgr->IsConPorcGuarded(unit)) return true;
+	if (!std::isfinite(economyMgr->EnemyPorcClearance(pos))) {  // no porc known: as given, watched
+		porcAreas[unit] = std::make_pair(pos, reclRadius);
+		return true;
+	}
+	if ((radius == .0f) || !geom::is_valid(position)) {
+		pos = unit->GetPos(manager->GetCircuit()->GetLastFrame());
+	}
+	const float clearance = economyMgr->EnemyPorcClearance(pos);
+	if (clearance < SQUARE_SIZE * 4) {
+		LeavePorc(unit, pos, "reclaim");
+		return false;
+	}
+	reclRadius = std::min(reclRadius, clearance);
+	porcAreas[unit] = std::make_pair(pos, reclRadius);
+	return true;
+}
+
+bool IReclaimTask::IsPorcAreaStale(CCircuitUnit* unit)
+{
+	auto it = porcAreas.find(unit);
+	if (it == porcAreas.end()) return false;
+	const float clearance = manager->GetCircuit()->GetEconomyManager()->EnemyPorcClearance(it->second.first);
+	return clearance < it->second.second - SQUARE_SIZE;
 }
 
 void IReclaimTask::RemoveAssignee(CCircuitUnit* unit)
 {
+	porcAreas.erase(unit);
 	IBuilderTask::RemoveAssignee(unit);
 	if (units.empty()) {
 		manager->AbortTask(this);
@@ -101,6 +141,7 @@ bool IReclaimTask::Execute(CCircuitUnit* unit)
 		pos = position;
 		reclRadius = radius;
 	}
+	if (!PorcSafeArea(unit, pos, reclRadius)) return false;  // the task may be dead now
 	TRY_UNIT(circuit, unit,
 		// NOTE: CONTROL_KEY enables special mode that ignores autoreclaimable value
 		unit->CmdReclaimInArea(pos, reclRadius, UNIT_COMMAND_OPTION_CONTROL_KEY, frame + FRAMES_PER_SEC * 60);

@@ -146,6 +146,10 @@ public:
 
 	float ClampPriority() const { return std::min(static_cast<float>(priority), 1.0f); }  // FIXME: BA
 
+	// Owner 2026-11-04: a T1/T2 construction vehicle (economy.con_porc_safety)
+	// takes no job whose spot lies in reach of seen or ghost enemy porc.
+	bool IsPorcBlocked(CCircuitUnit* unit) const;
+
 protected:
 	void SetTaskPos(const springai::AIFloat3& pos) { position = pos; }
 	CCircuitUnit* GetNextAssignee();
@@ -153,7 +157,12 @@ protected:
 	virtual bool Reevaluate(CCircuitUnit* unit);
 	// Owner 2026-11-02: MEX/MEXUP only; true when the spot is unsafe for this
 	// builder and the task was dropped (unstarted) or the builder fell back.
+	// Owner 2026-11-04: every other job of a construction vehicle too, porc only.
 	bool DropIfUnsafe(CCircuitUnit* unit, const char* where);
+	bool DropIfPorc(CCircuitUnit* unit, const char* where);
+	// The unit leaves this job (others keep it; its own job is dropped).
+	// Only when the unit is alive and still on this task; true when it left.
+	bool LeavePorc(CCircuitUnit* unit, const springai::AIFloat3& spot, const char* where);
 	// Experimental build mode (D-064): the manager's flag; the engine's build
 	// range for this unit and site (reach + buildee radius, x0.9); the command
 	// timeout (none in the mode); engage when inside the range, or inside the

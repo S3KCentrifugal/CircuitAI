@@ -11,6 +11,9 @@
 #include "task/builder/BuilderTask.h"
 #include "unit/CircuitUnit.h"
 
+#include <map>
+#include <utility>
+
 namespace circuit {
 
 class IReclaimTask: public IBuilderTask {
@@ -46,6 +49,14 @@ protected:
 
 	float radius;
 	bool isMetal;
+	// Owner 2026-11-04: the area a construction vehicle was sent to reclaim,
+	// shrunk to stop short of enemy porc reach (centre, radius) per unit.
+	std::map<CCircuitUnit*, std::pair<springai::AIFloat3, float>> porcAreas;
+	// false: the unit left the job (centre in porc reach or no safe circle)
+	bool PorcSafeArea(CCircuitUnit* unit, springai::AIFloat3& pos, float& reclRadius);
+public:
+	// true: the porc picture closed in on the circle the unit was given
+	bool IsPorcAreaStale(CCircuitUnit* unit);
 };
 
 } // namespace circuit

@@ -144,11 +144,17 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 		return true;
 	}
 	if (recoveryControlled) return true; // Local commander/SEA selector owns target changes.
+	CCircuitAI* circuit = manager->GetCircuit();
+	// Owner 2026-11-04: porc seen (or a ghost placed) near a construction
+	// vehicle's reclaim circle since it was given: re-issue it shrunk, or leave.
+	if ((target == nullptr) && IsPorcAreaStale(unit)) {
+		Execute(unit);
+		return false;  // re-issued or left (the task may be dead): nothing more this round
+	}
 	if (!isMetal) {
 		return true;
 	}
 
-	CCircuitAI* circuit = manager->GetCircuit();
 	if (circuit->GetEconomyManager()->IsMetalFull()) {
 		manager->AbortTask(this);
 		return false;
@@ -180,6 +186,8 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 		auto features = circuit->GetCallback()->GetFeaturesIn(pos, 500.0f);
 		if (!features.empty()) {
 			CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+			CEconomyManager* economyMgr = circuit->GetEconomyManager();
+			const bool porcGuarded = economyMgr->IsConPorcGuarded(unit);  // owner 2026-11-04
 			circuit->GetThreatMap()->SetThreatType(unit);
 			float minSqDist = std::numeric_limits<float>::max();
 			Resource* metalRes = circuit->GetEconomyManager()->GetMetalRes();
@@ -188,6 +196,9 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 				CTerrainManager::CorrectPosition(featPos);  // Impulsed flying feature
 				if (!terrainMgr->CanReachAtSafe2(unit, featPos, unit->GetCircuitDef()->GetBuildDistance())) {
 					continue;
+				}
+				if (porcGuarded && (economyMgr->EnemyPorcClearance(featPos) < 0.f)) {
+					continue;  // a wreck in porc reach is no target for a construction vehicle
 				}
 				FeatureDef* featDef = feature->GetDef();
 				if (!featDef->IsReclaimable()) {

@@ -1577,6 +1577,16 @@ void CBuilderManager::FallbackTask(CCircuitUnit* unit)
 	static_cast<CBuilderScript*>(script)->TaskAssigned(unit);
 }
 
+void CBuilderManager::LeaveTask(CCircuitUnit* unit)
+{
+	if (!circuit->IsOwnedUnit(unit) || (unit->GetTask() == nullptr) || unit->GetTask()->IsDead()) return;
+	const int frame = circuit->GetLastFrame();
+	IUnitTask* task = Enqueue(TaskB::Patrol(IBuilderTask::Priority::LOW, unit->GetPos(frame), FRAMES_PER_SEC * 5));
+	if (task == nullptr) return;
+	AssignTask(unit, task);  // ITaskModule::AssignTask: removes it from the old task, guards dead tasks
+	if ((unit->GetTask() != task) && !task->IsDead() && task->GetAssignees().empty()) AbortTask(task);
+}
+
 bool CBuilderManager::TakeApproachMove(CCircuitUnit* unit, const AIFloat3& point, bool& keepWalk)
 {
 	keepWalk = false;
@@ -1885,7 +1895,7 @@ IBuilderTask* CBuilderManager::MakeEnergizerTask(CCircuitUnit* unit, const CQuer
 	for (const std::pair<IBuilderTask::BuildType, float>& pair : prioTasks) {
 		const float maxSqTaskDist = std::max(maxSqBaseDist, pair.second);
 		for (const IBuilderTask* candidate : GetTasks(pair.first)) {
-			if (!candidate->CanAssignTo(unit)) {
+			if (!candidate->CanAssignTo(unit) || candidate->IsPorcBlocked(unit)) {
 				continue;
 			}
 
@@ -2327,7 +2337,7 @@ IBuilderTask* CBuilderManager::MakeCommTask(CCircuitUnit* unit, const CQueryCost
 
 	for (const std::set<IBuilderTask*>& tasks : buildTasks) {
 		for (const IBuilderTask* candidate : tasks) {
-			if (!candidate->CanAssignTo(unit)
+			if (!candidate->CanAssignTo(unit) || candidate->IsPorcBlocked(unit)
 				|| (isNotReady
 					&& (candidate->GetBuildDef() != nullptr)
 					&& (candidate->GetPriority() != IBuilderTask::Priority::NOW)))
@@ -2473,7 +2483,7 @@ IBuilderTask* CBuilderManager::MakeBuilderTask(CCircuitUnit* unit, const CQueryC
 	float metric = std::numeric_limits<float>::max();
 	for (const std::set<IBuilderTask*>& tasks : buildTasks) {
 		for (const IBuilderTask* candidate : tasks) {
-			if (!candidate->CanAssignTo(unit)
+			if (!candidate->CanAssignTo(unit) || candidate->IsPorcBlocked(unit)
 				|| (isNotReady
 					&& (candidate->GetPriority() != IBuilderTask::Priority::NOW)
 					&& (candidate->GetBuildDef() != nullptr)

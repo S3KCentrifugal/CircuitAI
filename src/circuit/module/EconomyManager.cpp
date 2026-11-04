@@ -442,6 +442,20 @@ void CEconomyManager::ReadConfig(float& outMinEInc)
 		mexSafety.porcMaxRange = std::max(0.f, ms.get("porc_max_range", 1800.f).asFloat());
 		mexSafety.threat = std::max(0.f, ms.get("threat", THREAT_MIN).asFloat());
 	}
+	{	// Construction vehicle porc safety (owner 2026-11-04): economy.con_porc_safety {enabled, units}
+		const Json::Value& cs = econ["con_porc_safety"];
+		conPorcSafety.enabled = cs.get("enabled", true).asBool();
+		const Json::Value& units = cs["units"];
+		if (units.isArray()) {
+			for (const Json::Value& name : units) {
+				if (name.isString()) conPorcSafety.units.insert(name.asString());
+			}
+		} else {
+			// T1 and T2 construction vehicles, amphibious ones included
+			conPorcSafety.units = {"armcv", "corcv", "legcv", "armbeaver", "cormuskrat", "legotter",
+				"armacv", "coracv", "legacv"};
+		}
+	}
 
 	{
 		const Json::Value& bd = econ["build_delay"];

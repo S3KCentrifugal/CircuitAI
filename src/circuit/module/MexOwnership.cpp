@@ -127,7 +127,7 @@ void CEconomyManager::RefreshMexPorc() {
         const float range = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
         if (!(range > 0.f) || range > mexSafety.porcMaxRange) continue;
         const float reach = range + mexSafety.porcMargin;
-        mexPorc.push_back({p, reach * reach});
+        mexPorc.push_back({p, reach * reach, reach});
     }
 }
 
@@ -159,6 +159,39 @@ void CEconomyManager::LogMexUnsafe(CCircuitUnit* builder, const AIFloat3& pos, i
     circuit->LOG("%s SAFETY: %s %i %s at (%.0f,%.0f): %s (%i refusals so far)", kind ? kind : "MEX",
         builder ? builder->GetCircuitDef()->GetDef()->GetName() : "?", builder ? builder->GetId() : -1, where,
         pos.x, pos.z, why == 2 ? "enemy porc in range" : "threat map", mexUnsafeCount);
+}
+
+bool CEconomyManager::IsConPorcGuarded(const CCircuitUnit* unit) {
+    if (!conPorcSafety.enabled || (unit == nullptr) || unit->IsDead()) return false;
+    const CCircuitDef* def = unit->GetCircuitDef();
+    if ((def == nullptr) || def->IsRoleComm() || def->IsAbleToFly()) return false;
+    auto it = conPorcSafety.byDef.find(def->GetId());
+    if (it == conPorcSafety.byDef.end()) {
+        const bool listed = conPorcSafety.units.count(def->GetDef()->GetName()) > 0;
+        it = conPorcSafety.byDef.emplace(def->GetId(), listed).first;
+    }
+    return it->second;
+}
+
+float CEconomyManager::EnemyPorcClearance(const AIFloat3& pos) {
+    float best = std::numeric_limits<float>::infinity();
+    if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return best;
+    RefreshMexPorc();
+    for (const SMexPorc& porc : mexPorc) {
+        best = std::min(best, std::sqrt(porc.pos.SqDistance2D(pos)) - porc.reach);
+    }
+    return best;
+}
+
+void CEconomyManager::LogConPorc(const CCircuitUnit* unit, const AIFloat3& pos, const char* where, const char* what) {
+    ++conPorcCount;
+    const int frame = circuit->GetLastFrame();
+    if (frame - conPorcLogFrame < FRAMES_PER_SEC * 10) return;
+    conPorcLogFrame = frame;
+    const CCircuitDef* def = (unit != nullptr) ? unit->GetCircuitDef() : nullptr;
+    circuit->LOG("CON SAFETY: %s %i %s %s at (%.0f,%.0f): enemy porc in range (%i refusals so far)",
+        (def != nullptr) ? def->GetDef()->GetName() : "?", (unit != nullptr) ? unit->GetId() : -1,
+        where, what ? what : "task", pos.x, pos.z, conPorcCount);
 }
 
 float CEconomyManager::MexStartDistance(SMexStart& start, const AIFloat3& pos) {
