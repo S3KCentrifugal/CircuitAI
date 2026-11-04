@@ -211,7 +211,15 @@
 			// radars/jammers or shields already in weapon range when nothing else is to shoot and they have not fired
 			// for ghost_idle_seconds. They never move toward a ghost.
 			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
-			"ghost_idle_seconds": 20   // owner 2026-11-04: 20 s idle
+			"ghost_idle_seconds": 20,   // owner 2026-11-04: 20 s idle
+			// Owner 2026-11-04 16:58Z: target lock. A unit keeps the identified (LOS or radar) enemy it shoots until it
+			// dies; within weapon range + lock_margin (radar error) it holds and re-attacks, a structure farther out only
+			// gets a step in to range - lock_step_in (no forward path, no route resume). Only commander / heavy priority
+			// breaks a lock, which resumes after. lock_mobiles false: structures, commanders and heavies only.
+			"lock": true,
+			"lock_mobiles": false,
+			"lock_margin": 150,
+			"lock_step_in": 100
 		},
 		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
 		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of

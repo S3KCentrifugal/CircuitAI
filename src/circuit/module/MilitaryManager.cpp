@@ -666,12 +666,17 @@ void CMilitaryManager::ReadConfig()
 			if (ghostNames.count(d.GetDef()->GetName()) > 0) artyCommInfo.ghostDefs.insert(d.GetId());
 		}
 		artyCommInfo.ghostIdleFrames = int(std::max(0.f, artyCommCfg.get("ghost_idle_seconds", 10.f).asFloat()) * FRAMES_PER_SEC);
+		artyCommInfo.lockEnabled = artyCommCfg.get("lock", true).asBool();
+		artyCommInfo.lockMobiles = artyCommCfg.get("lock_mobiles", false).asBool();
+		artyCommInfo.lockMargin = std::max(0.f, artyCommCfg.get("lock_margin", 150.f).asFloat());
+		artyCommInfo.lockStepIn = std::max(0.f, artyCommCfg.get("lock_step_in", 100.f).asFloat());
 		artyCommInfo.isEnabled = !artyCommInfo.defs.empty() || !artyCommInfo.ghostDefs.empty();
 	}
-	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f heavy=%u ghost=%u idle=%i",
+	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f heavy=%u ghost=%u idle=%i lock=%i mobiles=%i margin=%.0f step_in=%.0f",
 			cfgName.c_str(), artyCommInfo.isEnabled ? "enabled" : "disabled", unsigned(artyCommInfo.defs.size()),
 			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC, unsigned(artyCommInfo.heavyMaxSqSpeed.size()),
-			unsigned(artyCommInfo.ghostDefs.size()), artyCommInfo.ghostIdleFrames);
+			unsigned(artyCommInfo.ghostDefs.size()), artyCommInfo.ghostIdleFrames, int(artyCommInfo.lockEnabled),
+			int(artyCommInfo.lockMobiles), artyCommInfo.lockMargin, artyCommInfo.lockStepIn);
 
 	/*
 	 * Artillery snipe: see SArtySnipeInfo. Def names; distances in elmos,

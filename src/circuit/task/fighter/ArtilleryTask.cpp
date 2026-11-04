@@ -25,14 +25,22 @@
 #include "util/Utils.h"
 
 #include "spring/SpringMap.h"
+#include "spring/SpringCallback.h"
 
 #include "AISCommands.h"
 #include "Log.h"
 #include "Weapon.h"
+#include "Feature.h"
+#include "FeatureDef.h"
+
+#include <cstring>
+#include <string>
 
 namespace circuit {
 
 using namespace springai;
+
+static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e);
 
 CArtilleryTask::CArtilleryTask(ITaskModule* mgr)
 		: IFighterTask(mgr, FightType::ARTY, 1.f)
@@ -167,6 +175,26 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	const AIFloat3& pos = unit->GetPos(frame);
 	CEnemyInfo* bestTarget = FindTarget(unit, pos);
 
+	// Owner 2026-11-04 16:58Z: target lock. A commander / heavy pick breaks it
+	// for now (it resumes after); else the locked target is kept until dead.
+	{
+		float lockDist = 0.f;
+		CEnemyInfo* locked = ArtyLockGet(circuit, unit, frame, lockDist);
+		const CMilitaryManager::SArtyCommInfo& lockInfo = circuit->GetMilitaryManager()->GetArtyCommInfo();
+		const bool pickPriority = (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS() && LockPriority(lockInfo, bestTarget);
+		const bool safeHere = [&]() {
+			CThreatMap* tm = circuit->GetThreatMap();
+			tm->SetThreatType(unit);
+			return tm->GetThreatAt(pos) <= THREAT_MIN;
+		}();
+		if ((locked != nullptr) && safeHere && !(pickPriority && (bestTarget != locked) && !LockPriority(lockInfo, locked))) {
+			if (ArtyLockDrive(circuit, unit, frame, locked, lockDist)) return;
+		}
+		if ((locked == nullptr) && (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS()) {  // a priority pick leaves the lock to resume
+			ArtyLockSet(circuit, unit, frame, bestTarget);
+		}
+	}
+
 	if (bestTarget != nullptr) {
 		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();  // audit 11-04: never null here, guarded anyway
 
@@ -202,10 +230,10 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		TRY_UNIT(circuit, unit,
 			if (ghost) {
 				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
-			} else if (!circuit->IsCheating() && (bestTarget->GetUnit() != nullptr)) {
+			} else if (bestTarget->GetUnit() != nullptr) {  // owner 16:57Z: the engine drops it on death, also when cheating
 				unit->GetUnit()->Attack(bestTarget->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
-			} else {
-				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+			} else {  // no unit handle: a short ground-fire order, re-issued while it lives
+				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, std::min(timeout, frame + FRAMES_PER_SEC * 4));
 			}
 			if (!ghost) unit->CmdSetTarget(bestTarget);
 		)
@@ -279,15 +307,55 @@ void CArtilleryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
  * the enemy manager no longer has it, it is hidden (its spot was seen empty),
  * dead or dying, or its spot is in our LOS now with nothing seen there. O(1).
  */
-static bool GhostGone(CCircuitAI* circuit, int enemyId)
+/*
+ * Owner 2026-11-04 16:57Z: "If a wreck appears after firing, do not send
+ * another salvo." A ghost's own wreck (feature "<def>_dead" / "<def>_heap")
+ * within 64 of its spot, visible to us now: the engine returns only features
+ * our ally team sees, so this is the live view, not the AI LOS map, which is
+ * refreshed with the threat map every few seconds and let ground fire go on
+ * at a seen wreck. One feature query per enemy at most every 0.5 s.
+ */
+static bool WreckSeen(CCircuitAI* circuit, const CEnemyUnit* e)
+{
+	if ((e == nullptr) || (e->GetCircuitDef() == nullptr)) return false;
+	const int frame = circuit->GetLastFrame();
+	auto& cache = circuit->GetMilitaryManager()->GetWreckCache();
+	auto it = cache.find(e->GetId());
+	if ((it != cache.end()) && (frame - it->second.first < FRAMES_PER_SEC / 2)) return it->second.second;
+	if (cache.size() > 4096) cache.clear();
+	const std::string name = e->GetCircuitDef()->GetDef()->GetName();
+	bool seen = false;
+	auto features = circuit->GetCallback()->GetFeaturesIn(e->GetPos(), 64.f);
+	for (springai::Feature* f : features) {
+		if (seen || (f == nullptr)) continue;
+		springai::FeatureDef* fd = f->GetDef();
+		if (fd != nullptr) {
+			const std::string fn = fd->GetName();
+			seen = (fn.size() > name.size()) && (fn.compare(0, name.size(), name) == 0)
+				&& ((fn.compare(name.size(), std::string::npos, "_dead") == 0) || (fn.compare(name.size(), std::string::npos, "_heap") == 0));
+			delete fd;
+		}
+	}
+	utils::free_clear(features);
+	cache[e->GetId()] = std::make_pair(frame, seen);
+	return seen;
+}
+
+// nullptr: the ghost image still stands; else why it is gone.
+static const char* GhostGoneWhy(CCircuitAI* circuit, int enemyId, bool wreck = true)
 {
 	const CEnemyUnit* e = circuit->GetEnemyManager()->GetEnemyUnit(enemyId);
-	if ((e == nullptr) || e->IsHidden() || e->IsDead()
-		|| ((e->GetData().losStatus & SEnemyData::LosMask::DYING) != 0))
-	{
-		return true;
-	}
-	return !e->IsInLOS() && circuit->GetMapManager()->IsInLOS(e->GetPos());
+	if ((e == nullptr) || e->IsDead() || ((e->GetData().losStatus & SEnemyData::LosMask::DYING) != 0)) return "dead";
+	if (e->IsHidden()) return "seen empty";
+	if (e->IsInLOS()) return nullptr;
+	if (circuit->GetMapManager()->IsInLOS(e->GetPos())) return "seen empty";
+	if (wreck && !e->IsInRadar() && WreckSeen(circuit, e)) return "wreck";
+	return nullptr;
+}
+
+static bool GhostGone(CCircuitAI* circuit, int enemyId)
+{
+	return GhostGoneWhy(circuit, enemyId) != nullptr;
 }
 
 /*
@@ -357,6 +425,145 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 	return int(ids.size());
 }
 
+/*
+ * Owner 2026-11-04 16:58Z: target lock (artillery_commander lock*). Returns
+ * the unit's locked enemy while it is alive and identified (LOS or radar) and
+ * worth keeping, else drops the lock (logged) and returns nullptr. `dist`: 2D
+ * distance to it. A mobile lock farther than range + margin drops (no chase).
+ * O(1).
+ */
+static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e)
+{
+	const CCircuitDef* edef = (e != nullptr) ? e->GetCircuitDef() : nullptr;
+	return (edef != nullptr) && (edef->IsRoleComm() || (info.heavyMaxSqSpeed.count(edef->GetId()) > 0));
+}
+
+CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, float& dist)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtyCommInfo& info = military->GetArtyCommInfo();
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!info.isEnabled || !info.lockEnabled || (info.defs.count(cdef->GetId()) == 0)) return nullptr;
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	if (st.lockId < 0) return nullptr;
+	CEnemyInfo* e = circuit->GetEnemyInfo(st.lockId);
+	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+	const char* why = nullptr;
+	bool stop = false;
+	if ((e == nullptr) || e->GetData()->IsDead() || e->GetData()->IsDying()) {
+		why = "dead";
+		stop = true;
+	} else if (e->IsHidden()) {
+		why = "seen empty";
+		stop = true;
+	} else if (!e->IsInRadarOrLOS()) {
+		if (WreckSeen(circuit, e->GetData())) {
+			why = "wreck";
+			stop = true;
+		} else {
+			why = "lost from radar and LOS (ghost rules)";
+		}
+	} else if (e->GetCircuitDef() == nullptr) {
+		why = "unidentified";
+	} else {
+		dist = unit->GetPos(frame).distance2D(e->GetPos());
+		if (e->GetCircuitDef()->IsMobile() && (dist > range + info.lockMargin)) why = "moved out of range";
+		// a step in is only for a target just out of reach; after a retreat or a
+		// long pause (another task) the lock is stale: never walk back to it
+		else if (dist > range * 1.5f) why = "far away";
+		else if ((st.lockLastHold >= 0) && (frame - st.lockLastHold > FRAMES_PER_SEC * 30)) why = "not driven for 30 s";
+	}
+	if (why == nullptr) return e;
+	circuit->LOG("ARTY: %s %i target %s %i %s, lock drops", cdef->GetDef()->GetName(), unit->GetId(),
+			(e != nullptr && e->GetCircuitDef() != nullptr) ? e->GetCircuitDef()->GetDef()->GetName() : "?", st.lockId, why);
+	if (stop) {
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+		)
+	}
+	st.lockId = -1;
+	st.lockOrderUntil = -1;
+	st.lockStepping = false;
+	return nullptr;
+}
+
+// Locks `e` (picked to shoot: identified, LOS or radar) when it qualifies.
+void ArtyLockSet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtyCommInfo& info = military->GetArtyCommInfo();
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!info.isEnabled || !info.lockEnabled || (info.defs.count(cdef->GetId()) == 0)) return;
+	if ((e == nullptr) || !e->IsInRadarOrLOS() || (e->GetCircuitDef() == nullptr) || (e->GetUnit() == nullptr)) return;
+	if (e->GetCircuitDef()->IsMobile() && !info.lockMobiles && !LockPriority(info, e)) return;
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	if (st.lockId == e->GetId()) return;
+	if ((st.lockId >= 0) && !LockPriority(info, e)) return;  // only a commander / heavy replaces a lock
+	st.lockId = e->GetId();
+	st.lockOrderUntil = -1;
+	st.lockLastHold = frame;
+	st.lockStepping = false;
+	circuit->LOG("ARTY: %s %i locks on %s %i (%s) at %.0f", cdef->GetDef()->GetName(), unit->GetId(),
+			e->GetCircuitDef()->GetDef()->GetName(), e->GetId(), e->IsInLOS() ? "LOS" : "radar",
+			unit->GetPos(frame).distance2D(e->GetPos()));
+}
+
+/*
+ * Drives the unit on its lock: within range + margin an attack on the unit
+ * handle, re-issued every 4 s (5 s orders); a structure farther out: a move to
+ * range - step_in on the line to it, then the attack. True when it gave the
+ * order (the caller issues nothing else: no forward path, no route resume).
+ */
+bool ArtyLockDrive(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e, float dist)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtyCommInfo& info = military->GetArtyCommInfo();
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+	const bool hold = dist <= range + info.lockMargin;
+	if (frame - st.lockLastHold > FRAMES_PER_SEC * 2) {
+		circuit->LOG("ARTY: %s %i lock resumes on %s %i at %.0f", cdef->GetDef()->GetName(), unit->GetId(),
+				e->GetCircuitDef()->GetDef()->GetName(), e->GetId(), dist);
+		st.lockOrderUntil = -1;
+	}
+	st.lockLastHold = frame;
+	if (hold == st.lockStepping) st.lockOrderUntil = -1;  // hold <-> step-in changed
+	if (frame < st.lockOrderUntil) return true;
+	st.lockOrderUntil = frame + FRAMES_PER_SEC * 4;
+	const int timeout = frame + FRAMES_PER_SEC * 5;
+	if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+	if (hold) {
+		if (st.lockStepping) {
+			circuit->LOG("ARTY: %s %i lock holds on %s %i at %.0f (range %.0f + %.0f)", cdef->GetDef()->GetName(), unit->GetId(),
+					e->GetCircuitDef()->GetDef()->GetName(), e->GetId(), dist, range, info.lockMargin);
+		}
+		st.lockStepping = false;
+		TRY_UNIT(circuit, unit,
+			unit->GetUnit()->Attack(e->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+			unit->CmdSetTarget(e);
+		)
+		return true;
+	}
+	AIFloat3 here = unit->GetPos(frame);
+	AIFloat3 dir = here - e->GetPos();
+	dir.y = 0.f;
+	const float len = std::max(1.f, dir.Length2D());
+	const float want = std::max(100.f, range - info.lockStepIn);
+	AIFloat3 to = e->GetPos() + dir * (want / len);
+	CTerrainManager::CorrectPosition(to);
+	if (!st.lockStepping) {
+		circuit->LOG("ARTY: %s %i lock steps in on %s %i: %.0f away, to %.0f (no advance)", cdef->GetDef()->GetName(),
+				unit->GetId(), e->GetCircuitDef()->GetDef()->GetName(), e->GetId(), dist, want);
+	}
+	st.lockStepping = true;
+	TRY_UNIT(circuit, unit,
+		unit->CmdMoveTo(to, 0, frame + FRAMES_PER_SEC * 8);
+		unit->GetUnit()->Attack(e->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, frame + FRAMES_PER_SEC * 8);
+	)
+	return true;
+}
+
 bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit)
 {
 	if ((circuit == nullptr) || (unit == nullptr)) return false;
@@ -400,8 +607,9 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 		track.shot = unit->GetFireFrame();
 		if (track.shot >= track.orderUntil - FRAMES_PER_SEC * 5) track.orderUntil = -1;
 	}
-	if ((frame < track.orderUntil) && (track.target >= 0) && GhostGone(circuit, track.target)) {
-		circuit->LOG("ARTY: %s %i ghost %i gone, stops", cdef->GetDef()->GetName(), unit->GetId(), track.target);
+	const char* goneWhy = ((frame < track.orderUntil) && (track.target >= 0)) ? GhostGoneWhy(circuit, track.target) : nullptr;
+	if (goneWhy != nullptr) {
+		circuit->LOG("ARTY: %s %i target %i %s, stops", cdef->GetDef()->GetName(), unit->GetId(), track.target, goneWhy);
 		track.orderUntil = -1;
 		track.target = -1;
 		TRY_UNIT(circuit, unit,
@@ -450,7 +658,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 			}
 		}
 		const float sqDist = pos.SqDistance2D(e->GetPos());
-		if (sqDist < bestSqDist) {
+		if ((sqDist < bestSqDist) && !GhostGone(circuit, e->GetId())) {  // owner 16:57Z: no salvo at a seen wreck
 			bestSqDist = sqDist;
 			best = e;
 		}
@@ -646,7 +854,7 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 			const int timeout = frame + FRAMES_PER_SEC * 5;
 			if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
 			TRY_UNIT(circuit, unit,
-				if (!circuit->IsCheating() && (hv->GetUnit() != nullptr)) {
+				if (hv->GetUnit() != nullptr) {
 					unit->GetUnit()->Attack(hv->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 				} else {
 					unit->CmdAttackGround(hv->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
@@ -721,8 +929,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	const AIFloat3 pos = unit->GetPos(frame);
 	// Owner 2026-11-04 00:29Z: the default ghost pick's image is gone (scouted
 	// dead, seen empty): stop the ground fire, drop it, clear its counts.
-	if ((st.stage == 0) && (st.ghostAim >= 0) && GhostGone(circuit, st.ghostAim)) {
-		circuit->LOG("SNIPE: %s %i ghost %i gone, stops", cdef->GetDef()->GetName(), unit->GetId(), st.ghostAim);
+	const char* aimGone = ((st.stage == 0) && (st.ghostAim >= 0)) ? GhostGoneWhy(circuit, st.ghostAim) : nullptr;
+	if (aimGone != nullptr) {
+		circuit->LOG("ARTY: %s %i target %i %s, stops (ghost pick)", cdef->GetDef()->GetName(), unit->GetId(), st.ghostAim, aimGone);
 		st.ghostDone.erase(st.ghostAim);
 		st.ghostAim = -1;
 		st.ghostShots = 0;
@@ -910,14 +1119,18 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 		return false;  // the ordinary controller takes over on this same call
 	};
-	if (!SnipeAlive(threat) || (!threat->IsInRadarOrLOS() && GhostGone(circuit, st.threat))) {
+	const char* threatGone = !SnipeAlive(threat) ? "dead"
+			: (!threat->IsInRadarOrLOS() ? GhostGoneWhy(circuit, st.threat) : nullptr);
+	if (threatGone != nullptr) {
 		// Owner 00:29Z: stop the queued ground fire / attack on a gone target.
+		// Owner 16:58Z: "target dead" and "ghost gone" (seen empty / wreck) apart.
 		const int gone = st.threat;
 		TRY_UNIT(circuit, unit,
 			unit->CmdStop();
 		)
 		st.ghostDone.erase(gone);
-		return finish("ghost gone, stops");
+		return finish((std::strcmp(threatGone, "dead") == 0) ? "target dead, stops"
+				: (std::strcmp(threatGone, "wreck") == 0) ? "ghost gone (wreck seen), stops" : "ghost gone (seen empty), stops");
 	}
 
 	// Hazards: every known threat structure, plus (avoid_other_porc) other armed
@@ -1038,7 +1251,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				unit->CmdMoveTo(st.spot, 0, timeout);
 				opts |= UNIT_COMMAND_OPTION_SHIFT_KEY;
 			}
-			if (!ghost && !circuit->IsCheating() && (aim->GetUnit() != nullptr)) {
+			if (!ghost && (aim->GetUnit() != nullptr)) {
 				unit->GetUnit()->Attack(aim->GetUnit(), opts, timeout);
 			} else {
 				unit->CmdAttackGround(aim->GetPos(), opts, timeout);
@@ -1076,6 +1289,12 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const char* why = nullptr;
 			if (!SnipeAlive(target)) {
 				why = "destroyed";
+			} else if (!seen && (GhostGoneWhy(circuit, st.target) != nullptr)) {
+				why = "ghost gone (seen empty or wreck)";  // owner 16:57Z: no salvo at a wreck
+				st.targetGhost = false;  // gone: not kept as a done ghost
+				TRY_UNIT(circuit, unit,
+					unit->CmdStop();
+				)
 			} else {
 				if (!st.targetGhost && !seen) {
 					st.targetGhost = true;  // lost from radar and LOS: the ghost rule from here
@@ -1480,7 +1699,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 						u->CmdMoveTo(os.spot, 0, timeout);
 						opts |= UNIT_COMMAND_OPTION_SHIFT_KEY;
 					}
-					if (threatSeen && !circuit->IsCheating() && (threat->GetUnit() != nullptr)) {
+					if (threatSeen && (threat->GetUnit() != nullptr)) {
 						u->GetUnit()->Attack(threat->GetUnit(), opts, timeout);
 					} else {
 						u->CmdAttackGround(threat->GetPos(), opts, timeout);
@@ -1642,6 +1861,9 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 			}
 
 			const float sqDist = pos.SqDistance2D(enemy->GetPos());
+			if ((sqDist < minSqDist) && ghost && GhostGone(circuit, enemy->GetId())) {
+				continue;  // owner 16:57Z: its wreck (or empty spot) is seen: no salvo
+			}
 			if (sqDist < minSqDist) {
 				if (edef->IsEnemyRoleAny(CCircuitDef::RoleMask::BUILDER)) {
 					bestTarget = enemy;

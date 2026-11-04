@@ -200,7 +200,22 @@ void CRouteTask::Update()
 		sniping.erase(unit);
 		CEnemyInfo* nearest = nullptr;
 		float nearestSq = SQUARE(def->GetMaxRange() * 1.1f);
-		if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
+		// Owner 2026-11-04 16:58Z: a locked target is kept (not the nearest re-pick)
+		// within range + margin; a locked structure farther out gets a step in,
+		// never the route resume.
+		float lockDist = 0.f;
+		CEnemyInfo* locked = ArtyLockGet(circuit, unit, circuit->GetLastFrame(), lockDist);
+		if ((locked != nullptr) && (lockDist > def->GetMaxRange(CCircuitDef::RangeType::LAND)
+				+ circuit->GetMilitaryManager()->GetArtyCommInfo().lockMargin)) {
+			if (ArtyLockDrive(circuit, unit, circuit->GetLastFrame(), locked, lockDist)) {
+				engaging.insert(unit);
+				continue;
+			}
+		}
+		if (locked != nullptr) {
+			nearest = locked;
+			nearestSq = SQUARE(lockDist);
+		} else if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
 			const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
 			for (const auto& kv : circuit->GetEnemyInfos()) {
 				CEnemyInfo* enemy = kv.second;
@@ -217,6 +232,7 @@ void CRouteTask::Update()
 				circuit->LOG("RANGE: %s(%i) pauses route at %.0f for weapon range %.0f",
 						def->GetDef()->GetName(), unit->GetId(), std::sqrt(nearestSq), def->GetMaxRange());
 			}
+			if (locked == nullptr) ArtyLockSet(circuit, unit, circuit->GetLastFrame(), nearest);
 			if (unit->KeepWeaponRange(nearest, circuit->GetLastFrame() + FRAMES_PER_SEC * 10)) continue;
 		} else if (GhostFireStep(circuit, unit, unit->GetPos(circuit->GetLastFrame()), circuit->GetLastFrame(),
 				ghostFire[unit->GetId()], ghostSupport)) {
