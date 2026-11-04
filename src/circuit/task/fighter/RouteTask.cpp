@@ -237,6 +237,9 @@ void CRouteTask::Update()
 			}
 			if (locked == nullptr) ArtyLockSet(circuit, unit, circuit->GetLastFrame(), nearest);
 			if (unit->KeepWeaponRange(nearest, circuit->GetLastFrame() + FRAMES_PER_SEC * 10)) continue;
+		} else if (ArtyRadarDotStep(circuit, unit, circuit->GetLastFrame(), unit->GetPos(circuit->GetLastFrame()))) {
+			engaging.insert(unit);  // owner 2026-11-04 20:03Z: unidentified radar dot in range
+			continue;
 		} else if (GhostFireStep(circuit, unit, unit->GetPos(circuit->GetLastFrame()), circuit->GetLastFrame(),
 				ghostFire[unit->GetId()], ghostSupport)) {
 			// Owner 2026-11-02: a ghost volley pauses the route like range micro;

@@ -240,6 +240,12 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		return;
 	}
 
+	// Owner 2026-11-04 20:03Z: unidentified radar dots in range, after the
+	// normal pick and before the idle ghost volley.
+	if (ArtyRadarDotStep(circuit, unit, frame, pos)) {
+		return;
+	}
+
 	if (FireAtGhost(unit, pos, frame)) {
 		return;
 	}
@@ -562,6 +568,80 @@ bool ArtyLockDrive(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInf
 	TRY_UNIT(circuit, unit,
 		unit->CmdMoveTo(to, 0, frame + FRAMES_PER_SEC * 8);
 		unit->GetUnit()->Attack(e->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY | UNIT_COMMAND_OPTION_SHIFT_KEY, frame + FRAMES_PER_SEC * 8);
+	)
+	return true;
+}
+
+/*
+ * Owner 2026-11-04 20:03Z: unidentified radar dots. After the normal pick (and
+ * the lock), before the idle ghost volley: the nearest enemy in radar, not in
+ * LOS, with no def, within weapon range, is attacked by its unit handle (5 s
+ * orders, re-issued every 4 s) until it dies. Dropped (and the order stopped)
+ * when it dies, gets identified (the normal rules take it on the next pick),
+ * leaves radar, or leaves range + lock_margin; never a move toward it.
+ * Skipped: dots more than 100 above the ground (aircraft), underwater dots for
+ * a non-water weapon, a unit under threat. A dot has no def: nothing here reads
+ * one. O(known enemies) at most once a second while no dot is in range.
+ */
+bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AIFloat3& pos)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtyCommInfo& info = military->GetArtyCommInfo();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!info.isEnabled || !info.radarDots || (info.defs.count(cdef->GetId()) == 0)) return false;
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+	CEnemyInfo* dot = (st.dotId >= 0) ? circuit->GetEnemyInfo(st.dotId) : nullptr;
+	if (st.dotId >= 0) {
+		const char* why = nullptr;
+		if ((dot == nullptr) || dot->GetData()->IsDead() || dot->GetData()->IsDying()) why = "dead";
+		else if (dot->GetCircuitDef() != nullptr) why = "identified (normal rules)";
+		else if (dot->IsInLOS()) why = "in LOS";
+		else if (!dot->GetData()->IsInRadar() || dot->IsHidden()) why = "lost from radar";
+		else if (pos.distance2D(dot->GetPos()) > range + info.lockMargin) why = "out of range";
+		if (why != nullptr) {
+			circuit->LOG("ARTY: %s %i radar dot %i %s, stops", cdef->GetDef()->GetName(), unit->GetId(), st.dotId, why);
+			TRY_UNIT(circuit, unit,
+				unit->CmdStop();
+			)
+			st.dotId = -1;
+			st.dotOrderUntil = -1;
+			dot = nullptr;
+		}
+	}
+	if (dot == nullptr) {
+		if (frame < st.dotScan) return false;
+		st.dotScan = frame + FRAMES_PER_SEC;
+		CThreatMap* threatMap = circuit->GetThreatMap();
+		threatMap->SetThreatType(unit);
+		if (threatMap->GetThreatAt(pos) > THREAT_MIN) return false;  // retreat comes first
+		const bool notAW = !cdef->HasSurfToWater();
+		float bestSq = SQUARE(range);
+		for (auto& kv : circuit->GetEnemyInfos()) {
+			CEnemyInfo* e = kv.second;
+			if ((e == nullptr) || (e->GetCircuitDef() != nullptr) || e->IsInLOS() || e->IsHidden()
+				|| !e->GetData()->IsInRadar() || e->GetData()->IsDead() || e->GetData()->IsDying()
+				|| (e->GetUnit() == nullptr)) continue;
+			const AIFloat3& ep = e->GetPos();
+			if (notAW && (ep.y < -SQUARE_SIZE * 5)) continue;
+			if (ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;  // airborne
+			const float sq = pos.SqDistance2D(ep);
+			if (sq < bestSq) {
+				bestSq = sq;
+				dot = e;
+			}
+		}
+		if (dot == nullptr) return false;
+		st.dotId = dot->GetId();
+		st.dotOrderUntil = -1;
+		circuit->LOG("ARTY: %s %i fires on radar dot %i at %.0f (unidentified)", cdef->GetDef()->GetName(), unit->GetId(),
+				st.dotId, std::sqrt(bestSq));
+	}
+	if (frame < st.dotOrderUntil) return true;
+	st.dotOrderUntil = frame + FRAMES_PER_SEC * 4;
+	if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+	TRY_UNIT(circuit, unit,
+		unit->GetUnit()->Attack(dot->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 5);
 	)
 	return true;
 }

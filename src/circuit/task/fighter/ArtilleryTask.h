@@ -37,6 +37,7 @@ CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, floa
 void ArtyLockSet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e);
 bool ArtyLockDrive(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CEnemyInfo* e, float dist);
 void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
+bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const springai::AIFloat3& pos);
 
 class CArtilleryTask final: public IFighterTask {
 public:

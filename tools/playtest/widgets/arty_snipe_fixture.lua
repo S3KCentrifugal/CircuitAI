@@ -100,6 +100,12 @@ local function gameFrame(f)
         cmd("globallos "..ally)
     end
     if f==(cfg.losOnAt or 60) then cmd("globallos "..aiAlly); echo("global LOS on for ally "..aiAlly) end
+    if cfg.extraMove and f==(cfg.extraAt or cfg.placeAt or 300)+30 then   -- a mobile radar dot passing through range
+        for u,t in pairs(tracked) do
+            if t.team==myTeam and (cfg.extraDefs or {})[t.def] then Spring.GiveOrderToUnit(u,CMD.MOVE,{cfg.extraMove[1],0,cfg.extraMove[2]},0) end
+        end
+        echo(string.format("extra host units move to (%d,%d)",cfg.extraMove[1],cfg.extraMove[2]))
+    end
     if f==(cfg.placeAt or 300) then
         for _,e in ipairs(cfg.porc) do give(e[1],myTeam,cfg.cx+e[2],cfg.cz+e[3]) end
         echo(string.format("porc cluster at (%d,%d): %d units",cfg.cx,cfg.cz,#cfg.porc))

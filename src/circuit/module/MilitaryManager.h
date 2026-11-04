@@ -430,6 +430,10 @@ public:
 		bool lockMobiles = false;
 		float lockMargin = 150.f;
 		float lockStepIn = 100.f;
+		// Owner 2026-11-04 20:03Z: after the normal pick and before the idle ghost
+		// volley, an unidentified radar dot (no def) in weapon range is fired on
+		// until dead; never walked toward.
+		bool radarDots = true;
 	};
 	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
 	// Owner 2026-11-04 16:57Z: per enemy id, the last frame a wreck query ran
@@ -592,6 +596,9 @@ public:
 		int lockLastHold = -1;  // last frame the lock drove the unit (resume log after a pause)
 		bool lockStepping = false;
 		int lockSeen = -1;      // last frame the lock was evaluated (task Execute / route update)
+		int dotId = -1;         // owner 2026-11-04 20:03Z: unidentified radar dot fired on, -1 none
+		int dotOrderUntil = -1; // next re-issue of the attack on it
+		int dotScan = -1;       // no dot found: next scan frame
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
