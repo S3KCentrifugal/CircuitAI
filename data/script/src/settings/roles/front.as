@@ -25,6 +25,48 @@ namespace Front {
             float GeothermalIncomeFraction = 0.5f;
             float GeothermalBootstrapEnergy = 120.0f;
 
+            // D-463: the T1 energy seat. It first builds a free geothermal
+            // vent within EnergySeatGeoRadius of the factory that produced it.
+            // When the map's average wind ((min + max) / 2) is above
+            // EnergySeatWindAverage it builds wind turbines in dense blocks,
+            // else native's energy choice. While energy income (lowest of the
+            // last 10 s) is above EnergySeatReleaseIncome it does default work.
+            float EnergySeatGeoRadius = 900.0f;
+            // A geothermal order that ends without a geothermal (re-offered at
+            // the same vent) backs off EnergySeatGeoRetrySeconds x failures;
+            // after EnergySeatGeoAttempts failures the seat stops trying.
+            float EnergySeatGeoRetrySeconds = 60.0f;
+            int EnergySeatGeoAttempts = 3;
+            // An own geothermal order not started (no frame) within this many
+            // seconds is aborted and counted as a failure.
+            float EnergySeatGeoOrderSeconds = 90.0f;
+            float EnergySeatWindAverage = 7.0f;
+            float EnergySeatReleaseIncome = 2000.0f;
+            // D-463: the fifth T1 constructor builds T1 energy converters in
+            // dense blocks (not on metal maps or with converters disabled)
+            // until metal income (lowest of the last 10 s) first exceeds
+            // ConverterSeatReleaseMetalIncome, then does default work for
+            // good. A converter is ordered only with energy storage at least
+            // ConverterSeatEnergyFill full and no stall; else it assists the
+            // energy seat.
+            bool ConverterSeatEnabled = true;
+            float ConverterSeatReleaseMetalIncome = 60.0f;
+            float ConverterSeatEnergyFill = 0.5f;
+            // D-463 dense blocks: columns x rows touching footprints (no gap),
+            // searched on a lattice behind the start position within
+            // BaseSupportRadius. A block is kept when EcoBlockMinimumFill of
+            // its slots reserve; a failed search retries after
+            // EcoBlockRetrySeconds.
+            int WindBlockColumns = 4;
+            int WindBlockRows = 3;
+            int ConverterBlockColumns = 4;
+            int ConverterBlockRows = 3;
+            float EcoBlockRearOffset = 192.0f;
+            int EcoBlockSearchRings = 3;
+            float EcoBlockMinimumFill = 0.75f;
+            float EcoBlockRetrySeconds = 20.0f;
+            float EcoBlockOrderSeconds = 120.0f;
+
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;
