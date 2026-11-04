@@ -1986,12 +1986,36 @@ namespace Layout {
         // perimeter while valid zone-owned space remains (nuke wind buffer).
         // Definition counts are O(1); unfinished count uses the existing queue.
         if (nano !is null && nano.count > aiBuilderMgr.GetUnfinishedCount(nano)) return null;
+        // Played (Ice Scream 2026-11-04, corner start): the spine zone covered
+        // every footprint within the opening radius, native's unpinned search
+        // refused them all and the nuke rush re-ordered its first solar every
+        // 1.6 s for 24 minutes. An order that vanished unframed with nothing of
+        // its kind built since is a miss; after OpeningEnergyMaxMisses the
+        // district's pinned packer below places the opening energy instead.
+        if (openingGiveUp) return null;
+        const int built = def.count;
+        if (openingAskFrame >= 0 && openingDef == def.id && built == openingCount
+            && aiBuilderMgr.GetUnfinishedCount(def) == 0 && aiBuilderMgr.GetQueuedBuildCount(int(type), def) == 0) {
+            if (++openingMisses >= OpeningEnergyMaxMisses) {
+                openingGiveUp = true;
+                GenericHelpers::LogUtil("[Layout][Spine] opening " + name + ": " + openingMisses
+                    + " orders dropped unframed (no free ground within " + int(Global::RoleSettings::Tech::LayoutOpeningEnergyRadius)
+                    + " of the start); packing opening energy in the district", 1);
+                return null;
+            }
+        } else if (built != openingCount || aiBuilderMgr.GetUnfinishedCount(def) > 0) {
+            openingMisses = 0;
+        }
+        openingAskFrame = ai.frame; openingDef = def.id; openingCount = built;
         // Use a fixed opening anchor: centering each new order on its builder
         // lets a chain of windmills drift beyond the rush's local-worker gate.
         // Native ordinary placement still checks held slots and allied plans.
         return aiBuilderMgr.Enqueue(TaskB::Common(type, priority, def, Global::Map::StartPos,
             Global::RoleSettings::Tech::LayoutOpeningEnergyRadius, true, timeout));
     }
+    const int OpeningEnergyMaxMisses = 3;
+    bool openingGiveUp = false;
+    int openingMisses = 0, openingAskFrame = -1, openingDef = -1, openingCount = -1;
 
     IUnitTask@ PlaceMeasured(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder)
     {
