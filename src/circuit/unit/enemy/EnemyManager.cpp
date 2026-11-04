@@ -25,6 +25,9 @@
 #include "spring/SpringMap.h"
 
 #include "WrappUnit.h"
+#include "Feature.h"
+#include "FeatureDef.h"
+#include "UnitDef.h"
 #include "Cheats.h"
 
 #include <limits>
@@ -146,6 +149,21 @@ void CEnemyManager::UpdateEnemyDatas(CQuadField& quadField)
 			DyingEnemy(enemy);
 			++enemyIterator;
 			continue;
+		}
+
+		// Owner 2026-11-04 18:32Z: ghosts turn into wreckage when they die. A ghost
+		// structure whose own wreck lies at its spot, or whose spot was seen empty,
+		// is handled as a real death (EnemyDestroyed for every AI of the ally team:
+		// threat map, enemy infos, ghost lists, tasks), so every consumer drops it.
+		if (enemy->NotInRadarAndLOS()) {
+			const char* why = GhostStructureGone(enemy, circuit->GetLastFrame());
+			if (why != nullptr) {
+				circuit->LOG("ENEMY: ghost %s %i %s, removed", enemy->GetCircuitDef()->GetDef()->GetName(), enemy->GetId(), why);
+				ghostCheckFrame.erase(enemy->GetId());
+				DyingEnemy(enemy, circuit->GetLastFrame());
+				++enemyIterator;
+				continue;
+			}
 		}
 
 		if (enemy->IsInRadarOrLOS()) {
@@ -379,6 +397,52 @@ void CEnemyManager::DyingEnemy(CEnemyUnit* enemy)
 {
 	enemyDying.insert(enemy);
 	UnregisterEnemyUnit(enemy);
+}
+
+/*
+ * Owner 2026-11-04 18:32Z. At most one check per ghost per second, only for
+ * identified ghost structures (no mobiles, no aircraft): one engine feature
+ * query of radius 48 at the image. Its wreck: the def's corpse feature
+ * (UnitDef wreckName) or "<def>_dead" / "<def>_heap". The engine's feature
+ * list is not limited to our LOS, so a wreck counts as soon as it exists (a
+ * live structure cannot stand on its own wreck). Seen empty: the map manager
+ * marked the image hidden (its spot in our LOS without it); not for
+ * cloak-capable defs, which may only be invisible.
+ */
+const char* CEnemyManager::GhostStructureGone(CEnemyUnit* enemy, int frame)
+{
+	CCircuitDef* cdef = enemy->GetCircuitDef();
+	if ((cdef == nullptr) || cdef->IsMobile() || cdef->IsAbleToFly()) return nullptr;
+	if (ghostCheckFrame.size() > 50000) ghostCheckFrame.clear();
+	int& next = ghostCheckFrame[enemy->GetId()];
+	if (frame < next) return nullptr;
+	next = frame + FRAMES_PER_SEC;
+	springai::UnitDef* ud = cdef->GetDef();
+	if (enemy->IsHidden()) {
+		auto it = cloakDefs.find(cdef->GetId());
+		if (it == cloakDefs.end()) it = cloakDefs.emplace(cdef->GetId(), ud->IsAbleToCloak()).first;
+		if (!it->second) return "seen empty";
+	}
+	auto wit = wreckNames.find(cdef->GetId());
+	if (wit == wreckNames.end()) {
+		const char* wn = ud->GetWreckName();
+		wit = wreckNames.emplace(cdef->GetId(), std::string((wn != nullptr) ? wn : "")).first;
+	}
+	const std::string name = ud->GetName();
+	bool wreck = false;
+	auto features = circuit->GetCallback()->GetFeaturesIn(enemy->GetPos(), 48.f);
+	for (springai::Feature* f : features) {
+		if (wreck || (f == nullptr)) continue;
+		springai::FeatureDef* fd = f->GetDef();
+		if (fd == nullptr) continue;
+		const std::string fn = fd->GetName();
+		delete fd;
+		wreck = (!wit->second.empty() && (fn == wit->second))
+			|| ((fn.size() > name.size()) && (fn.compare(0, name.size(), name) == 0)
+				&& ((fn.compare(name.size(), std::string::npos, "_dead") == 0) || (fn.compare(name.size(), std::string::npos, "_heap") == 0)));
+	}
+	utils::free_clear(features);
+	return wreck ? "wreck seen" : nullptr;
 }
 
 void CEnemyManager::DeleteEnemyUnit(CEnemyUnit* data)
