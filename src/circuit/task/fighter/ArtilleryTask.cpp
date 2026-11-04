@@ -18,6 +18,7 @@
 #include "unit/action/MoveAction.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/enemy/EnemyManager.h"
+#include "map/MapManager.h"
 #include "unit/CircuitUnit.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
@@ -171,7 +172,10 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		// A commander can walk off: a short order so ATTACK never chases it out
 		// of the firing spot; the next Execute re-picks (a structure if it left).
 		const CCircuitDef* edef = bestTarget->GetCircuitDef();
-		const int timeout = frame + FRAMES_PER_SEC * ((edef != nullptr && edef->IsMobile()) ? 5 : 60);
+		// Owner 00:29Z: a ghost pick gets a short order (re-issued each
+		// Execute while the ghost lasts), so it cannot outlive the image.
+		const int timeout = frame + FRAMES_PER_SEC * ((!bestTarget->IsInRadarOrLOS()) ? 8
+				: ((edef != nullptr && edef->IsMobile()) ? 5 : 60));
 		// Owner 21:36Z: a ghost pick is ground fire on its image; ArtySnipeStep
 		// counts the volleys against it.
 		const bool ghost = !bestTarget->IsInRadarOrLOS();
@@ -263,6 +267,23 @@ void CArtilleryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 	IFighterTask::OnUnitDamaged(unit, attacker);
 }
 
+/*
+ * Owner 2026-11-04 00:29Z: AI 10 kept blind-firing at a ghost image after it
+ * was scouted dead and the image disappeared. A blind-fire target is gone when
+ * the enemy manager no longer has it, it is hidden (its spot was seen empty),
+ * dead or dying, or its spot is in our LOS now with nothing seen there. O(1).
+ */
+static bool GhostGone(CCircuitAI* circuit, int enemyId)
+{
+	const CEnemyUnit* e = circuit->GetEnemyManager()->GetEnemyUnit(enemyId);
+	if ((e == nullptr) || e->IsHidden() || e->IsDead()
+		|| ((e->GetData().losStatus & SEnemyData::LosMask::DYING) != 0))
+	{
+		return true;
+	}
+	return !e->IsInLOS() && circuit->GetMapManager()->IsInLOS(e->GetPos());
+}
+
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame,
 		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport)
 {
@@ -296,6 +317,15 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	if (unit->GetFireFrame() > track.shot) {
 		track.shot = unit->GetFireFrame();
 		if (track.shot >= track.orderUntil - FRAMES_PER_SEC * 5) track.orderUntil = -1;
+	}
+	if ((frame < track.orderUntil) && (track.target >= 0) && GhostGone(circuit, track.target)) {
+		circuit->LOG("ARTY: %s %i ghost %i gone, stops", cdef->GetDef()->GetName(), unit->GetId(), track.target);
+		track.orderUntil = -1;
+		track.target = -1;
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+		)
+		return false;
 	}
 	if (frame < track.orderUntil) {
 		return true;  // the volley is on its way; do not replace the order
@@ -349,6 +379,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	unit->GetTravelAct()->StateWait();
 	const int timeout = frame + FRAMES_PER_SEC * 5;
 	track.orderUntil = timeout;
+	track.target = best->GetId();
 	TRY_UNIT(circuit, unit,
 		unit->CmdAttackGround(best->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 	)
@@ -606,6 +637,17 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 
 	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
 	const AIFloat3 pos = unit->GetPos(frame);
+	// Owner 2026-11-04 00:29Z: the default ghost pick's image is gone (scouted
+	// dead, seen empty): stop the ground fire, drop it, clear its counts.
+	if ((st.stage == 0) && (st.ghostAim >= 0) && GhostGone(circuit, st.ghostAim)) {
+		circuit->LOG("SNIPE: %s %i ghost %i gone, stops", cdef->GetDef()->GetName(), unit->GetId(), st.ghostAim);
+		st.ghostDone.erase(st.ghostAim);
+		st.ghostAim = -1;
+		st.ghostShots = 0;
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+		)
+	}
 	if (isPriority && ArtyPriorityStep(circuit, unit, frame, st, pos, range)) {
 		return true;
 	}
@@ -785,8 +827,14 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 		return false;  // the ordinary controller takes over on this same call
 	};
-	if (!SnipeAlive(threat)) {
-		return finish("gone");
+	if (!SnipeAlive(threat) || (!threat->IsInRadarOrLOS() && GhostGone(circuit, st.threat))) {
+		// Owner 00:29Z: stop the queued ground fire / attack on a gone target.
+		const int gone = st.threat;
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+		)
+		st.ghostDone.erase(gone);
+		return finish("ghost gone, stops");
 	}
 
 	// Hazards: every known threat structure, plus (avoid_other_porc) other armed
