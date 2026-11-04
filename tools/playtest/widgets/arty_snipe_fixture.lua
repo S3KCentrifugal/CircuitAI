@@ -116,7 +116,7 @@ local function gameFrame(f)
     end
     if f==(cfg.artyAt or 360) then
         for _,e in ipairs(cfg.arty) do give(e[1],A,cfg.ax+e[2],cfg.az+e[3]) end
-        if cfg.aiRadar then give("armrad",A,cfg.aiRadar[1],cfg.aiRadar[2]); echo(string.format("AI radar tower at (%d,%d)",cfg.aiRadar[1],cfg.aiRadar[2])) end
+        if cfg.aiRadar and not cfg.radarAt then give("armrad",A,cfg.aiRadar[1],cfg.aiRadar[2]); echo(string.format("AI radar tower at (%d,%d)",cfg.aiRadar[1],cfg.aiRadar[2])) end
         for _,e in ipairs(cfg.aiExtra or {}) do give(e[1],A,e[2],e[3]) end
         if cfg.aiExtra and #cfg.aiExtra>0 then echo(string.format("AI extra units: %d",#cfg.aiExtra)) end
         echo(string.format("artillery at (%d,%d): %d units",cfg.ax,cfg.az,#cfg.arty))
@@ -148,6 +148,12 @@ local function gameFrame(f)
     if cfg.revealAt and f==cfg.revealAt then give("armeyes",A,cfg.cx+350,cfg.cz); echo(string.format("AI camera at (%d,%d): the spot is seen",cfg.cx+350,cfg.cz)) end
     if cfg.losAgainAt and f==cfg.losAgainAt then cmd("globallos "..aiAlly); echo("global LOS on again for ally "..aiAlly) end
     if cfg.losOffAt and f==cfg.losOffAt then cmd("globallos "..aiAlly); echo("global LOS off for ally "..aiAlly) end
+    if cfg.aiRadar and cfg.radarAt and f==cfg.radarAt then give("armrad",A,cfg.aiRadar[1],cfg.aiRadar[2]); echo(string.format("AI radar tower at (%d,%d)",cfg.aiRadar[1],cfg.aiRadar[2])) end
+    if cfg.radarOffAt and f==cfg.radarOffAt then   -- the target goes dark again
+        local n=0
+        for _,u in ipairs(Spring.GetTeamUnitsByDefs(A,UnitDefNames.armrad.id) or {}) do Spring.SendLuaRulesMsg(string.format("$dev$:destroyunits %d",u)); n=n+1 end
+        echo(string.format("AI radar towers destroyed: %d",n))
+    end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
     -- every new projectile of the AI's tracked artillery (ghost-gone test: no shots after the spot is seen empty)
     if cfg.killAt then

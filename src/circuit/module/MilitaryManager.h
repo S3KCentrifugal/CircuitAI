@@ -624,7 +624,12 @@ public:
 		bool holding = false;        // stage 2: outranged (close_in_min_range), holding outside its reach
 		int drifts = 0;         // prep: times the unit slid into a threat's reach on this target
 		bool drifting = false;
-		std::unordered_set<int> ghostDone;  // ghost images already given their volleys (until seen again)
+		// Owner 2026-11-04 20:08Z: ghost volleys per dark period. ghostDone: enemy id ->
+		// the dark period (CEnemyUnit::GetDarkSince) in which it got all its volleys;
+		// ghostCount: enemy id -> (dark period, volleys fired at it in that period).
+		// A re-sighting (radar or LOS) starts a new period: a fresh 3 (heavy) or 1.
+		std::unordered_map<int, int> ghostDone;
+		std::unordered_map<int, std::pair<int, int>> ghostCount;
 		springai::AIFloat3 spot;
 		std::unordered_map<int, int> skipUntil;  // enemy id -> frame (done prep targets, sniped threats)
 	};

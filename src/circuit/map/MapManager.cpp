@@ -174,6 +174,7 @@ bool CMapManager::EnemyEnterLOS(CEnemyUnit* enemy)
 void CMapManager::EnemyLeaveLOS(CEnemyUnit* enemy)
 {
 	enemy->ClearInLOS();
+	if (!enemy->IsInRadar()) enemy->SetDarkSince(circuit->GetLastFrame());  // a ghost from now
 }
 
 void CMapManager::EnemyEnterRadar(CEnemyUnit* enemy)
@@ -218,6 +219,7 @@ void CMapManager::EnemyLeaveRadar(CEnemyUnit* enemy)
 {
 	enemy->SetLastSeen(circuit->GetLastFrame());
 	enemy->ClearInRadar();
+	if (!enemy->IsInLOS()) enemy->SetDarkSince(circuit->GetLastFrame());  // a ghost from now
 }
 
 bool CMapManager::EnemyDestroyed(CEnemyUnit* enemy)

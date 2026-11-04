@@ -59,6 +59,8 @@ def main():
     p.add_argument('--extra-at', type=int, default=0, help='lock test: game second the --extra host units are given (default with the porc), e.g. a commander walking into range later')
     p.add_argument('--no-los', action='store_true', help='radar dot test: the AI never gets global LOS (targets stay unidentified radar dots)')
     p.add_argument('--extra-move', default='', help='radar dot test: "x,z" the --extra host units are ordered to move to, 1 s after they are given')
+    p.add_argument('--radar-at', type=int, default=0, help='re-sighting test: game second the --radar tower is given (default with the artillery)')
+    p.add_argument('--radar-off', type=int, default=0, help='re-sighting test: game second the AI radar towers are destroyed (the target goes dark again)')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
@@ -107,8 +109,8 @@ def main():
     if a.main_at:
         at = tuple(int(v) for v in a.main_at.split(','))
     conf = ('return {mode="%s", cx=%d, cz=%d, ax=%d, az=%d, porc=%s, arty=%s, artyDefs=%s, placeAt=300, artyAt=%d, '
-            'losOnAt=%s, extraMove=%s, extraAt=%s, revealAt=%s, protect=%s, killAt=%s, losAgainAt=%s, aiRadar=%s, aiExtra=%s, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
-        a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(porc), lua(arty), defs, a.los_off * 30 + 60 if ghost else 360, '-1' if a.no_los else '60', ('{%s}' % a.extra_move) if a.extra_move else 'nil', (a.extra_at * 30) if a.extra_at else 'nil', (a.reveal_at * 30) if a.reveal_at else 'nil', 'true' if a.protect else 'false', (a.kill_at * 30) if a.kill_at else 'nil', (a.los_again * 30) if a.los_again else 'nil',
+            'radarAt=%s, radarOffAt=%s, losOnAt=%s, extraMove=%s, extraAt=%s, revealAt=%s, protect=%s, killAt=%s, losAgainAt=%s, aiRadar=%s, aiExtra=%s, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
+        a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(porc), lua(arty), defs, a.los_off * 30 + 60 if ghost else 360, (a.radar_at * 30) if a.radar_at else 'nil', (a.radar_off * 30) if a.radar_off else 'nil', '-1' if a.no_los else '60', ('{%s}' % a.extra_move) if a.extra_move else 'nil', (a.extra_at * 30) if a.extra_at else 'nil', (a.reveal_at * 30) if a.reveal_at else 'nil', 'true' if a.protect else 'false', (a.kill_at * 30) if a.kill_at else 'nil', (a.los_again * 30) if a.los_again else 'nil',
         ('{%d,%d}' % (CLUSTER[0] - 1202, CLUSTER[1] - 1202)) if a.radar else 'nil',
         lua([tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.ai_extra.split(';') if e]), lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
         '{' + ''.join('%s=%s,' % tuple(kv.split(':')) for kv in a.damage.split(',') if kv) + '}',

@@ -21,7 +21,7 @@ class CEnemyInfo;
 // the native artillery task and specialist routes (FRONT squads). Last shot is
 // read off the main weapon's reload frame, sampled on every call. True while
 // a ghost volley order is issued or in flight (the caller leaves the unit be).
-struct SGhostFire { int reload = -1, shot = -1, orderUntil = -1, target = -1; };  // target: the ghost being fired on
+struct SGhostFire { int reload = -1, shot = -1, orderUntil = -1, target = -1, orderFrame = -1; bool counted = false; };  // target: the ghost being fired on
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFloat3& pos, int frame,
 		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport);
 
