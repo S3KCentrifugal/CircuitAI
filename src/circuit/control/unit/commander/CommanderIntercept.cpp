@@ -226,7 +226,13 @@ bool CCommanderController::PriorityDGun(CCircuitUnit* unit,State& s,int frame) {
             ai->GetAllyTeam()->GetCommanderShots().Release(ai->GetTeamId(),unit->GetId());
         } else return true;
     }
-    if(cfg->combat.priorityDGun<=0 || priorityDefs.empty()) return false;
+    // Owner 2026-11-04: a member of an enemy T1/T2 group worth heavy_metal or
+    // more is shot here too once in D-gun reach, ahead of the keep-out
+    // withdrawal its disc starts; one at most heavy_leash beyond reach is
+    // stepped toward (short leash), never farther. A health retreat keeps only T3 shots.
+    const bool listedOn=cfg->combat.priorityDGun>0 && !priorityDefs.empty();
+    const bool heavyOn=cfg->safety.heavyNoChase>0 && !HealthRetreat(unit);
+    if(!listedOn && !heavyOn) return false;
     const AIFloat3 pos=unit->GetPos(frame);
     if(pos.y<0.f) return false; // BAR D-guns do not fire submerged
     auto* def=unit->GetCircuitDef();
@@ -238,22 +244,38 @@ bool CCommanderController::PriorityDGun(CCircuitUnit* unit,State& s,int frame) {
     // commander in the lane. Other friendlies in the lane are accepted losses.
     // Out of reach but within t3_distance, the nearest one is closed on
     // directly instead (no hidden-station, funding or screen declines).
-    const commander::Contact* target=nullptr; commander::Line best; float nearest=1e9f;
+    const commander::Contact* target=nullptr; commander::Line best; float nearest=1e9f; bool bestListed=false;
     const commander::Contact* chase=nullptr; float chaseDistance=std::min(cfg->combat.scan,cfg->t3.distance);
+    const commander::Contact* leash=nullptr; float leashDistance=1e9f;
     for(const auto& c:contacts) {
         if(c.friendly || c.blocker || !c.targetable) continue;
         auto* enemy=ai->GetEnemyInfo(c.id);
-        if(!enemy || !enemy->GetCircuitDef() || !priorityDefs.count(enemy->GetCircuitDef()->GetId())) continue;
+        if(!enemy || !enemy->GetCircuitDef()) continue;
+        const bool listed=listedOn && priorityDefs.count(enemy->GetCircuitDef()->GetId())>0;
+        if(!listed && !(heavyOn && !c.reserved && HeavyGroup(int(&c-contacts.data())))) continue;
         const float distance=commander::Length(c.pos-P(pos));
         if(distance>range+c.radius*.5f) {
-            if(distance<chaseDistance) { chaseDistance=distance; chase=&c; }
+            // A listed T3 is closed on from t3_distance; a heavy group member
+            // only from at most heavy_leash beyond reach.
+            if(listed && distance<chaseDistance) { chaseDistance=distance; chase=&c; }
+            else if(!listed && distance<=range+c.radius*.5f+cfg->safety.heavyLeash && distance<leashDistance
+                && std::abs(c.height-std::max(0.f,pos.y))<=range*.5f) { leashDistance=distance; leash=&c; }
             continue;
         }
-        if(distance>=nearest) continue;
+        // A listed T3 outranks any heavy T1/T2; within a class, the nearest.
+        if(target && (bestListed && !listed)) continue;
+        if(target && bestListed==listed && distance>=nearest) continue;
         if(std::abs(c.height-std::max(0.f,pos.y))>range*.5f) continue;
         const Point lead=c.pos+c.velocity*(distance/speed);
         commander::Line line; line.direction=commander::Normal(lead-P(pos));
         if(commander::Length(line.direction)<.5f) continue;
+        if(!listed) {
+            // A heavy T1/T2 is not worth friendly losses: any friendly in the
+            // swept lane vetoes it (the ordinary line rule), and the lane must hit it.
+            const auto scored=commander::ScoreLine(contacts,P(pos),lead-P(pos),range,speed,width,
+                cfg->combat.killReward,cfg->combat.friendlyMargin,c.id);
+            if(scored.blocked || !scored.requiredHit) continue;
+        }
         bool commanderInLane=false;
         for(const auto& f:contacts) {
             if(!f.friendly || !f.blocker) continue;
@@ -265,16 +287,19 @@ bool CCommanderController::PriorityDGun(CCircuitUnit* unit,State& s,int frame) {
         }
         if(commanderInLane) continue;
         line.target=c.id; line.value=c.cost; line.requiredHit=true;
-        target=&c; best=line; nearest=distance;
+        target=&c; best=line; nearest=distance; bestListed=listed;
     }
     if(!target) {
         s.priorityInReach=-1;
-        return chase!=nullptr && PriorityApproach(unit,s,*chase,chaseDistance,frame);
+        if(chase!=nullptr) return PriorityApproach(unit,s,*chase,chaseDistance,frame);
+        // The short leash: only with the D-gun ready to fire on arrival.
+        return leash!=nullptr && unit->IsDGunReady(frame,ai->GetEconomyManager()->GetEnergyCur())
+            && PriorityApproach(unit,s,*leash,leashDistance,frame,true);
     }
     if(s.priorityTarget!=target->id || s.priorityInReach<0) {
         s.priorityTarget=target->id; s.priorityInReach=frame;
-        ai->LOG("[CommanderPriority] unit=%i target=%i def=%s action=in_reach distance=%.0f range=%.0f frame=%i",
-            unit->GetId(),target->id,ai->GetEnemyInfo(target->id)->GetCircuitDef()->GetDef()->GetName(),nearest,range,frame);
+        ai->LOG("[CommanderPriority] unit=%i target=%i def=%s action=in_reach distance=%.0f range=%.0f heavy=%i frame=%i",
+            unit->GetId(),target->id,ai->GetEnemyInfo(target->id)->GetCircuitDef()->GetDef()->GetName(),nearest,range,int(!bestListed),frame);
     }
     // Actual bank only: the shot outranks every other commander's reserve.
     const float bank=ai->GetEconomyManager()->GetEnergyCur();
@@ -304,7 +329,7 @@ bool CCommanderController::PriorityDGun(CCircuitUnit* unit,State& s,int frame) {
     return true;
 }
 
-bool CCommanderController::PriorityApproach(CCircuitUnit* unit,State& s,const commander::Contact& target,float distance,int frame) {
+bool CCommanderController::PriorityApproach(CCircuitUnit* unit,State& s,const commander::Contact& target,float distance,int frame,bool shortLeash) {
     auto* def=unit->GetCircuitDef();
     const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(def);
     const float shot=def->GetDGunDef()->GetCostE(),bank=ai->GetEconomyManager()->GetEnergyCur();
@@ -314,10 +339,13 @@ bool CCommanderController::PriorityApproach(CCircuitUnit* unit,State& s,const co
     const float speed=std::max(1.f,cap.speed);
     // Meet it where it will be: lead by our travel time, stand range-40 off
     // its centre on our side (the T3 plan's own station distance).
-    const Point lead=target.pos+target.velocity*std::min(3.f,distance/speed);
+    // A short-leash step (heavy group, owner 2026-11-04) never leads a target
+    // moving away: it closes on where the member stands, at most heavy_leash.
+    const Point lead=shortLeash?target.pos:target.pos+target.velocity*std::min(3.f,distance/speed);
     AIFloat3 goal=F(lead+commander::Normal(P(pos)-lead)*std::max(0.f,range-40.f));
     goal.y=ai->GetMap()->GetElevationAt(goal.x,goal.z);
     if(goal.y<0 || !OnMap(goal) || !ai->GetTerrainManager()->CanReachAt(unit,goal,64)) {
+        if(shortLeash) return false; // never walk onto a heavy group member
         goal=F(target.pos); goal.y=ai->GetMap()->GetElevationAt(goal.x,goal.z);
         if(goal.y<0 || !OnMap(goal) || !ai->GetTerrainManager()->CanReachAt(unit,goal,64)) return false;
     }
@@ -340,8 +368,8 @@ bool CCommanderController::PriorityApproach(CCircuitUnit* unit,State& s,const co
     const bool cloak=cap.cloak && bank>=shot+cap.cloakMoving*(distance/speed+1.f);
     Conceal(unit,s,cloak); Transition(unit,s,Mode::APPROACH,frame);
     Move(unit,s,goal,frame);
-    if(frame%30<3) ai->LOG("[CommanderPriority] unit=%i target=%i action=approach distance=%.0f goal=%.0f,%.0f cloak=%i frame=%i",
-        unit->GetId(),target.id,distance,goal.x,goal.z,int(cloak),frame);
+    if(frame%30<3) ai->LOG("[CommanderPriority] unit=%i target=%i action=%s distance=%.0f goal=%.0f,%.0f cloak=%i frame=%i",
+        unit->GetId(),target.id,shortLeash?"leash_approach":"approach",distance,goal.x,goal.z,int(cloak),frame);
     return true;
 }
 

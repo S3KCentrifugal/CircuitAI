@@ -257,6 +257,9 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
         const bool submerged=c.height<-c.radius*.4f;
         if(!c.targetable && !submerged) continue;
         const float distance=commander::Length(c.pos-P(pos));
+        // Owner 2026-11-04: the base-defence plan never walks toward a member of a
+        // 600+ metal T1/T2 group beyond D-gun reach + heavy_leash.
+        if(baseDefence && HeavyChaseBlocked(int(&c-contacts.data()),distance,unit->GetDGunRange())) continue;
         // No-disrupt work yields only to an imminent local threat. An already
         // owned combat task is not interrupted construction.
         if(!task && def->IsAttrNoDisrupt() && distance>def->GetMaxRange(CCircuitDef::RangeType::LAND)+c.radius) continue;

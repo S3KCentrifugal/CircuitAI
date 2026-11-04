@@ -221,6 +221,15 @@ struct CommanderSafetyConfig {
     // withdraws droneStep toward its rear and holds droneHold seconds after the
     // last drone hit. A nearby T3 it can D-gun still comes first. 0 = off.
     float droneRetreat=1,droneHold=6,droneStep=600;
+    // Owner 2026-11-04: commanders never pursue a group of enemy T1/T2
+    // combatants worth at least heavyMetal together (members within
+    // heavyGroupRadius of each other). A member at most heavyLeash beyond D-gun
+    // reach may be stepped toward and shot (PriorityDGun), never farther. Each
+    // member's weapon range plus heavyMargin is a keep-out zone held heavyHold
+    // seconds after it was last seen there, so the keep-out withdrawal walks
+    // the commander away and the front goal and work sites stay outside. A T3
+    // nearly in D-gun reach (T3Exempt) still comes first. Not at home. 0 = off.
+    float heavyNoChase=1,heavyMetal=600,heavyGroupRadius=400,heavyLeash=50,heavyHold=6,heavyMargin=100;
 };
 // D-389 cloak posture levers (commander-cloak-policy.md section 4.4).
 struct CommanderCloakConfig {
@@ -562,18 +571,32 @@ private:
     // nearby T3 (an engaged T3 plan, or a T3 in D-gun reach with the D-gun ready).
     bool T3Exempt(CCircuitUnit* unit,const State& s,int frame) const;
     // ---- keep-out and shelling withdrawal (CommanderKeepOut.cpp) ----
-    struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false,porc=false,ghost=false; };
+    struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false,porc=false,ghost=false,heavy=false; };
     std::vector<KeepOutZone> keepOut; // towers rebuilt once a second; shell zones until expiry
     int keepOutFrame=-10000,nextDiveFrame=0;
     std::set<int> towerDefs; bool towerDefsResolved=false;
     std::map<int,float> porcTech; // static armed def id -> customparams techlevel (cache)
+    struct HeavyCandidate { commander::Point pos; float cost=0,range=0; int id=-1; };
+    std::vector<HeavyCandidate> heavyScratch; // RefreshKeepOut buffer, reused
     std::map<int,int> diveRolled; // tower id -> frame a new dive roll is allowed
     float nearestDot=-1; springai::AIFloat3 nearestDotPos; // radar-only contact, from Observe
     float visibleReachDps=0; // in-LOS weapons whose range reaches the commander, from Observe
     int dronesInReach=0; springai::AIFloat3 nearestDronePos{-1,0,-1}; // in-LOS enemy drones in weapon reach, from Observe
     void RefreshKeepOut(CCircuitUnit* unit,int frame);
     float PorcTech(CCircuitDef* def);
-    const KeepOutZone* KeepOutAt(commander::Point p,float margin=0) const;
+    const KeepOutZone* KeepOutAt(commander::Point p,float margin=0,bool heavy=true) const;
+    // Owner 2026-11-04: an enemy T1/T2 combatant (no commander, no T3) ...
+    static bool GroupMember(const commander::Contact& c) {
+        return !c.friendly && !c.blocker && !c.t3 && c.combatTier>=1 && c.combatTier<=2;
+    }
+    // ...whose group (members within heavy_group_radius of it) is worth
+    // heavy_metal or more: never walked toward beyond D-gun reach + heavy_leash.
+    // Lazy per observation: O(E) per asked contact, at most once each.
+    bool HeavyGroup(int index);
+    bool HeavyChaseBlocked(int index,float distance,float reach) {
+        return distance>reach+cfg->safety.heavyLeash && HeavyGroup(index);
+    }
+    std::vector<float> groupMetal; int observeSerial=0,groupMetalSerial=-1;
     springai::AIFloat3 KeepOutGoal(CCircuitUnit* unit,const springai::AIFloat3& goal) const;
     springai::AIFloat3 WithdrawGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,bool shelled,int frame,bool droned=false);
     bool TowerDive(CCircuitUnit* unit,State& s,const KeepOutZone& zone,int frame);
@@ -599,7 +622,7 @@ private:
     // Priority D-gun override (CommanderIntercept.cpp, owner 2026-10-20).
     std::set<int> priorityDefs; bool priorityResolved=false;
     bool PriorityDGun(CCircuitUnit* unit,State& state,int frame);
-    bool PriorityApproach(CCircuitUnit* unit,State& state,const commander::Contact& target,float distance,int frame);
+    bool PriorityApproach(CCircuitUnit* unit,State& state,const commander::Contact& target,float distance,int frame,bool shortLeash=false);
     bool FallbackActive(const State& state,int frame) const { return state.fallback.active && frame<state.fallback.until; }
     // Engine reachability indexes sectors by position without bounds checks
     // (KI register, GetClosestSector). Reject garbage/off-map points first.

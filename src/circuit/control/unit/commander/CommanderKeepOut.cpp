@@ -28,6 +28,17 @@
 // the base's AA is the cover. The only exception is the commander's top task:
 // a nearby T3 it can D-gun (PriorityDGun runs first; T3Exempt releases this).
 //
+// Heavy groups (owner 2026-11-04): a commander never pursues a group of enemy
+// T1/T2 combatants worth heavy_metal (600) or more together. RefreshKeepOut
+// turns each member in radar or LOS into a keep-out disc of its weapon range
+// against the commander plus heavy_margin, held heavy_hold seconds past its
+// last sighting, so the same withdrawal walks the commander out, Deploy's front
+// goal stays outside and work sites inside are refused (no walk back in, no
+// ping-pong). A member in D-gun reach, or at most heavy_leash (50) beyond it,
+// is stepped toward and shot first (PriorityDGun). A nearby T3 D-gun
+// (T3Exempt) still releases the withdrawal; at home (BASE_RADIUS) heavy discs
+// do not move the commander.
+//
 // Cost: the tower list is rebuilt once a second from the enemy manager
 // (O(enemy units)); a commander tick reads O(zones) and engine reachability for
 // at most eight goal candidates once a second while withdrawing.
@@ -70,11 +81,15 @@ constexpr float DIVE_SCREEN=700.f;  // no enemy combatant this close to a dived 
 void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
     keepOutFrame=frame;
     keepOut.erase(std::remove_if(keepOut.begin(),keepOut.end(),
-        [frame](const KeepOutZone& z){return z.tower || z.until<frame;}),keepOut.end());
+        [this,frame](const KeepOutZone& z){return z.tower || z.until<frame
+            || (z.heavy && ai->GetEnemyInfo(z.id)==nullptr);}),keepOut.end());
     for(auto it=diveRolled.begin();it!=diveRolled.end();) it=it->second<frame?diveRolled.erase(it):std::next(it);
     Bind bound(this,PresetOfUnit(unit->GetId()));
     const bool towers=cfg->safety.towerKeepOut>0, porc=cfg->safety.porcKeepOut>0;
-    if(!towers && !porc) return;
+    const bool heavy=cfg->safety.heavyNoChase>0;
+    if(!towers && !porc && !heavy) return;
+    const int heavyUntil=frame+int(cfg->safety.heavyHold*FRAMES_PER_SEC);
+    heavyScratch.clear();
     if(!towerDefsResolved) {
         towerDefsResolved=true;
         for(const char* name:TOWER_NAMES) if(auto* def=ai->GetCircuitDef(name)) towerDefs.insert(def->GetId());
@@ -82,6 +97,19 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
     for(const auto& [id,enemy]:ai->GetEnemyManager()->GetEnemyUnits()) {
         auto* def=enemy?enemy->GetCircuitDef():nullptr;
         if(!def || enemy->IsFake() || enemy->IsDead() || enemy->IsDying()) continue;
+        // Owner 2026-11-04: T1/T2 ground combatants (no aircraft, commanders or
+        // T3) are group candidates; their discs are made after the scan.
+        if(def->IsMobile()) {
+            if(!heavy || !def->IsAttacker() || def->IsAbleToFly() || def->IsRoleComm()
+                || DefinitionFor(def).t3 || enemy->IsBeingBuilt() || !enemy->IsInRadarOrLOS()) continue;
+            const auto& g=enemy->GetData();
+            if(g.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
+            const AIFloat3& at=enemy->GetPos();
+            if(!std::isfinite(at.x) || !std::isfinite(at.z)) continue;
+            const auto& m=MatchupFor(def,unit->GetCircuitDef());
+            heavyScratch.push_back({P(at),def->GetCostM(),m.range>cfg->safety.porcMaxRange?0.f:m.range,id});
+            continue;
+        }
         const bool tower=towerDefs.count(def->GetId())>0;
         bool ghost=false;
         if(tower) {
@@ -92,7 +120,7 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
             // 30%-built Pulsar): heavy and ghost porc count from the nanoframe,
             // since an assisted frame finishes in seconds.
             // Owner 2026-11-03: ghost porc of any tier and seen heavy porc.
-            if(!porc || def->IsMobile() || def->IsAbleToFly() || def->IsRoleSuper()) continue;
+            if(!porc || def->IsAbleToFly() || def->IsRoleSuper()) continue;
             const auto& g=enemy->GetData();
             // An image whose spot was seen empty (HIDDEN) is gone.
             if(g.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
@@ -108,6 +136,25 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
         z.porc=!tower; z.ghost=ghost;
         keepOut.push_back(z);
     }
+    // Groups: each candidate sums the cost of candidates within
+    // heavy_group_radius; members of a 600+ metal group get a disc of their own
+    // weapon range. Once a second per AI (not per commander): an x-sorted sweep,
+    // O(N log N + N*k) for k candidates in the x window, no engine calls.
+    const float radius=cfg->safety.heavyGroupRadius, r2=SQUARE(radius);
+    std::sort(heavyScratch.begin(),heavyScratch.end(),[](const HeavyCandidate& a,const HeavyCandidate& b){return a.pos.x<b.pos.x;});
+    for(size_t i=0;i<heavyScratch.size();++i) {
+        const auto& h=heavyScratch[i];
+        if(h.range<=0.f) continue;
+        float metal=h.cost;
+        for(size_t j=i;j-->0 && h.pos.x-heavyScratch[j].pos.x<=radius;)
+            if(commander::Dot(heavyScratch[j].pos-h.pos,heavyScratch[j].pos-h.pos)<=r2) metal+=heavyScratch[j].cost;
+        for(size_t j=i+1;j<heavyScratch.size() && heavyScratch[j].pos.x-h.pos.x<=radius;++j)
+            if(commander::Dot(heavyScratch[j].pos-h.pos,heavyScratch[j].pos-h.pos)<=r2) metal+=heavyScratch[j].cost;
+        if(metal<cfg->safety.heavyMetal) continue;
+        auto existing=std::find_if(keepOut.begin(),keepOut.end(),[&h](const KeepOutZone& z){return z.heavy && z.id==h.id;});
+        KeepOutZone& z=existing!=keepOut.end()?*existing:keepOut.emplace_back();
+        z.center=h.pos; z.radius=h.range+cfg->safety.heavyMargin; z.id=h.id; z.until=heavyUntil; z.heavy=true;
+    }
 }
 
 float CCommanderController::PorcTech(CCircuitDef* def) {
@@ -120,11 +167,12 @@ float CCommanderController::PorcTech(CCircuitDef* def) {
     return porcTech.emplace(def->GetId(),tech).first->second;
 }
 
-const CCommanderController::KeepOutZone* CCommanderController::KeepOutAt(Point p,float margin) const {
+const CCommanderController::KeepOutZone* CCommanderController::KeepOutAt(Point p,float margin,bool heavy) const {
     const KeepOutZone* deepest=nullptr; float depth=0;
     const int frame=ai->GetLastFrame();
     for(const auto& z:keepOut) {
         if(!z.tower && z.until<frame) continue;
+        if(z.heavy && !heavy) continue;
         const float d=z.radius+margin-commander::Length(p-z.center);
         if(d>depth) { depth=d; deepest=&z; }
     }
@@ -134,7 +182,9 @@ const CCommanderController::KeepOutZone* CCommanderController::KeepOutAt(Point p
 bool CCommanderController::KeepOutBlocks(CCircuitUnit* unit,const AIFloat3& site) const {
     if(keepOut.empty() || !unit || !geom::is_valid(site)) return false;
     if(!Handles(unit) && !IsGroupMember(unit->GetId())) return false;
-    return KeepOutAt(P(site))!=nullptr;
+    // Heavy-unit discs refuse work away from home only, like their withdrawal.
+    const bool home=site.SqDistance2D(ai->GetSetupManager()->GetBasePos())<SQUARE(BASE_RADIUS);
+    return KeepOutAt(P(site),0,!home)!=nullptr;
 }
 
 AIFloat3 CCommanderController::KeepOutGoal(CCircuitUnit* unit,const AIFloat3& goal) const {
@@ -281,7 +331,7 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
             if(cfg->safety.shellZone>0 && !home) {
                 const int until=frame+int(cfg->safety.shellZoneSeconds*FRAMES_PER_SEC);
                 auto existing=std::find_if(keepOut.begin(),keepOut.end(),[&](const KeepOutZone& z){
-                    return !z.tower && commander::Length(z.center-P(pos))<cfg->safety.shellZone*.5f;});
+                    return !z.tower && !z.heavy && commander::Length(z.center-P(pos))<cfg->safety.shellZone*.5f;});
                 if(existing!=keepOut.end()) existing->until=until;
                 else { KeepOutZone z; z.center=P(pos); z.radius=cfg->safety.shellZone; z.until=until; keepOut.push_back(z); }
             }
@@ -302,7 +352,9 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         }
     } else s.keep.droneUntil=-1;
 
-    const auto* zone=KeepOutAt(P(pos));
+    // Heavy-unit discs do not move a commander at home, where the base is the cover.
+    const bool atHome=pos.SqDistance2D(ai->GetSetupManager()->GetBasePos())<SQUARE(BASE_RADIUS);
+    const auto* zone=KeepOutAt(P(pos),0,!atHome);
     const bool shelled=frame<s.keep.shelledUntil;
     const bool droned=frame<s.keep.droneUntil;
     if(!zone && !shelled && !droned) return release("clear",true);
@@ -326,11 +378,11 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;
         TRY_UNIT(ai,unit,unit->CmdStop();)
     }
-    const char* reason=zone && zone->porc?(zone->ghost?"porc_ghost":"porc_heavy")
+    const char* reason=zone && zone->heavy?"heavy_unit":zone && zone->porc?(zone->ghost?"porc_ghost":"porc_heavy")
         :zone && zone->tower?"tower":shelled?"shelled":droned?"drones":"shell_zone";
     if(!s.keep.active || std::strcmp(s.keep.reason,reason)!=0)
         ai->LOG("[CommanderSafety] unit=%i action=keep_out reason=%s tower=%i hp=%.2f x=%.0f z=%.0f",
-            unit->GetId(),reason,zone && zone->tower?zone->id:-1,unit->GetHealthPercent(),pos.x,pos.z);
+            unit->GetId(),reason,zone && (zone->tower || zone->heavy)?zone->id:-1,unit->GetHealthPercent(),pos.x,pos.z);
     if(!s.keep.active) { s.route.clear(); s.keep.goal={-1,0,-1}; }
     s.keep.active=true; s.keep.reason=reason;
     s.budget=0; s.deployed=false;

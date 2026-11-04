@@ -90,6 +90,9 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::shellZoneSeconds>("shell_zone_seconds",0,600),Safety<&SC::shellHold>("shell_hold",0,60),
         Safety<&SC::droneRetreat>("drone_retreat",0,1),Safety<&SC::droneHold>("drone_hold",0,60),
         Safety<&SC::droneStep>("drone_step",128,2000),
+        Safety<&SC::heavyNoChase>("heavy_no_chase",0,1),Safety<&SC::heavyMetal>("heavy_metal",0,100000),
+        Safety<&SC::heavyGroupRadius>("heavy_group_radius",0,2000),Safety<&SC::heavyLeash>("heavy_leash",0,400),
+        Safety<&SC::heavyHold>("heavy_hold",0,60),Safety<&SC::heavyMargin>("heavy_margin",0,600),
         // D-389 cloak posture
         Cloak<&KC::posture>("cloak_posture",0,1),Cloak<&KC::threatRadius>("threat_radius",400,4000),
         Cloak<&KC::horizon>("threat_horizon",0,15),Cloak<&KC::outrangeMargin>("outrange_margin",0,500),
@@ -398,6 +401,7 @@ bool CCommanderController::SetOption(const std::string& name,float value) {
 void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_OBSERVE);
     contacts.clear(); threats.clear(); seeds.clear(); attackers.clear(); submergedContact=false; protectedAfus=-1;
+    ++observeSerial; // invalidates the lazy HeavyGroup memo
     nearestDot=-1; visibleReachDps=0; dronesInReach=0; nearestDronePos={-1,0,-1};
     auto& claims=ai->GetAllyTeam()->GetCommanderShots(); claims.Prune(frame);
     auto world=ai->GetMilitaryManager()->GetRangedWorld();
@@ -593,6 +597,23 @@ void CCommanderController::Observe(CCircuitUnit* unit,int frame) {
         if(!enemy->GetUnit()->IsBeingBuilt() && !enemy->GetUnit()->IsParalyzed()
             && enemy->GetUnit()->GetRulesParamFloat("disarmed",0)<=0) observeWeapons(id,c,cap);
     }
+}
+
+bool CCommanderController::HeavyGroup(int index) {
+    if(cfg->safety.heavyNoChase<=0 || index<0 || size_t(index)>=contacts.size()) return false;
+    const auto& c=contacts[index];
+    if(!GroupMember(c)) return false;
+    if(groupMetalSerial!=observeSerial || groupMetal.size()!=contacts.size()) {
+        groupMetalSerial=observeSerial; groupMetal.assign(contacts.size(),-1.f);
+    }
+    float& metal=groupMetal[index];
+    if(metal<0) {
+        metal=0;
+        const float r2=SQUARE(cfg->safety.heavyGroupRadius);
+        for(const auto& o:contacts)
+            if(GroupMember(o) && commander::Dot(o.pos-c.pos,o.pos-c.pos)<=r2) metal+=o.cost;
+    }
+    return metal>=cfg->safety.heavyMetal;
 }
 
 float CCommanderController::Exposure(Point from,Point to,float seconds,float height,bool moving,float newVolleyRisk) const {
@@ -1020,6 +1041,9 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
         if(i>0 && !commander::Survivable(hp,maxHp,risk,maxLoss)) continue;
         for(int index:seeds) {
             const auto& seed=contacts[index];
+            // Owner 2026-11-04: a member of a 600+ metal T1/T2 group is stepped
+            // toward only while it stands at most heavy_leash beyond D-gun reach.
+            if(i>0 && HeavyChaseBlocked(index,commander::Length(seed.pos-P(pos)),range)) continue;
             Point dir=seed.pos+seed.velocity*(commander::Length(seed.pos-P(candidate))/projectileSpeed)-P(candidate);
             auto line=commander::ScoreLine(contacts,P(candidate),dir,range,projectileSpeed,width,
                 cfg->combat.killReward,cfg->combat.friendlyMargin);
