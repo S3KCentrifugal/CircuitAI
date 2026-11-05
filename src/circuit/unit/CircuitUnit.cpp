@@ -6,6 +6,7 @@
  */
 
 #include "unit/CircuitUnit.h"
+#include "task/fighter/MissileTargetPolicy.h"
 #include "unit/action/DGunAction.h"
 #include "unit/action/TravelAction.h"
 #include "unit/enemy/EnemyUnit.h"
@@ -625,6 +626,7 @@ void CCircuitUnit::CmdResurrectInArea(const AIFloat3& pos, float radius, short o
 
 void CCircuitUnit::CmdSetFireState(CCircuitDef::FireT state)
 {
+    if (IsSlowMissileLauncher(circuitDef->GetDef()->GetName())) state = CCircuitDef::FireType::HOLD;
 	unit->SetFireState(state);
     requestedFire=state;
 }

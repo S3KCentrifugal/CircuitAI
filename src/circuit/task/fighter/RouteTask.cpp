@@ -221,7 +221,7 @@ void CRouteTask::Update()
 			for (const auto& kv : circuit->GetEnemyInfos()) {
 				CEnemyInfo* enemy = kv.second;
 				const CCircuitDef* edef = enemy->GetCircuitDef();
-				if (enemy->IsHidden() || !enemy->IsInRadarOrLOS() || edef == nullptr
+				if (enemy->IsHidden() || !enemy->IsInRadarOrLOS() || !MissileTargetAllowed(def, enemy) || edef == nullptr
 						|| !(edef->GetCategory() & def->GetTargetCategory())
 						|| (!def->HasSurfToWater() && enemy->GetPos().y < -SQUARE_SIZE * 5)) continue;
 				const float sq = here.SqDistance(enemy->GetPos());

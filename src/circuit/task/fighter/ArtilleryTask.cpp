@@ -33,6 +33,7 @@
 #include "Feature.h"
 #include "FeatureDef.h"
 
+#include "task/fighter/MissileTargetPolicy.h"
 #include <cstring>
 #include <string>
 
@@ -40,6 +41,13 @@ namespace circuit {
 
 using namespace springai;
 
+bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy)
+{
+    if (!IsSlowMissileLauncher(launcher->GetDef()->GetName())) return true;
+    if (enemy == nullptr) return false;
+    const CCircuitDef* def = enemy->GetCircuitDef();
+    return SlowMissileSpeedAllowed(enemy->GetVel().SqLength2D(), def ? def->GetSpeed() : 0.f, def != nullptr, FRAMES_PER_SEC);
+}
 static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e);
 static bool GhostGone(CCircuitAI* circuit, int enemyId);
 // Owner 2026-11-04 20:08Z: one ghost volley count per unit and ghost dark period.
@@ -521,6 +529,8 @@ CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, floa
 		} else {
 			why = "lost from radar and LOS (ghost rules)";
 		}
+	} else if (!MissileTargetAllowed(cdef, e)) {
+        why = "moving too fast"; stop = true;
 	} else if (e->GetCircuitDef() == nullptr) {
 		why = "unidentified";
 	} else {
@@ -648,6 +658,7 @@ bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const 
 		const char* why = nullptr;
 		if ((dot == nullptr) || dot->GetData()->IsDead() || dot->GetData()->IsDying()) why = "dead";
 		else if (dot->GetCircuitDef() != nullptr) why = "identified (normal rules)";
+		else if (!MissileTargetAllowed(cdef, dot)) why = "moving too fast";
 		else if (dot->IsInLOS()) why = "in LOS";
 		else if (!dot->GetData()->IsInRadar() || dot->IsHidden()) why = "lost from radar";
 		else if (pos.distance2D(dot->GetPos()) > range + info.lockMargin) why = "out of range";
@@ -673,7 +684,7 @@ bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const 
 			CEnemyInfo* e = kv.second;
 			if ((e == nullptr) || (e->GetCircuitDef() != nullptr) || e->IsInLOS() || e->IsHidden()
 				|| !e->GetData()->IsInRadar() || e->GetData()->IsDead() || e->GetData()->IsDying()
-				|| (e->GetUnit() == nullptr)) continue;
+				|| (e->GetUnit() == nullptr) || !MissileTargetAllowed(cdef, e)) continue;
 			const AIFloat3& ep = e->GetPos();
 			if (notAW && (ep.y < -SQUARE_SIZE * 5)) continue;
 			if (ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;  // airborne
@@ -996,7 +1007,7 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 		const float sqRange = SQUARE(range);
 		for (auto& kv : circuit->GetEnemyInfos()) {
 			CEnemyInfo* e = kv.second;
-			if (e->IsHidden() || !e->IsInRadarOrLOS()) continue;
+			if (e->IsHidden() || !e->IsInRadarOrLOS() || !MissileTargetAllowed(cdef, e)) continue;
 			const CCircuitDef* edef = e->GetCircuitDef();
 			if ((edef == nullptr) || ((edef->GetCategory() & canTargetCat) == 0)) continue;
 			const float sq = pos.SqDistance2D(e->GetPos());
@@ -1125,6 +1136,45 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			unit->CmdStop();
 		)
 	}
+    if (IsSlowMissileLauncher(cdef->GetDef()->GetName())) {
+        unit->TrySetFireState(CCircuitDef::FireType::HOLD);
+        CEnemyInfo* best = nullptr;
+        float bestSq = SQUARE(range);
+        for (const auto& kv : circuit->GetEnemyInfos()) {
+            CEnemyInfo* e = kv.second;
+            if (e->IsHidden() || !e->IsInRadarOrLOS() || e->GetData()->IsDead() || e->GetData()->IsDying()
+                    || e->GetUnit() == nullptr || !MissileTargetAllowed(cdef, e)) continue;
+            const CCircuitDef* edef = e->GetCircuitDef();
+            if (edef && ((edef->GetCategory() & cdef->GetTargetCategory()) == 0 || edef->IsIgnore())) continue;
+            const AIFloat3& ep = e->GetPos();
+            if (!cdef->HasSurfToWater() && ep.y < -SQUARE_SIZE * 5) continue;
+            if (!edef && ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;
+            const float sq = pos.SqDistance2D(ep);
+            if (sq < bestSq) { best = e; bestSq = sq; }
+        }
+        if (best) {
+            if (st.missileTarget != best->GetId() || frame >= st.missileOrderUntil) {
+                if (st.missileTarget != best->GetId()) circuit->LOG("MISSILE: %s %i selects slow %s target %i speed %.2f elmos/s", cdef->GetDef()->GetName(), unit->GetId(), best->IsInLOS() ? "LOS" : "radar", best->GetId(), std::sqrt(best->GetVel().SqLength2D()) * FRAMES_PER_SEC);
+                st.missileTarget = best->GetId();
+                st.missileOrderUntil = frame + FRAMES_PER_SEC;
+                if (unit->GetTravelAct()) unit->GetTravelAct()->StateWait();
+                TRY_UNIT(circuit, unit,
+                    unit->ClearPriorityTarget();
+                    unit->GetUnit()->Attack(best->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 2);
+                )
+            }
+            return true;
+        }
+        if (st.missileTarget >= 0) {
+            circuit->LOG("MISSILE: %s %i drops live target %i (no eligible slow target), resumes ghost rules", cdef->GetDef()->GetName(), unit->GetId(), st.missileTarget);
+            st.missileTarget = -1;
+            st.missileOrderUntil = -1;
+            TRY_UNIT(circuit, unit,
+                unit->ClearPriorityTarget();
+                unit->CmdStop();
+            )
+        }
+    }
 	if (isPriority && ArtyPriorityStep(circuit, unit, frame, st, pos, range)) {
 		return true;
 	}
@@ -2006,6 +2056,7 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 			}
 			const bool ghost = !enemy->IsInRadarOrLOS();
 			if (enemy->IsHidden()
+                || (enemy->IsInRadarOrLOS() && !MissileTargetAllowed(cdef, enemy))
 				|| (ghost && ((ghostSt == nullptr) || (enemy->GetCircuitDef() == nullptr) || enemy->GetCircuitDef()->IsMobile()
 					|| enemy->GetData()->IsDying() || enemy->GetData()->IsDead()
 					|| GhostDoneHas(*ghostSt, enemy->GetData())))
@@ -2093,6 +2144,7 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
 			if (enemy->IsHidden()
+                || (enemy->IsInRadarOrLOS() && !MissileTargetAllowed(cdef, enemy))
 				|| !enemy->IsInRadarOrLOS()
 				|| (notAW && (enemy->GetPos().y < -SQUARE_SIZE * 5)))
 			{

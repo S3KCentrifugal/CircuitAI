@@ -181,3 +181,8 @@ add_executable(transport_definition_test transport_definition_test.cpp)
 target_compile_features(transport_definition_test PRIVATE cxx_std_20)
 target_include_directories(transport_definition_test PRIVATE ../src/circuit)
 add_test(NAME transport_definition_test COMMAND transport_definition_test)
+
+add_executable(circuit_missile_target_policy_test missile_target_policy_test.cpp)
+target_compile_features(circuit_missile_target_policy_test PRIVATE cxx_std_20)
+target_include_directories(circuit_missile_target_policy_test PRIVATE ../src/circuit)
+add_test(NAME circuit_missile_target_policy_test COMMAND circuit_missile_target_policy_test)
