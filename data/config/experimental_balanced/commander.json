@@ -102,6 +102,10 @@
 		"front_work_behind": 400,
 		"jam_safe": 1,
         "cloak_energy_retreat": 1,
+        // D-472: an energy retreat whose reserve (moving cloak x escape_seconds
+        // + margin, 4450 E) exceeds what the team can store ends after this many
+        // seconds without threat. 0 keeps the latch until the reserve returns.
+        "cloak_energy_release": 5,
         "front_mex_aa_enabled": 1,
 		"jam_heavy_cost": 900,
 		"front_push_ahead": 600, "front_push_screen": 0, "front_push_until_seconds": 0, "front_push_home_riot": 0,

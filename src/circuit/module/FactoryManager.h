@@ -237,6 +237,12 @@ private:
 	IUnitTask* CreateAssistTask(CCircuitUnit* unit);
 
 	void Watchdog();
+	// D-472: zero-factory recovery (factory_recovery_seconds; INV-256).
+	bool ReplaceLostFactory(const int frame);
+	void RecoverFactory();
+	float factoryRecoverySeconds = 0.f;
+	bool factoryLost = false;
+	int factoryRecoveryLogNext = 0;
 	void UpdateEnemyReclaim();
 	bool enemyReclaimEnabled = true;
 	int enemyReclaimMisses = 0;

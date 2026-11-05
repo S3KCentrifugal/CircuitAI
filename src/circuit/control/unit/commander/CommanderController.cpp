@@ -55,6 +55,13 @@ template<auto M> Field Work(const char* n,float lo,float hi) { return {n,[](Comm
 using CC=CommanderCombatConfig; using SC=CommanderSafetyConfig; using KC=CommanderCloakConfig;
 using GC=CommanderGroupConfig; using FC=CommanderFrontConfig; using TC=CommanderT3Config;
 using BC=CommanderFallbackConfig; using WC=CommanderWorkConfig;
+// D-472: the bank never sits at full storage while anything is built, so a
+// reserve above this share of storage counts as one the team cannot hold.
+static constexpr float ENERGY_RESERVE_STORABLE_SHARE=.9f;
+// D-472: INV-255 allows this long past cloak_energy_release (one tick and a
+// retreat-task update); one line per commander per ENERGY_INVARIANT_LOG_FRAMES.
+static constexpr float ENERGY_RELEASE_INVARIANT_SLACK_SECONDS=3.f;
+static constexpr int ENERGY_INVARIANT_LOG_FRAMES=30*FRAMES_PER_SEC;
 
 const control::CConfigTable<CommanderConfig>& ConfigTable() {
     static const control::CConfigTable<CommanderConfig> table({
@@ -75,6 +82,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::jamSafe>("jam_safe",0,1),Safety<&SC::jamHeavyCost>("jam_heavy_cost",0,100000),
         Safety<&SC::cloakEnergyRetreat>("cloak_energy_retreat",0,1),
         Safety<&SC::cloakRetreatDistance>("cloak_retreat_distance",128,2000),
+        Safety<&SC::cloakEnergyRelease>("cloak_energy_release",0,600),
         Safety<&SC::healthRetreat>("health_retreat",0,1),Safety<&SC::healthShotSeconds>("health_shot_seconds",0,5),
         Safety<&SC::decoyHealthRetreat>("decoy_health_retreat",0,1),Safety<&SC::decoyHealthRecover>("decoy_health_recover",0,1),
         Safety<&SC::decoyBait>("decoy_bait",0,1),
@@ -242,13 +250,34 @@ void CCommanderController::OnPresetAssigned(int defId,int preset) {
 }
 bool CCommanderController::RetreatCloakFunded(CCircuitUnit* unit) const {
     if(!Handles(unit) || !unit->GetCircuitDef()->IsAbleToCloak()) return false;
+    return ai->GetEconomyManager()->GetEnergyCur()>=RetreatCloakReserve(unit);
+}
+float CCommanderController::RetreatCloakReserve(CCircuitUnit* unit) const {
     Bind bound(this,PresetOfUnit(unit->GetId()));
     const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(unit->GetCircuitDef());
-    return ai->GetEconomyManager()->GetEnergyCur()>=cap.cloakMoving*cfg->combat.escapeSeconds+cfg->combat.margin;
+    return cap.cloakMoving*cfg->combat.escapeSeconds+cfg->combat.margin;
+}
+// D-472: every faction commander moves cloaked at 1000 E/s and stores 500 E,
+// so with balanced's 4.3 s escape the reserve is 4450 E: storable only while
+// energy storage buildings stand. Cost: one storage read per call.
+bool CCommanderController::RetreatCloakStorable(CCircuitUnit* unit) const {
+    return RetreatCloakReserve(unit)<=ai->GetEconomyManager()->GetEnergyStore()*ENERGY_RESERVE_STORABLE_SHARE;
 }
 bool CCommanderController::EnergyRetreat(CCircuitUnit* unit) const {
     const State* s=states.Find(unit->GetId());
     return s && s->retreat.energy;
+}
+// INV-255 (D-472): a commander whose escape reserve the team cannot store is
+// never held in energy retreat longer than cloak_energy_release (+ slack)
+// after its last threat. Called on each tick of a held latch; constant work;
+// one line per commander every ENERGY_INVARIANT_LOG_FRAMES.
+void CCommanderController::CheckEnergyRelease(CCircuitUnit* unit,State& s,int frame) {
+    if(!s.retreat.energy || cfg->safety.cloakEnergyRelease<=0 || frame<s.retreat.energyLogNext) return;
+    const float calm=float(frame-s.retreat.energyThreat)/FRAMES_PER_SEC;
+    if(calm<cfg->safety.cloakEnergyRelease+ENERGY_RELEASE_INVARIANT_SLACK_SECONDS || RetreatCloakStorable(unit)) return;
+    s.retreat.energyLogNext=frame+ENERGY_INVARIANT_LOG_FRAMES;
+    ai->LOG("[INVARIANT] INV-255 commander %i held in energy retreat %.0f s without threat; reserve %.0f > storage %.0f",
+        unit->GetId(),calm,RetreatCloakReserve(unit),ai->GetEconomyManager()->GetEnergyStore());
 }
 void CCommanderController::Damaged(CCircuitUnit* unit) {
     State* found=states.Find(unit->GetId());
@@ -700,9 +729,25 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     // returns; no extra scan and no peaceful low-energy evacuation.
     const bool threatened=(s.lastDamage>=0 && frame-s.lastDamage<FRAMES_PER_SEC)
         || Exposure(P(pos),P(pos),cfg->combat.escapeSeconds,pos.y)>0.f;
+    // D-472: the latch outlives the threat only while the reserve fits in the
+    // team's storage. A commander whose base storage is gone could never fund
+    // the reserve again and stayed in retreat for the rest of the game
+    // (played: base destroyed, commander parked beside an ally, no rebuild).
+    // Unstorable, it ends after cloak_energy_release seconds without threat;
+    // a new threat latches it again (the D-373 entry rule is unchanged).
+    bool released=false;
+    if(s.retreat.energy && !threatened && cfg->safety.cloakEnergyRelease>0
+        && frame-s.retreat.energyThreat>=int(cfg->safety.cloakEnergyRelease*FRAMES_PER_SEC)
+        && !RetreatCloakFunded(unit) && !RetreatCloakStorable(unit)) {
+        released=true;
+        ai->LOG("[Commander] unit=%i cloak_energy_release frame=%i calm=%.0f reserve=%.0f storage=%.0f",unit->GetId(),frame,
+            float(frame-s.retreat.energyThreat)/FRAMES_PER_SEC,RetreatCloakReserve(unit),ai->GetEconomyManager()->GetEnergyStore());
+    }
     if(cfg->safety.cloakEnergyRetreat>0 && def->IsAbleToCloak()
-        && !RetreatCloakFunded(unit) && (threatened || s.retreat.energy)) {
+        && !RetreatCloakFunded(unit) && (threatened || (s.retreat.energy && !released))) {
         s.conceal.postureCloak=false;
+        if(threatened || !s.retreat.energy) s.retreat.energyThreat=frame;
+        CheckEnergyRelease(unit,s,frame);
         if(!s.retreat.energy) {
             ai->LOG("[Commander] unit=%i cloak_energy_retreat frame=%i",unit->GetId(),frame);
             // Clear the cloak request once so the bank can refill, and return

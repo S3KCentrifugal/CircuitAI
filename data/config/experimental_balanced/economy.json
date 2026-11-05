@@ -2,6 +2,9 @@
 {
 "tech_production": {"air_foundry_count": 6},
 "economy": {
+	// D-472: while every factory is gone, ask the role for a replacement this
+	// often (seconds; 0 disables). The role still picks the factory or "none".
+	"factory_recovery_seconds": 10,
 	"energy": {
 		// If land area >= 40% of the map then "land" config used, "water" otherwise
 		"land": {

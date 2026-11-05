@@ -37,6 +37,8 @@
 #include "Feature.h"
 #include "Log.h"
 
+#include <algorithm>
+
 namespace circuit {
 namespace {
 constexpr float POKE_MIN_IN_RANGE = 0.f;
@@ -50,6 +52,8 @@ constexpr float POKE_MIN_HEALTH = 0.f;
 constexpr float POKE_MAX_HEALTH = 1.f;
 constexpr float POKE_MIN_PAUSE_SECONDS = 0.f;
 constexpr float POKE_MAX_PAUSE_SECONDS = 60.f;
+// D-472: at most one INV-256 line every 30 s.
+constexpr int FACTORY_INVARIANT_LOG_FRAMES = 30 * FRAMES_PER_SEC;
 }
 
 using namespace springai;
@@ -385,6 +389,8 @@ void CFactoryManager::ReadConfig()
 {
 	const Json::Value& root = circuit->GetSetupManager()->GetConfig();
 	enemyReclaimEnabled = root["economy"].get("turret_enemy_reclaim", true).asBool();
+	// D-472: seconds between replacement asks while every factory is gone (0: off).
+	factoryRecoverySeconds = std::clamp(root["economy"].get("factory_recovery_seconds", 0.f).asFloat(), 0.f, 600.f);
 	const std::string& cfgName = circuit->GetSetupManager()->GetConfigName();
 
 	CMaskHandler& sideMasker = circuit->GetGameAttribute()->GetSideMasker();
@@ -963,6 +969,11 @@ void CFactoryManager::InitFactory()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::UpdateEnemyReclaim, this),
 				FRAMES_PER_SEC / 2, circuit->GetSkirmishAIId() % (FRAMES_PER_SEC / 2));
 
+		if (factoryRecoverySeconds > 0.f) {  // D-472
+			const int recovery = std::max(1, int(factoryRecoverySeconds * FRAMES_PER_SEC));
+			scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::RecoverFactory, this),
+					recovery, circuit->GetSkirmishAIId() % recovery);
+		}
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
 								circuit->GetSkirmishAIId() * WATCHDOG_COUNT + 11);
@@ -1652,6 +1663,7 @@ void CFactoryManager::EnableFactory(CCircuitUnit* unit)
 		circuit->GetSetupManager()->SetBasePos(pos);
 		circuit->GetMilitaryManager()->MakeBaseDefence(pos);
 	}
+	factoryLost = false;  // D-472
 
 	auto it = factoryDefs.find(unit->GetCircuitDef()->GetId());
 	if (it != factoryDefs.end()) {
@@ -1683,53 +1695,9 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 		AbortTask(task);
 	}
 
-	auto checkBuilderFactory = [this](const int frame) {
-		CBuilderManager* builderMgr = this->circuit->GetBuilderManager();
-		// check if any factory with builders left
-		bool hasBuilder = false;
-		for (SFactory& fac : factories) {
-			if ((fac.builder != nullptr) && fac.builder->IsAvailable(frame)) {
-				hasBuilder = true;
-				break;
-			}
-		}
-		if (!hasBuilder) {
-			// check queued factories
-			std::set<IBuilderTask*> tasks = builderMgr->GetTasks(IBuilderTask::BuildType::FACTORY);
-			for (IBuilderTask* task : tasks) {
-				auto it = factoryDefs.find(task->GetBuildDef()->GetId());
-				if (it != factoryDefs.end()) {
-					const SFactoryDef& facDef = it->second;
-					CCircuitDef* bdef = GetFacRoleDef(ROLE_TYPE(BUILDER), facDef);
-					hasBuilder = ((bdef != nullptr) && bdef->IsAvailable(frame));
-					if (hasBuilder) {
-						break;
-					} else if (task->GetTarget() == nullptr) {
-						builderMgr->AbortTask(task);
-					}
-				}
-			}
-			if (!hasBuilder) {
-				// queue new factory with builder
-				CCircuitDef* facDef = GetFactoryToBuild(-RgtVector, true, true);
-				if (facDef != nullptr) {
-					// D-101: the role reserved the site (the layout, while a turret stands):
-					// the task goes there, pinned (played: unpinned, native's own search
-					// reserved a footprint beside the old lab and built there)
-					CTerrainManager* terrainMgr = circuit->GetTerrainManager();
-					const int slot = terrainMgr->TakeResetFactorySlot();
-					const AIFloat3 at = (slot >= 0) ? terrainMgr->GetReservationPos(slot) : -RgtVector;
-					IBuilderTask* task = builderMgr->Enqueue(TaskB::Factory(IBuilderTask::Priority::NOW, facDef, at, GetRepresenter(facDef)));
-					if ((slot >= 0) && (task != nullptr) && !task->PinReservation(slot)) {
-						circuit->LOG("RESERVE: replacement %s could not be pinned to slot %i", facDef->GetDef()->GetName(), slot);
-					}
-				}
-			}
-		}
-	};
 
 	if (unit->GetTask()->GetType() == IUnitTask::Type::NIL) {
-		checkBuilderFactory(circuit->GetLastFrame());
+		ReplaceLostFactory(circuit->GetLastFrame());
 		return;
 	}
 
@@ -1790,7 +1758,81 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 		validAir.erase(unit);
 	}
 
-	checkBuilderFactory(circuit->GetLastFrame());
+	ReplaceLostFactory(circuit->GetLastFrame());
+	factoryLost = factories.empty();  // D-472: RecoverFactory asks again
+}
+
+// When no factory with a builder stands and none is queued, ask the role for
+// a replacement (isReset) and queue it at NOW priority. Returns true when the
+// role named a factory but no task could be queued (INV-256).
+bool CFactoryManager::ReplaceLostFactory(const int frame)
+{
+	bool named = false;
+	IBuilderTask* queued = nullptr;
+	CBuilderManager* builderMgr = this->circuit->GetBuilderManager();
+	// check if any factory with builders left
+	bool hasBuilder = false;
+	for (SFactory& fac : factories) {
+		if ((fac.builder != nullptr) && fac.builder->IsAvailable(frame)) {
+			hasBuilder = true;
+			break;
+		}
+	}
+	if (!hasBuilder) {
+		// check queued factories
+		std::set<IBuilderTask*> tasks = builderMgr->GetTasks(IBuilderTask::BuildType::FACTORY);
+		for (IBuilderTask* task : tasks) {
+			auto it = factoryDefs.find(task->GetBuildDef()->GetId());
+			if (it != factoryDefs.end()) {
+				const SFactoryDef& facDef = it->second;
+				CCircuitDef* bdef = GetFacRoleDef(ROLE_TYPE(BUILDER), facDef);
+				hasBuilder = ((bdef != nullptr) && bdef->IsAvailable(frame));
+				if (hasBuilder) {
+					break;
+				} else if (task->GetTarget() == nullptr) {
+					builderMgr->AbortTask(task);
+				}
+			}
+		}
+		if (!hasBuilder) {
+			// queue new factory with builder
+			CCircuitDef* facDef = GetFactoryToBuild(-RgtVector, true, true);
+			if (facDef != nullptr) {
+				named = true;
+				// D-101: the role reserved the site (the layout, while a turret stands):
+				// the task goes there, pinned (played: unpinned, native's own search
+				// reserved a footprint beside the old lab and built there)
+				CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+				const int slot = terrainMgr->TakeResetFactorySlot();
+				const AIFloat3 at = (slot >= 0) ? terrainMgr->GetReservationPos(slot) : -RgtVector;
+				queued = builderMgr->Enqueue(TaskB::Factory(IBuilderTask::Priority::NOW, facDef, at, GetRepresenter(facDef)));
+				if ((slot >= 0) && (queued != nullptr) && !queued->PinReservation(slot)) {
+					circuit->LOG("RESERVE: replacement %s could not be pinned to slot %i", facDef->GetDef()->GetName(), slot);
+				}
+			}
+		}
+	}
+	return named && (queued == nullptr);
+}
+
+// D-472: DisableFactory queued one replacement when the last factory died and
+// nothing asked again; the task expires after its assign timeout (300 s) or
+// aborts on a threatened site, and experimental-build roles have no native
+// factory job (EconomyManager::StartFactoryJob). Played: a base was destroyed
+// and the AI never rebuilt it. While every factory is gone this job asks the
+// role again every factory_recovery_seconds; the role still chooses (or says
+// "none"). Cost: one factory scan and one FACTORY task-set lookup per run, a
+// script call only when nothing is queued; nothing while a factory stands.
+void CFactoryManager::RecoverFactory()
+{
+	if (!factoryLost || !factories.empty()) {
+		return;
+	}
+	const int frame = circuit->GetLastFrame();
+	if (ReplaceLostFactory(frame) && (frame >= factoryRecoveryLogNext)) {
+		factoryRecoveryLogNext = frame + FACTORY_INVARIANT_LOG_FRAMES;
+		circuit->LOG("[INVARIANT] INV-256 no factory stands and the role names one, but no factory task could be queued");
+	}
 }
 
 IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)
