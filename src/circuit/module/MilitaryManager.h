@@ -603,6 +603,7 @@ public:
 		int lockLastHold = -1;  // last frame the lock drove the unit (resume log after a pause)
 		bool lockStepping = false;
 		int lockSeen = -1;      // last frame the lock was evaluated (task Execute / route update)
+		int missileTarget = -1, missileOrderUntil = -1;
 		int dotId = -1;         // owner 2026-11-04 20:03Z: unidentified radar dot fired on, -1 none
 		int dotOrderUntil = -1; // next re-issue of the attack on it
 		int dotScan = -1;       // no dot found: next scan frame

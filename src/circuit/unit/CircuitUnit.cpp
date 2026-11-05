@@ -6,6 +6,7 @@
  */
 
 #include "unit/CircuitUnit.h"
+#include "task/fighter/MissileTargetPolicy.h"
 #include "unit/action/DGunAction.h"
 #include "unit/action/TravelAction.h"
 #include "unit/enemy/EnemyUnit.h"
@@ -724,6 +725,7 @@ bool CCircuitUnit::RepeatState(int& sent, int& sentFrame, int value)
 
 void CCircuitUnit::CmdSetFireState(CCircuitDef::FireT state)
 {
+    if (IsSlowMissileLauncher(circuitDef->GetDef()->GetName())) state = CCircuitDef::FireType::HOLD;
     requestedFire=state;
 	if (RepeatState(sentFire, sentFireFrame, state)) return;
 	unit->SetFireState(state);

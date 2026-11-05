@@ -14,6 +14,7 @@
 
 namespace circuit {
 class CCircuitAI;
+class CCircuitDef;
 class CRangedEngagement;
 class CEnemyInfo;
 
@@ -28,6 +29,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFl
 // Owner 2026-11-03: sequenced snipe of outranging artillery structures
 // (SArtySnipeInfo). True while it owns the unit; state lives in the military
 // manager so a task change keeps the sequence.
+bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy);
 bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
 // Owner 2026-11-04: true while an artillery snipe sequence owns the unit (route
 // tasks hold their orders for it, the squad keeps it).
