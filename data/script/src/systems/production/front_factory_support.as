@@ -21,6 +21,35 @@ namespace FrontFactorySupport {
         if(unit.id==factories[0] || unit.id==factories[1]) frame=-SECOND;
         const int index=turrets.find(unit.id);
         if(index>=0) {turrets.removeAt(index);frame=-SECOND;}
+        const int far=farIds.find(unit.id);
+        if(far>=0) {farIds.removeAt(far);farSince.removeAt(far);}
+    }
+    // D-468, INV-252: a turret never holds a repair order on a target outside
+    // its reach for TurretRepairReachGraceSeconds (played: FRONT's factory
+    // turrets stood on a T1 constructor that had walked away). Native
+    // CSRepairTask releases them; this watches that it does. Runs inside the
+    // once-a-second census, O(turrets with an out-of-reach target).
+    array<int> farIds,farSince;
+    void CheckReach(CCircuitUnit@ turret) {
+        IBuilderTask@ task=cast<IBuilderTask>(turret.task);
+        CCircuitUnit@ target=(task is null || task.IsDead()
+            || task.GetBuildType()!=int(Task::BuildType::REPAIR))?null:task.target;
+        bool far=false;
+        if(target !is null) {
+            // GetModelRadius is registered non-const: resolve the mutable def.
+            CCircuitDef@ targetDef=ai.GetCircuitDef(target.circuitDef.GetName());
+            const float reach=turret.circuitDef.GetBuildDistance()+(targetDef is null?0.f:targetDef.GetModelRadius());
+            far=MapHelpers::SqDist(turret.GetPos(ai.frame),target.GetPos(ai.frame))>reach*reach;
+        }
+        const int index=farIds.find(turret.id);
+        if(!far) {
+            if(index>=0) {farIds.removeAt(index);farSince.removeAt(index);}
+            return;
+        }
+        if(index<0) {farIds.insertLast(turret.id);farSince.insertLast(ai.frame);return;}
+        if(ai.frame-farSince[index]<int(Global::RoleSettings::Front::TurretRepairReachGraceSeconds*SECOND)) return;
+        Invariants::Violation("INV-252","front-turret-"+turret.id,"construction turret "+turret.id+" has held a repair order on "
+            +target.circuitDef.GetName()+" "+target.id+" out of its reach for "+((ai.frame-farSince[index])/SECOND)+" s");
     }
     void Load() {
         if(loaded) return;
@@ -85,6 +114,7 @@ namespace FrontFactorySupport {
                 reachMasks[j]=0;powers[j]=0.f;
                 CCircuitUnit@ turret=ai.GetTeamUnit(turrets[j]);
                 if(turret is null || turret.GetBuildProgress()<1.f) continue;
+                CheckReach(turret);
                 if(turret.task !is null && (turret.task.IsExternalControlled() || turret.task.IsEnemyReclaim()
                     || turret.task.GetType()==int(Task::Type::PLAYER)
                     || turret.task.GetType()==int(Task::Type::RETREAT))) continue;
