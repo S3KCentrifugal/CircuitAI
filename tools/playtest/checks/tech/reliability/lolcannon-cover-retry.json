@@ -1,0 +1,19 @@
+{
+  "stop_minute": 15,
+  "expect": [
+    {"key":"loaded", "pattern":"\\[CannonCoverTest\\] loaded", "scope":"any", "by_minute":1},
+    {"key":"fixture", "pattern":"\\[CannonCoverFixture\\] initialized stale_slot=\\d+", "by_minute":1},
+    {"key":"tracked", "pattern":"\\[LolCannon\\] project cannon unit=", "by_minute":5},
+    {"key":"finished", "pattern":"\\[LolCannon\\] REPORT finished", "by_minute":12},
+    {"key":"cover", "pattern":"\\[LolCannon\\] REPORT cover shields=2/2 heavy=2/2 flak=1/1.*\\(done\\)", "by_minute":15},
+    {"key":"observed", "pattern":"\\[CannonCoverTest\\] PASS cannon=1 shields=2 heavy=2 flak=1 completed_near_actual_cannon", "scope":"any", "by_minute":15},
+    {"key":"released", "pattern":"\\[LolCannon\\] crews released.*cover done", "by_minute":15}
+  ],
+  "forbid": [
+    {"key":"scripts", "pattern":": ERR\\s+:|SCRIPT CRASH|Lib exception", "scope":"any"},
+    {"key":"invariants", "pattern":"\\[INVARIANT\\]", "scope":"any"},
+    {"key":"observer", "pattern":"\\[CannonCover(Test|Fixture)\\] ERROR", "scope":"any"}
+  ],
+  "complete_on":{"key":"complete", "pattern":"\\[LolCannon\\] crews released.*cover done"},
+  "completion_grace_seconds":20
+}

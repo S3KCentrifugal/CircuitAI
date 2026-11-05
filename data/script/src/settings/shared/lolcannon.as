@@ -69,6 +69,7 @@ namespace LolCannon {
     // is held again
     // a cannon order alive this long with no frame down is aborted and counts as failed
     int GunFrameSeconds = 300;
+    float GunSiteRadius = 128.0f;   // all roles: bounded placement and nearby-frame adoption; associated frames are tracked by ID
     // FRONT: elmos between the cannon's footprint and its turret block / storage
     // strip (TECH 16). The engine's unpinned site search keeps the cannon's
     // block_map yard (48 elmos a side) clear of turrets and held slots.

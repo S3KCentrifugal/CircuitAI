@@ -192,6 +192,7 @@ namespace LolCannon {
     int facing = 0;
     int gunRes = -1;
     IUnitTask@ gunTask;
+    int gunUnitId = -1;             // associated task target; never a borrowed unit handle across ticks
     AIFloat3 blockCentre(-1.0f, 0.0f, -1.0f);
     AIFloat3 stripCentre(-1.0f, 0.0f, -1.0f);
     array<AIFloat3> turretPos;
@@ -346,7 +347,7 @@ namespace LolCannon {
     {
         if (ai.frame < nextTakeBack || phase != BUILD || gunTask is null || gunTask.IsDead()) return;
         nextTakeBack = ai.frame + 5 * SECOND;
-        if (Gun() is null || aiBuilderMgr.FindUnfinishedNear(site, 128.0f, Gun()) !is null) return;
+        if (Gun() is null || ProjectGun() !is null) return;
         ProbeOrder();
         array<string>@ keys = crewOf.getKeys();
         for (uint i = 0; i < keys.length(); ++i) {
@@ -934,6 +935,7 @@ namespace LolCannon {
     void ResetSlots()
     {
         @gunTask = null;
+        gunUnitId = -1;
         turretTask.resize(0); turretMiss.resize(0);
         for (uint i = 0; i < turretPos.length(); ++i) { turretTask.insertLast(null); turretMiss.insertLast(0); }
         storeTask.resize(0); storeMiss.resize(0); storeDead.resize(0); badStoreSpots.resize(0);
@@ -944,11 +946,31 @@ namespace LolCannon {
         nextStoreFix = 0;
     }
 
-    CCircuitUnit@ StandingGun()
+    // **Invariant.** A program-owned cannon frame remains the same project when
+    // native placement differs from its anchor. One ID lookup / active task per
+    // call; no owned-unit scan. ResetSlots invalidates the ID for a new project.
+    CCircuitUnit@ ProjectGun()
     {
         CCircuitDef@ gun = Gun();
         if (gun is null || site.x < 0.0f) return null;
-        CCircuitUnit@ g = aiBuilderMgr.FindOwnNear(site, 96.0f, gun);
+        CCircuitUnit@ g = gunUnitId < 0 ? null : ai.GetTeamUnit(gunUnitId);
+        if (g !is null && g.circuitDef is gun) return g;
+        gunUnitId = -1;
+        IBuilderTask@ bt = (gunTask is null || gunTask.IsDead()) ? null : cast<IBuilderTask>(gunTask);
+        @g = bt is null ? null : bt.target;
+        if (g is null) @g = aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::GunSiteRadius, gun);
+        if (g is null) @g = aiBuilderMgr.FindOwnNear(site, Global::LolCannon::GunSiteRadius, gun);
+        if (g is null || g.circuitDef !is gun) return null;
+        gunUnitId = g.id;
+        const AIFloat3 p = g.GetPos(ai.frame);
+        GenericHelpers::LogUtil("[LolCannon] project cannon unit=" + g.id + " at (" + int(p.x) + ", " + int(p.z)
+            + "), " + int(sqrt(MapHelpers::SqDist(p, site))) + " from anchor (" + int(site.x) + ", " + int(site.z) + ")", 1);
+        return g;
+    }
+
+    CCircuitUnit@ StandingGun()
+    {
+        CCircuitUnit@ g = ProjectGun();
         return (g !is null && g.GetBuildProgress() >= 1.0f) ? g : null;
     }
 
@@ -961,10 +983,11 @@ namespace LolCannon {
     }
 
     // Pinned to its reservation while it holds (TECH), else at the spot itself.
-    IUnitTask@ OrderAt(Task::BuildType type, CCircuitDef@ d, const AIFloat3 &in p, int id)
+    IUnitTask@ OrderAt(Task::BuildType type, CCircuitDef@ d, const AIFloat3 &in p, int id, bool requiredPin = false)
     {
         if (d is null) return null;
         const bool pin = id >= 0 && aiTerrainMgr.GetReservationState(id) == 0;
+        if (requiredPin && !pin) return null;   // a stale slot must not turn into an unrestricted TECH search
         const AIFloat3 at = pin ? aiTerrainMgr.GetReservationPos(id) : p;
         ordering = true;
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(type, Task::Priority::HIGH, d, at, 0.0f, true, 180 * SECOND));
@@ -1026,7 +1049,7 @@ namespace LolCannon {
         // put T13's next to the footprint, inside the cannon's yard, while the
         // cannon was being ordered (fix 8 test: 18 orders refused the ground).
         if (phase == BUILD && !aiTerrainMgr.IsLayoutEnabled() && StandingGun() is null
-            && (Gun() is null || aiBuilderMgr.FindUnfinishedNear(site, 128.0f, Gun()) is null)) return null;
+            && ProjectGun() is null) return null;
         // full counts the orders in flight too (each may not have its frame down yet):
         // short for a moment at worst, never over
         int flying = 0;
@@ -1114,7 +1137,7 @@ namespace LolCannon {
         bool switched = false;
         int held = 0;
         if (phase == BUILD && gunRes < 0 && (gunTask is null || gunTask.IsDead()) && StandingGun() is null
-            && aiBuilderMgr.FindUnfinishedNear(site, 128.0f, gun) is null) {
+            && ProjectGun() is null) {
             if (!aiTerrainMgr.SetLayoutEnabled(true)) return;
             switched = true;
             if (aiTerrainMgr.CanReserveBuilding(gun, site, facing)) gunRes = aiTerrainMgr.ReserveBuilding(gun, site, facing);
@@ -1272,7 +1295,7 @@ namespace LolCannon {
     {
         CCircuitDef@ gun = Gun();
         if (gun is null || StandingGun() !is null) return null;
-        CCircuitUnit@ gf = aiBuilderMgr.FindUnfinishedNear(site, 128.0f, gun);
+        CCircuitUnit@ gf = ProjectGun();
         if (gf !is null) {
             gunTryFrom = -1; quickEnds = 0;
             return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, gf, 60 * SECOND));
@@ -1324,24 +1347,34 @@ namespace LolCannon {
                 if (GunFailed(n + " order(s) over " + tried + " s, none put a frame down")) return null;
             }
         }
-        if (gunRes >= 0 && !aiTerrainMgr.IsLayoutEnabled()) {
+        const bool layout = aiTerrainMgr.IsLayoutEnabled();
+        if (layout && (gunRes < 0 || aiTerrainMgr.GetReservationState(gunRes) != 0)) {
+            // Only reached without a live order or a project frame. The prior
+            // order can consume/erase its plain reservation; reacquire our own
+            // footprint instead of silently sending the retry to PackNearPoint.
+            if (gunRes >= 0) aiTerrainMgr.ReleaseReservation(gunRes);
+            gunRes = aiTerrainMgr.CanReserveBuilding(gun, site, facing) ? aiTerrainMgr.ReserveBuilding(gun, site, facing) : -1;
+            GenericHelpers::LogUtil("[LolCannon] cannon retry reservation=" + gunRes + " at (" + int(site.x) + ", " + int(site.z) + ")", 1);
+            if (gunRes < 0) {
+                nextGunTry = ai.frame + 10 * SECOND;
+                GunFailed("the exact cannon footprint could not be reserved again");
+                return null;
+            }
+        }
+        if (gunRes >= 0 && !layout) {
             // FRONT: the held footprint is let go for the order, which goes there unpinned
             aiTerrainMgr.ReleaseReservation(gunRes);
             gunRes = -1;
         }
-        @gunTask = OrderAt(Task::BuildType::BIG_GUN, gun, site, gunRes);
+        @gunTask = OrderAt(Task::BuildType::BIG_GUN, gun, site, gunRes, layout);
         if (gunTask is null) {
             nextGunTry = ai.frame + 10 * SECOND;
             GunFailed("the order was refused");
             return null;
         }
-        if (!aiTerrainMgr.IsLayoutEnabled()) {
-            // FRONT (unpinned): the engine searches only round the site and, finding
-            // no room there, ends the order with a "SITE: aborting" line instead of a
-            // silent fallback - or a cannon far off its turret block.
-            IBuilderTask@ bt = cast<IBuilderTask>(gunTask);
-            if (bt !is null) bt.siteRadius = 128.0f;
-        }
+        // Every role has the same bounded fallback contract, including rebuilds.
+        IBuilderTask@ bt = cast<IBuilderTask>(gunTask);
+        if (bt !is null) bt.siteRadius = Global::LolCannon::GunSiteRadius;
         if (orderFrame < 0) orderFrame = ai.frame;
         gunOrderedAt = ai.frame;
         nextGunTry = ai.frame + 3 * SECOND;   // one order at a time: crews asking in the same frame help this one
@@ -1419,6 +1452,7 @@ namespace LolCannon {
     void MoveBack()
     {
         moveBack = false;
+        if (ProjectGun() !is null) return;   // never abandon a frame already associated with this project
         if (gunTask !is null && !gunTask.IsDead()) aiBuilderMgr.AbortTask(gunTask);
         @gunTask = null;
         for (uint k = 0; k < turretTask.length(); ++k) if (turretTask[k] !is null && !turretTask[k].IsDead()) aiBuilderMgr.AbortTask(turretTask[k]);
@@ -1660,7 +1694,17 @@ namespace LolCannon {
 
     void Finish()
     {
-        Report(StandingGun());
+        CCircuitUnit@ g = StandingGun();
+        if (g is null) return;
+        // Cover, scouting and lost-cannon checks use the real completed position.
+        // Existing turret/storage slot arrays retain their own reserved positions.
+        const AIFloat3 actual = g.GetPos(ai.frame);
+        if (rebuild) {
+            for (uint i = 0; i < doneSites.length(); ++i)
+                if (MapHelpers::SqDist(doneSites[i], site) < 1.0f) { doneSites[i] = actual; break; }
+        }
+        site = actual;
+        Report(g);
         if (!rebuild) {
             ++built;
             doneSites.insertLast(site);
@@ -2053,7 +2097,7 @@ namespace LolCannon {
         }
         OrderCrews();
         TakeBackStarter();
-        if (frameFrame < 0 && Gun() !is null && aiBuilderMgr.FindUnfinishedNear(site, 128.0f, Gun()) !is null) {
+        if (frameFrame < 0 && ProjectGun() !is null) {
             frameFrame = ai.frame;
             GenericHelpers::LogUtil("[LolCannon] REPORT framed at=" + (ai.frame / SECOND) + "s ordered=" + (orderFrame < 0 ? -1 : orderFrame / SECOND) + "s", 1);
         }
@@ -2064,7 +2108,7 @@ namespace LolCannon {
         if (ai.frame >= nextLog) {
             nextLog = ai.frame + 60 * SECOND;
             const int turrets = CountStanding(Nano(), turretPos, 24.0f), stores = CountStanding(Store(), storePos, 32.0f);
-            CCircuitUnit@ gf = (Gun() is null) ? null : aiBuilderMgr.FindUnfinishedNear(site, 128.0f, Gun());
+            CCircuitUnit@ gf = ProjectGun();
             GenericHelpers::LogUtil("[LolCannon] building: crews " + crewCount[STARTER] + "+" + crewCount[AIR] + "+" + crewCount[STORE] + "+" + crewCount[GROUND]
                 + " (" + recruitsT2.length() + "+" + recruitsAir.length() + "+" + recruitsGround.length() + " ordered), turrets " + turrets + " of " + turretPos.length()
                 + ", storages " + stores + " of " + storePos.length() + ", cannon " + (gf is null ? "not started" : int(gf.GetBuildProgress() * 100.0f) + "%"), 1);
