@@ -155,6 +155,8 @@ protected:
 	// timeout (none in the mode); engage when inside the range, or inside the
 	// direct range on safe ground, cancelling the AI path.
 	bool IsExperimental() const;
+	// The engine's own build range, unscaled (D-467: where a wait may apply).
+	float EngineBuildRange(CCircuitUnit* unit);
 	float EngageRange(CCircuitUnit* unit);
 	int CmdTimeout(int frame) const;
 	bool TryEngage(CCircuitUnit* unit);
