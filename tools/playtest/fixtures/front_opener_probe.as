@@ -25,7 +25,11 @@ namespace FrontOpenerProbe {
             Global::AISettings::Side = side;
             if (!Global::Map::MapResolved) Setup::setupMap(AIFloat3(2513,0,7983));
             if (Global::AISettings::Role != AiRole::FRONT) GenericHelpers::LogUtil("[FrontOpenerTest] FAIL wrong role", 1);
-            if (mode != "profile") Global::RoleSettings::Front::VehicleTankOpenerChance = mode == "ordinary" ? 0.0f : 1.0f;
+            if (mode != "profile") {
+                const float forced = mode == "ordinary" ? 0.0f : 1.0f;
+                Global::RoleSettings::Front::VehicleTankOpenerChance = forced;
+                Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = forced; // D-471
+            }
             if (mode == "timeout") Global::RoleSettings::Front::VehicleTankGatherSeconds = 20;
             if (mode == "unavailable") ai.GetCircuitDef(side == "cortex" ? "corgator" : "leghades").maxThisUnit = 0;
             Global::Spam::Enabled = false; // supplied economy must not activate a spam pump

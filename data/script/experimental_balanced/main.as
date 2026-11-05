@@ -176,6 +176,8 @@ namespace Main {
         Global::RoleSettings::Tech::T3RushTurretsRampSeconds = 300;
         Global::RoleSettings::Tech::T3RushTurretsRampTo = 40;
         Global::RoleSettings::Front::VehicleTankOpenerChance = 0.0f;
+        // D-471 (owner, 2026-11-04): Cortex vehicles open Rascal scout, then ten Incisors.
+        Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = 1.0f;
 		// FRONT (owner, 2026-10-17): two FRONTs each build a spam lab for an edge lane, left and right
 		// (src/settings/shared/spam.as EdgeLanesEnabled, off there; systems/combat/edge_lanes.as)
 		Global::Spam::EdgeLanesEnabled = true;

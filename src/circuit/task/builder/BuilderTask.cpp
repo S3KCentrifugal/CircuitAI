@@ -739,6 +739,11 @@ bool IBuilderTask::IsExperimental() const
 
 float IBuilderTask::EngageRange(CCircuitUnit* unit)
 {
+	return EngineBuildRange(unit) * 0.9f;
+}
+
+float IBuilderTask::EngineBuildRange(CCircuitUnit* unit)
+{
 	// The engine's rule (Recoil BuilderCAI::GetBuildRange / MoveInBuildRange):
 	// in range when |builder - site| <= buildDistance + modelRadius(buildee);
 	// its own move goal is 0.9 of that. The same numbers, so the AI never
@@ -749,7 +754,7 @@ float IBuilderTask::EngageRange(CCircuitUnit* unit)
 	} else if (buildDef != nullptr) {
 		radius = buildDef->GetRadius();
 	}
-	return (unit->GetCircuitDef()->GetBuildDistance() + radius) * 0.9f;
+	return unit->GetCircuitDef()->GetBuildDistance() + radius;
 }
 
 int IBuilderTask::CmdTimeout(int frame) const
@@ -908,8 +913,18 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 				// the builder off its order (played: the first lab and the opening
 				// solars took minutes whenever energy was empty). The sequence
 				// manages energy itself; a slow build beats an abandoned one.
+				// D-467: wait only where the engine builds. "In range" above is 2D
+				// within build distance + DEFAULT_SLACK (64); the engine's is 3D
+				// within build distance + the buildee's radius (BuilderCAI.cpp:257).
+				// A builder walking its last steps through that band was put on
+				// CMD_WAIT while energy was empty and froze just out of range
+				// (owner's game: FRONT's first constructor at a base mex, D-466).
+				// Outside the engine's range any wait is lifted so it walks in.
+				// Cost: one 3D distance per re-evaluation; a command only on a flip.
 				if (!IsExperimental() && ((unit->GetTravelAct() == nullptr) || unit->GetTravelAct()->IsFinished())) {
-					unit->CmdWait(ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
+					const float engineRange = EngineBuildRange(unit);
+					const bool inEngineRange = pos.SqDistance(GetPosition()) <= SQUARE(engineRange);
+					unit->CmdWait(inEngineRange && ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
 							&& (buildType != BuildType::STORE) && (buildType != BuildType::RECLAIM));
 				}
 			)

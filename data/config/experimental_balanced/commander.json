@@ -12,6 +12,12 @@
         "enabled": 1, "radius": 1800, "memory": 45, "strategic_memory": 600,
         "heavy_metal": 1200, "heavy_health": 4000, "baseline_health": 1000,
         "stable_seconds": 60, "stable_distance": 160,
+        // D-469: a ground army this far past a turret's range still counts,
+        // so the group fortifies the side facing it before it closes.
+        "approach": 600,
+        // D-470: seconds the commander waits for a constructor to start a
+        // defence only constructors build before it builds its own instead.
+        "seat_grace": 5,
         // Idle FRONT groups spend uncommitted metal above this bank (0 disables).
         // Keep sustained firing headroom and a separate burst reserve.
         "surplus_metal": 2000, "surplus_energy_margin": 100,
@@ -20,6 +26,9 @@
         // Full project funding + operating energy + readiness still apply.
         "rules": {
             "light": {"surplus_priority": 1, "metal": 0, "energy": 0, "limit": 2},
+            // D-469: the commander's own light laser, only while no group seat
+            // can start "light" (slot 0); fallback_for names that slot.
+            "llt": {"surplus_priority": 1, "metal": 0, "energy": 0, "limit": 2, "fallback_for": 0},
             "hlt": {"surplus_priority": 2, "metal": 20, "energy": 500, "limit": 3},
             "t2": {"surplus_priority": 4, "metal": 50, "energy": 1000, "seconds": 90, "limit": 4},
             "heavy": {"metal": 120, "energy": 2500, "seconds": 120, "value_ratio": 0.75, "limit": 3},
@@ -93,6 +102,10 @@
 		"front_work_behind": 400,
 		"jam_safe": 1,
         "cloak_energy_retreat": 1,
+        // D-472: an energy retreat whose reserve (moving cloak x escape_seconds
+        // + margin, 4450 E) exceeds what the team can store ends after this many
+        // seconds without threat. 0 keeps the latch until the reserve returns.
+        "cloak_energy_release": 5,
         "front_mex_aa_enabled": 1,
 		"jam_heavy_cost": 900,
 		"front_push_ahead": 600, "front_push_screen": 0, "front_push_until_seconds": 0, "front_push_home_riot": 0,

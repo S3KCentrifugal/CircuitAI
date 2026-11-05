@@ -16,11 +16,22 @@
 #include "terrain/BattleAnalysis.h"
 #include <limits>
 #include "task/common/WaitTask.h"
+#include "Mod.h"
 
 namespace circuit {
 using springai::AIFloat3;
 using commander::Point;
 static Point P(const AIFloat3& p) { return {p.x,p.z}; }
+// KI-756. The engine jams whole cells, so its coverage reaches up to about
+// one cell diagonal past the nominal range; the friendly query must include it.
+static constexpr float JAM_QUERY_SLACK_CELLS=1.5f;
+// A held firing point stays jammed while the commander drifts up to half a
+// cell from it (the most JamCells::CoversAround tests exactly).
+static constexpr float JAM_FIRING_MARGIN_CELLS=.5f;
+// Inward search step along the jammer-to-target ray, in cells.
+static constexpr float JAM_FIRING_STEP_CELLS=.5f;
+// Footprint room beyond the commander's radius for the preferred point.
+static constexpr float JAM_FIRING_COMFORT=16.f;
 
 void CCommanderController::InitJammerRadii() {
     // UnitDef radii are immutable for this AI lifetime. Cache only metadata;
@@ -35,6 +46,11 @@ void CCommanderController::InitJammerRadii() {
             jammerRadii[def.GetId()]=radius;
             maxJammerRadius=std::max(maxJammerRadius,radius);
         }
+        // KI-756: the radar mip level is fixed for the game; read it once.
+        springai::Mod* mod=ai->GetCallback()->GetMod();
+        const int mipLevel=mod->GetRadarMipLevel();
+        delete mod;
+        jamCells=commander::JamCells(SQUARE_SIZE,mipLevel,int(maxJammerRadius));
     }
 }
 
@@ -119,17 +135,21 @@ bool CCommanderController::Jammed(CCircuitUnit* unit) {
     jamZones.clear();
     if(cfg->safety.jamSafe<=0 || !Handles(unit) || EnergyRetreat(unit) || HealthRetreat(unit)) return false;
     InitJammerRadii();
-    if(maxJammerRadius<=0) return false;
+    if(maxJammerRadius<=0 || !jamCells.Valid()) return false;
     const int frame=ai->GetLastFrame();
     const auto pos=unit->GetPos(frame);
-    jammerIds=ai->GetCallback()->GetFriendlyUnitIdsIn(pos,maxJammerRadius,false);
+    jammerIds=ai->GetCallback()->GetFriendlyUnitIdsIn(pos,
+        maxJammerRadius+jamCells.CellSize()*JAM_QUERY_SLACK_CELLS,false);
     for(int id:jammerIds) {
         const int def=ai->GetCallback()->Unit_GetDefId(id);
         if(def<=0 || size_t(def)>=jammerRadii.size() || jammerRadii[def]<=0) continue;
         auto* ally=ai->GetFriendlyUnit(id);
         if(!ally || !ai->GetUnitAPI()->IsActiveSensor(id)) continue;
+        // KI-756: the engine's cells, not the nominal disc, decide jamming.
         const auto center=P(ally->GetPos(frame));
-        if(commander::Length(P(pos)-center)<=jammerRadii[def]) jamZones.push_back({center,jammerRadii[def]});
+        const JamZone zone{center,jammerRadii[def],jamCells.CellOf(center),
+            jamCells.Radius(int(jammerRadii[def])),ally->GetCircuitDef()->IsMobile()};
+        if(jamCells.Covers(zone.cell,zone.cells,zone.mobile,P(pos))) jamZones.push_back(zone);
     }
     return !jamZones.empty();
 }
@@ -170,22 +190,28 @@ bool CCommanderController::JamControl(CCircuitUnit* unit,State& s,int frame) {
             line.target=c.id; best=line;goal=P(pos);bestDistance=0;break;
         }
         for(const auto& zone:jamZones) {
-            // Keep the destination inside coverage, including the footprint.
-            auto candidate=commander::JamFiringPoint(zone.center,zone.radius,def->GetRadius()+16.f,lead);
-            // Use the outer coverage edge when the comfortable inset would
-            // discard an otherwise reachable shot. Revalidate live jamming at
-            // firing time; the commander center must remain inside the disc.
-            if(commander::Length(lead-candidate)>range+c.radius)
-                candidate=commander::JamFiringPoint(zone.center,zone.radius,4.f,lead);
-            if(commander::Length(lead-candidate)>range+c.radius) continue;
+            // KI-756: a point is held only where the engine's jam cells cover
+            // it with half a cell to spare. Prefer room for the footprint;
+            // when that loses the shot, search inward from the nominal edge.
+            // Live jamming is revalidated at firing time.
+            const float margin=jamCells.CellSize()*JAM_FIRING_MARGIN_CELLS;
+            const float step=jamCells.CellSize()*JAM_FIRING_STEP_CELLS;
+            Point candidate;
+            bool found=jamCells.FiringPoint(zone.center,zone.cell,zone.cells,zone.mobile,zone.radius,
+                def->GetRadius()+JAM_FIRING_COMFORT,lead,margin,step,candidate);
+            if(!found || commander::Length(lead-candidate)>range+c.radius)
+                found=jamCells.FiringPoint(zone.center,zone.cell,zone.cells,zone.mobile,zone.radius,
+                    0.f,lead,margin,step,candidate);
+            if(!found || commander::Length(lead-candidate)>range+c.radius) continue;
             const float distance=commander::Length(candidate-P(pos));
             if(distance>=bestDistance) continue;
             AIFloat3 at(candidate.x,0,candidate.z);
             if(!OnMap(at)) continue;
             at.y=ai->GetMap()->GetElevationAt(at.x,at.z);
             if(at.y<0 || !Route(unit,pos,at)) continue;
-            // Both endpoints lie in one convex coverage disc. Route validates
-            // the straight terrain corridor; re-observation handles mobile jams.
+            // Both endpoints lie in one jammer's cell circle, which is convex
+            // up to a cell. Route validates the straight terrain corridor;
+            // re-observation each tick catches a leg that leaves coverage.
             best.target=c.id;best.requiredHit=false;goal=candidate;bestDistance=distance;
         }
     }

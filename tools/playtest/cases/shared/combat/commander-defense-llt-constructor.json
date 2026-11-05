@@ -1,0 +1,212 @@
+{
+  "name": "commander-defense-llt-constructor",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "D-469: with a T1 constructor in the commander group (FRONT's commander seat, filled after the energy, support and expansion seats, so five constructors) the same Pawns get a Beamer (armbeamer), never the commander-only light laser fallback",
+  "commander_overrides": {
+    "front_push_screen": 0,
+    "commander_group_jammer_income": 0,
+    "commander_group_combat_distance": 0,
+    "commander_group_radar_priority": 0,
+    "commander_group_defence_metal": 50,
+    "commander_group_defence_energy": 1000,
+    "commander_group_radius": 1000
+  },
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      7000,
+      5000
+    ]
+  ],
+  "camera": [
+    4000,
+    3500,
+    2500
+  ],
+  "photos": [],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "hold_friendly": true,
+  "groups": [
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2876,
+        2806
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armnanotc",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2676,
+        2806
+      ],
+      "after_seconds": 20
+    },
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 4,
+      "position": [
+        2676,
+        3206
+      ],
+      "after_seconds": 28,
+      "spacing": 180,
+      "columns": 2
+    },
+    {
+      "unit": "armck",
+      "team": 0,
+      "count": 5,
+      "spacing": 70,
+      "columns": 5,
+      "position": [
+        2826,
+        2856
+      ],
+      "after_seconds": 24
+    },
+    {
+      "unit": "armpw",
+      "team": 1,
+      "count": 6,
+      "spacing": 70,
+      "columns": 2,
+      "position": [
+        4976,
+        4306
+      ],
+      "after_seconds": 50,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          800,
+          500
+        ],
+        "max_distance": 1800
+      }
+    },
+    {
+      "unit": "armpeep",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4976,
+        4306
+      ],
+      "after_seconds": 51,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          400,
+          250
+        ],
+        "max_distance": 1800
+      }
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-defense-llt-constructor",
+  "commander_initial": true,
+  "start_metal": 100000,
+  "commander_trace": true,
+  "coverage_probe": false,
+  "coverage_min_advance": 1500,
+  "builders": true,
+  "production": false,
+  "start_energy": 1000000,
+  "storage_scenario": "defense-llt-constructor",
+  "modoptions": {
+    "multiplier_metalextraction": 10
+  },
+  "front_spacing_observation": false,
+  "commander_radar_package_check": false,
+  "commander_policy": {
+    "commander_group_income": 0,
+    "commander_group_t2_metal": 0,
+    "commander_group_t2_energy": 0,
+    "commander_group_second_t2_metal": 100000,
+    "commander_group_second_t2_energy": 100000,
+    "commander_group_third_t2_metal": 100000,
+    "commander_group_third_t2_energy": 100000
+  },
+  "defense_overrides": [
+    {
+      "slot": -1,
+      "key": "baseline_health",
+      "value": 0
+    },
+    {
+      "slot": -1,
+      "key": "surplus_metal",
+      "value": 0
+    },
+    {
+      "slot": 1,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 2,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 3,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 4,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 5,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 6,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 7,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 8,
+      "key": "priority",
+      "value": 0
+    },
+    {
+      "slot": 15,
+      "key": "priority",
+      "value": 0
+    }
+  ],
+  "commander_defense_observation": "armbeamer"
+}

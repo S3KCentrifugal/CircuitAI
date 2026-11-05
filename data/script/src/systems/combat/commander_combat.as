@@ -90,6 +90,7 @@ namespace CommanderCombat {
             Option("front_mex_los",0.f);
             Option("cloak_energy_retreat",0.f);
             Option("cloak_retreat_distance",600.f);
+            Option("cloak_energy_release",0.f); // D-472: 0 keeps the D-373 latch
             Option("health_retreat",.4f);
             Option("decoys",1.f);
             Option("decoy_bait",1.f);

@@ -14,6 +14,10 @@ namespace Front {
             // commander takes the queued start factory itself. 0 disables.
             float StartFactoryTakeoverSeconds = 60.0f;
             float FactoryProductionBudgetShare = 0.65f;
+            // D-468, INV-252: a construction turret holding a repair order on a
+            // target outside its reach this long is logged as a violation
+            // (native releases it on the task's next update).
+            float TurretRepairReachGraceSeconds = 5.0f;
             float FactoryT1BudgetShare = 0.6f;
             float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
             bool GeothermalEnabled = true;
@@ -155,6 +159,9 @@ namespace Front {
             int RaiderOpenerCount = 10;
             // Opt-in profile policy: retain the first scout, then choose tanks.
             float VehicleTankOpenerChance = 0.0f;
+            // D-471: Cortex vehicle labs keep the Rascal scout, then open with
+            // the RaiderOpenerCount batch as Incisors (corgator), not Rascals.
+            float VehicleTankOpenerChanceCortex = 1.0f;
             int VehicleTankGatherSeconds = 300; // release a disrupted/incomplete batch
             float SwitchFactoryCostMultiplier = 1.2f;
             int ScoutAssignmentLimit = 5;
