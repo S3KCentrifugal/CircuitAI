@@ -48,7 +48,7 @@ namespace FrontLabPorc {
         bool planned = false;
         bool far = false;
         array<int> standing = { 0, 0, 0, 0 };  // tier 0 unused, 1 mid, 2 heavy, 3 flak
-        array<CCircuitUnit@> frames(4);
+        array<int> frameIds = { -1, -1, -1, -1 }; // borrowed units never survive a callback here
         IUnitTask@ order;
         int orderTier = -1;
         int orderBefore = 0;
@@ -295,7 +295,7 @@ namespace FrontLabPorc {
         // each gun counts for the nearest far lab within LabPorcRadius
         const float r = Global::RoleSettings::Front::LabPorcRadius;
         for (uint i = 0; i < labs.length(); ++i)
-            for (int t = 0; t < 4; ++t) { labs[i].standing[t] = 0; @labs[i].frames[t] = null; }
+            for (int t = 0; t < 4; ++t) { labs[i].standing[t] = 0; labs[i].frameIds[t] = -1; }
         for (uint g = 0; g < guns.length(); ++g) {
             const AIFloat3 p = guns[g].GetPos(ai.frame);
             Lab@ best = null;
@@ -307,8 +307,8 @@ namespace FrontLabPorc {
             }
             if (best is null) continue;
             const int t = (guns[g].circuitDef is heavy) ? 2 : (guns[g].circuitDef is flak) ? 3 : 1;
-            best.standing[t] += 1;
-            if (guns[g].GetBuildProgress() < 1.0f) @best.frames[t] = guns[g];
+            if (guns[g].GetBuildProgress() < 1.0f) best.frameIds[t] = guns[g].id;
+            else best.standing[t] += 1;
         }
         // an order that died without TaskRemoved (none expected): forget it; the counts above decide
         for (uint i = 0; i < labs.length(); ++i)
@@ -333,7 +333,7 @@ namespace FrontLabPorc {
             if (l.order !is task) continue;
             @l.order = null;
             if (done) {
-                if (l.orderTier >= 1 && l.orderTier <= 3 && !l.orderRepair) l.standing[l.orderTier] += 1;
+                if (l.orderTier >= 1 && l.orderTier <= 3) l.standing[l.orderTier] += 1;
                 l.fails = 0; l.shift = 0;
                 return;
             }
@@ -354,6 +354,33 @@ namespace FrontLabPorc {
         if (t is null || t.IsDead()) return false;
         for (uint i = 0; i < labs.length(); ++i) if (labs[i].order is t) return true;
         return false;
+    }
+
+    // Join only existing work; called by the existing mex-helper census and
+    // Work. O(labs), no census/allocation beyond the task's bounded assignees.
+    // TaskRemoved/Scan own invalidation; keep a task handle across callbacks,
+    // never a cached unit handle. Native AssignTask owns detachment and restart.
+    IUnitTask@ Help(CCircuitUnit@ u) {
+        if (!PorcOn() || u is null || u.circuitDef is null || FrontRecovery::Active()) return null;
+        if (UnitHelpers::IsCommander(u.circuitDef) || UnitHelpers::GetConstructorTier(u.circuitDef) != 2) return null;
+        for (uint i = 0; i < labs.length(); ++i) {
+            Lab@ l = labs[i];
+            IUnitTask@ order = l.order;
+            if (!l.far || order is null || order.IsDead() || ai.GetTeamUnit(l.id) is null) continue;
+            if (u.task is order) return order;
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), l.pos) > Global::RoleSettings::Front::LabPorcReach * Global::RoleSettings::Front::LabPorcReach) continue;
+            IBuilderTask@ b = cast<IBuilderTask>(order);
+            if (b is null || (b.buildDef !is null && !u.circuitDef.CanBuild(b.buildDef))) continue;
+            array<CCircuitUnit@>@ on = order.GetUnits();
+            if (on !is null && on.length() >= 2) continue;
+            // Before the first worker arrives native may not have selected a
+            // site yet. Check the lab anchor then, as Work does for new orders.
+            AIFloat3 at = b.GetBuildPos();
+            if (at.x < 0.0f || at.z < 0.0f) at = l.pos;
+            if (!aiTerrainMgr.CanReachAt(u, at, u.circuitDef.GetBuildDistance())) continue;
+            return order;
+        }
+        return null;
     }
 
     // Slot of the k-th gun of a tier at a far lab: pop-ups either side of the corridor ahead of the
@@ -379,6 +406,8 @@ namespace FrontLabPorc {
         if (UnitHelpers::IsCommander(u.circuitDef) || UnitHelpers::GetConstructorTier(u.circuitDef) != 2) return null;
         const bool free = FrontFactoryNanos::Free(u);
         if (!free && !FrontFactoryNanos::Takeable(u)) return null;
+        IUnitTask@ help = Help(u);
+        if (help !is null) return help;
         const float reach = free ? Global::RoleSettings::Front::LabPorcReach : Global::RoleSettings::Front::LabPorcTakeRadius;
         const AIFloat3 wp = u.GetPos(ai.frame);
         const float mi = Economy::GetMinMetalIncomeLast10s();
@@ -386,16 +415,26 @@ namespace FrontLabPorc {
         for (uint i = 0; i < labs.length(); ++i) {
             Lab@ l = labs[i];
             if (!l.far || MapHelpers::SqDist(wp, l.pos) > reach * reach) continue;
-            // an open order: join it (two constructors at most)
+            // Help already considered every open order (two constructors max).
             if (l.order !is null && !l.order.IsDead()) {
-                array<CCircuitUnit@>@ on = l.order.GetUnits();
-                IBuilderTask@ b = cast<IBuilderTask>(l.order);
-                if ((on is null || on.length() < 2) && (b is null || b.buildDef is null || u.circuitDef.CanBuild(b.buildDef))) return l.order;
                 continue;
             }
             if (ai.frame < l.holdUntil) continue;
             CCircuitUnit@ labUnit = ai.GetTeamUnit(l.id);
             if (labUnit is null || labUnit.GetBuildProgress() < 1.0f) continue;   // the guns follow a standing lab
+            // Finish any surviving frame before opening another rung. The
+            // census counts completed guns only; even a full set of frames
+            // must not make an unfinished cluster look complete.
+            for (int t = 1; t <= 3; ++t) {
+                CCircuitUnit@ frame = ai.GetTeamUnit(l.frameIds[t]);
+                if (frame is null || frame.circuitDef !is GunDef(t) || frame.GetBuildProgress() >= 1.0f) continue;
+                if (MapHelpers::SqDist(frame.GetPos(ai.frame), l.pos) > Global::RoleSettings::Front::LabPorcRadius * Global::RoleSettings::Front::LabPorcRadius) continue;
+                if (!u.circuitDef.CanBuild(frame.circuitDef) || !aiTerrainMgr.CanReachAt(u, frame.GetPos(ai.frame), u.circuitDef.GetBuildDistance())) continue;
+                @l.order = aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 120 * SECOND));
+                if (l.order is null || l.order.IsDead()) continue;
+                l.orderRepair = true; l.orderTier = t; l.orderBefore = l.standing[t];
+                return l.order;
+            }
             // the first step of the ladder not yet met
             array<int> need = { 0, 0, 0, 0 };
             int step = -1, tier = -1;
@@ -418,10 +457,7 @@ namespace FrontLabPorc {
                     + d.GetName() + " (stand: mid " + l.standing[1] + ", heavy " + l.standing[2] + ", flak " + l.standing[3] + "; M +" + int(mi) + ", "
                     + int(sqrt(MapHelpers::SqDist(l.pos, Global::Map::StartPos))) + " from our start)", 1);
             }
-            if (l.frames[tier] !is null && ai.GetTeamUnit(l.frames[tier].id) !is null) {
-                @l.order = aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, l.frames[tier], 120 * SECOND));
-                l.orderRepair = true;
-            } else {
+            {
                 if (d.maxThisUnit >= 0 && d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
                 if (!d.IsAvailable(ai.frame)) continue;
                 const int k = l.standing[tier] + l.shift;

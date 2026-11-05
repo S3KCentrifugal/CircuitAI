@@ -100,12 +100,22 @@ namespace FrontMexUp {
 
     // A helper: work the team loses nothing by moving (another builder stays on a shared build)
     bool Helper(CCircuitUnit@ u) {
+        if (u is null || u.circuitDef is null) return false;
         IUnitTask@ t = u.task;
         if (t is null || t.IsDead() || t.IsExternalControlled() || t.IsEnemyReclaim()) return false;
         if (t.GetType() != Task::Type::BUILDER) return false;
         IBuilderTask@ b = cast<IBuilderTask>(t);
         if (b is null) return false;
         const Task::BuildType bt = Task::BuildType(b.GetBuildType());
+        // Active defence is a commitment, including the lab planner's repair of
+        // an abandoned frame. A second assignee may be walking or out of range;
+        // its presence does not make the working constructor expendable.
+        if (bt == Task::BuildType::DEFENCE || FrontLabPorc::IsOurs(t)) return false;
+        if (bt == Task::BuildType::REPAIR && b.target !is null) {
+            CCircuitUnit@ target = ai.GetTeamUnit(b.target.id);
+            if (target !is null && target.circuitDef !is null && !target.circuitDef.IsMobile()
+                && target.GetBuildProgress() < 1.0f && target.circuitDef.GetMaxRange() > 0.0f) return false;
+        }
         if (bt == Task::BuildType::MEX || bt == Task::BuildType::MEXUP) return false;
         if (bt == Task::BuildType::GUARD || bt == Task::BuildType::PATROL || bt == Task::BuildType::REPAIR) return true;
         array<CCircuitUnit@>@ units = t.GetUnits();
@@ -134,15 +144,41 @@ namespace FrontMexUp {
         for (int i = int(pulledIds.length()) - 1; i >= 0; --i)
             if (ai.frame - pulledFrames[i] >= Global::RoleSettings::Front::MexUpgradeRepullSeconds * SECOND) { pulledIds.removeAt(i); pulledFrames.removeAt(i); }
         array<int>@ ids = ai.GetOwnedUnitIds();
+        bool upgradeOpen = true;
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             // the lolcannon crew is never a helper here (owner 2026-10-28: a FRONT starter
             // was pulled off its cannon order, shared with its crew, for 15 min)
-            if (!IsT2Constructor(u) || LolCannon::IsCrew(u.id) || !Helper(u) || PulledRecently(u.id)) continue;
+            if (!IsT2Constructor(u) || LolCannon::IsCrew(u.id) || !Helper(u)) continue;
+            // Reuse this existing census: finish an active forward defence
+            // before sending spare helpers to mexes. Help only joins live work.
+            IUnitTask@ defence = FrontLabPorc::Help(u);
+            if (defence !is null) {
+                const int id = ids[i];
+                @u = ai.GetTeamUnit(id);
+                if (u !is null && !defence.IsDead() && Helper(u)) aiBuilderMgr.AssignTask(u, defence);
+                @u = ai.GetTeamUnit(id);
+                if (u !is null && !defence.IsDead() && u.task is defence)
+                    GenericHelpers::LogUtil("[FRONT][LabPorc] " + u.circuitDef.GetName() + " " + id + " joins active defence", 1);
+                continue;
+            }
+            if (!upgradeOpen || PulledRecently(u.id)) continue;
+            const int id = u.id;
+            IUnitTask@ previous = u.task;
             IUnitTask@ up = Upgrade(u, "left a helper's job");
-            if (up is null) return;   // nothing open or the cap is reached: no other helper fares better
-            Pulled(u.id);
-            aiBuilderMgr.AssignTask(u, up);
+            // No more mex searches this census, but a later nearby helper may
+            // still be able to finish a defence the earlier helper cannot reach.
+            if (up is null) { upgradeOpen = false; continue; }
+            // Enqueue/assignment may dispatch lifecycle callbacks. Never use a
+            // borrowed unit after that boundary without resolving its ID again.
+            @u = ai.GetTeamUnit(id);
+            if (u !is null && !up.IsDead() && u.task is previous && Helper(u)) aiBuilderMgr.AssignTask(u, up);
+            @u = ai.GetTeamUnit(id);
+            if (u !is null && !up.IsDead() && u.task is up) Pulled(id);
+            else if (!up.IsDead()) {
+                array<CCircuitUnit@>@ on = up.GetUnits();
+                if (on is null || on.length() == 0) aiBuilderMgr.AbortTask(up);
+            }
         }
     }
 }
