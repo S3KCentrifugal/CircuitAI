@@ -54,6 +54,9 @@ def main():
         {'key':'effective build edges','pattern':r'\[FrontOpenerTest\] build_edges_checked=5','by_minute':1,'scope':'any'},
         {'key':'observer','pattern':r'\[FrontOpenerTest\] observer_started','by_minute':1,'scope':'any'}]
     tank = args.scenario not in ('ordinary','unavailable','profile') and args.side != 'armada' and args.kind == 'vehicle'
+    # D-471: VehicleTankOpenerChanceCortex defaults to 1, so the profile's own
+    # settings give a Cortex vehicle lab its Incisor batch.
+    tank = tank or (args.scenario == 'profile' and args.side == 'cortex' and args.kind == 'vehicle')
     if tank:
         count = 9 if args.scenario in ('casualty','cancel') else (4 if args.scenario=='factory-loss' else 10)
         launch = r'\[Gather\] launch units='+str(count)+r' .*expired=0'
