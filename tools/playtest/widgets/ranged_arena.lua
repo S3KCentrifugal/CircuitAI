@@ -16,6 +16,47 @@ local commanderShooters,commanderShooterCount={},0
 local combatInputs,combatInputCount={},0
 local frontArrived,frontMexes=false,0
 local function log(s) Spring.Echo("[RangedArena] frame="..Spring.GetGameFrame().." "..s) end
+-- KI-756 opt-in (jam_state_observation): the engine's own jam map against the
+-- nominal disc for a commander. nominal = inside radarDistanceJam of an active
+-- allied jammer; engine = GetPositionLosState's inJammer for its ally team.
+-- Logs changes, every D-gun shot, and a stationary hold (2 s) that is inside
+-- the disc but outside the engine's cells. Observation only, no orders.
+local jamStates={}
+local function jamProbe(id)
+    local x,y,z=Spring.GetUnitPosition(id)
+    if not x then return nil end
+    local ally=Spring.GetUnitAllyTeam(id)
+    local nominal=false
+    for _,j in ipairs(Spring.GetUnitsInCylinder(x,z,1200) or {}) do
+        local jd=UnitDefs[Spring.GetUnitDefID(j) or -1]
+        local r=jd and (jd.jammerRadius or 0) or 0
+        if r>0 and j~=id and Spring.GetUnitAllyTeam(j)==ally and Spring.GetUnitIsActive(j) then
+            local jx,_,jz=Spring.GetUnitPosition(j)
+            if jx and (x-jx)^2+(z-jz)^2<=r*r then nominal=true;break end
+        end
+    end
+    local _,_,_,engine=Spring.GetPositionLosState(x,y,z,ally)
+    return nominal,engine and true or false,x,z
+end
+local function jamObserve(id,f)
+    local nominal,engine,x,z=jamProbe(id)
+    if nominal==nil then return end
+    local s=jamStates[id] or {}
+    jamStates[id]=s
+    if s.nominal~=nominal or s.engine~=engine then
+        s.nominal,s.engine=nominal,engine
+        log(string.format("jam_state id=%d event=change nominal=%d engine=%d x=%d z=%d",id,nominal and 1 or 0,engine and 1 or 0,x,z))
+    end
+    local vx,_,vz=Spring.GetUnitVelocity(id)
+    local still=vx and vx*vx+vz*vz<0.09
+    if nominal and not engine and still then
+        s.since=s.since or f
+        if f-s.since>=60 and not s.held then
+            s.held=true
+            log(string.format("jam_edge_hold id=%d x=%d z=%d",id,x,z))
+        end
+    else s.since=nil;s.held=false end
+end
 -- Opt-in census fixtures (D-294/D-295/D-296). Observation only, no orders.
 -- caseUnits: cfg.units (list) or cfg.unit. Tallies are logged as one summary
 -- line every 10 s so checks can match thresholds with a regex.
@@ -595,6 +636,7 @@ function widget:GameFrame(f)
                     end
                     local hp=Spring.GetUnitHealth(id)
                     local state=Spring.GetUnitStates(id) or {}
+                    if cfg.jam_state_observation then jamObserve(id,f) end
                     if cfg.commander_geometry then log("commander_geometry id="..id.." y="..tostring(y).." ground="..Spring.GetGroundHeight(x,z).." radius="..Spring.GetUnitRadius(id)) end
                     log("commander id="..id.." x="..math.floor(x).." z="..math.floor(z).." hp="..math.floor(hp or 0)
                         .." cloaked="..tostring(Spring.GetUnitIsCloaked(id)).." fire="..tostring(state.firestate))
@@ -613,6 +655,13 @@ function widget:GameFrame(f)
                             and WeaponDefs[w.weaponDef].type=="DGun" and not commanderShooters[u.team] then
                             commanderShooters[u.team]=true;commanderShooterCount=commanderShooterCount+1
                             log("commander_shooters="..commanderShooterCount.." team="..u.team)
+                        end
+                        if cfg.jam_state_observation and d.customParams and d.customParams.iscommander
+                            and WeaponDefs[w.weaponDef].type=="DGun" then
+                            local nominal,engine,x,z=jamProbe(id)
+                            if nominal~=nil then
+                                log(string.format("jam_state id=%d event=shot nominal=%d engine=%d x=%d z=%d",id,nominal and 1 or 0,engine and 1 or 0,x,z))
+                            end
                         end
                         local kind,_,target=Spring.GetUnitWeaponTarget(id,index)
                         local distance=-1

@@ -14,6 +14,7 @@
 #include "control/kernel/CommanderFortification.h"
 #include "control/kernel/CommanderGroupWork.h"
 #include "control/kernel/CommanderIdleWork.h"
+#include "control/kernel/CommanderJammerCoverage.h"
 #include "control/kernel/CommanderJammerPlan.h"
 #include "control/kernel/CommanderPosture.h"
 #include "control/kernel/DefensePlanner.h"
@@ -500,7 +501,10 @@ private:
     commander::JammerDemandMemory jammerDemand;
     std::map<int,commander::JammerOutage> jammerOutages;
     bool HealthControl(CCircuitUnit* unit,State& s,int frame);
-    struct JamZone { commander::Point center; float radius; };
+    // KI-756: the engine's cell coverage decides jamming; radius is the
+    // nominal disc, only the outer bound of a firing-point search.
+    struct JamZone { commander::Point center; float radius; commander::JamCell cell; int cells=0; bool mobile=false; };
+    commander::JamCells jamCells;
     std::vector<JamZone> jamZones;
     bool JamControl(CCircuitUnit* unit,State& state,int frame);
     void Tick(CCircuitUnit* unit,State& state,int frame);

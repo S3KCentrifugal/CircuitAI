@@ -1,0 +1,79 @@
+{
+  "name": "commander-jam-cells",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "TACTICAL",
+  "description": "KI-756: a Sneaky Pete whose centre sits half a cell into its radar cell; a heavy target on the 45-degree line where the engine jams only to 475 of the nominal 500. The old 4-elmo fallback point (496) is outside the engine's cells; the commander must never fire or hold there.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4302,
+      3826
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "commander_initial": true,
+  "enemy_commander_home": true,
+  "enemy_destination": [
+    4632,
+    3496
+  ],
+  "commander_overrides": {
+    "retreat": 0.99
+  },
+  "camera": [
+    4400,
+    3800,
+    1200
+  ],
+  "photos": [
+    23,
+    28,
+    40
+  ],
+  "min_spawn_spacing": 60,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "observation_frames": 3,
+  "groups": [
+    {
+      "unit": "armjamt",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4112,
+        4016
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armeyes",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4773,
+        3637
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armbull",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4632,
+        3496
+      ],
+      "after_seconds": 23
+    }
+  ],
+  "assertions": {
+    "max_losses": 0
+  },
+  "checks": "commander-jam-cells",
+  "jam_state_observation": true
+}

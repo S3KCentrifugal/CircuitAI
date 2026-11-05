@@ -1,0 +1,57 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 0.4
+    },
+    {
+      "key": "inside",
+      "pattern": "\\[RangedArena\\].*jam_state id=\\d+ event=change nominal=1 engine=1",
+      "scope": "any",
+      "by_minute": 0.8
+    },
+    {
+      "key": "jammed-shot",
+      "pattern": "\\[RangedArena\\].*jam_state id=\\d+ event=shot nominal=1 engine=1",
+      "scope": "any",
+      "by_minute": 1.5
+    },
+    {
+      "key": "kill",
+      "pattern": "\\[RangedArena\\].*death id=\\d+ team=1 unit=armbull",
+      "scope": "any",
+      "by_minute": 1.8,
+      "after_key": "jammed-shot"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "shot-outside-cells",
+      "pattern": "\\[RangedArena\\].*jam_state id=\\d+ event=shot nominal=1 engine=0",
+      "scope": "any"
+    },
+    {
+      "key": "edge-hold",
+      "pattern": "\\[RangedArena\\].*jam_edge_hold",
+      "scope": "any"
+    },
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}
