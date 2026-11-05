@@ -216,9 +216,11 @@ bool CCommanderController::GroupSiteAllowed(CCircuitUnit* unit,const AIFloat3& s
         +(cfg->front.laneMargin>0?cfg->front.laneMargin:unit->GetCircuitDef()->GetBuildDistance());
 }
 // An expansion mex may be on the lane's start connector, outside the group's
-// narrower territory polygon. Only LLTs and their nano support inherit that
-// local capture window; factories/radars/other group work keep their boundary.
-// Geometry only, no engine collection query. Income gates offers, not retention.
+// narrower territory polygon. LLTs, their nano support and (D-470) the group
+// defence planner's rule structures inherit that local capture window, so a
+// planned defence can go where the commander stands; factories/radars/other
+// group work keep their boundary. Geometry only, no engine collection query;
+// the rule lookup is MAX_RULES integer compares. Income gates offers, not retention.
 bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircuitDef* def,const AIFloat3& site) const {
     // Engineering's anchor must not constrain TECH's unrelated home builders.
     // Fixed-size membership lookup; commander_group_work_test covers ownership.
@@ -229,8 +231,12 @@ bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircu
     }
     if(GroupSiteAllowed(unit,site)) return true;
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
-    if(!unit || !def || cfg->front.mexMinIncome<=0
-        || (def->GetId()!=int(cfg->front.lineDef) && def->GetId()!=groupNano)) return false;
+    if(!unit || !def || cfg->front.mexMinIncome<=0) return false;
+    // D-470: every planned defence was refused when the commander stood
+    // outside its corridor polygon; only the LLT (line turret) could go down.
+    const bool planned=defenseSettings.enabled>0 && std::any_of(defenseRules.begin(),defenseRules.end(),
+        [&](const defense::Rule& r){ return r.def==def->GetId() && r.priority>0; });
+    if(def->GetId()!=int(cfg->front.lineDef) && def->GetId()!=groupNano && !planned) return false;
     auto* anchor=Handles(unit)?unit:GroupCommander();
     return anchor && LaneMexSiteAllowed(anchor,site);
 }
@@ -307,12 +313,25 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
     const auto center=anchor->GetPos(frame);
     const bool jammer=def->GetId()==groupJammer || def->GetId()==groupJammer2;
     const auto coverage=GroupJammerCoverage(unit,def,site,jammer?cfg->group.radius:160.f);
+    // Trace only: the first failing site gate per candidate cell, so a
+    // planner `placement` skip names its cause. No cost without the variable.
+    static const bool traceSites=std::getenv("CIRCUIT_COMMANDER_TRACE")!=nullptr;
+    std::array<int,6> rejected{};
     CTerrainManager::TerrainPredicate admit=[&](const AIFloat3& p) {
-        return coverage.Allows({p.x,p.z})
-            && GroupBuildSiteAllowed(unit,def,p) && GroupLaneWorkAllowed(unit,def,p)
-            && p.SqDistance2D(center)<=SQUARE(cfg->group.radius)
-            && ai->GetThreatMap()->GetThreatAt(unit,p)<=cfg->front.threat
-            && ai->GetTerrainManager()->CanReachAtSafe2(unit,p,unit->GetCircuitDef()->GetBuildDistance());
+        int gate=0;
+        const bool ok=(++gate,coverage.Allows({p.x,p.z}))
+            && (++gate,GroupBuildSiteAllowed(unit,def,p)) && (++gate,GroupLaneWorkAllowed(unit,def,p))
+            && (++gate,p.SqDistance2D(center)<=SQUARE(cfg->group.radius))
+            && (++gate,ai->GetThreatMap()->GetThreatAt(unit,p)<=cfg->front.threat)
+            && (++gate,ai->GetTerrainManager()->CanReachAtSafe2(unit,p,unit->GetCircuitDef()->GetBuildDistance()));
+        if(!ok && traceSites) ++rejected[gate-1];
+        return ok;
+    };
+    const auto traceReject=[&](const char* why) -> IUnitTask* {
+        if(traceSites && defenseSlot>=0)
+            ai->LOG("[CommanderGroup] site_reject unit=%i def=%s why=%s coverage=%i site=%i lane=%i radius=%i threat=%i reach=%i",
+                unit->GetId(),def->GetDef()->GetName(),why,rejected[0],rejected[1],rejected[2],rejected[3],rejected[4],rejected[5]);
+        return nullptr;
     };
     AIFloat3 at=-RgtVector;
     if(!jammer) at=ai->GetTerrainManager()->FindBuildSite(def,site,160.f,0,admit);
@@ -333,15 +352,15 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
             if(score>best) {best=score;at=candidate;}
         }
     }
-    if(!OnMap(at)) return nullptr;
+    if(!OnMap(at)) return traceReject("no_site");
     if(defenseSlot>=0) {
         const auto& rule=defenseRules[defenseSlot];
         const auto& facts=DefenseFactsFor(def);
-        if(facts.coverage>0 && at.SqDistance2D(center)>SQUARE(facts.coverage)) return nullptr;
+        if(facts.coverage>0 && at.SqDistance2D(center)>SQUARE(facts.coverage)) return traceReject("coverage_radius");
         // Check actual range/trajectory only on a returned site, not on every
         // terrain-search cell. Five proposal sites bound the expensive work.
         const auto capacity=DefenseCapacity(def,rule,&at);
-        if(!surplus && defense::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM())<=0) return nullptr;
+        if(!surplus && defense::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM())<=0) return traceReject("no_benefit_at_site");
     }
     ai->LOG("[CommanderGroup] unit=%i build=%s nano=%i x=%.0f z=%.0f",unit->GetId(),def->GetDef()->GetName(),int(nano),at.x,at.z);
     auto* task=builder->Enqueue(TaskB::Common(type,IBuilderTask::Priority::HIGH,def,at,0.f,true,60*FRAMES_PER_SEC));

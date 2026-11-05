@@ -394,7 +394,15 @@ private:
     IdMembership defenseRepresented;
     int defenseNext=0,defenseOfferNext=0,defenseChoice=-1;
     int defenseDecisionNext=0;
+    int defenseCoverageLogNext=0; // D-469: INV-253 log limit
+    void CheckOwnGroundDefense(CCircuitUnit* anchor,int frame);
     defense::Evaluation defenseEvaluation;
+    // D-470: the anchor's own best rule while the shared choice is seat-only,
+    // and the frame that choice became seat-only (grace before the anchor acts).
+    defense::Evaluation defenseOwnEvaluation;
+    int defenseOwnChoice=-1,defenseSeatWaitSince=-1;
+    int defenseSeatLogNext=0; // D-470: INV-254 log limit
+    void CheckSeatWait(CCircuitUnit* anchor,int frame);
     float defenseReservedMetal=0,defenseReservedEnergy=0;
     std::string defenseReason="not_assessed";
     const DefenseFacts& DefenseFactsFor(CCircuitDef* def);
