@@ -219,6 +219,10 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
     if(cfg->t3.intercept<=0 || !cap.cloak) { s.fundingBudget=0; EndT3(unit,s,frame,"disabled"); return false; }
 
     const bool baseDefence=protectedAfus>=0;
+    // Owner 2026-11-06: the doctrine owns every T3 (shot in reach, 2-second
+    // approach, retreat); this plan keeps only the AFUS defence of T1/T2.
+    const bool doctrine=DoctrineOn(unit);
+    if(doctrine && !baseDefence) { EndT3(unit,s,frame,"doctrine"); s.t3.declined=-1; return false; }
     // Strategic pursuit stays in the published FRONT corridor. This is an
     // O(1) grid read; immediate shots above and escape/juke moves stay reactive.
     const auto inLane=[&](const AIFloat3& point) {
@@ -250,6 +254,7 @@ bool CCommanderController::Intercept(CCircuitUnit* unit,State& s,int frame) {
     float nearest=std::numeric_limits<float>::max();
     for(const auto& c:contacts) {
         if(c.friendly || c.blocker || (!c.t3 && !(baseDefence && c.combatTier>0 && c.targetable))) continue;
+        if(doctrine && c.t3) continue;
         auto* enemy=ai->GetEnemyInfo(c.id);
         if(!enemy || !enemy->GetCircuitDef()) continue;
         // A surface-only D-gun cannot hit aircraft or a definition outside

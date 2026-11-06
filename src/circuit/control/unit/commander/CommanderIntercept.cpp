@@ -110,7 +110,7 @@ bool CCommanderController::CloakSafe(CCircuitUnit* unit,Point from,Point to,floa
     return false;
 }
 
-bool CCommanderController::Fire(CCircuitUnit* unit,State& s,const commander::Line& line,int frame,bool acceptT3Risk,bool acceptJamRisk) {
+bool CCommanderController::Fire(CCircuitUnit* unit,State& s,const commander::Line& line,int frame,bool acceptT3Risk,bool acceptJamRisk,bool forced) {
     const auto pos=unit->GetPos(frame); const float range=unit->GetDGunRange()-12;
     auto* def=unit->GetCircuitDef();
     if(acceptT3Risk) {
@@ -150,7 +150,7 @@ bool CCommanderController::Fire(CCircuitUnit* unit,State& s,const commander::Lin
     // line shot or fallback shot must not bypass T3 death-blast protection.
     // O(local contacts), only when issuing a shot; definitions are AI-owned
     // immutable caches. Predict the same intersections used by shot claims.
-    if(cfg->t3.trade<=0 && !acceptT3Risk && !acceptJamRisk) {
+    if(cfg->t3.trade<=0 && !acceptT3Risk && !acceptJamRisk && !forced) {
         const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(def);
         const int armor=std::max(0,def->GetDef()->GetArmorType());
         float blast=0; bool t3=false;
@@ -257,7 +257,8 @@ bool CCommanderController::PriorityDGun(CCircuitUnit* unit,State& s,int frame) {
         if(distance>range+c.radius*.5f) {
             // A listed T3 is closed on from t3_distance; a heavy group member
             // only from at most heavy_leash beyond reach.
-            if(listed && distance<chaseDistance) { chaseDistance=distance; chase=&c; }
+            // Owner 2026-11-06: under the doctrine a T3 is closed on only by its 2-second rule.
+            if(listed && distance<chaseDistance && !DoctrineOn(unit)) { chaseDistance=distance; chase=&c; }
             else if(!listed && distance<=range+c.radius*.5f+cfg->safety.heavyLeash && distance<leashDistance
                 && std::abs(c.height-std::max(0.f,pos.y))<=range*.5f) { leashDistance=distance; leash=&c; }
             continue;

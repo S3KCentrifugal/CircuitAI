@@ -88,7 +88,11 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
     Bind bound(this,PresetOfUnit(unit->GetId()));
     const bool towers=cfg->safety.towerKeepOut>0, porc=cfg->safety.porcKeepOut>0;
     const bool heavy=cfg->safety.heavyNoChase>0;
-    if(!towers && !porc && !heavy) return;
+    // Owner 2026-11-06 doctrine: T3s and outranging T2+ shooters are discs too,
+    // so the front goal and work sites stay out of their reach after a retreat.
+    const bool doctrine=DoctrineOn(unit);
+    const float laser=doctrine?LaserRange(unit->GetCircuitDef()):0.f;
+    if(!towers && !porc && !heavy && !doctrine) return;
     const int heavyUntil=frame+int(cfg->safety.heavyHold*FRAMES_PER_SEC);
     heavyScratch.clear();
     if(!towerDefsResolved) {
@@ -101,6 +105,19 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
         // Owner 2026-11-04: T1/T2 ground combatants (no aircraft, commanders or
         // T3) are group candidates; their discs are made after the scan.
         if(def->IsMobile()) {
+            if(doctrine && def->IsAttacker() && !def->IsAbleToFly() && !def->IsRoleComm() && !enemy->IsBeingBuilt()
+                && enemy->IsInRadarOrLOS() && !(enemy->GetData().losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN))) {
+                const auto& md=DefinitionFor(def);
+                const auto& m=MatchupFor(def,unit->GetCircuitDef());
+                const AIFloat3& at=enemy->GetPos();
+                if((md.t3 || (md.tech>=cfg->doctrine.outrangeTier && m.range>laser+cfg->doctrine.rangedMargin))
+                    && m.range>0 && m.range<=cfg->safety.porcMaxRange && std::isfinite(at.x) && std::isfinite(at.z)) {
+                    auto existing=std::find_if(keepOut.begin(),keepOut.end(),[id](const KeepOutZone& z){return z.heavy && z.id==id;});
+                    KeepOutZone& z=existing!=keepOut.end()?*existing:keepOut.emplace_back();
+                    z.center=P(at); z.radius=m.range+cfg->doctrine.t3Margin; z.id=id; z.until=heavyUntil; z.heavy=true;
+                    continue;
+                }
+            }
             if(!heavy || !def->IsAttacker() || def->IsAbleToFly() || def->IsRoleComm()
                 || DefinitionFor(def).t3 || enemy->IsBeingBuilt() || !enemy->IsInRadarOrLOS()) continue;
             const auto& g=enemy->GetData();
@@ -295,6 +312,7 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
         if(!s.keep.active && s.keep.diveTarget<0) return false;
         ai->LOG("[CommanderSafety] unit=%i action=keep_out_end reason=%s",unit->GetId(),why);
         s.keep.active=false; s.keep.diveTarget=-1; s.keep.goal={-1,0,-1};
+        if(!s.doctrine.active) s.doctrine.cloak=false;
         if(!resume || !task) return false;
         Conceal(unit,s,false); Transition(unit,s,Mode::SUPPORT,frame); task->Resume(unit);
         return true;
@@ -392,6 +410,15 @@ bool CCommanderController::SafetyWithdraw(CCircuitUnit* unit,State& s,int frame)
     s.keep.active=true; s.keep.reason=reason;
     s.budget=0; s.deployed=false;
     Transition(unit,s,Mode::ESCAPE,frame);
+    // Owner 2026-11-06 doctrine: a withdrawal under fire (or from shelling or
+    // drones) walks out cloaked when the bank funds it, fire held while hidden.
+    if(DoctrineOn(unit)) {
+        const bool hit=s.lastDamage>=0 && frame-s.lastDamage<3*FRAMES_PER_SEC;
+        if(hit || shelled || droned || s.doctrine.cloak) {
+            const bool cloaked=DoctrineCloak(unit,s,true);
+            writer.FireState(unit,cloaked?CCircuitDef::FireType::HOLD:CCircuitDef::FireType::RETURN,"keep_out");
+        }
+    }
     if(frame>=s.keep.goalPlan+FRAMES_PER_SEC || s.keep.goal.x<0 || pos.SqDistance2D(s.keep.goal)<SQUARE(48.f)
         || KeepOutAt(P(s.keep.goal))) {
         s.keep.goalPlan=frame;

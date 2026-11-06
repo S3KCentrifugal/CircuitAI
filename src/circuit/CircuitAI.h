@@ -291,6 +291,9 @@ public:
 	CGameAttribute* GetGameAttribute() const { return gameAttribute.get(); }
 	const std::shared_ptr<CScheduler>& GetScheduler() { return scheduler; }
 	int GetLastFrame()    const { return lastFrame; }
+	// Owner 2026-11-06: the attacker id of the UnitDamaged event being dispatched
+	// (-1 unknown); lets the commander tell friendly fire from an unseen shooter.
+	int GetDamageAttackerId() const { return damageAttackerId; }
 	int GetSkirmishAIId() const { return skirmishAIId; }
 	int GetTeamId()       const { return teamId; }
 	int GetAllyTeamId()   const { return allyTeamId; }
@@ -370,6 +373,7 @@ private:
 	bool isResigned : 1;
 	bool isSlave : 1;
 	int lastFrame;
+	int damageAttackerId = -1;
 	int skirmishAIId;
 	int teamId;
 	int allyTeamId;

@@ -47,13 +47,14 @@ using Field=control::ConfigField<CommanderConfig>;
 template<auto M> Field Combat(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.combat.*M;},lo,hi}; }
 template<auto M> Field Safety(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.safety.*M;},lo,hi}; }
 template<auto M> Field Cloak(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.cloak.*M;},lo,hi}; }
+template<auto M> Field Doc(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.doctrine.*M;},lo,hi}; }
 template<auto M> Field Group(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.group.*M;},lo,hi}; }
 template<auto M> Field Front(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.front.*M;},lo,hi}; }
 template<auto M> Field T3(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.t3.*M;},lo,hi}; }
 template<auto M> Field Fall(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.fallback.*M;},lo,hi}; }
 template<auto M> Field Work(const char* n,float lo,float hi) { return {n,[](CommanderConfig& c)->float&{return c.work.*M;},lo,hi}; }
 using CC=CommanderCombatConfig; using SC=CommanderSafetyConfig; using KC=CommanderCloakConfig;
-using GC=CommanderGroupConfig; using FC=CommanderFrontConfig; using TC=CommanderT3Config;
+using DC=CommanderDoctrineConfig; using GC=CommanderGroupConfig; using FC=CommanderFrontConfig; using TC=CommanderT3Config;
 using BC=CommanderFallbackConfig; using WC=CommanderWorkConfig;
 
 const control::CConfigTable<CommanderConfig>& ConfigTable() {
@@ -107,6 +108,16 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Cloak<&KC::budget>("cloak_budget",0,1),Cloak<&KC::stillSeconds>("cloak_still_seconds",0,60),
         Cloak<&KC::period>("posture_period",3,300),Cloak<&KC::log>("cloak_log",0,1),
         Cloak<&KC::blipDps>("blip_dps",0,10000),Cloak<&KC::blipRange>("blip_range",0,3000),
+        // Owner 2026-11-06 retreat doctrine
+        Doc<&DC::doctrine>("doctrine",0,1),Doc<&DC::cloakRunway>("doctrine_cloak_runway",0,30),
+        Doc<&DC::cloakKeep>("doctrine_cloak_keep",0,30),Doc<&DC::hitHold>("doctrine_hit_hold",0,30),
+        Doc<&DC::rangedMargin>("doctrine_ranged_margin",0,1000),Doc<&DC::t3Close>("doctrine_t3_close",0,10),
+        Doc<&DC::t3Margin>("doctrine_t3_margin",0,1000),Doc<&DC::recloakSeconds>("doctrine_recloak_seconds",0,60),
+        Doc<&DC::outrangeTier>("doctrine_outrange_tier",1,3),Doc<&DC::spamMinutes>("doctrine_spam_minutes",0,120),
+        Doc<&DC::spamCount>("doctrine_spam_count",1,100),Doc<&DC::spamCost>("doctrine_spam_cost",0,2000),
+        Doc<&DC::spamRange>("doctrine_spam_range",.5f,6),Doc<&DC::spamHold>("doctrine_spam_hold",0,60),
+        Doc<&DC::jammerSearch>("doctrine_jammer_search",0,10000),Doc<&DC::step>("doctrine_step",128,2000),
+        Doc<&DC::supportHoldFire>("doctrine_support_hold_fire",0,1),
         Group<&GC::combatDistance>("commander_group_combat_distance",0,4000),
         Group<&GC::combatMemory>("commander_group_combat_memory",0,120),
         Group<&GC::radius>("commander_group_radius",128,2000),
@@ -301,10 +312,27 @@ void CCommanderController::Damaged(CCircuitUnit* unit) {
     Tick(unit,s,frame); reserve=std::max(previousReserve,reserve+std::max(s.budget,s.fundingBudget));
 }
 void CCommanderController::DamagedBy(CCircuitUnit* unit,CEnemyInfo* attacker) {
-    if(!attacker || !Handles(unit)) return;
+    if(!Handles(unit)) return;
     State* found=states.Find(unit->GetId());
-    auto* ad=attacker->GetCircuitDef();
-    if(found && ad && ad->IsDrone()) found->keep.droneHit=ai->GetLastFrame();
+    if(!found) return;
+    const int frame=ai->GetLastFrame();
+    auto* ad=attacker?attacker->GetCircuitDef():nullptr;
+    if(ad && ad->IsDrone()) found->keep.droneHit=frame;
+    // Owner 2026-11-06 doctrine: fire the commander cannot answer. No enemy
+    // record: either a friendly (splash, ignored) or a shooter we never saw.
+    auto& d=found->doctrine;
+    if(!attacker) {
+        const int id=ai->GetDamageAttackerId();
+        if(id>=0 && ai->GetFriendlyUnit(id)) return;
+        d.unseenHit=frame; return;
+    }
+    const AIFloat3 at=attacker->GetPos();
+    if(OnMap(at)) d.hitFrom=at;
+    if(ad && ad->IsAbleToFly()) { d.airHit=frame; return; }
+    if(!attacker->IsInLOS()) { d.unseenHit=frame; return; }
+    Bind bound(this,found->preset);
+    const float reach=LaserRange(unit->GetCircuitDef())+cfg->doctrine.rangedMargin;
+    if(OnMap(at) && at.SqDistance2D(unit->GetPos(frame))>SQUARE(reach)) d.rangedHit=frame;
 }
 void CCommanderController::MoveFailed(int id) {
     State* s=states.Find(id); if(!s) return;
@@ -689,7 +717,9 @@ void CCommanderController::Move(CCircuitUnit* unit,State& s,const AIFloat3& goal
     TRY_UNIT(ai,unit,unit->CmdMoveTo(goal,0,frame+lifetime);)
 }
 void CCommanderController::Conceal(CCircuitUnit* unit,State& s,bool value) {
-    const int fire=value?CCircuitDef::FireType::HOLD:CCircuitDef::FireType::OPEN;
+    // Owner 2026-11-06: a posture cloak holds fire too (no decloak on air or spam).
+    const bool holdCloak=s.conceal.postureCloak && cfg->doctrine.doctrine>0 && cfg->doctrine.supportHoldFire>0;
+    const int fire=value || holdCloak?CCircuitDef::FireType::HOLD:CCircuitDef::FireType::OPEN;
     writer.FireState(unit,fire,value?"conceal":"reveal");
     // D-389: an engagement's concealment combines with the posture's cloak
     // (formerly the D-380 fog cloak). The single writer sends the order.
@@ -760,8 +790,10 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     // the states of a controlled commander; restore its default fire state here.
     {
         const int taskType=int(current->GetType());
-        if(s.retreat.lastTaskType==int(IUnitTask::Type::RETREAT) && taskType!=s.retreat.lastTaskType)
+        if(s.retreat.lastTaskType==int(IUnitTask::Type::RETREAT) && taskType!=s.retreat.lastTaskType) {
             writer.FireState(unit,unit->GetCircuitDef()->GetFireState(),"retreat_end");
+            if(!s.doctrine.active) s.doctrine.cloak=false;
+        }
         s.retreat.lastTaskType=taskType;
     }
     if(!task && s.mode!=Mode::SUPPORT) {
@@ -785,6 +817,9 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     const float range=unit->GetDGunRange()-12;
     Observe(unit,frame);
     if(trace) ai->LOG("[CommanderTrace] observation unit=%i contacts=%i seeds=%i threats=%i y=%.0f",unit->GetId(),int(contacts.size()),int(seeds.size()),int(threats.size()),pos.y);
+    // Owner 2026-11-06 retreat doctrine: fire it cannot answer, outranging
+    // T2/T3, spam and the T3 two-second rule come before every other owner.
+    if(Doctrine(unit,s,frame)) return;
     // Threat-only energy fallback precedes even jam-safe/T3 work. The latch
     // keeps a healthy commander in its retreat task until the cloak reserve
     // returns; no extra scan and no peaceful low-energy evacuation.

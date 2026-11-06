@@ -68,6 +68,24 @@ struct CommanderKeepOutState {
     // the commander; droneUntil: the withdrawal holds until this frame.
     int droneHit=-10000,droneUntil=-1;
 };
+// Owner 2026-11-06 retreat doctrine (CommanderSafety.cpp, Doctrine): fire it
+// cannot answer, outranging T2/T3, spam after the opening and the T3 2-second
+// rule. Frames are -10000 when never set.
+struct CommanderDoctrineState {
+    int unseenHit=-10000;   // damaged by a shooter out of LOS (or no attacker id)
+    int rangedHit=-10000;   // damaged by a visible shooter beyond our laser reach
+    int airHit=-10000;      // damaged by an aircraft
+    springai::AIFloat3 hitFrom{-1,0,-1}; // last known position of such a shooter
+    bool active=false;      // the doctrine owns the commander (retreat or hold)
+    const char* reason="";
+    int goalPlan=-10000; springai::AIFloat3 goal{-1,0,-1};
+    bool holding=false;     // standing still cloaked (spam at a jammer, T3 ambush)
+    int spamUntil=-1;       // spam retreat held until this frame
+    int recloakUntil=-1;    // after a T3 shot: no new T3 approach until cloaked again
+    int shot=-1,shotTarget=-1; // pending doctrine D-gun (frame ordered, target)
+    bool cloak=false;       // last doctrine cloak decision (hysteresis)
+    int logNext=0;
+};
 struct CommanderFallbackState {
     // D-293 fallback: held until `until`, porc line replanned once/second.
     bool active=false;
@@ -169,6 +187,7 @@ struct CommanderState : control::ControlledState {
     CommanderConcealState conceal;
     CommanderRetreatState retreat;
     CommanderKeepOutState keep;
+    CommanderDoctrineState doctrine;
     CommanderFallbackState fallback;
     CommanderT3State t3;
     CommanderFrontState front;
@@ -230,6 +249,22 @@ struct CommanderSafetyConfig {
     // the commander away and the front goal and work sites stay outside. A T3
     // nearly in D-gun reach (T3Exempt) still comes first. Not at home. 0 = off.
     float heavyNoChase=1,heavyMetal=600,heavyGroupRadius=400,heavyLeash=50,heavyHold=6,heavyMargin=100;
+};
+// Owner 2026-11-06 retreat doctrine levers (doctrine 0 = the old behaviour).
+struct CommanderDoctrineConfig {
+    float doctrine=1;
+    float cloakRunway=5;     // seconds the bank must fund a moving cloak to switch it on
+    float cloakKeep=1;       // ...and to keep an active doctrine cloak on
+    float hitHold=3;         // retreat held this long after the last hit it cannot answer
+    float rangedMargin=50;   // a visible shooter this far beyond our laser reach is "from range"
+    float t3Close=2;         // a T3 is approached only when D-gun reach is this many seconds away
+    float t3Margin=100;      // elmos past a T3's weapon reach that still count as danger
+    float recloakSeconds=8;  // bound on the after-shot wait for the cloak to come back
+    float outrangeTier=2;    // mobile tier from which an outranging shooter forces a retreat
+    float spamMinutes=10,spamCount=5,spamCost=150,spamRange=2,spamHold=5;
+    float jammerSearch=3000; // spam retreat looks for an active friendly jammer this far
+    float step=600;          // retreat step
+    float supportHoldFire=1; // a support/posture cloak holds fire (no decloak on air or spam)
 };
 // D-389 cloak posture levers (commander-cloak-policy.md section 4.4).
 struct CommanderCloakConfig {
@@ -332,6 +367,7 @@ struct CommanderConfig {
     CommanderCombatConfig combat;
     CommanderSafetyConfig safety;
     CommanderCloakConfig cloak;
+    CommanderDoctrineConfig doctrine;
     CommanderGroupConfig group;
     CommanderFrontConfig front;
     CommanderT3Config t3;
@@ -601,6 +637,19 @@ private:
     springai::AIFloat3 WithdrawGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,bool shelled,int frame,bool droned=false);
     bool TowerDive(CCircuitUnit* unit,State& s,const KeepOutZone& zone,int frame);
     bool SafetyWithdraw(CCircuitUnit* unit,State& s,int frame);
+    // ---- owner 2026-11-06 retreat doctrine (CommanderSafety.cpp) ----
+    bool DoctrineOn(CCircuitUnit* unit) const;
+    bool Doctrine(CCircuitUnit* unit,State& s,int frame);
+    // Seconds the bank keeps a cloak (moving or still) running at present income.
+    float CloakRunway(CCircuitUnit* unit,bool moving) const;
+    // The doctrine cloak: on at cloak_runway seconds, kept down to cloak_keep.
+    bool DoctrineCloak(CCircuitUnit* unit,State& s,bool moving);
+    float LaserRange(CCircuitDef* def);
+    std::map<int,float> laserRanges;
+    std::set<int> spamDefs; bool spamResolved=false;
+    bool IsSpam(CCircuitDef* def,const commander::Contact& c);
+    bool DoctrineShot(CCircuitUnit* unit,State& s,int frame,bool t3Only,const springai::AIFloat3* after);
+    springai::AIFloat3 DoctrineGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,commander::Point threat,bool spam,int frame);
     struct JamZone { commander::Point center; float radius; };
     std::vector<JamZone> jamZones;
     bool JamControl(CCircuitUnit* unit,State& state,int frame);
@@ -618,7 +667,8 @@ private:
     bool Intercept(CCircuitUnit* unit,State& state,int frame);
     void EndT3(CCircuitUnit* unit,State& state,int frame,const char* reason);
     void Decline(CCircuitUnit* unit,State& state,const commander::Contact& target,int frame,const char* reason);
-    bool Fire(CCircuitUnit* unit,State& state,const commander::Line& line,int frame,bool acceptT3Risk=false,bool acceptJamRisk=false);
+    // forced (owner 2026-11-06 doctrine): skip the T3 survival veto, the shot is always taken.
+    bool Fire(CCircuitUnit* unit,State& state,const commander::Line& line,int frame,bool acceptT3Risk=false,bool acceptJamRisk=false,bool forced=false);
     // Priority D-gun override (CommanderIntercept.cpp, owner 2026-10-20).
     std::set<int> priorityDefs; bool priorityResolved=false;
     bool PriorityDGun(CCircuitUnit* unit,State& state,int frame);

@@ -227,6 +227,10 @@ void CCommanderController::SyncSupportCloak(CCircuitUnit* unit,State& s,int fram
     if(current==nullptr || dynamic_cast<const CControlledTask*>(current)!=nullptr
         || current->GetType()==IUnitTask::Type::RETREAT) return;
     const bool want=SupportCloak(unit,s);
+    // Owner 2026-11-06: a cloaked commander at work holds fire, so lasers at
+    // aircraft or spam never decloak it; uncloaked, its default fire state.
+    if(cfg->doctrine.doctrine>0 && cfg->doctrine.supportHoldFire>0)
+        writer.FireState(unit,want?CCircuitDef::FireType::HOLD:unit->GetCircuitDef()->GetFireState(),"support_cloak");
     if(verify) {
         // INV-246: in support, only this controller turns the cloak on. Once a
         // second, compare BAR's request flag with this controller's last request.
@@ -259,8 +263,16 @@ void CCommanderController::RetreatConceal(CCircuitUnit* unit,State& s,int frame,
     // An approaching threat counts: a low-health commander must already be
     // hidden when it arrives (commander-health-cloaked-t3), not start cloaking
     // once it is in range. A retreat with nothing near still does not cloak.
-    const bool hide=(threatened || s.conceal.threatNear || s.conceal.postureCloak) && !s.retreat.energy && RetreatCloakFunded(unit)
+    bool hide=(threatened || s.conceal.threatNear || s.conceal.postureCloak) && !s.retreat.energy && RetreatCloakFunded(unit)
         && CloakSafe(unit,pos,pos,cfg->combat.escapeSeconds);
+    // Owner 2026-11-06 doctrine: a threatened retreat cloaks whenever the bank
+    // runs a moving cloak doctrine_cloak_runway seconds, on enemy radar or not.
+    if(DoctrineOn(unit) && unit->GetCircuitDef()->IsAbleToCloak()) {
+        const float runway=CloakRunway(unit,true);
+        hide=(threatened || s.conceal.threatNear || s.conceal.postureCloak)
+            && runway>=(s.doctrine.cloak?cfg->doctrine.cloakKeep:cfg->doctrine.cloakRunway);
+        s.doctrine.cloak=hide;
+    }
     writer.FireState(unit,hide?CCircuitDef::FireType::HOLD:CCircuitDef::FireType::RETURN,"retreat");
     writer.CloakFrom(unit,hide,s.conceal.requested,hide?"retreat hidden":"retreat seen");
     s.conceal.requested=hide;

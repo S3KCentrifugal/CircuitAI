@@ -163,6 +163,7 @@ bool CCommanderController::JamControl(CCircuitUnit* unit,State& s,int frame) {
     for(const auto& c:contacts) {
         if(c.friendly || c.blocker || c.reserved || !c.targetable
             || !(c.t3 || (c.combatTier==2 && c.cost>=cfg->safety.jamHeavyCost))) continue;
+        if(c.t3 && DoctrineOn(unit)) continue; // owner 2026-11-06: T3s follow the doctrine's 2-second rule
         const auto lead=c.pos+c.velocity*(commander::Length(c.pos-P(pos))/speed);
         auto line=commander::ScoreLine(contacts,P(pos),lead-P(pos),range,speed,width,
             cfg->combat.killReward,cfg->combat.friendlyMargin,c.id);

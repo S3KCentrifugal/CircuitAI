@@ -1353,6 +1353,7 @@ int CCircuitAI::UnitMoveFailed(CCircuitUnit* unit)
 int CCircuitAI::UnitDamaged(CCircuitUnit* unit, ICoreUnit::Id attackerId, int weaponId, AIFloat3 dir)
 {
 	unit->SetDamagedFrame(lastFrame);
+	damageAttackerId = attackerId;
 	CEnemyInfo* attacker = GetEnemyInfo(attackerId);
 	if (battle != nullptr) {
 		battle->OnOwnDamaged(unit->GetPos(lastFrame));  // D-126: combat heat
