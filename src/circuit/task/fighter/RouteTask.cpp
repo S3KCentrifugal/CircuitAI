@@ -8,6 +8,7 @@
  */
 
 #include "task/fighter/RouteTask.h"
+#include "task/fighter/MissileTargetPolicy.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/RangedGeometry.h"
@@ -224,6 +225,9 @@ void CRouteTask::Update()
 			ArtyLockHeld(circuit, unit, circuit->GetLastFrame());
 		} else if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
 			const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
+			const bool slowLauncher = IsSlowMissileLauncher(def->GetDef()->GetName());
+			CEnemyInfo* losNearest = nullptr;
+			float losSq = nearestSq;
 			for (const auto& kv : circuit->GetEnemyInfos()) {
 				CEnemyInfo* enemy = kv.second;
 				const CCircuitDef* edef = enemy->GetCircuitDef();
@@ -232,7 +236,10 @@ void CRouteTask::Update()
 						|| (!def->HasSurfToWater() && enemy->GetPos().y < -SQUARE_SIZE * 5)) continue;
 				const float sq = here.SqDistance(enemy->GetPos());
 				if (sq < nearestSq) { nearestSq = sq; nearest = enemy; }
+				if (enemy->IsInLOS() && (sq < losSq)) { losSq = sq; losNearest = enemy; }
 			}
+			// 2026-11-06 Task C: the 3 slow launchers take LOS targets before radar contacts
+			if (slowLauncher && (losNearest != nullptr)) { nearest = losNearest; nearestSq = losSq; }
 		}
 		ArtyRangeTargetCheck(circuit, unit, nearest);  // 2026-11-06: a target turned identified T1 is dropped
 		if (nearest != nullptr) {
