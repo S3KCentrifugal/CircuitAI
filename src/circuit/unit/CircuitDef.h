@@ -328,6 +328,7 @@ public:
 	bool IsReclaimable()     const { return isReclaimable; }
 	bool IsCapturable()      const { return isCapturable; }
 	bool IsBuilder()         const { return !buildOptions.empty(); }
+	float GetTechLevel()     const { return techLevel; }  // customParams.techlevel, 1 when absent
 
 	void SetIsMex(bool value) { isMex = value; }
 	bool IsMex() const { return isMex; }
@@ -451,6 +452,7 @@ private:
 	bool buildAllowed = true;  // JSON construction veto, independent of temporary role caps
 	float targetMinCost = 0.f; // Opt-in valuable-contact preference; zero is legacy.
 	float standoff = 0.f;  // Fraction of weapon range to hold; zero keeps legacy micro.
+	float techLevel = 1.f;
 	bool isIgnore : 1;
 
 	bool isAttacker : 1;

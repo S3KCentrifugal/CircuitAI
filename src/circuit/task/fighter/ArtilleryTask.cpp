@@ -41,8 +41,35 @@ namespace circuit {
 
 using namespace springai;
 
+/*
+ * 2026-11-06: Ambassador, Negotiator, Boreas and Arbiter do not shoot an
+ * IDENTIFIED (def known) MOBILE enemy of tech level 1 (customParams.techlevel,
+ * 1 when absent) that is idle or slow (SlowMissileSpeedAllowed: stationary, or
+ * below min(top speed x 0.25, 12) elmos/s). Unidentified radar dots stay
+ * targets. Commanders (no techlevel in BAR, so 1) are not exempt: the
+ * commander priority stands.
+ */
+bool ArtyT1Exempt(const CCircuitDef* launcher, const CEnemyInfo* enemy)
+{
+    if ((launcher == nullptr) || (enemy == nullptr) || !IsT1ExemptLauncher(launcher->GetDef()->GetName())) return false;
+    const CCircuitDef* d = enemy->GetCircuitDef();
+    if ((d == nullptr) || !d->IsMobile() || d->IsRoleComm() || (d->GetTechLevel() > 1.5f)) return false;
+    return SlowMissileSpeedAllowed(enemy->GetVel().SqLength2D(), d->GetSpeed(), true, FRAMES_PER_SEC);
+}
+
+static void T1ExemptDrop(CCircuitAI* circuit, CCircuitUnit* unit, const CEnemyInfo* e, const char* path)
+{
+    circuit->LOG("T1EXEMPT: %s %i drops %s %i identified T1 (%s)", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
+            (e && e->GetCircuitDef()) ? e->GetCircuitDef()->GetDef()->GetName() : "?", e ? e->GetId() : -1, path);
+    TRY_UNIT(circuit, unit,
+        unit->ClearPriorityTarget();
+        unit->CmdStop();
+    )
+}
+
 bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy)
 {
+    if (ArtyT1Exempt(launcher, enemy)) return false;
     if (!IsSlowMissileLauncher(launcher->GetDef()->GetName())) return true;
     if (enemy == nullptr) return false;
     const CCircuitDef* def = enemy->GetCircuitDef();
@@ -206,11 +233,23 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
+	if (ArtySpamRetreatStep(circuit, unit, frame)) {
+		return;  // 2026-11-06: backing off from spam
+	}
 	if (ArtySnipeStep(circuit, unit, frame)) {
 		return;  // owner 2026-11-03: sniping an outranging artillery structure
 	}
 	const AIFloat3& pos = unit->GetPos(frame);
 	CEnemyInfo* bestTarget = FindTarget(unit, pos);
+	// 2026-11-06: the previous default pick became identified T1: stop at once.
+	{
+		CMilitaryManager::SArtySnipeState& ps = circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame);
+		if ((ps.pickTarget >= 0) && ((bestTarget == nullptr) || (bestTarget->GetId() != ps.pickTarget))) {
+			CEnemyInfo* old = circuit->GetEnemyInfo(ps.pickTarget);
+			if ((old != nullptr) && ArtyT1Exempt(unit->GetCircuitDef(), old)) T1ExemptDrop(circuit, unit, old, "pick");
+		}
+		ps.pickTarget = ((bestTarget != nullptr) && bestTarget->IsInRadarOrLOS()) ? bestTarget->GetId() : -1;
+	}
 
 	// Owner 2026-11-04 16:58Z: target lock. A commander / heavy pick breaks it
 	// for now (it resumes after); else the locked target is kept until dead.
@@ -351,6 +390,7 @@ void CArtilleryTask::OnUnitMoveFailed(CCircuitUnit* unit)
 
 void CArtilleryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	ArtySpamRetreatDamaged(manager->GetCircuit(), unit, attacker);
 	if (ranged) {
 		ranged->Idle();
         // Script/JSON chooses this doctrine. Forward-only firing-line hulls
@@ -529,6 +569,10 @@ CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, floa
 		} else {
 			why = "lost from radar and LOS (ghost rules)";
 		}
+	} else if (ArtyT1Exempt(cdef, e)) {
+		T1ExemptDrop(circuit, unit, e, "lock");
+		why = "identified T1 (exempt)";
+		stop = false;  // stopped above
 	} else if (!MissileTargetAllowed(cdef, e)) {
         why = "moving too fast"; stop = true;
 	} else if (e->GetCircuitDef() == nullptr) {
@@ -657,7 +701,14 @@ bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const 
 	if (st.dotId >= 0) {
 		const char* why = nullptr;
 		if ((dot == nullptr) || dot->GetData()->IsDead() || dot->GetData()->IsDying()) why = "dead";
-		else if (dot->GetCircuitDef() != nullptr) why = "identified (normal rules)";
+		else if (dot->GetCircuitDef() != nullptr) {
+			why = "identified (normal rules)";
+			if (ArtyT1Exempt(cdef, dot)) {
+				circuit->LOG("T1EXEMPT: %s %i drops %s %i identified T1 (radar dot)", cdef->GetDef()->GetName(), unit->GetId(),
+						dot->GetCircuitDef()->GetDef()->GetName(), dot->GetId());
+				why = "identified T1 (exempt)";
+			}
+		}
 		else if (!MissileTargetAllowed(cdef, dot)) why = "moving too fast";
 		else if (dot->IsInLOS()) why = "in LOS";
 		else if (!dot->GetData()->IsInRadar() || dot->IsHidden()) why = "lost from radar";
@@ -715,11 +766,125 @@ void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame).lockLastHold = frame;
 }
 
+void ArtyRangeTargetCheck(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo* nearest)
+{
+	if ((circuit == nullptr) || (unit == nullptr) || !IsT1ExemptLauncher(unit->GetCircuitDef()->GetDef()->GetName())) return;
+	CMilitaryManager::SArtySnipeState& st = circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame());
+	if ((st.rangeTarget >= 0) && ((nearest == nullptr) || (nearest->GetId() != st.rangeTarget))) {
+		CEnemyInfo* old = circuit->GetEnemyInfo(st.rangeTarget);
+		if ((old != nullptr) && ArtyT1Exempt(unit->GetCircuitDef(), old)) T1ExemptDrop(circuit, unit, old, "route range");
+	}
+	st.rangeTarget = (nearest != nullptr) ? nearest->GetId() : -1;
+}
+
+/*
+ * 2026-11-06: spam retreat. An Ambassador, Negotiator or Boreas damaged by a
+ * T1/T2 mobile that is not a listed heavy unit, or by an unknown attacker
+ * (none, or no def), moves spam_retreat_distance away: of three points (away
+ * from the attacker, the same turned +-45 degrees) plus one toward our base,
+ * the one with the least threat; clamped to the map. More damage re-aims it
+ * (at most once a second). Ends (logged) once the unit is at the point and has
+ * taken no damage for spam_retreat_quiet_seconds; then the normal steps take
+ * it again. Porc and heavies do not trigger it (the snipe/lock rules handle
+ * those). O(1) per call.
+ */
+void ArtySpamRetreatDamaged(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo* attacker)
+{
+	if ((circuit == nullptr) || (unit == nullptr) || unit->IsDead()) return;
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!info.spamRetreat || (cdef == nullptr) || !IsSlowMissileLauncher(cdef->GetDef()->GetName())) return;
+	const CCircuitDef* adef = (attacker != nullptr) ? attacker->GetCircuitDef() : nullptr;
+	if (adef != nullptr) {
+		if (!adef->IsMobile()) return;  // porc: snipe rules
+		if (adef->GetTechLevel() >= 3.f) return;
+		if (military->GetArtyCommInfo().heavyMaxSqSpeed.count(adef->GetId()) > 0) return;  // heavy unit
+	}
+	const int frame = circuit->GetLastFrame();
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	st.retreatDamage = frame;
+	if (st.retreating && (frame - st.retreatAimed < FRAMES_PER_SEC)) return;
+	const AIFloat3 pos = unit->GetPos(frame);
+	AIFloat3 from = (attacker != nullptr) ? attacker->GetPos() : pos;
+	const AIFloat3 base = circuit->GetSetupManager()->GetBasePos();
+	AIFloat3 away = pos - from;
+	away.y = 0.f;
+	if (away.Length2D() < 1.f) {
+		away = base - pos;
+		away.y = 0.f;
+	}
+	if (away.Length2D() < 1.f) away = AIFloat3(1.f, 0.f, 0.f);
+	away.Normalize2D();
+	const float d = info.spamRetreatDistance;
+	CThreatMap* threatMap = circuit->GetThreatMap();
+	threatMap->SetThreatType(unit);
+	AIFloat3 best;
+	float bestThreat = std::numeric_limits<float>::max();
+	const float angles[3] = {0.f, 0.785398f, -0.785398f};
+	for (float a : angles) {
+		const float c = std::cos(a), s = std::sin(a);
+		AIFloat3 p(pos.x + (away.x * c - away.z * s) * d, pos.y, pos.z + (away.x * s + away.z * c) * d);
+		CTerrainManager::CorrectPosition(p);
+		const float t = threatMap->GetThreatAt(p);
+		if (t < bestThreat) { bestThreat = t; best = p; }
+	}
+	{
+		AIFloat3 home = base - pos;
+		home.y = 0.f;
+		if (home.Length2D() > 1.f) {
+			home.Normalize2D();
+			AIFloat3 p(pos.x + home.x * d, pos.y, pos.z + home.z * d);
+			CTerrainManager::CorrectPosition(p);
+			const float t = threatMap->GetThreatAt(p);
+			if (t < bestThreat) { bestThreat = t; best = p; }
+		}
+	}
+	if (!st.retreating) {
+		circuit->LOG("SPAMRETREAT: start %s %i from %s %i, to (%.0f, %.0f)", cdef->GetDef()->GetName(), unit->GetId(),
+				(adef != nullptr) ? adef->GetDef()->GetName() : "unknown", (attacker != nullptr) ? attacker->GetId() : -1, best.x, best.z);
+	}
+	st.retreating = true;
+	st.retreatPoint = best;
+	st.retreatAimed = frame;
+	st.retreatOrderUntil = -1;  // re-issued on the next step
+}
+
+bool ArtySpamRetreatStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
+{
+	if ((circuit == nullptr) || (unit == nullptr)) return false;
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const auto& states = military->GetArtySnipeStates();
+	auto it = states.find(unit->GetId());
+	if ((it == states.end()) || !it->second.retreating) return false;
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
+	const AIFloat3 pos = unit->GetPos(frame);
+	const bool there = pos.SqDistance2D(st.retreatPoint) < SQUARE(120.f);
+	if ((frame - st.retreatDamage > info.spamRetreatQuietFrames) && (there || (frame - st.retreatDamage > info.spamRetreatQuietFrames * 4))) {
+		st.retreating = false;
+		circuit->LOG("SPAMRETREAT: end %s %i at (%.0f, %.0f), %.1f s quiet", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
+				pos.x, pos.z, float(frame - st.retreatDamage) / FRAMES_PER_SEC);
+		st.orderKey = -1;
+		st.lockOrderUntil = -1;
+		return false;
+	}
+	if (!there && (frame >= st.retreatOrderUntil)) {
+		st.retreatOrderUntil = frame + FRAMES_PER_SEC * 2;
+		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+		TRY_UNIT(circuit, unit,
+			unit->CmdMoveTo(st.retreatPoint, 0, frame + FRAMES_PER_SEC * 6);
+		)
+	}
+	return true;
+}
+
 bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit)
 {
 	if ((circuit == nullptr) || (unit == nullptr)) return false;
 	const auto& states = circuit->GetMilitaryManager()->GetArtySnipeStates();
 	auto it = states.find(unit->GetId());
+	if ((it != states.end()) && it->second.retreating) return true;  // 2026-11-06: spam retreat holds the unit
 	return (it != states.end()) && (it->second.stage != 0)
 		&& (circuit->GetLastFrame() - it->second.lastCall <= FRAMES_PER_SEC * 10);
 }
@@ -1027,6 +1192,13 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 			}
 		}
 	}
+	if ((hv == nullptr) && (st.orderKey <= -1000000)) {
+		CEnemyInfo* cur = circuit->GetEnemyInfo(-1000000 - st.orderKey);
+		if ((cur != nullptr) && ArtyT1Exempt(cdef, cur)) {
+			T1ExemptDrop(circuit, unit, cur, "priority");
+			st.orderKey = -1;
+		}
+	}
 	if (hv != nullptr) {
 		st.hvUntil = frame + FRAMES_PER_SEC * 3;
 		const int key = -1000000 - hv->GetId();
@@ -1138,6 +1310,14 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	}
     if (IsSlowMissileLauncher(cdef->GetDef()->GetName())) {
         unit->TrySetFireState(CCircuitDef::FireType::HOLD);
+        if (st.missileTarget >= 0) {
+            CEnemyInfo* cur = circuit->GetEnemyInfo(st.missileTarget);
+            if ((cur != nullptr) && ArtyT1Exempt(cdef, cur)) {
+                T1ExemptDrop(circuit, unit, cur, "missile");
+                st.missileTarget = -1;
+                st.missileOrderUntil = -1;
+            }
+        }
         CEnemyInfo* best = nullptr;
         float bestSq = SQUARE(range);
         for (const auto& kv : circuit->GetEnemyInfos()) {

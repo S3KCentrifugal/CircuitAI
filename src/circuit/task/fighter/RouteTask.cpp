@@ -192,6 +192,10 @@ void CRouteTask::Update()
 		CCircuitDef* def = unit->GetCircuitDef();
 		// Owner 2026-11-03: the artillery snipe comes before range micro and
 		// ghost fire; the route resumes (below) once it lets go.
+		if (ArtySpamRetreatStep(circuit, unit, circuit->GetLastFrame())) {
+			engaging.insert(unit);  // 2026-11-06: backing off from spam; route orders wait (ArtySnipeOwns)
+			continue;
+		}
 		if (ArtySnipeStep(circuit, unit, circuit->GetLastFrame())) {
 			sniping.insert(unit);
 			engaging.insert(unit);
@@ -228,6 +232,7 @@ void CRouteTask::Update()
 				if (sq < nearestSq) { nearestSq = sq; nearest = enemy; }
 			}
 		}
+		ArtyRangeTargetCheck(circuit, unit, nearest);  // 2026-11-06: a target turned identified T1 is dropped
 		if (nearest != nullptr) {
 			if (engaging.insert(unit).second) { // before Stop can cause an idle callback
 				circuit->LOG("RANGE: %s(%i) pauses route at %.0f for weapon range %.0f",
@@ -293,6 +298,7 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 
 void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+    ArtySpamRetreatDamaged(manager->GetCircuit(), unit, attacker);  // 2026-11-06
     if (seaControl && !combatRetreat) return;
     if (seaControl && repairThreshold > 0.f && unit->GetHealthPercent() < repairThreshold) {
         // Opt-in task policy, never mutate a shared UnitDef retreat threshold.
