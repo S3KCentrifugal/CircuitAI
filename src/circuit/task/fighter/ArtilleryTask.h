@@ -37,6 +37,9 @@ void ArtySpamRetreatDamaged(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo*
 bool ArtySpamRetreatStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
 // The FRONT squad range micro target: dropped (logged) when it becomes identified T1.
 void ArtyRangeTargetCheck(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo* nearest);
+// 2026-11-06 Task C: real weapon reach of known armed enemies (not the padded threat map).
+bool ArtyRealUnsafeAt(CCircuitAI* circuit, const springai::AIFloat3& at);
+bool ArtyApproach99(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const springai::AIFloat3& pos);
 bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
 // Owner 2026-11-04: true while an artillery snipe sequence owns the unit (route
 // tasks hold their orders for it, the squad keeps it).

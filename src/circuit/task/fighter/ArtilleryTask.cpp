@@ -77,6 +77,7 @@ bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy)
 }
 static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e);
 static bool GhostGone(CCircuitAI* circuit, int enemyId);
+static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame);
 // Owner 2026-11-04 20:08Z: one ghost volley count per unit and ghost dark period.
 static int GhostNeedFor(const CMilitaryManager::SArtySnipeInfo& si, const CCircuitDef* d)
 {
@@ -258,11 +259,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		CEnemyInfo* locked = ArtyLockGet(circuit, unit, frame, lockDist);
 		const CMilitaryManager::SArtyCommInfo& lockInfo = circuit->GetMilitaryManager()->GetArtyCommInfo();
 		const bool pickPriority = (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS() && LockPriority(lockInfo, bestTarget);
-		const bool safeHere = [&]() {
-			CThreatMap* tm = circuit->GetThreatMap();
-			tm->SetThreatType(unit);
-			return tm->GetThreatAt(pos) <= THREAT_MIN;
-		}();
+		const bool safeHere = !ArtyUnsafeHere(circuit, unit, pos, frame);
 		if ((locked != nullptr) && safeHere && !(pickPriority && (bestTarget != locked) && !LockPriority(lockInfo, locked))) {
 			if (ArtyLockDrive(circuit, unit, frame, locked, lockDist)) return;
 		}
@@ -321,6 +318,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 				gst.ghostHeavy = (edef != nullptr) && ((si.threats.count(edef->GetId()) > 0) || (si.directThreats.count(edef->GetId()) > 0));
 				gst.ghostNeed = GhostNeedFor(si, edef);
 				gst.ghostShots = GhostCountRef(gst, bestTarget->GetData());
+				circuit->LOG("ARTYPICK: %s %i tier ghost target %i", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), bestTarget->GetId());
 				circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f), volleys %i/%i", unit->GetCircuitDef()->GetDef()->GetName(),
 						unit->GetId(), (edef != nullptr) ? edef->GetDef()->GetName() : "?", bestTarget->GetId(),
 						bestTarget->GetPos().x, bestTarget->GetPos().z, gst.ghostShots, gst.ghostNeed);
@@ -346,6 +344,11 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	}
 
 	if (FireAtGhost(unit, pos, frame)) {
+		return;
+	}
+
+	// 2026-11-06 Task C: to 0.99 x range of the nearest reachable porc, outside real porc reach.
+	if (ArtyApproach99(circuit, unit, frame, pos)) {
 		return;
 	}
 
@@ -726,9 +729,7 @@ bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const 
 	if (dot == nullptr) {
 		if (frame < st.dotScan) return false;
 		st.dotScan = frame + FRAMES_PER_SEC;
-		CThreatMap* threatMap = circuit->GetThreatMap();
-		threatMap->SetThreatType(unit);
-		if (threatMap->GetThreatAt(pos) > THREAT_MIN) return false;  // retreat comes first
+		if (ArtyUnsafeHere(circuit, unit, pos, frame)) return false;  // retreat comes first (Task C: real reach for the 3 launchers)
 		const bool notAW = !cdef->HasSurfToWater();
 		float bestSq = SQUARE(range);
 		for (auto& kv : circuit->GetEnemyInfos()) {
@@ -764,6 +765,118 @@ bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const 
 void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 {
 	circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame).lockLastHold = frame;
+}
+
+/*
+ * 2026-11-06 Task C (Ambassador, Negotiator, Boreas): the real weapon reach of
+ * known armed enemies, not the padded threat map (which reaches ~110% of porc
+ * range and left them idle at its edge). True when `at` is within ground range
+ * + 16 of an identified armed structure (live, radar or a ghost that still
+ * stands) or of a live (LOS/radar) identified armed mobile. O(known enemies).
+ */
+bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at)
+{
+	for (const auto& kv : circuit->GetEnemyInfos()) {
+		const CEnemyInfo* e = kv.second;
+		const CCircuitDef* d = (e != nullptr) ? e->GetCircuitDef() : nullptr;
+		if ((d == nullptr) || e->IsHidden() || e->GetData()->IsDead() || e->GetData()->IsDying() || !d->HasSurfToLand()) continue;
+		const bool live = e->IsInRadarOrLOS();
+		if (d->IsMobile() ? !live : (!live && GhostGone(circuit, e->GetId()))) continue;
+		if (live && e->IsBeingBuilt()) continue;
+		const float r = d->GetMaxRange(CCircuitDef::RangeType::LAND);
+		if ((r > 0.f) && (at.SqDistance2D(e->GetPos()) < SQUARE(r + 16.f))) return true;
+	}
+	return false;
+}
+
+static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame)
+{
+	if (!IsSlowMissileLauncher(unit->GetCircuitDef()->GetDef()->GetName())) {
+		CThreatMap* tm = circuit->GetThreatMap();
+		tm->SetThreatType(unit);
+		return tm->GetThreatAt(pos) > THREAT_MIN;
+	}
+	CMilitaryManager::SArtySnipeState& st = circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame);
+	if (st.unsafeFrame != frame) {
+		st.unsafeFrame = frame;
+		st.unsafeHere = ArtyRealUnsafeAt(circuit, pos);
+	}
+	return st.unsafeHere;
+}
+
+/*
+ * 2026-11-06 Task C: approach. Nothing in range to shoot: the nearest enemy
+ * structure beyond own range (live, radar, or a ghost not yet given its
+ * volleys) is approached to 0.99 x own range on the line from it, if that spot
+ * is outside the real reach (+16) of every known armed structure and live
+ * armed mobile; else the line is turned in 15 degree steps up to +-90. Porc
+ * whose reach is beyond 0.99 x own range is left to the snipe routine; none
+ * found: false (the old path). Re-issued every 3 s. O(known enemies x 13).
+ */
+bool ArtyApproach99(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AIFloat3& pos)
+{
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!IsSlowMissileLauncher(cdef->GetDef()->GetName())) return false;
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+	const float want = range * 0.99f;
+	const int canTargetCat = cdef->GetTargetCategory();
+	CEnemyInfo* best = nullptr;
+	float bestSq = std::numeric_limits<float>::max();
+	for (const auto& kv : circuit->GetEnemyInfos()) {
+		CEnemyInfo* e = kv.second;
+		const CCircuitDef* d = (e != nullptr) ? e->GetCircuitDef() : nullptr;
+		if ((d == nullptr) || d->IsMobile() || d->IsIgnore() || e->IsHidden() || e->GetData()->IsDead() || e->GetData()->IsDying()
+			|| ((d->GetCategory() & canTargetCat) == 0)) continue;
+		if (!cdef->HasSurfToWater() && (e->GetPos().y < -SQUARE_SIZE * 5)) continue;
+		const bool ghost = !e->IsInRadarOrLOS();
+		if (ghost && (GhostDoneHas(st, e->GetData()) || GhostGone(circuit, e->GetId()))) continue;
+		if (d->HasSurfToLand() && (d->GetMaxRange(CCircuitDef::RangeType::LAND) + 16.f > want)) continue;  // outranges: snipe routine
+		const float sq = pos.SqDistance2D(e->GetPos());
+		if (sq <= SQUARE(range)) continue;  // in range: the pick's job
+		if (sq < bestSq) { bestSq = sq; best = e; }
+	}
+	if (best == nullptr) {
+		st.approachTarget = -1;
+		return false;
+	}
+	const AIFloat3 tp = best->GetPos();
+	AIFloat3 dir = pos - tp;
+	dir.y = 0.f;
+	if (dir.Length2D() < 1.f) dir = AIFloat3(1.f, 0.f, 0.f);
+	dir.Normalize2D();
+	bool found = false;
+	AIFloat3 spot;
+	for (int k = 0; (k <= 12) && !found; ++k) {
+		const int step = (k + 1) / 2 * ((k % 2) ? 1 : -1);  // 0, +1, -1, +2, -2, ... (x 15 deg)
+		const float a = step * 0.261799f;
+		const float c = std::cos(a), s = std::sin(a);
+		AIFloat3 p(tp.x + (dir.x * c - dir.z * s) * want, tp.y, tp.z + (dir.x * s + dir.z * c) * want);
+		CTerrainManager::CorrectPosition(p);
+		if (!ArtyRealUnsafeAt(circuit, p)) { spot = p; found = true; }
+	}
+	if (!found) {
+		st.approachTarget = -1;
+		return false;
+	}
+	const bool changed = (st.approachTarget != best->GetId()) || (spot.SqDistance2D(st.approachSpot) > SQUARE(100.f));
+	if (changed) {
+		circuit->LOG("APPROACH99: %s %i to (%.0f, %.0f) for %s %i %s", cdef->GetDef()->GetName(), unit->GetId(), spot.x, spot.z,
+				best->GetCircuitDef()->GetDef()->GetName(), best->GetId(), best->IsInLOS() ? "live" : (best->IsInRadarOrLOS() ? "radar" : "ghost"));
+	}
+	if (changed || (frame >= st.approachOrderUntil)) {
+		st.approachTarget = best->GetId();
+		st.approachSpot = spot;
+		st.approachOrderUntil = frame + FRAMES_PER_SEC * 3;
+		if (pos.SqDistance2D(spot) > SQUARE(48.f)) {
+			if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+			TRY_UNIT(circuit, unit,
+				unit->CmdMoveTo(spot, 0, frame + FRAMES_PER_SEC * 8);
+			)
+		}
+	}
+	return true;
 }
 
 void ArtyRangeTargetCheck(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo* nearest)
@@ -869,6 +982,7 @@ bool ArtySpamRetreatStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.lockOrderUntil = -1;
 		return false;
 	}
+	unit->TrySetFireState(CCircuitDef::FireType::OPEN);  // shoots back at chasing spam; the MISSILE step sets HOLD again after
 	if (!there && (frame >= st.retreatOrderUntil)) {
 		st.retreatOrderUntil = frame + FRAMES_PER_SEC * 2;
 		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
@@ -972,10 +1086,8 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	if ((frame - track.shot < (volleyLimit > 0 ? 0 : info.ghostIdleFrames)) || (reload > frame)) {
 		return false;
 	}
-	CThreatMap* threatMap = circuit->GetThreatMap();
-	threatMap->SetThreatType(unit);
-	if (threatMap->GetThreatAt(pos) > THREAT_MIN) {
-		return false;  // retreat comes first
+	if (ArtyUnsafeHere(circuit, unit, pos, frame)) {
+		return false;  // retreat comes first (Task C: real reach for the 3 launchers)
 	}
 	const bool notAW = !cdef->HasSurfToWater();
 	const int canTargetCat = cdef->GetTargetCategory();
@@ -1320,6 +1432,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
         }
         CEnemyInfo* best = nullptr;
         float bestSq = SQUARE(range);
+        int bestTier = 3;  // 2026-11-06 Task C: 0 LOS, 1 identified radar, 2 unidentified dot
         for (const auto& kv : circuit->GetEnemyInfos()) {
             CEnemyInfo* e = kv.second;
             if (e->IsHidden() || !e->IsInRadarOrLOS() || e->GetData()->IsDead() || e->GetData()->IsDying()
@@ -1330,7 +1443,13 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
             if (!cdef->HasSurfToWater() && ep.y < -SQUARE_SIZE * 5) continue;
             if (!edef && ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;
             const float sq = pos.SqDistance2D(ep);
-            if (sq < bestSq) { best = e; bestSq = sq; }
+            if (sq >= SQUARE(range)) continue;
+            const int tier = e->IsInLOS() ? 0 : ((edef != nullptr) ? 1 : 2);
+            if ((tier < bestTier) || ((tier == bestTier) && (sq < bestSq))) { best = e; bestSq = sq; bestTier = tier; }
+        }
+        if (best && (st.missileTarget != best->GetId())) {
+            static const char* tierName[3] = {"live", "radar", "dot"};
+            circuit->LOG("ARTYPICK: %s %i tier %s target %i", cdef->GetDef()->GetName(), unit->GetId(), tierName[bestTier], best->GetId());
         }
         if (best) {
             if (st.missileTarget != best->GetId() || frame >= st.missileOrderUntil) {
@@ -2200,7 +2319,11 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 
 	enemyPositions.clear();
 	threatMap->SetThreatType(unit);
-	bool isPosSafe = (threatMap->GetThreatAt(pos) <= THREAT_MIN) || cdef->IsPlane();
+	// 2026-11-06 Task C: Ambassador/Negotiator/Boreas use the real reach of known
+	// armed enemies, not the padded threat map (which parked them idle at ~110%).
+	bool isPosSafe = IsSlowMissileLauncher(cdef->GetDef()->GetName())
+			? !ArtyUnsafeHere(circuit, unit, pos, circuit->GetLastFrame())
+			: ((threatMap->GetThreatAt(pos) <= THREAT_MIN) || cdef->IsPlane());
 
 	const CCircuitAI::EnemyInfos& enemies = circuit->GetEnemyInfos();
 	if (isPosSafe) {

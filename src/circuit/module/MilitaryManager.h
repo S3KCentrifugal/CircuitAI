@@ -429,6 +429,11 @@ public:
 		int retreatDamage = -1;   // last spam damage frame
 		int retreatAimed = -1;    // last re-aim frame
 		int retreatOrderUntil = -1;
+		int unsafeFrame = -1;     // 2026-11-06 Task C: real-reach safety, cached per frame
+		bool unsafeHere = false;
+		int approachTarget = -1;  // APPROACH99 target and order
+		int approachOrderUntil = -1;
+		springai::AIFloat3 approachSpot;
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
