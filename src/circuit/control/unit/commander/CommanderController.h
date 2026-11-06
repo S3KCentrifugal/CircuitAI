@@ -267,6 +267,9 @@ struct CommanderDoctrineConfig {
     float jammerSearch=3000; // spam retreat looks for an active friendly jammer this far
     float step=600;          // retreat step
     float supportHoldFire=1; // a support/posture cloak holds fire (no decloak on air or spam)
+    // A T3 inside baseRadius of our base (and not walking out) may be closed on
+    // cloaked from up to baseApproach, the old priority D-gun reach (0 = off).
+    float baseRadius=1500,baseApproach=1000;
 };
 // D-389 cloak posture levers (commander-cloak-policy.md section 4.4).
 struct CommanderCloakConfig {

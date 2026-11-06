@@ -118,6 +118,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Doc<&DC::spamRange>("doctrine_spam_range",.5f,6),Doc<&DC::spamHold>("doctrine_spam_hold",0,60),
         Doc<&DC::jammerSearch>("doctrine_jammer_search",0,10000),Doc<&DC::step>("doctrine_step",128,2000),
         Doc<&DC::supportHoldFire>("doctrine_support_hold_fire",0,1),
+        Doc<&DC::baseRadius>("doctrine_base_radius",0,6000),Doc<&DC::baseApproach>("doctrine_base_approach",0,2000),
         Group<&GC::combatDistance>("commander_group_combat_distance",0,4000),
         Group<&GC::combatMemory>("commander_group_combat_memory",0,120),
         Group<&GC::radius>("commander_group_radius",128,2000),

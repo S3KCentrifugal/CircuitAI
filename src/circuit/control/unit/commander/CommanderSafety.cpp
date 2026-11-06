@@ -433,6 +433,10 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
     int spam=0; bool spamClose=false; bool outranged=false;
     bool t3Danger=false,t3Receding=false;
     const commander::Contact* approach=nullptr; float approachTime=1e9f;
+    // Owner 2026-11-06 (regression t3-behemoth): a T3 walking into our base is
+    // closed on cloaked from doctrine_base_approach; the 2 s rule governs elsewhere.
+    const AIFloat3 basePos=ai->GetSetupManager()->GetBasePos();
+    const commander::Contact* baseT3=nullptr; float baseDistance=1e9f;
     for(const auto& c:contacts) {
         if(c.friendly) continue;
         auto* enemy=ai->GetEnemyInfo(c.id);
@@ -452,6 +456,12 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
             if(gap>0 && c.targetable && dry && closing>=-5.f) {
                 const float t=gap/(speed+std::max(0.f,closing));
                 if(t<=cfg->doctrine.t3Close && t<approachTime) { approach=&c; approachTime=t; }
+            }
+            const Point toBase=P(basePos)-c.pos;
+            if(gap>0 && c.targetable && dry && cfg->doctrine.baseApproach>0 && distance<=cfg->doctrine.baseApproach
+                && commander::Length(toBase)<=cfg->doctrine.baseRadius
+                && commander::Dot(c.velocity,commander::Normal(toBase))>=-5.f && distance<baseDistance) {
+                baseT3=&c; baseDistance=distance;
             }
             if(m.range>0 && distance<=m.range+def->GetRadius()+cfg->doctrine.t3Margin+exitSlack) {
                 t3Danger=true; addThreat(c.pos,4.f);
@@ -479,7 +489,12 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
     if(health) return release("health_retreat",false);
     // 2. The T3 two-second rule: close only when reach is that near, never on
     //    unseen or air fire, spam, or before the cloak is back after a T3 shot.
-    if(approach && !spamActive && !unseen && !air && !afterT3Shot
+    bool homeDefence=false;
+    if(!approach && baseT3 && (cloaked || CloakRunway(unit,true)>=cfg->doctrine.cloakRunway)) {
+        approach=baseT3; approachTime=std::min(3.f,baseDistance/speed); homeDefence=true;
+    }
+    // At home the T3 is usually the unseen shooter itself: only spam, air and the recloak wait block it.
+    if(approach && !spamActive && (homeDefence || !unseen) && !air && !afterT3Shot
         && unit->IsDGunReady(frame,ai->GetEconomyManager()->GetEnergyCur())) {
         const Point lead=approach->pos+approach->velocity*approachTime;
         AIFloat3 goal(lead.x,0,lead.z);
