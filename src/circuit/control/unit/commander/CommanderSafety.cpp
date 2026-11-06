@@ -508,6 +508,9 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
             return true;
         }
     }
+    // A retreat runs at least doctrine_hit_hold seconds once started (Glitters
+    // 1d52d5cd: outranged then clear 3 frames later, 8 starts a minute).
+    if(!reason && d.active && std::strcmp(d.reason,"t3_approach")!=0 && frame-d.since<hold) reason=d.reason;
     if(!reason) return release("clear",true);
     // 3. Retreat (or stand still cloaked).
     if(!task) {
@@ -522,7 +525,7 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
     if(!d.active || std::strcmp(d.reason,reason)!=0) {
         ai->LOG("[CommanderDoctrine] unit=%i action=retreat reason=%s spam=%i hp=%.2f x=%.0f z=%.0f frame=%i",
             unit->GetId(),reason,spam,unit->GetHealthPercent(),pos.x,pos.z,frame);
-        if(!d.active) d.goal={-1,0,-1};
+        if(!d.active) { d.goal={-1,0,-1}; d.since=frame; }
         d.goalPlan=-10000;
     }
     d.active=true; d.reason=reason;
