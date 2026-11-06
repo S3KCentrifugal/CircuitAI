@@ -459,7 +459,7 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
             }
             const Point toBase=P(basePos)-c.pos;
             if(gap>0 && c.targetable && dry && cfg->doctrine.baseApproach>0 && distance<=cfg->doctrine.baseApproach
-                && commander::Length(toBase)<=cfg->doctrine.baseRadius
+                && (commander::Length(toBase)<=cfg->doctrine.baseRadius || pos.SqDistance2D(basePos)<=SQUARE(cfg->doctrine.baseRadius))
                 && commander::Dot(c.velocity,commander::Normal(toBase))>=-5.f && distance<baseDistance) {
                 baseT3=&c; baseDistance=distance;
             }
@@ -489,18 +489,32 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
     if(health) return release("health_retreat",false);
     // 2. The T3 two-second rule: close only when reach is that near, never on
     //    unseen or air fire, spam, or before the cloak is back after a T3 shot.
+    // Base defence walks in visible when the bank cannot fund the cloak (the
+    // old priority approach did; 5931a5c9 waited for 5 s of cloak and lost).
     bool homeDefence=false;
-    if(!approach && baseT3 && (cloaked || CloakRunway(unit,true)>=cfg->doctrine.cloakRunway)) {
+    if(!approach && baseT3) {
         approach=baseT3; approachTime=std::min(3.f,baseDistance/speed); homeDefence=true;
+    }
+    // A started approach is kept on its target until the shot, the target is
+    // gone or 8 s pass; one tick's gate miss no longer releases it (5931a5c9).
+    const bool latched=d.active && std::strcmp(d.reason,"t3_approach")==0 && frame<d.approachUntil;
+    if(latched && (!approach || approach->id!=d.approachTarget)) {
+        for(const auto& c:contacts) if(c.id==d.approachTarget && !c.friendly && c.targetable) {
+            const float gap=commander::Length(c.pos-here)-(range+c.radius*.5f);
+            if(gap>0) { approach=&c; approachTime=std::min(3.f,gap/speed); homeDefence=true; }
+            break;
+        }
     }
     // At home the T3 is usually the unseen shooter itself: only spam, air and the recloak wait block it.
     if(approach && !spamActive && (homeDefence || !unseen) && !air && !afterT3Shot
-        && unit->IsDGunReady(frame,ai->GetEconomyManager()->GetEnergyCur())) {
+        && (latched || unit->IsDGunReady(frame,ai->GetEconomyManager()->GetEnergyCur()))) {
         const Point lead=approach->pos+approach->velocity*approachTime;
-        AIFloat3 goal(lead.x,0,lead.z);
         const Point station=lead+commander::Normal(here-lead)*std::max(0.f,range-40.f);
-        goal=AIFloat3(station.x,0,station.z);
+        AIFloat3 goal(station.x,0,station.z);
         goal.y=ai->GetMap()->GetElevationAt(goal.x,goal.z);
+        if(goal.y<0 || !OnMap(goal) || !ai->GetTerrainManager()->CanReachAt(unit,goal,64)) {
+            goal=AIFloat3(approach->pos.x,0,approach->pos.z); goal.y=ai->GetMap()->GetElevationAt(goal.x,goal.z);
+        }
         if(goal.y>=0 && OnMap(goal) && ai->GetTerrainManager()->CanReachAt(unit,goal,64)) {
             if(!task) {
                 task=ai->GetBuilderManager()->EnqueueControlled(this,current);
@@ -513,6 +527,7 @@ bool CCommanderController::Doctrine(CCircuitUnit* unit,State& s,int frame) {
             if(!d.active || std::strcmp(d.reason,"t3_approach")!=0)
                 ai->LOG("[CommanderDoctrine] unit=%i action=t3_approach target=%i seconds=%.1f distance=%.0f frame=%i",
                     unit->GetId(),approach->id,approachTime,commander::Length(approach->pos-here),frame);
+            if(!latched || d.approachTarget!=approach->id) { d.approachTarget=approach->id; d.approachUntil=frame+8*FRAMES_PER_SEC; }
             d.active=true; d.reason="t3_approach"; d.holding=false; d.goal={-1,0,-1};
             EndT3(unit,s,frame,"doctrine");
             const bool cloak=DoctrineCloak(unit,s,true);

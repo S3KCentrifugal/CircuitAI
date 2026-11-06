@@ -85,6 +85,7 @@ struct CommanderDoctrineState {
     int shot=-1,shotTarget=-1; // pending doctrine D-gun (frame ordered, target)
     bool cloak=false;       // last doctrine cloak decision (hysteresis)
     int since=-10000;       // frame the current retreat reason started (minimum hold)
+    int approachTarget=-1,approachUntil=-1; // a started T3 approach is kept to its shot (bounded)
     const char* lastReason=""; // reason held through the minimum retreat time
     int logNext=0;
 };
