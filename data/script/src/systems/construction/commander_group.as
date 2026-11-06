@@ -89,7 +89,7 @@ namespace CommanderGroup {
     }
     bool Owns(int id) {
         if(Global::AISettings::Role!=AiRole::FRONT) return false;
-        Load();return id>=0 && (members.find(id)>=0 || (enabled && FrontConstructors::seats[2]==id));
+        Load();return id>=0 && (members.find(id)>=0 || (enabled && FrontConstructors::seats[FrontConstructors::COMMANDER]==id));
     }
     bool OnAdded(CCircuitUnit@ unit) {
         if(Global::AISettings::Role!=AiRole::FRONT || !Eligible(unit)) return false;

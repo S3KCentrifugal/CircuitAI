@@ -6,6 +6,7 @@
  */
 
 #include "unit/ally/AllyTeam.h"
+#include "task/fighter/RangedObservation.h"
 #include "unit/FactoryData.h"
 #include "map/MapManager.h"
 #include "map/ThreatMap.h"
@@ -120,6 +121,7 @@ void CAllyTeam::InitThreatRanges(CCircuitAI* ai)
 void CAllyTeam::Release()
 {
 	resignSize++;
+	if (rangedObservation) rangedObservation->Invalidate();  // D-462: reader and definitions may be gone
 	if (--initCount > 0) {
 		return;
 	}
@@ -224,6 +226,7 @@ bool CAllyTeam::EnemyInLOS(CEnemyUnit* data, CCircuitAI* ai)
 		return !data->IsIgnore();
 	}
 
+	++enemyRevision;
 	return enemyManager->UnitInLOS(data);
 }
 
@@ -233,6 +236,7 @@ std::pair<CEnemyUnit*, bool> CAllyTeam::RegisterEnemyUnit(ICoreUnit::Id unitId, 
 		return std::make_pair(enemyManager->GetEnemyUnit(unitId), true);
 	}
 
+	++enemyRevision;
 	return enemyManager->RegisterEnemyUnit(unitId, isInLOS);
 }
 
@@ -244,6 +248,7 @@ CEnemyUnit* CAllyTeam::RegisterEnemyUnit(Unit* e, CCircuitAI* ai)
 		return enemyManager->GetEnemyUnit(unitId);
 	}
 
+	++enemyRevision;
 	return enemyManager->RegisterEnemyUnit(e);
 }
 
@@ -254,10 +259,12 @@ void CAllyTeam::UnregisterEnemyUnit(CEnemyUnit* data, CCircuitAI* ai)
 	}
 
 	enemyManager->UnregisterEnemyUnit(data);
+	++enemyRevision;
 }
 
 void CAllyTeam::RegisterEnemyFake(CCircuitDef::Id unitDefId, const AIFloat3& pos, int timeout)
 {
+	++enemyRevision;
 	CEnemyFake* data = enemyManager->RegisterEnemyFake(unitDefId, pos, timeout);
 	mapManager->AddFakeEnemy(data);
 	quadField.MovedEnemyFake(data);
@@ -268,6 +275,7 @@ void CAllyTeam::UnregisterEnemyFake(CEnemyFake* data)
 	quadField.RemoveEnemyFake(data);
 	mapManager->DelFakeEnemy(data);
 	enemyManager->UnregisterEnemyFake(data);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyEnterLOS(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -279,6 +287,7 @@ void CAllyTeam::EnemyEnterLOS(CEnemyUnit* enemy, CCircuitAI* ai)
 	if (mapManager->EnemyEnterLOS(enemy)) {
 		enemyManager->AddEnemyCost(enemy);
 	}
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyLeaveLOS(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -288,6 +297,7 @@ void CAllyTeam::EnemyLeaveLOS(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	mapManager->EnemyLeaveLOS(enemy);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyEnterRadar(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -297,6 +307,7 @@ void CAllyTeam::EnemyEnterRadar(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	mapManager->EnemyEnterRadar(enemy);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyLeaveRadar(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -306,6 +317,7 @@ void CAllyTeam::EnemyLeaveRadar(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	mapManager->EnemyLeaveRadar(enemy);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyDestroyed(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -319,6 +331,13 @@ void CAllyTeam::EnemyDestroyed(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	quadField.RemoveEnemyUnit(enemy);
+	++enemyRevision;
+}
+
+const std::shared_ptr<CRangedObservation>& CAllyTeam::GetRangedObservation(CCircuitAI* reader)
+{
+	if (!rangedObservation) rangedObservation = std::make_shared<CRangedObservation>(this, reader);
+	return rangedObservation;
 }
 
 void CAllyTeam::UpdateInLOS(CEnemyUnit* data, CCircuitDef::Id unitDefId)
@@ -327,6 +346,7 @@ void CAllyTeam::UpdateInLOS(CEnemyUnit* data, CCircuitDef::Id unitDefId)
 	enemyManager->UnitInLOS(data, unitDefId);
 	mapManager->EnemyEnterLOS(data);
 	enemyManager->AddEnemyCost(data);
+	++enemyRevision;
 }
 
 void CAllyTeam::Update(CCircuitAI* ai)
@@ -343,6 +363,7 @@ void CAllyTeam::Update(CCircuitAI* ai)
 	} else {
 		enemyManager->UpdateEnemyDatas(quadField);
 	}
+	++enemyRevision;  // D-462: enemy records (and hidden flags) changed this frame
 }
 
 void CAllyTeam::EnqueueUpdate()
@@ -478,6 +499,8 @@ void CAllyTeam::DelegateAuthority()
 void CAllyTeam::ApplyAuthority(CCircuitAI* newOwner)
 {
 	this->circuit = newOwner;
+	++enemyRevision;
+	if (rangedObservation) rangedObservation->Invalidate();  // D-462: definitions belong to the authority
 	mapManager->SetAuthority(newOwner);
 	metalManager->SetAuthority(newOwner);
 	energyManager->SetAuthority(newOwner);

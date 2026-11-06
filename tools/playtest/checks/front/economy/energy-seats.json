@@ -1,0 +1,30 @@
+{
+  "stop_minute": 14,
+  "expect": [
+    {
+      "key": "energy-policy",
+      "pattern": "\\[FrontConstructors\\] energy seat policy wind=",
+      "by_minute": 3,
+      "scope": "any"
+    },
+    {
+      "key": "wind-block",
+      "pattern": "\\[FrontEco\\] wind block group=",
+      "by_minute": 5,
+      "scope": "any"
+    },
+    {
+      "key": "converter-block",
+      "pattern": "\\[FrontEco\\] converter block group=",
+      "by_minute": 10,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": "INVARIANT|SCRIPT CRASH|: ERR\\s+:|has crashed|Lib exception",
+      "scope": "any"
+    }
+  ]
+}

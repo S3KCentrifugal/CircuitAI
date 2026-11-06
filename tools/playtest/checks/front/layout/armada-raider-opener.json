@@ -1,0 +1,34 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "scout",
+      "scope": "any",
+      "pattern": "\\[FRONT\\] ScoutRush enqueued count=1",
+      "by_minute": 4
+    },
+    {
+      "key": "pawn batch",
+      "scope": "any",
+      "pattern": "\\[FRONT\\] T1 raider opener enqueued count=10 unit=armpw",
+      "by_minute": 4
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script errors",
+      "scope": "any",
+      "pattern": ": ERR\\s+:|: WARN :|SCRIPT CRASH|Lib exception|has crashed"
+    },
+    {
+      "key": "tick batch",
+      "scope": "any",
+      "pattern": "T1 raider opener enqueued count=10 unit=armflea"
+    },
+    {
+      "key": "invariant",
+      "scope": "any",
+      "pattern": "\\[INVARIANT\\]"
+    }
+  ]
+}

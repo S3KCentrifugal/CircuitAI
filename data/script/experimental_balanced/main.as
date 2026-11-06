@@ -174,10 +174,6 @@ namespace Main {
 
         // The opening Tick must search for gaps and raid just like later scouts.
         Global::ScoutRaid::KeepNativeScouts = 0;
-        Global::RoleSettings::Tech::HeavyDeliveryFrontEnabled = true;
-        Global::RoleSettings::Tech::HeavyDeliveryBlockedSeconds = 5.0f;
-        Global::RoleSettings::Tech::HeavyDeliveryFrontProbes = 40;        // owner 2026-11-01: Carrot Incinerators held ~2 min with no front drop
-        Global::RoleSettings::Tech::HeavyDeliveryWalkWithoutFront = true; // walk toward the recipient meanwhile, never hold at the factory
 
 		// Air-factory gate. Native CEnemyManager::IsAirValid() tests
 		//     GetEnemyThreat(AA) <= maxAAThreat
@@ -316,6 +312,8 @@ namespace Main {
         // FRONT bot labs (owner, 2026-10-19): every 3 min from the opener wave to the first T2 factory, 50% for 10-15
         // Pawns/Grunts or 15-20 Goblins held at the lab until the last is out, then one attack wave (BotWave*, off in src)
         Global::RoleSettings::Front::BotWaveChance = 0.5f;
+        // D-471 (owner, 2026-11-04): Cortex vehicles open Rascal scout, then ten Incisors.
+        Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = 1.0f;
 		// FRONT (owner, 2026-10-17): two FRONTs each build a spam lab for an edge lane, left and right
 		// (src/settings/shared/spam.as EdgeLanesEnabled, off there; systems/combat/edge_lanes.as)
 		Global::Spam::EdgeLanesEnabled = true;

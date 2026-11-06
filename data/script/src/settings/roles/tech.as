@@ -4,6 +4,7 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tech {
+            int AirFactoryAssistCount = 6; // Air Foundry; JSON tech_production/air_foundry_count overrides at init.
             bool RushBootstrapEnabled = true;
             float RushBootstrapLocalRadius = 800.f;
             float RushBootstrapMaxThreat = 0.f;
@@ -41,21 +42,6 @@ namespace Tech {
             bool HeavyTransportPoolEnabled = true;
             float HeavyTransportAdditionalIncomeStart = 40.0f;
             float HeavyTransportMetalPerAdditional = 100.0f;
-            float HeavyDeliveryArrivalRadius = 240.0f;
-            float HeavyDeliveryDestinationMove = 192.0f;
-            float HeavyDeliveryRouteRetrySeconds = 10.0f;
-            bool HeavyDeliveryFrontEnabled = false;
-            float HeavyDeliveryAirPadding = 192.0f;
-            float HeavyDeliveryAirThreat = 0.5f;
-            float HeavyDeliveryBlockedSeconds = 90.0f;
-            float HeavyDeliveryFrontRadius = 128.0f;
-            // Drop probes from the fog edge back toward the lane start (each one
-            // FindSafeDropSpot); 12 was a fixed 64-elmo window that found nothing
-            // on Carrot Mountains 2026-11-01. Probes spread over the whole lane.
-            int HeavyDeliveryFrontProbes = 12;
-            // While the front planner has no drop, walk toward the recipient's
-            // delivery anchor instead of holding at the factory.
-            bool HeavyDeliveryWalkWithoutFront = false;
             // Capital rush (owner, 2026-10-26; Strategy::CAPITAL_RUSH, roles/tech/tech_capital_rush.as):
             // once the 10 s minimum metal income reaches CapitalRushMetalIncome and the T2 aircraft
             // plant has its dedicated constructors (D-108), it builds only the side's capital ship and
@@ -456,7 +442,7 @@ namespace Tech {
             float ChainWindBootstrap = 5.0f;
             float ChainAssistRadius = 4000.0f;
             float ChainParallelCostM = 400.0f;
-            float ChainQueuedStaleSeconds = 90.0f;          // a cheap chain step's queued order that no builder adopts this long is ordered again
+            float ChainStaleQueuedSeconds = 60.0f;          // D-461: a queued chain order no builder can take stops counting as in flight after this; 0 disables
             float ChainStepStallSeconds = 120.0f;           // D-070: a chain step with no progress for this long is skipped (an unreachable frame must not end the rush)              // D-070: structures cheaper than this (metal) are built one per builder in parallel; dearer ones get every builder on one frame              // D-070: every builder inside this joins the current step's frame
             float ChainNearFrameRadius = 600.0f;            // D-075: a chain frame of a cheap step within this of the builder is finished before anything else
             float PowerTurretBankFactor = 1.5f;             // D-075: ... and the bank holds this many turret costs

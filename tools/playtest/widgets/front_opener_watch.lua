@@ -5,7 +5,9 @@ local factoryName=prefix..(kind=="bot" and "lab" or "vp")
 local scout=kind=="bot" and ({armada="armflea",cortex="corak",legion="leggob"})[side]
     or ({armada="armflash",cortex="corfav",legion="legscout"})[side]
 local tank=({armada="armflash",cortex="corgator",legion="leghades"})[side]
-local wantsTank=mode~="ordinary" and mode~="unavailable" and mode~="profile" and kind=="vehicle" and side~="armada"
+-- D-471: the profile's own settings open Cortex vehicle labs with Incisors.
+local wantsTank=(mode~="ordinary" and mode~="unavailable" and mode~="profile" and kind=="vehicle" and side~="armada")
+    or (mode=="profile" and kind=="vehicle" and side=="cortex")
 local batch=wantsTank and tank or scout
 local factory,products,finished,live=nil,{},0,{}
 local lost,ended=false,false

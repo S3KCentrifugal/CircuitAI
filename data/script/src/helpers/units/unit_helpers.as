@@ -758,10 +758,12 @@ namespace UnitHelpers {
     // Conceptually this is the "raider class" (e.g., armpw/corak/leggob or their vehicle equivalents).
     string GetFrontT1RaiderForFactory(const string &in factoryName, const string &in side)
     {
-        // For now, we reuse the same mapping as scouts/raiders, since those are the lightest
-        // frontline units per side. This keeps the behavior consistent and centralized.
+        // The combat batch is distinct from the scout: Armada sends Pawns,
+        // while its one-time scout remains a Tick (KI-737).
         if (IsT1BotLab(factoryName)) {
-            return GetT1BotScoutForSide(side);
+            if (side == "cortex") return "corak";
+            if (side == "legion") return "leggob";
+            return "armpw";
         }
         if (IsT1VehicleLab(factoryName)) {
             return GetT1VehicleScoutForSide(side);

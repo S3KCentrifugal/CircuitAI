@@ -2001,9 +2001,13 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+        IUnitTask@ foundry = TechAirFoundry::Work(u);
+        if (foundry !is null) return foundry;
         // FRONT ownership precedes generic edge/spam/economy providers and
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
+            IUnitTask@ support=FrontFactorySupport::Assist(u,false);
+            if(support !is null) return support;
             FrontEnergy::Update(); // before any group/base/default provider can enqueue energy
             // owner, 2026-11-04: a FRONT that lost its base rebuilds it first - every T1 constructor of any
             // seat retakes the start mexes, builds wind/solar and restarts the factory (front_recovery.as Rebuild);
@@ -2023,13 +2027,17 @@ namespace Builder {
                 // owner, 2026-11-02: the T1 seats (not the commander group's) help a tactical launcher order (front_tactical.as)
                 IUnitTask@ tacticalHelp = FrontTactical::AssistPull(u);
                 if (tacticalHelp !is null) return tacticalHelp;
+                if (FrontConstructors::Seat(u.id) == FrontConstructors::ENERGY) return FrontConstructors::EnergyWork(u);
+                if (FrontConstructors::Seat(u.id) == FrontConstructors::CONVERTER) return FrontConstructors::ConverterWork(u);   // D-463
                 if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
                 // owner, 2026-11-01: the expansion seat builds the edge lane's lab and turrets
                 // once the lane is funded; a FRONT with only its three seated T1 constructors
                 // never asked EdgeLanes, so a funded lane (first holder or heir) stayed unbuilt
-                if (FrontConstructors::Seat(u.id) == 1) { IUnitTask@ edge = EdgeLanes::BuilderTask(u); if (edge !is null) return edge; }
-                if (FrontConstructors::Seat(u.id) != 2) return aiBuilderMgr.DefaultMakeTask(u);
+                if (FrontConstructors::Seat(u.id) == FrontConstructors::EXPANSION) { IUnitTask@ edge = EdgeLanes::BuilderTask(u); if (edge !is null) return edge; }
+                if (FrontConstructors::Seat(u.id) != FrontConstructors::COMMANDER) return aiBuilderMgr.DefaultMakeTask(u);
             }
+            IUnitTask@ opening=FrontConstructors::CommanderOpening(u);
+            if(opening !is null) return opening;
             IUnitTask@ front=UnitHelpers::IsCommander(u.circuitDef)?CommanderFront::Work(u):CommanderGroup::Work(u);
             if(front !is null) return front;
         }
@@ -2118,6 +2126,7 @@ namespace Builder {
 	{
 		LolCannon::TaskAdded(task);   // owner, 2026-10-21: a lolcannon outside its program is aborted
 		T3Unstick::TaskAdded(task);   // the engine's self-reclaim of a stuck T3 is aborted (owner, 2026-10-20)
+		if (Global::AISettings::Role == AiRole::FRONT) FrontLayout::Prepare(task);
 		if (Global::AISettings::Role == AiRole::TECH && Global::RoleSettings::Tech::ExperimentalBuild)
 			Invariants::ConstructionAdmitted(task);
 		if (Global::AISettings::Role == AiRole::TECH) TechReclaim::Audit(task);   // D-290: every reclaim of ours, named by path

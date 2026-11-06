@@ -14,6 +14,7 @@
 #include "control/kernel/CommanderFortification.h"
 #include "control/kernel/CommanderGroupWork.h"
 #include "control/kernel/CommanderIdleWork.h"
+#include "control/kernel/CommanderJammerCoverage.h"
 #include "control/kernel/CommanderJammerPlan.h"
 #include "control/kernel/CommanderPosture.h"
 #include "control/kernel/DefensePlanner.h"
@@ -51,6 +52,7 @@ struct CommanderConcealState {
 };
 struct CommanderRetreatState {
     bool energy=false; int energyPlan=-10000,energyCalm=-1; springai::AIFloat3 energyGoal{-1,0,-1};
+    int energyThreat=-1,energyLogNext=0; // D-472: last threatened frame while latched; INV-255 log limit
     bool health=false; int healthPlan=-10000,healthShotUntil=-1; springai::AIFloat3 healthGoal{-1,0,-1};
     int lastTaskType=-1;    // D-389: detects the end of a retreat lease
 };
@@ -222,6 +224,9 @@ struct CommanderSafetyConfig {
     float decoyBait=1; // reuse safety/lane work, never plan a real-commander D-gun attack
     float jamSafe=0,jamHeavyCost=900;
     float cloakEnergyRetreat=0,cloakRetreatDistance=600;
+    // D-472: seconds without threat after which an energy retreat whose
+    // reserve the team cannot store ends anyway. 0 keeps the D-373 latch.
+    float cloakEnergyRelease=0;
     // Owner 2026-11-01 tower keep-out: stay towerMargin outside the weapon range
     // of scouted enemy LLTs, Beamers, Twin Guards and Cacophonies; dive one alone
     // rarely (towerDiveChance per tower per towerDiveCooldown seconds).
@@ -415,6 +420,10 @@ public:
     bool Jammed(CCircuitUnit* unit);
     bool RetreatCloakFunded(CCircuitUnit* unit) const;
     bool EnergyRetreatFunded(CCircuitUnit* unit) const;
+    // D-472: energy the moving-cloak escape needs, and whether the team's
+    // storage can hold it (false: the D-373 latch could never release).
+    float RetreatCloakReserve(CCircuitUnit* unit) const;
+    bool RetreatCloakStorable(CCircuitUnit* unit) const;
     bool EnergyRetreat(CCircuitUnit* unit) const;
     bool HealthRetreat(CCircuitUnit* unit) const;
     int FrontCommanderId() const;
@@ -520,7 +529,16 @@ private:
     IdMembership defenseRepresented;
     int defenseNext=0,defenseOfferNext=0,defenseChoice=-1;
     int defenseDecisionNext=0;
+    int defenseCoverageLogNext=0; // D-469: INV-253 log limit
+    void CheckOwnGroundDefense(CCircuitUnit* anchor,int frame);
     defense::Evaluation defenseEvaluation;
+    // D-470: the anchor's own best rule while the shared choice is seat-only,
+    // and the frame that choice became seat-only (grace before the anchor acts).
+    defense::Evaluation defenseOwnEvaluation;
+    int defenseOwnChoice=-1,defenseSeatWaitSince=-1;
+    int defenseSeatLogNext=0; // D-470: INV-254 log limit
+    void CheckSeatWait(CCircuitUnit* anchor,int frame);
+    void CheckEnergyRelease(CCircuitUnit* unit,State& s,int frame); // D-472: INV-255
     float defenseReservedMetal=0,defenseReservedEnergy=0;
     std::string defenseReason="not_assessed";
     const DefenseFacts& DefenseFactsFor(CCircuitDef* def);
@@ -656,7 +674,10 @@ private:
     bool IsSpam(CCircuitDef* def,const commander::Contact& c);
     bool DoctrineShot(CCircuitUnit* unit,State& s,int frame,bool t3Only,const springai::AIFloat3* after);
     springai::AIFloat3 DoctrineGoal(CCircuitUnit* unit,State& s,const springai::AIFloat3& pos,commander::Point threat,bool spam,int frame);
-    struct JamZone { commander::Point center; float radius; };
+    // KI-756: the engine's cell coverage decides jamming; radius is the
+    // nominal disc, only the outer bound of a firing-point search.
+    struct JamZone { commander::Point center; float radius; commander::JamCell cell; int cells=0; bool mobile=false; };
+    commander::JamCells jamCells;
     std::vector<JamZone> jamZones;
     bool JamControl(CCircuitUnit* unit,State& state,int frame);
     void Tick(CCircuitUnit* unit,State& state,int frame);

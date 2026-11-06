@@ -1,0 +1,15 @@
+{
+  "stop_minute": 3,
+  "expect": [
+    {"key": "pending factory", "scope": "any", "pattern": "\\[FactoryShutdown\\] pending", "by_minute": 2},
+    {"key": "leave battle", "scope": "any", "pattern": "\\[ReloadAction\\] user exited to menu", "by_minute": 2},
+    {"key": "AI destruction", "scope": "any", "pattern": "\\[EOH::DestroySkirmishAI", "by_minute": 2},
+    {"key": "game destroyed", "scope": "any", "pattern": "\\[Game::~CGame\\]\\[3\\]", "by_minute": 2}
+  ],
+  "complete_on": {"key": "teardown completed", "scope": "any", "pattern": "\\[Game::~CGame\\]\\[3\\]"},
+  "completion_grace_seconds": 0,
+  "forbid": [
+    {"key": "runtime", "scope": "any", "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation"},
+    {"key": "invariant", "scope": "any", "pattern": "\\[INVARIANT\\]"}
+  ]
+}

@@ -4,6 +4,8 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tactical {
+            bool FactoryLayoutsEnabled = true;
+            int FactorySupportRows = 3;
             // Local recovery is used only when native opening selection waits
             // without a factory task. Keep normal productive openings intact.
             float OpeningRecoveryRadius = 1024.0f;

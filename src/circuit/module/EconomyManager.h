@@ -183,6 +183,8 @@ public:
 	// Same, skipping the porc whose definition `skip` accepts (drone AA: carriers).
 	float EnemyPorcClearance(const springai::AIFloat3& pos, const std::function<bool (CCircuitDef*)>& skip);
 	void LogConPorc(const CCircuitUnit* unit, const springai::AIFloat3& pos, const char* where, const char* what);
+	// D-465: a geothermal vent no claimant ground start reaches (build stance, 3D).
+	bool IsGeoAirOnly(const springai::AIFloat3& pos);
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
 	bool IsMexOwnershipActive() const;
@@ -277,7 +279,7 @@ public:
 	IBuilderTask* MakeEconomyTasks(const springai::AIFloat3& position, CCircuitUnit* unit);
 	IBuilderTask* UpdateMetalTasks(const springai::AIFloat3& position, CCircuitUnit* unit);
 	IBuilderTask* UpdateReclaimTasks(const springai::AIFloat3& position, CCircuitUnit* unit, bool isNear = true);
-	IBuilderTask* UpdateEnergyTasks(const springai::AIFloat3& position, CCircuitUnit* unit = nullptr);
+	IBuilderTask* UpdateEnergyTasks(const springai::AIFloat3& position, CCircuitUnit* unit = nullptr, bool buildableOnly = false);
 	IBuilderTask* UpdateGeoTasks(const springai::AIFloat3& position, CCircuitUnit* unit = nullptr);
 	IBuilderTask* UpdateFactoryTasks(const springai::AIFloat3& position, CCircuitUnit* unit = nullptr);
 	IBuilderTask* UpdateFactoryTasks();
@@ -522,6 +524,7 @@ private:
 	std::uint64_t mexOwnerRevision = 0;
 	bool mexOwnersDirty = true;
 	float MexStartDistance(SMexStart& start, const springai::AIFloat3& pos);
+	void EnsureOwnMexStart();
 
 	// D-352 theatres. One terrain field per (class, seed set), rebuilt on a
 	// terrain publication; every number the rules read is broadcast roster

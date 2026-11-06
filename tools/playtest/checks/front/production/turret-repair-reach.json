@@ -1,0 +1,18 @@
+{
+  "stop_minute": 14,
+  "expect": [
+    {
+      "key": "front-support",
+      "pattern": "\\[FrontLayout\\] support state=",
+      "by_minute": 6,
+      "scope": "any"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": "INVARIANT|SCRIPT CRASH|: ERR\\s+:|has crashed|Lib exception",
+      "scope": "any"
+    }
+  ]
+}

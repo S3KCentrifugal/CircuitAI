@@ -205,6 +205,33 @@ void CEconomyManager::LogConPorc(const CCircuitUnit* unit, const AIFloat3& pos, 
         where, what ? what : "task", pos.x, pos.z, conPorcCount);
 }
 
+// The own start, added lazily: it is not announced through SetMexAllyStart.
+void CEconomyManager::EnsureOwnMexStart() {
+    const int ownTeam = circuit->GetTeamId();
+    if (mexStarts.find(ownTeam) != mexStarts.end()) return;
+    SMexStart own;
+    own.pos = circuit->GetSetupManager()->GetStartPos();
+    const auto* def = circuit->GetSetupManager()->GetCommChoice();
+    if (def) own.definition = def->GetId();
+    mexStarts.emplace(ownTeam, std::move(own));
+    mexOwnersDirty = true;
+}
+
+// D-465: a geothermal vent only aircraft can serve, the RACE_AIR test of the
+// mex race applied to a vent: no claimant start (own, and allies announced
+// through SetMexAllyStart) reaches a legal ground construction stance within
+// build range, in 3D. Without allied starts (mex navigation off) it judges by
+// the own start only. Cost: each start's sector field is built once per
+// height revision; a query is O(starts * (range / pitch)^2).
+bool CEconomyManager::IsGeoAirOnly(const AIFloat3& pos) {
+    if (!ValidMexPosition(pos)) return false;
+    EnsureOwnMexStart();
+    for (auto& entry : mexStarts) {
+        if (std::isfinite(MexStartDistance(entry.second, pos))) return false;
+    }
+    return !mexStarts.empty();
+}
+
 float CEconomyManager::MexStartDistance(SMexStart& start, const AIFloat3& pos) {
     auto* terrain = circuit->GetTerrainManager();
     const auto* data = terrain->GetAreaData();

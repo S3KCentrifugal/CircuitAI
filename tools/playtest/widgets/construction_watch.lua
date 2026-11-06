@@ -1,5 +1,6 @@
 function widget:GetInfo() return {name="Construction recovery observer",layer=115,enabled=true} end
 local products={}
+local commanderStarts={}
 function widget:UnitCreated(id,def,team,builder)
     local yard=builder and UnitDefs[Spring.GetUnitDefID(builder) or -1]
     if yard and (yard.name=="armsy" or yard.name=="corsy" or yard.name=="legsy"
@@ -49,6 +50,16 @@ function widget:GameFrame(frame)
         for _,id in ipairs(Spring.GetTeamUnits(team)) do
             local d=UnitDefs[Spring.GetUnitDefID(id) or -1]
             if d and (d.buildSpeed or 0)>0 then sample(id,team,"sample") end
+            if d and (d.name=="armcom" or d.name=="corcom" or d.name=="legcom") then
+                local x,_,z=Spring.GetUnitPosition(id)
+                if frame==0 and x then commanderStarts[id]={x=x,z=z} end
+                local start=commanderStarts[id]
+                if start and not start.departed and x and (x-start.x)^2+(z-start.z)^2>=512^2 then
+                    start.departed=true
+                    Spring.Echo(string.format("[ConstructionWatch] frame=%d event=commander-departed team=%d id=%d distance=%.0f",
+                        frame,team,id,math.sqrt((x-start.x)^2+(z-start.z)^2)))
+                end
+            end
         end
     end
 end

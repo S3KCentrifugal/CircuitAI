@@ -22,10 +22,11 @@ namespace DefensePlanner {
         Option(slot,"reserve",.2f,path);Option(slot,"efficiency",.65f,path);
         Option(slot,"light",light,path);Option(slot,"heavy",heavy,path);Option(slot,"air",air,path);
         Option(slot,"static",stationary,path);Option(slot,"nuclear",nuclear,path);Option(slot,"plasma",plasma,path);
+        Option(slot,"fallback_for",-1,path); // D-469: an earlier slot this rule stands in for
         // Local saturation is native. Keep a separate per-AI safety cap so
         // defenses left at an old front do not consume the new station's quota.
         const int total=int(aiSetupMgr.ConfigFloat(path+"total_limit",32));
-        if(priority>0 && (!loadedAdvancedOnly || (slot!=0 && slot!=1 && slot!=15))
+        if(priority>0 && (!loadedAdvancedOnly || (slot!=0 && slot!=1 && slot!=15 && slot!=16))
             && def.IsBuildAllowed() && def.maxThisUnit<total) def.maxThisUnit=total;
     }
     void Load(bool advancedOnly=false) {
@@ -43,11 +44,19 @@ namespace DefensePlanner {
         Option(-1,"heavy_metal",1200,path);Option(-1,"heavy_health",4000,path);
         Option(-1,"baseline_health",1000,path);Option(-1,"stable_seconds",60,path);Option(-1,"stable_distance",160,path);
         Option(-1,"urgent_band",4,path);
+        Option(-1,"approach",0,path); // D-469: elmos past turret range an approaching ground army still counts
+        Option(-1,"seat_grace",5,path); // D-470: seconds a commander waits for a seat to start a choice it cannot build
         Option(-1,"shield_in_plasma_zone",1,path);Option(-1,"shield_safe_seconds",10,path);
         const string side=Global::AISettings::Side.length()>0?Global::AISettings::Side:ai.GetSideName();
         const bool cor=side=="cortex",leg=side=="legion";
-        Rule(0,cor?"corhllt":leg?"leglht":"armbeamer","light",2,2,0,0,60,1,0,1,.15f,0,0,0,0);
-        Rule(1,cor?"corhlt":leg?"legmg":"armhlt","hlt",2,3,20,500,90,2,0,1,.6f,0,0,0,0);
+        // D-469: slot 0 is the constructor turret (Beamer, Twin Guard, and
+        // Cacophony, which BAR's build menu puts in Legion's Twin Guard slot).
+        // Slot 16, the light laser a commander builds itself (Sentry, Guard,
+        // Pharos), stands in only when no group seat can start slot 0.
+        // Legion has no HLT row: the Cacophony moved up to slot 0, and the hive
+        // in BAR's HLT slot fires drones the planner cannot model (0 damage).
+        Rule(0,cor?"corhllt":leg?"legmg":"armbeamer","light",2,2,0,0,60,1,0,1,.15f,0,0,0,0);
+        if(!leg) Rule(1,cor?"corhlt":"armhlt","hlt",2,3,20,500,90,2,0,1,.6f,0,0,0,0);
         Rule(2,cor?"corvipe":leg?"legapopupdef":"armpb","t2",2,4,50,1000,90,4,0,1,1,0,0,0,0);
         Rule(3,cor?"cordoom":leg?"legbastion":"armanni","heavy",2,3,120,2500,120,3,.75f,cor||leg?.5f:0,1,0,0,0,0);
         // Owner 2026-11-02: the T2 pop-up plasma artillery (Persecutor / Eviscerator / Rattlesnake) builds
@@ -59,6 +68,8 @@ namespace DefensePlanner {
         Rule(7,cor?"corfmd":leg?"legabm":"armamd","antinuke",3,2,50,1000,240,1,0,0,0,0,0,1,0);
         Rule(8,cor?"corgate":leg?"legdeflector":"armgate","shield",3,2,100,2500,150,1,0,0,0,0,0,0,1);
         Rule(15,UnitHelpers::GetStaticAALightNameForSide(side),"aa_light",2,3,0,0,60,1,0,0,0,1,0,0,0);
+        Rule(16,UnitHelpers::GetStaticLLTNameForSide(side),"llt",2,2,0,0,60,1,0,1,.15f,0,0,0,0);
+        Option(16,"fallback_for",0,"commander/defense/rules/llt/");
         // Read coverage from every faction. A captured builder can be supported
         // by a policy-added buildable row; priority zero means coverage only.
         const array<string> anti={"armamd","corfmd","legabm"};
@@ -71,6 +82,7 @@ namespace DefensePlanner {
             aiBuilderMgr.SetDefenseRule(0,"priority",0);
             aiBuilderMgr.SetDefenseRule(1,"priority",0);
             aiBuilderMgr.SetDefenseRule(15,"priority",0);
+            aiBuilderMgr.SetDefenseRule(16,"priority",0);
         }
     }
 }
