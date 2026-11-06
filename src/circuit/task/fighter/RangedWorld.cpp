@@ -179,6 +179,7 @@ void CRangedWorld::Refresh()
             // Unidentified radar contacts can support low-priority blind fire,
             // but never invented precision identities, HP or threat estimates.
             c.pos.y=circuit->GetTerrainManager()->GetAreaData()->GetElevationAt(c.pos.x,c.pos.z);
+            c.airDot=e->GetPos().y>c.pos.y+60.f; // radar height error is small; aircraft fly higher
             c.mobile=true;
             // D-294: the engine reports a radar dot's velocity (UpdateInRadarData);
             // a shooter uses it to tell a slow or stationary dot (blind shot

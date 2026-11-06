@@ -19,11 +19,14 @@ public:
     void Release(CCircuitUnit* unit, bool commands=true);
     int Target() const { return target; }
     bool IsSustainedRush() const { return world.IsSustainedRush(id); }
+    // Owner 2026-10-19/27, 2026-11-06: spam for this policy (roster, cost class,
+    // and with spam_radar_dots an unidentified ground radar dot). Public so the
+    // military manager's spam hold uses the same rule outside the controller.
+    static bool Spam(const RangedPolicy& policy,const CRangedWorld::Contact& c);
 private:
     void SelectTarget(CCircuitUnit* unit,int id,int weapon,float damage,float score=-1.f);
     bool Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape,bool urgent=false);
     void Hold(CCircuitUnit* unit,bool unsafe=false);
-    static bool Spam(const RangedPolicy& policy,const CRangedWorld::Contact& c);
     void UpdateFireState(CCircuitUnit* unit,bool open);
     void Disperse(CCircuitUnit* unit);
     void UpdateCohort(CCircuitUnit* unit);

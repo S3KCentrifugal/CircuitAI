@@ -743,6 +743,10 @@ public:
 	void UpdateDefenceTasks();
 	void UpdateSensorGuards();
 	void UpdateCommanderSnipe();
+	// Owner 2026-11-06: a fire-at-will ranged hull with a spam rule (Astraeus)
+	// outside its ranged controller (retreat, script routes) holds fire while
+	// spam is in reach, else keeps its default fire state.
+	void UpdateSpamFireHold();
 	// Debug goal: takes the military non-spam units in reach into one
 	// CDebugGoalTask while it is on, ends the task when it is off
 	void UpdateDebugGoal();

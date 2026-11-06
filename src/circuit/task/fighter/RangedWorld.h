@@ -56,6 +56,9 @@ public:
         // their own list/index: a hazard for shooters that opt in (see
         // RangedPolicy::ghostPorcRange), never a target or an objective.
         bool ghost = false;
+        // Owner 2026-11-06: an unidentified radar dot well above the ground
+        // (an aircraft). Only meaningful when def is null.
+        bool airDot = false;
     };
     struct Friend {
         int id; springai::AIFloat3 pos; float radius;

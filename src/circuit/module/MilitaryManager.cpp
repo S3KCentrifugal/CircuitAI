@@ -38,6 +38,7 @@
 #include "task/fighter/BombTask.h"
 #include "task/fighter/ArtilleryTask.h"
 #include "task/fighter/RangedWorld.h"
+#include "task/fighter/RangedEngagement.h"
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
@@ -1037,6 +1038,8 @@ void CMilitaryManager::InitMilitary()
 			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateCommanderSnipe, this),
 					commSnipeInfo.interval, offset + 2);
 		}
+		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSpamFireHold, this),
+				FRAMES_PER_SEC / 2, offset + 4);
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -2353,6 +2356,46 @@ void CMilitaryManager::UpdateCommanderSnipe()
 		TRY_UNIT(circuit, unit,
 			unit->SetCommanderTarget(best, frame);
 		)
+	}
+}
+
+void CMilitaryManager::UpdateSpamFireHold()
+{
+	// Every 15 frames: O(team units) def filter; the ranged snapshot is read
+	// only when such a hull is outside its controller (usually none).
+	const int frame = circuit->GetLastFrame();
+	std::vector<int> nearby;
+	bool refreshed = false;
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		if (!cdef->IsAttrRanged()) continue;
+		const RangedPolicy& p = cdef->GetRangedPolicy();
+		if (!p.fireAtWill || p.alwaysFireAtWill || p.coordinated || !p.HasSpam()) continue;
+		IUnitTask* task = unit->GetTask();
+		if (unit->IsDead() || task == nullptr || task->GetType() == IUnitTask::Type::NIL
+			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled()) continue;
+		// The ranged controller (ARTY task of a ranged hull) owns its fire state.
+		if (task->GetType() == IUnitTask::Type::FIGHTER
+			&& static_cast<IFighterTask*>(task)->GetFightType() == IFighterTask::FightType::ARTY) continue;
+		auto world = GetRangedWorld();
+		if (!refreshed) { world->Refresh(); refreshed = true; }
+		const AIFloat3& pos = unit->GetPos(frame);
+		const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+		world->Nearby(pos, range + 400.f, nearby);
+		bool spam = false;
+		for (int i : nearby) {
+			const auto& c = world->Contacts()[i];
+			if (c.pos.y < -20.f || (c.def != nullptr && c.def->IsAbleToFly()) || !CRangedEngagement::Spam(p, c)) continue;
+			const float reach = range + c.radius + 200.f;  // same early hold as the controller
+			if (pos.SqDistance2D(c.pos) <= SQUARE(reach)) { spam = true; break; }
+		}
+		const CCircuitDef::FireT want = spam ? CCircuitDef::HOLD : cdef->GetFireState();
+		if (unit->GetRequestedFireState() != want) {
+			circuit->LOG("SPAMHOLD: %s %d %s (task type %d)", cdef->GetDef()->GetName(), unit->GetId(),
+				spam ? "holds: spam in reach" : "default fire state", int(task->GetType()));
+		}
+		unit->TrySetFireState(want);  // repeats are dropped by CmdSetFireState
 	}
 }
 

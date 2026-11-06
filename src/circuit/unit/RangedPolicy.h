@@ -154,6 +154,11 @@ struct RangedPolicy {
     // Owner 2026-10-27: named spam ("spam_units", def ids resolved at load),
     // in addition to spamMaxCost. Same rules: mobile, never a commander.
     std::unordered_set<int> spamDefs;
+    // Owner 2026-11-06 (Astraeus): an unidentified ground radar dot counts as
+    // spam too: never our priority target, and fire is held while one is in
+    // reach (engine autofire took dots, which were mostly fast T1 swarms).
+    bool spamRadarDots = false;
+    bool HasSpam() const { return spamMaxCost>0.f || !spamDefs.empty() || spamRadarDots; }
     // Owner 2026-11-02: "stay out of weapon range of ghost images that are
     // porc and wait for other units to give LOS". 0 = off. An armed structure
     // known only as a ghost (out of radar and LOS, spot not seen empty) with a

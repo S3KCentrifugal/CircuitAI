@@ -94,7 +94,12 @@ void CRangedEngagement::Release(CCircuitUnit* unit,bool commands)
         )
     }
     unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
-    unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
+    // 2026-11-06: a fire-at-will hull with a spam rule leaves on HOLD; outside
+    // this controller CMilitaryManager::UpdateSpamFireHold opens it to its
+    // default fire state only while no spam is in reach (retreat, routes).
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    const bool spamHold=p.fireAtWill && !p.alwaysFireAtWill && !p.coordinated && p.HasSpam();
+    unit->TrySetFireState(spamHold ? CCircuitDef::HOLD : unit->GetCircuitDef()->GetFireState());
 }
 void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,float damage,float score)
 {
@@ -147,6 +152,7 @@ void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,
 }
 bool CRangedEngagement::Spam(const RangedPolicy& p,const CRangedWorld::Contact& c)
 {
+    if(!c.def) return p.spamRadarDots && !c.ghost && !c.airDot;
     return c.def && c.mobile && ((p.spamMaxCost>0.f && c.cost<=p.spamMaxCost) || p.spamDefs.count(c.def->GetId()))
         && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
 }
@@ -817,6 +823,27 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     const bool report=trace && frame>=traceFrame+150;
     if(report) { traceFrame=frame; ai->LOG("RANGED: sample unit=%d contacts=%u near=%u range=%.1f",id,unsigned(contacts.size()),unsigned(nearby.size()),maxRange); }
 
+    // Individual fire_at_will: which contacts are in weapon reach. Scanned
+    // before the withdrawal branch (2026-11-06), so a forward-mount hull
+    // backing off a closing contact also holds while spam is in reach.
+    bool spamInRange=false, otherInRange=false;
+    if(policy.fireAtWill) for(int i:nearby) {
+        const auto& c=contacts[i];
+        // Unidentified dots enter only as spam (spam_radar_dots); an air dot
+        // or a dot without that flag never opens or holds fire.
+        if(c.pos.y< -20.f || (c.def ? c.def->IsAbleToFly() : !Spam(policy,c))) continue;
+        // Engine reach includes the target's radius. Spam is held 200 elmos
+        // early: a volley fired just before it walks in still lands on it.
+        const bool spam=Spam(policy,c);
+        const float reach=maxRange+c.radius+(spam?200.f:64.f);
+        // Owner 2026-10-27: a low_trajectory hull's non-spam contact opens
+        // fire only if its shell clears the terrain; an unreachable commander
+        // behind a ridge otherwise opened fire and engine autofire took spam.
+        // One terrain walk (distance/32 samples) per such contact in reach.
+        if(pos.SqDistance2D(c.pos)<=reach*reach && (spam || !policy.lowTrajectory
+            || std::any_of(caps.weapons.begin(),caps.weapons.end(),[&](const auto& w){return world.Trajectory(w,pos,c.pos);})))
+            (spam?spamInRange:otherInRange)=true;
+    }
     const CRangedWorld::Contact* closing=nullptr;
     float urgency=0.f;
     const bool forward=std::any_of(caps.weapons.begin(),caps.weapons.end(),[](const auto& w){return w.forward;});
@@ -871,7 +898,12 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
                 Move(unit,escape,true,true);
             }
         }
-        if(forward) return;
+        if(forward) {
+            // 2026-11-06: this early return skipped the hold below, so engine
+            // autofire could take spam while the hull backed off.
+            if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && otherInRange);
+            return;
+        }
     }
 
     if (policy.holdFireline && closing) {
@@ -879,22 +911,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         withdrawalUntil=0;
     }
     int best=-1,bestWeapon=-1; float bestScore=-1.f,bestDamage=0.f;
-    bool spamInRange=false, otherInRange=false; // individual fire_at_will
     for(int i:nearby) {
         const auto& c=contacts[i];
-        if(policy.fireAtWill && c.def && c.pos.y>=-20.f && !c.def->IsAbleToFly()) {
-            // Engine reach includes the target's radius. Spam is held 200 elmos
-            // early: a volley fired just before it walks in still lands on it.
-            const bool spam=Spam(policy,c);
-            const float reach=maxRange+c.radius+(spam?200.f:64.f);
-            // Owner 2026-10-27: a low_trajectory hull's non-spam contact opens
-            // fire only if its shell clears the terrain; an unreachable commander
-            // behind a ridge otherwise opened fire and engine autofire took spam.
-            // One terrain walk (distance/32 samples) per such contact in reach.
-            if(pos.SqDistance2D(c.pos)<=reach*reach && (spam || !policy.lowTrajectory
-                || std::any_of(caps.weapons.begin(),caps.weapons.end(),[&](const auto& w){return world.Trajectory(w,pos,c.pos);})))
-                (spam?spamInRange:otherInRange)=true;
-        }
         if(Spam(policy,c)) continue; // owner 2026-10-19: never a priority target
         if(!c.los && !policy.allowRadar) continue;
         if((c.mobile && !policy.allowMobile)||(!c.mobile && !policy.allowStatic)) continue;
