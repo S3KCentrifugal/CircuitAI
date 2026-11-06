@@ -982,7 +982,6 @@ bool ArtySpamRetreatStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.lockOrderUntil = -1;
 		return false;
 	}
-	unit->TrySetFireState(CCircuitDef::FireType::OPEN);  // shoots back at chasing spam; the MISSILE step sets HOLD again after
 	if (!there && (frame >= st.retreatOrderUntil)) {
 		st.retreatOrderUntil = frame + FRAMES_PER_SEC * 2;
 		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
