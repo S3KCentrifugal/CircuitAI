@@ -180,6 +180,7 @@ void CRangedWorld::Refresh()
             // but never invented precision identities, HP or threat estimates.
             c.pos.y=circuit->GetTerrainManager()->GetAreaData()->GetElevationAt(c.pos.x,c.pos.z);
             c.airDot=e->GetPos().y>c.pos.y+60.f; // radar height error is small; aircraft fly higher
+            { const auto seen=history.find(id); if(seen!=history.end()) c.seenDef=seen->second.def; }
             c.mobile=true;
             // D-294: the engine reports a radar dot's velocity (UpdateInRadarData);
             // a shooter uses it to tell a slow or stationary dot (blind shot
@@ -236,7 +237,7 @@ void CRangedWorld::Refresh()
                 h.stalled=(h.frame>0 && h.engaged>=h.frame && h.health-c.health< std::max(20.f,h.health*.03f)) ? std::min(4,h.stalled+1) : 0;
                 h.health=c.health; h.frame=now;
             }
-            h.seen=now;
+            h.seen=now; h.def=c.def;
         }
     }
     // A small shared strategic shortlist bounds distant selection per shooter.

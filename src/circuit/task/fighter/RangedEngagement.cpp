@@ -152,7 +152,16 @@ void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,
 }
 bool CRangedEngagement::Spam(const RangedPolicy& p,const CRangedWorld::Contact& c)
 {
-    if(!c.def) return p.spamRadarDots && !c.ghost && !c.airDot;
+    if(!c.def) {
+        if(!p.spamRadarDots || c.ghost || c.airDot) return false;
+        // Owner 2026-11-06: a dot we had in LOS keeps that identity for the
+        // spam rule (a Hammer fading to radar stays a target); a dot never
+        // seen is spam.
+        const CCircuitDef* d=c.seenDef;
+        if(d==nullptr) return true;
+        return d->IsMobile() && ((p.spamMaxCost>0.f && d->GetCostM()<=p.spamMaxCost) || p.spamDefs.count(d->GetId()))
+            && !d->IsEnemyRoleAny(CCircuitDef::COMM);
+    }
     return c.def && c.mobile && ((p.spamMaxCost>0.f && c.cost<=p.spamMaxCost) || p.spamDefs.count(c.def->GetId()))
         && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
 }

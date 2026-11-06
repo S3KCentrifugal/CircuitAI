@@ -59,6 +59,10 @@ public:
         // Owner 2026-11-06: an unidentified radar dot well above the ground
         // (an aircraft). Only meaningful when def is null.
         bool airDot = false;
+        // Owner 2026-11-06: for an unidentified dot, what it was when we last
+        // had it in LOS (within the last minute), else null. Used only by the
+        // spam rule; targeting still treats the dot as unidentified.
+        CCircuitDef* seenDef = nullptr;
     };
     struct Friend {
         int id; springai::AIFloat3 pos; float radius;
@@ -186,7 +190,8 @@ private:
     struct Shot { int target, until; float damage; };
     std::unordered_map<int,Shot> shots;
     std::unordered_map<int,float> reserved;
-    struct History { float health=0.f; int stalled=0, frame=0, seen=0, engaged=-1; };
+    // def: identity at the last LOS sighting (kept 1800 frames with the entry).
+    struct History { float health=0.f; int stalled=0, frame=0, seen=0, engaged=-1; CCircuitDef* def=nullptr; };
     std::unordered_map<int,History> history;
     struct EscortLease { int anchor=-1; bool jammer=false; };
     std::map<int,EscortLease> escorts;
