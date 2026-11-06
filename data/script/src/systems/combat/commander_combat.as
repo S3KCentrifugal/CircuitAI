@@ -130,6 +130,27 @@ namespace CommanderCombat {
                 CCircuitDef@ defence=ai.GetCircuitDef(defenceNames[i]);
                 if(defence !is null) aiBuilderMgr.SetCommanderCombatOption("front_defence_definition",float(defence.id));
             }
+            // D-475: the commander group's tactical queue, a reserved block of
+            // launchers built by T2 seats that expansion work has no room for.
+            // tactical_t2 0 keeps it off; the JSON enables it per profile.
+            Option("commander_group_tactical_t2",0.f);
+            Option("commander_group_tactical_metal",4000.f);
+            Option("commander_group_tactical_energy",.25f);
+            Option("commander_group_tactical_cols",3.f);
+            Option("commander_group_tactical_rows",3.f);
+            Option("commander_group_tactical_min_fill",.5f);
+            Option("commander_group_tactical_rear",300.f);
+            Option("commander_group_tactical_retry_seconds",10.f);
+            Option("commander_group_tactical_order_seconds",300.f);
+            // D-476: expansion jobs at once (one per constructor); 1 keeps the single job.
+            Option("commander_group_expansion_jobs",1.f);
+            aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",-1.f);
+            array<string>@ tacticalNames=aiSetupMgr.ConfigString("commander/combat/commander_group_tactical_definitions",
+                "armemp,cortron,legperdition").split(",");
+            for(uint i=0;i<tacticalNames.length();++i) {
+                CCircuitDef@ launcher=ai.GetCircuitDef(tacticalNames[i]);
+                if(launcher !is null) aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",float(launcher.id));
+            }
             Option("front_line_depth",800.f);
             Option("front_mex_offset",160.f);
             Option("front_work_behind",400.f);

@@ -215,6 +215,15 @@ struct CommanderGroupConfig {
     float sensorDefenseBand=3; // weapons at/above this band precede sensor work
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
+    // D-475 tactical queue: launchers in a reserved block, once the group has
+    // tacticalT2 T2 members (0: off), more than tacticalMetal stored metal and
+    // energy above tacticalEnergy of storage without a stall.
+    float tacticalT2=0,tacticalMetal=4000,tacticalEnergy=.25f;
+    float tacticalCols=3,tacticalRows=3,tacticalMinFill=.5f,tacticalRear=300;
+    float tacticalRetrySeconds=10,tacticalOrderSeconds=300;
+    // D-476: expansion jobs the group runs at once (one per constructor); 1
+    // keeps the single shared job of D-470 and earlier.
+    float expansionJobs=1;
 };
 struct CommanderFrontConfig {
     float workers=2;
@@ -322,7 +331,7 @@ public:
     bool HealthRetreat(CCircuitUnit* unit) const;
     int FrontCommanderId() const;
     void TaskFinished(IUnitTask* task,bool done);
-    bool OwnsGroupProject(const IUnitTask* task) const { return task && task==groupJob; }
+    bool OwnsGroupProject(const IUnitTask* task) const { return IsExpansionJob(task); }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);
     IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
@@ -371,11 +380,44 @@ private:
     std::array<int,6> groupMembers{{-1,-1,-1,-1,-1,-1}};
     int groupDef2=-1,groupRadar2=-1,groupJammer2=-1,groupAA2=-1;
     State groupState;
-    IUnitTask* groupJob=nullptr; // borrowed until BuilderManager::DequeueTask callback
+    // D-476: the expansion queue, up to commander_group_expansion_jobs jobs at
+    // once (formerly the single groupJob). Each slot borrows its task until
+    // TaskFinished and carries that job's nano debt and hold lease. Fixed
+    // array: every lookup is at most MAX_EXPANSION_JOBS pointer compares.
+    static constexpr int MAX_EXPANSION_JOBS=6;
+    struct ExpansionJob { IUnitTask* task=nullptr; bool earnsNano=true,nano=false; int until=-1; };
+    std::array<ExpansionJob,MAX_EXPANSION_JOBS> expansionJobs{};
+    int ExpansionCap() const;
+    int ExpansionJobCount() const;
+    int NanoJobCount() const;
+    // Owed nanos no expansion job is building yet (the nano debt that blocks).
+    bool NanoUnassigned() const { return groupNanoOwed>unsigned(NanoJobCount()); }
+    bool IsExpansionJob(const IUnitTask* task) const;
+    IUnitTask* FirstExpansionJob() const;
+    IUnitTask* JoinExpansionJob(CCircuitUnit* unit,bool nearby);
+    // D-475/D-476: the second group queue. expansionJobs is the expansion
+    // queue (every job the group had before); tacticalJob is the tactical
+    // queue: one constructor above tactical_metal, any constructor with no
+    // expansion work below it. Borrowed like an expansion job, cleared in
+    // TaskFinished. The block is the layout group its slots come from; not
+    // serialized (after a load a new block is reserved).
+    IUnitTask* tacticalJob=nullptr;
+    std::vector<int> tacticalDefs;          // script-owned, first buildable wins
+    int tacticalGroup=0,tacticalNext=0;     // reservation group; next block try (frame)
+    springai::AIFloat3 tacticalCentre{-1,0,-1};
+    float tacticalRadius=0;                 // half-diagonal of the reserved block
+    bool IsTacticalDef(const CCircuitDef* def) const;
+    int GroupT2Count() const;
+    bool TacticalEconomy() const;
+    bool TacticalJobAllowed(CCircuitUnit* unit,IUnitTask* task,CCircuitUnit* anchor) const;
+    bool ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,int frame);
+    IUnitTask* GroupTacticalWork(CCircuitUnit* unit,CCircuitUnit* anchor,bool nearby);
+    bool TacticalSplit(CCircuitUnit* unit) const;
+    bool CanBuildTactical(CCircuitUnit* unit) const;
     springai::AIFloat3 groupNanoSite{-1,0,-1};
-    bool groupNanoDue=false,groupJobNano=false,groupJobEarnsNano=true;
+    bool groupNanoDue=false;
     unsigned groupNanoOwed=0;
-    int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0,groupProjectUntil=-1;
+    int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0;
     bool GroupCanBuild(CCircuitDef* def,CCircuitUnit* anchor) const;
     bool GroupCanFund(CCircuitDef* def) const;
     std::array<defense::Rule,defense::MAX_RULES> defenseRules;
@@ -423,7 +465,9 @@ private:
     using DefenseBuilders=std::array<DefenseBuilder,6>;
     DefenseBuilders GatherDefenseBuilders(CCircuitUnit* anchor);
     defense::Project DefenseProject(CCircuitDef* def,const DefenseFacts& facts,const DefenseBuilders& builders);
-    IUnitTask* GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand=0);
+    // allowSurplus false: a surplus pick is not offered (D-476: the group asks
+    // for it only after mex upgrades and maintenance).
+    IUnitTask* GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand=0,bool allowSurplus=true);
     bool IsGroupStructure(int defId) const;
     bool GroupLaneWorkAllowed(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& at) const;
     IUnitTask* GroupUpgradeMex(CCircuitUnit* unit,CCircuitUnit* anchor);

@@ -345,7 +345,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
             s.work.idleReason=reason;s.work.idleLogNext=frame+30*FRAMES_PER_SEC;
             ai->LOG("[CommanderIdle] unit=%i reason=%i posture=%s defense=%s metal_room=%.0f energy_room=%.0f group_job=%i reclaim=%s",
                 unit->GetId(),reason,s.conceal.postureReason,defenseReason.c_str(),
-                s.work.reclaimMetalRoom,s.work.reclaimEnergyRoom,groupJob?1:0,s.work.reclaimReason);
+                s.work.reclaimMetalRoom,s.work.reclaimEnergyRoom,ExpansionJobCount(),s.work.reclaimReason);
         }
         auto* hold=static_cast<IWaitTask*>(ai->GetBuilderManager()->Enqueue(
             TaskB::Wait(int(std::clamp(radius,1.f,30.f)*FRAMES_PER_SEC))));

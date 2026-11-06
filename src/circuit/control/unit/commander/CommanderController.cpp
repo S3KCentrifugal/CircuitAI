@@ -106,6 +106,16 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::maintenance>("commander_group_maintenance",0,1),
         Group<&GC::lineReviewSeconds>("commander_group_line_review_seconds",1,60),
         Group<&GC::projectHoldSeconds>("commander_group_project_hold_seconds",0,120),
+        Group<&GC::tacticalT2>("commander_group_tactical_t2",0,3),
+        Group<&GC::tacticalMetal>("commander_group_tactical_metal",0,1000000),
+        Group<&GC::tacticalEnergy>("commander_group_tactical_energy",0,1),
+        Group<&GC::tacticalCols>("commander_group_tactical_cols",1,6),
+        Group<&GC::tacticalRows>("commander_group_tactical_rows",1,6),
+        Group<&GC::tacticalMinFill>("commander_group_tactical_min_fill",0,1),
+        Group<&GC::tacticalRear>("commander_group_tactical_rear",0,2000),
+        Group<&GC::tacticalRetrySeconds>("commander_group_tactical_retry_seconds",1,600),
+        Group<&GC::tacticalOrderSeconds>("commander_group_tactical_order_seconds",30,1200),
+        Group<&GC::expansionJobs>("commander_group_expansion_jobs",1,6),
         Group<&GC::jammerEdge>("commander_group_jammer_edge",0,1000),
         Group<&GC::jammerGain>("commander_group_jammer_gain",0,1),
         Group<&GC::jammerSpacing>("commander_group_jammer_spacing",0,2),
@@ -314,6 +324,13 @@ float CCommanderController::GetDeficit() const {
 }
 bool CCommanderController::SetOption(const std::string& name,float value) {
     if(!std::isfinite(value)) return false;
+    if(name=="commander_group_tactical_definition") {  // D-475: -1 clears, else append
+        if(value==-1) {tacticalDefs.clear();return true;}
+        if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
+        if(std::find(tacticalDefs.begin(),tacticalDefs.end(),int(value))==tacticalDefs.end())
+            tacticalDefs.push_back(int(value));
+        return true;
+    }
     if(name=="front_defence_definition") {
         if(value==-1) {frontDefenceDefs.clear();return true;}
         if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
@@ -1101,6 +1118,11 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_DEPLOY);
     auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
     if(FallbackActive(s,frame)) return false; // the porc line bounds exploration
+    // D-474: a commander that was hit, or whose structure under construction
+    // was destroyed, braces here: below every rule Tick ran before Deploy
+    // (energy and health retreat, jamming, T3 intercept, unseen fire,
+    // fallback, D-gun combat), above front deployment and its work.
+    if(ai->GetBuilderManager()->TakeCommanderBrace(unit)) return true;
     if(role.frontDuty) {
         // INV-236 (D-356): front duty is a FRONT-only policy; the script sets
         // "advance" for the roles in commander.json advance_roles and front_duty
@@ -1145,7 +1167,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 ai->LOG("[INVARIANT] INV-234 lane push goal beyond its bound unit=%i progress=%.0f bound=%.0f screens=%i",
                     unit->GetId(),progress,bound,s.front.pushScreens);
         }
-        if(groupJob && StartedCommanderConstruction(unit)) return true;
+        if(ExpansionJobCount()>0 && StartedCommanderConstruction(unit)) return true;
         if(unit->GetTask()==s.work.task && !unit->GetTask()->IsDead()
             && (s.work.kind==WORK_MEX_DEFENCE || s.work.kind==WORK_TERRITORY_LINE || s.work.kind==WORK_REPAIR_COMBAT)
             && CanResumeFrontTask(unit,unit->GetTask())) return true;
@@ -1169,7 +1191,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
         // Construction is a group objective. Let the selected worker establish
         // its frame before moving the anchor away; safety/fallback ran first.
         // GroupAssist bounds pre-frame holding by the project's original lease.
-        if(groupJob && GroupProjectAllowed(unit,groupJob)) {
+        if(ExpansionJobCount()>0) {
             if(auto* assist=GroupAssist(unit)) {
                 if(unit->GetTask()!=assist) ai->GetBuilderManager()->AssignTask(unit,assist);
                 return true;
