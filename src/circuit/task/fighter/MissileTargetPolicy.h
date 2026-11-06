@@ -5,6 +5,11 @@ namespace circuit {
 inline bool IsSlowMissileLauncher(const std::string& name) {
     return name == "armmerl" || name == "corvroc" || name == "legavroc";
 }
+// 2026-11-06: launchers that leave identified, idle or slow T1 mobiles alone
+// (Ambassador, Negotiator, Boreas, Arbiter).
+inline bool IsT1ExemptLauncher(const std::string& name) {
+    return name == "armmerl" || name == "corvroc" || name == "legavroc" || name == "corhrk";
+}
 // Velocity is elmos/frame; definition speed is elmos/second.
 inline bool SlowMissileSpeedAllowed(float velocitySq, float maxSpeed, bool identified, float fps) {
     if (!(velocitySq >= 0.f)) return false;

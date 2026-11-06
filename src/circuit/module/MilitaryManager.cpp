@@ -839,6 +839,9 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.snipeFraction = utils::clamp(snipeArtyCfg.get("snipe_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
 		artySnipeInfo.volleys = std::max(1, snipeArtyCfg.get("volleys", 3).asInt());
 		artySnipeInfo.ghostVolleysOther = std::max(1, snipeArtyCfg.get("ghost_volleys_other", 1).asInt());
+		artySnipeInfo.spamRetreat = snipeArtyCfg.get("spam_retreat", true).asBool();
+		artySnipeInfo.spamRetreatDistance = std::max(100.f, snipeArtyCfg.get("spam_retreat_distance", 500.f).asFloat());
+		artySnipeInfo.spamRetreatQuietFrames = int(std::max(1.f, snipeArtyCfg.get("spam_retreat_quiet_seconds", 4.f).asFloat()) * FRAMES_PER_SEC);
 		artySnipeInfo.visibleMaxVolleys = std::max(0, snipeArtyCfg.get("visible_max_volleys", 0).asInt());
 		auto seconds = [&](const char* key, float def) {
 			return int(std::max(0.f, snipeArtyCfg.get(key, def).asFloat()) * FRAMES_PER_SEC);

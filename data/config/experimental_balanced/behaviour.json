@@ -343,6 +343,12 @@
 			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
 			"snipe_range_fraction": 0.99,
 			"ghost_volleys_other": 1,     // owner 2026-11-04: blind volleys per unit at a ghost that is not a heavy (heavies: volleys)
+			// 2026-11-06: Ambassador / Negotiator / Boreas hit by spam (T1/T2 mobiles that are not heavy units, or unknown
+			// attackers) back off spam_retreat_distance (lowest-threat of away / +-45 / toward base); normal steps resume
+			// once at the point with spam_retreat_quiet_seconds without damage.
+			"spam_retreat": true,
+			"spam_retreat_distance": 500,
+			"spam_retreat_quiet_seconds": 4,
 			"volleys": 3,
 			"visible_max_volleys": 0,     // owner 01:43Z: seen porc until dead (0 = no cap)
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS

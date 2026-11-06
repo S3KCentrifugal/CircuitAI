@@ -276,7 +276,7 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 	// T3 (techlevel >= 3) and factories, the gantry included, stay NONE;
 	// commanders are skipped at the command boundary (role is set later).
 	it = customParams.find("techlevel");
-	const float techLevel = (it != customParams.end()) ? utils::string_to_float(it->second) : 1.f;
+	techLevel = (it != customParams.end()) ? utils::string_to_float(it->second) : 1.f;
 	if (techLevel >= 3.f) {
 		lagClass = LagClass::NONE;
 	} else if (speed > .1f) {

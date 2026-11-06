@@ -30,6 +30,13 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const springai::AIFl
 // (SArtySnipeInfo). True while it owns the unit; state lives in the military
 // manager so a task change keeps the sequence.
 bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy);
+bool ArtyT1Exempt(const CCircuitDef* launcher, const CEnemyInfo* enemy);
+// 2026-11-06: spam retreat (artillery_snipe spam_retreat*): Ambassador, Negotiator and
+// Boreas hit by spam (T1/T2 mobiles, unknown attackers) back off; true while retreating.
+void ArtySpamRetreatDamaged(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo* attacker);
+bool ArtySpamRetreatStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
+// The FRONT squad range micro target: dropped (logged) when it becomes identified T1.
+void ArtyRangeTargetCheck(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo* nearest);
 bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame);
 // Owner 2026-11-04: true while an artillery snipe sequence owns the unit (route
 // tasks hold their orders for it, the squad keeps it).

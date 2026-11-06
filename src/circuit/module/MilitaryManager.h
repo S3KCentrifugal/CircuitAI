@@ -555,6 +555,9 @@ public:
 		// Owner 2026-11-04 05:45Z: blind volleys per unit at a ghost that is not a
 		// heavy (threats + direct threats get `volleys`).
 		int ghostVolleysOther = 1;
+		bool spamRetreat = true;           // 2026-11-06: Ambassador/Negotiator/Boreas back off from spam
+		float spamRetreatDistance = 500.f;
+		int spamRetreatQuietFrames = 120;  // 4 s
 		int visibleMaxVolleys = 0;    // 0: seen porc until dead (owner 01:43Z)
 		int confirmFrames = 3 * 30;
 		int repeatFrames = 60 * 30;
@@ -607,6 +610,13 @@ public:
 		int dotId = -1;         // owner 2026-11-04 20:03Z: unidentified radar dot fired on, -1 none
 		int dotOrderUntil = -1; // next re-issue of the attack on it
 		int dotScan = -1;       // no dot found: next scan frame
+		int pickTarget = -1;    // 2026-11-06: last default live pick (T1 exemption drop)
+		int rangeTarget = -1;   // 2026-11-06: last route range micro target (T1 exemption drop)
+		bool retreating = false;  // 2026-11-06: spam retreat
+		springai::AIFloat3 retreatPoint;
+		int retreatDamage = -1;   // last spam damage frame
+		int retreatAimed = -1;    // last re-aim frame
+		int retreatOrderUntil = -1;
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
