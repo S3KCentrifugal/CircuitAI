@@ -217,6 +217,9 @@ namespace Air {
             // flies with what it has.
             int NukeScoutRadarCount = 3;
             int ScoutSweepFormSeconds = 90;
+            // The early (silo-frame) nuke package waits at staging for the half-stockpile
+            // call at most this long, then flies with what it has (owner 2026-11-06).
+            int NukeScoutHoldSeconds = 300;
             int RadarWaveIntervalSeconds = 600;
             int RadarMaxWaitSeconds = 90; // launch available planes even below the full cohort
             int RadarPatrolCheckSeconds = 2;

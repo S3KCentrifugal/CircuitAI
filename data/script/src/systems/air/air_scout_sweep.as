@@ -38,6 +38,14 @@ namespace AirScoutSweep {
     AIFloat3 nukedAt(-1,0,-1);
     float nukedSpread = 0.0f;
     bool owedNuke = false;
+    // The early call's package is held (owner 2026-11-06, Rosetta): it forms at
+    // staging and waits for TECH's half-stockpile call, then flies with what it
+    // has (base contact or not), so it crosses ~1 min before the first missile
+    // instead of ~2 min before the silo stocks. heldUntil: the hold's expiry frame
+    // (-1 none); released: the hold ended, fly now with the members.
+    int heldUntil = -1;
+    bool released = false;
+    bool Held() { return heldUntil >= 0 && ai.frame < heldUntil; }
     bool Flying(int id) { return flying.exists(""+id); }
     int Wanted(int kind) {
         if (kind == 0) return wantT1 >= 0 ? wantT1 : Global::RoleSettings::Air::ScoutSweepT1Count;
@@ -140,11 +148,28 @@ namespace AirScoutSweep {
         GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke draft T1="+draftT1+"/"+wantT1+" radar="+draftRadar+"/"+wantR
             +" baseContact="+AirBaseResponse::Emergency(),1);
     }
-    void Urgent(const AIFloat3 &in at, float spread) {
+    void Urgent(const AIFloat3 &in at, float spread) { Urgent(at, spread, false); }
+    // early: TECH's silo-frame call. Nothing is drafted then (built aircraft would
+    // cross minutes early); the whole package is owed and held at staging.
+    void Urgent(const AIFloat3 &in at, float spread, bool early) {
         if (!Enabled() || !AirEconomy::Active()) return;
         if (probeSince < 0) probeSince = ai.frame;
         probeCall = ai.frame; probeCallBest = -1000.0f;
-        Draft(at, spread);
+        if (early) {
+            draftT1 = 0; draftRadar = 0;
+            // a second TECH's early call joins the hold already running, never extends it
+            if (!Held() && !(forming && released)) { heldUntil = ai.frame + Global::RoleSettings::Air::NukeScoutHoldSeconds * SECOND; released = false; }
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke early call: package built and held at staging until the half-stockpile call (max "
+                + Global::RoleSettings::Air::NukeScoutHoldSeconds + " s)", 1);
+        } else {
+            Draft(at, spread);
+            if (Held()) {
+                // a package not begun yet forms as an ordinary urgent one
+                heldUntil = -1; released = forming && !dispatching;
+                GenericHelpers::LogUtil("[AIR][ScoutSweep] held package released by the half-stockpile call T1="+Count(0)+"/"+Wanted(0)
+                    +" radar="+Count(1)+"/"+Wanted(1),1);
+            }
+        }
         // What the draft lacked is built and flown later: the whole 10 T1 when
         // short of them, 3 radar planes when short of those (only with a T2 plant).
         const int restT1 = draftT1 >= Global::RoleSettings::Air::ScoutSweepT1Count ? 0 : Global::RoleSettings::Air::ScoutSweepT1Count;
@@ -373,8 +398,16 @@ namespace AirScoutSweep {
         // with what it has; an empty one is dropped, unless it is the owed nuke scout
         // (owner 2026-10-31). The clock stops while the base defends.
         bool late=false;
+        if (!dispatching && heldUntil>=0 && !Held()) {
+            heldUntil=-1; released=true;
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] hold expired without a half-stockpile call: flying with T1="+Count(0)+"/"+Wanted(0),1);
+        }
         if (!dispatching) {
-            if (AirBaseResponse::Emergency()) formedAt=ai.frame;
+            // held: the form clock waits; released: the nuke is about a minute out, so
+            // the members fly now even while the base defends (Rosetta 2026-11-06)
+            if (Held()) formedAt=ai.frame;
+            else if (released && !members.isEmpty()) late=true;
+            else if (AirBaseResponse::Emergency()) formedAt=ai.frame;
             else if (ai.frame-formedAt>=Global::RoleSettings::Air::ScoutSweepFormSeconds*SECOND) {
                 if (!members.isEmpty()) late=true;
                 else if (!wantUrgent) {
@@ -383,7 +416,7 @@ namespace AirScoutSweep {
                 }
             }
         }
-        if (!dispatching && !late && ((!wantUrgent && !Gate()) || Count(0)!=Wanted(0) || Count(1)!=Wanted(1) || arrived.getSize()!=members.getSize())) return;
+        if (!dispatching && !late && (Held() || (!wantUrgent && !Gate()) || Count(0)!=Wanted(0) || Count(1)!=Wanted(1) || arrived.getSize()!=members.getSize())) return;
         if (late) GenericHelpers::LogUtil("[AIR][ScoutSweep] forming timeout: flying with T1="+Count(0)+"/"+Wanted(0)+" radar="+Count(1)+"/"+Wanted(1),1);
         if (!dispatching && owedNuke && wantUrgent && Targeted() && nukedAt.x>=0.0f) { wantAt=nukedAt; wantSpread=nukedSpread; }
         if (!dispatching && wantUrgent) owedNuke=false;
@@ -414,7 +447,7 @@ namespace AirScoutSweep {
                 members.delete(left[i]); arrived.delete(left[i]);
             }
         }
-        if (members.isEmpty()) { assembly.Abort(); @assembly=null; forming=false; excluded.deleteAll(); wantT1=-1; wantRadar=-1; wantAt=AIFloat3(-1,0,-1); wantUrgent=false; }
+        if (members.isEmpty()) { assembly.Abort(); @assembly=null; forming=false; excluded.deleteAll(); wantT1=-1; wantRadar=-1; wantAt=AIFloat3(-1,0,-1); wantUrgent=false; released=false; }
     }
     void Reset() {
         array<string>@ controlled=members.getKeys();
@@ -431,7 +464,7 @@ namespace AirScoutSweep {
         @ids=caps.getKeys();
         for(uint i=0;i<ids.length();++i) { CCircuitDef@ def=ai.GetCircuitDef(ids[i]); int cap=0; if(def !is null && caps.get(ids[i],cap)) def.maxThisUnit=cap; }
         pendT1=-1; pendRadar=-1; wantT1=-1; wantRadar=-1; pendAt=AIFloat3(-1,0,-1); wantAt=AIFloat3(-1,0,-1); pendUrgent=false; wantUrgent=false;
-        draftT1=-1; draftRadar=0; formedAt=-1; probeSince=-1; probe80=-1; probeBestId=-1; probeBest=-1000.0f; probeCall=-1; probeCallBest=-1000.0f; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false;
+        draftT1=-1; draftRadar=0; formedAt=-1; probeSince=-1; probe80=-1; probeBestId=-1; probeBest=-1000.0f; probeCall=-1; probeCallBest=-1000.0f; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false; heldUntil=-1; released=false;
         @assembly=null; forming=false; dispatching=false; requested=false; firstPlantFrame=-1; nextPeriodic=-1; checked=-SECOND; planAfter=0;
         excluded.deleteAll(); members.deleteAll(); arrived.deleteAll(); flying.deleteAll(); endpoints.deleteAll(); expires.deleteAll(); caps.deleteAll(); starts.resize(0); goals.resize(0);
     }

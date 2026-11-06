@@ -28,7 +28,7 @@ namespace NukeRecon {
         if (frame is null || frame.GetBuildProgress()<Global::RoleSettings::Tech::NukeScoutSiloProgress) return;
         const int provider=LolCannonRecon::Provider(AiRole::AIR);
         if (provider<0) return;
-        AiSendMessage("nukerecon|first",provider);
+        AiSendMessage("nukerecon|first|early",provider);  // AIR builds the package and holds it until the call below
         earlyFrame=ai.frame;
         GenericHelpers::LogUtil("[TECH][NukeRecon] early call silo frame="+frame.id+" built="+int(frame.GetBuildProgress()*100.0f)+"% AIR="+provider,1);
     }
@@ -96,7 +96,8 @@ namespace NukeRecon {
             AIFloat3 at(-1,0,-1);
             float spread=0.0f;
             if (parts.length()>=5) { at=AIFloat3(parseFloat(parts[2]),0,parseFloat(parts[3])); spread=parseFloat(parts[4]); }
-            AirScoutSweep::Urgent(at,spread);
+            // nukerecon|first|early: the silo-frame call; the package is held until the half-stockpile call
+            AirScoutSweep::Urgent(at,spread,parts.length()==3 && parts[2]=="early");
             GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke request TECH="+fromTeamId+" at=("+int(at.x)+","+int(at.z)+") spread="+int(spread),1);
         }
         return true;
@@ -112,9 +113,12 @@ namespace NukeScoutProbe {
     AIFloat3 home(-1,0,-1), axis(0,0,0);
     float length=0.0f;
     float Progress(const AIFloat3 &in p) {
-        if (home.x<0.0f) {
+        if (length<1.0f) {
+            // Same axis as AirScoutSweep::Plan: with no enemy script starts (lobby games,
+            // Pawn Retreat 11-04 and Rosetta 11-06) the enemy is the mirrored start,
+            // never home itself, which left a zero axis and logged furthest=0% for ever.
             home=AirScoutSweep::Mean(Lanes::ScriptStarts(false),Global::Map::StartPos);
-            const AIFloat3 enemy=AirScoutSweep::Mean(Lanes::ScriptStarts(true),home);
+            const AIFloat3 enemy=AirScoutSweep::Mean(Lanes::ScriptStarts(true),AirScreen::Enemy(home));
             length=sqrt((enemy.x-home.x)*(enemy.x-home.x)+(enemy.z-home.z)*(enemy.z-home.z));
             if (length>=1.0f) axis=AIFloat3((enemy.x-home.x)/length,0,(enemy.z-home.z)/length);
         }
