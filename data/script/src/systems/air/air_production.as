@@ -154,6 +154,11 @@ namespace AirProduction {
         if (!emergency) {
             @t = AirScoutSweep::Produce(u);
             if (t !is null) return t;
+        } else {
+            // owner 2026-11-06 (Rosetta): a nuke wave under base contact still gets
+            // every other order of the plant, or it is never built before the launch
+            @t = AirScoutSweep::ProduceUnderFire(u);
+            if (t !is null) return t;
         }
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);

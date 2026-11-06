@@ -346,6 +346,14 @@ namespace AirScoutSweep {
         def.maxThisUnit=2147483647;
         return AirProduction::Recruit(plant,def.GetName(),AirProduction::Projected(def)+missing,"scout.sweep",Task::Priority::HIGH);
     }
+    // A nuke wave under base contact (owner 2026-11-06): every other plant order
+    // goes to its scouts, the rest to the base's defence (AirProduction::MakeTask).
+    int underFireTurn = 0;
+    IUnitTask@ ProduceUnderFire(CCircuitUnit@ plant) {
+        if (!forming || dispatching || !wantUrgent) return null;
+        if ((underFireTurn++ % 2) != 0) return null;
+        return Produce(plant);
+    }
     // Nuke scout probe (owner 2026-11-02): from TECH's first nuke request, the
     // furthest any scout-sweep aircraft got toward the enemy starts
     // (NukeScoutProbe::Progress) and when one first passed 80%.
