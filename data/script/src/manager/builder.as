@@ -2015,6 +2015,7 @@ namespace Builder {
             }
             // owner, 2026-11-02: a constructor on a tactical launcher order (or its frame repair) keeps it (front_tactical.as)
             if (FrontTactical::Owns(u)) return u.task;
+              if (FrontAgitator::OnOrder(u)) return u.task; // all four artillery steps keep their crew
             if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
             if (FrontConstructors::Eligible(u)) {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()

@@ -421,8 +421,8 @@ namespace Front {
             // map toward the enemy (along the ally-start -> enemy-start axis, map edge to map edge), when the
             // bank holds AgitatorMinMetalStock metal and the 10 s minimum income is AgitatorMinMetalIncome or more, a FRONT
             // constructor builds the faction's T1 area-control plasma artillery there.
-            // SpecialPorc: the T2 pop-up plasma artillery at the same spots, by T2 constructors, while the bank is
-            // above SpecialPorcMetalShare, the 10 s minimum metal income above SpecialPorcMinMetalIncome and a T2 lab stands.
+            // SpecialPorc: replace new T1 artillery with T2 from 12 minutes and +65 metal/s (10 s minimum).
+            // Both tiers share stock, advance, coverage and four-step preparation rules.
             // Both off here; experimental_balanced turns them on. Log [FRONT][Agitator], [FRONT][SpecialPorc].
             bool Agitator = false;
             array<string> AgitatorUnits = { "armguard", "corpun", "legcluster" };   // Gauntlet, Agitator, Amputator
@@ -439,14 +439,19 @@ namespace Front {
             bool AgitatorGroupConstructor = true;      // the commander group's T1 constructor builds them too (owner 2026-11-01)
             float AgitatorGroupReach = 2000.0f;        // ... at spots this near it
             int AgitatorReclaimAt = 3;                 // the group constructor reclaims our furthest-back agitator once this many stand (owner 2026-11-02; 0 off)
-            bool AgitatorPrep = true;                  // a nano turret, then an LLT, near the spot before each agitator (owner 2026-11-02)
+            bool AgitatorPrep = true;                  // nano, forward LLT, forward faction light gun, rear artillery
             array<string> AgitatorPrepNanoUnits = { "armnanotc", "cornanotc", "legnanotc" };
             array<string> AgitatorPrepLltUnits = { "armllt", "corllt", "leglht" };   // Sentry, Guard, Pharos
-            float AgitatorPrepRadius = 250.0f;         // one of ours this near the spot counts; prep orders are placed within 0.6x of it
+            array<string> AgitatorPrepGunUnits = { "armbeamer", "corhllt", "legmg" }; // Beamer, Twin Guard, Cacophony
+            float AgitatorPrepFront = 96.0f;           // both defensive guns toward the enemy from the anchor
+            float AgitatorPrepBack = 96.0f;            // artillery and nano behind the anchor
+            float AgitatorPrepGunSide = 80.0f;         // defensive guns either side of the lane axis
+            float AgitatorPrepNanoSide = 160.0f;       // nano beside the artillery, on the rear row
+            float AgitatorPrepRangeMargin = 32.0f;     // covers native unit-midpoint offsets at both ends
             bool SpecialPorc = false;
             array<string> SpecialPorcUnits = { "armamb", "cortoast", "legacluster" };   // Rattlesnake, Persecutor, Eviscerator
-            float SpecialPorcMetalShare = 0.5f;
-            float SpecialPorcMinMetalIncome = 100.0f;
+            int SpecialPorcMinGameSeconds = 12 * 60;   // from here, replace new T1 artillery clusters with T2
+            float SpecialPorcMinMetalIncome = 65.0f;   // 10-second minimum, inclusive; same other gates as T1
             float SpecialPorcCoverRadius = 350.0f;
             int SpecialPorcMax = 6;
             // Tactical launchers against enemy heavy turret clusters (owner, 2026-11-02; systems/construction/front_tactical.as).

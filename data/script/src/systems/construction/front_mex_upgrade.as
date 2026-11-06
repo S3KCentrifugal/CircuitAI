@@ -110,7 +110,7 @@ namespace FrontMexUp {
         // Active defence is a commitment, including the lab planner's repair of
         // an abandoned frame. A second assignee may be walking or out of range;
         // its presence does not make the working constructor expendable.
-        if (bt == Task::BuildType::DEFENCE || FrontLabPorc::IsOurs(t)) return false;
+        if (bt == Task::BuildType::DEFENCE || FrontLabPorc::IsOurs(t) || FrontAgitator::OnOrder(u)) return false;
         if (bt == Task::BuildType::REPAIR && b.target !is null) {
             CCircuitUnit@ target = ai.GetTeamUnit(b.target.id);
             if (target !is null && target.circuitDef !is null && !target.circuitDef.IsMobile()

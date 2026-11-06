@@ -19,20 +19,18 @@
 // 1 at the enemy's edge. A spot with an agitator of ours (finished or framed) within AgitatorCoverRadius
 // is done. The most forward open spot gets the next order, so the guns follow the front out. A further
 // agitator (any after the first standing one) waits until that spot is AgitatorAdvance (500) elmos further
-// forward along the axis than our most forward agitator (owner, 2026-11-01 20:31Z); special porc does not.
+// forward along the axis than our most forward artillery (either tier).
 //
 // Builders: FRONT constructors that can build the gun (not commanders, not lolcannon crews), idle /
 // guarding / assisting within AgitatorReach of the spot, or walking to an unframed build within
 // AgitatorTakeRadius. One order at a time; at most AgitatorMax agitators of ours standing. An order
 // that dies without a gun holds that spot (FailHoldSeconds x fails in a row; three, SpotHoldSeconds).
 //
-// Special porc (owner, 2026-11-01 20:20Z; Front::SpecialPorc): "add persecutors, razorbacks, and eviscerators
-// as special porc for when metal is both above 50% and lowest metal per income last 10 seconds is above
-// 100 for FRONT and the t2 lab is living." The T2 pop-up plasma artillery: Persecutor cortoast, Eviscerator
-// legacluster, and for Armada Rattlesnake armamb (Razorback armraz is a gantry mech, not a turret).
-// Same forward spots and rules as the agitators, own cover radius / cap, built by T2 constructors, gated
-// by: bank above SpecialPorcMetalShare (0.5) of storage now, the 10 s minimum metal income above
-// SpecialPorcMinMetalIncome (100), and one T2 bot lab or vehicle plant of ours standing.
+// Owner 2026-11-05: from 12 minutes and a 10-second minimum metal income >=65,
+// new clusters use Rattlesnake / Persecutor / Eviscerator instead of T1 artillery.
+// They share the stock, forward-spot, coverage, advance and preparation rules.
+// Existing clusters finish their chosen tier. A traded T2 builder is sufficient;
+// there is no separate percent-storage or own-T2-factory prerequisite.
 //
 // Cost: one owned-unit scan every AgitatorScanSeconds while the feature is on. Log [FRONT][Agitator].
 namespace FrontAgitator {
@@ -40,6 +38,7 @@ namespace FrontAgitator {
     const int FailHoldSeconds = 20;
     const int SpotHoldSeconds = 180;
     const int AGITATOR = 0, SPECIAL = 1, KINDS = 2;
+    const float PrepUnitTolerance = 16.0f; // owned-unit API returns model midpoints (Twin Guard +3.12 z)
     const array<string> KindName = { "Agitator", "SpecialPorc" };
 
     class Spot {
@@ -62,21 +61,27 @@ namespace FrontAgitator {
         string lastWhy = "";
     }
     array<Kind@> kinds;
-    array<CCircuitDef@> t2Labs;
     int lastScan = -100000;
     bool defsDone = false;
+    int nextPrepPlan = -1; // failed quartet search: one bounded attempt per existing scan interval
 
     bool AgitatorOn() { return Global::RoleSettings::Front::Agitator; }
     bool SpecialOn() { return Global::RoleSettings::Front::SpecialPorc; }
     bool On() { return (AgitatorOn() || SpecialOn()) && Global::AISettings::Role == AiRole::FRONT; }
-    bool KindOn(int k) { return k == AGITATOR ? AgitatorOn() : SpecialOn(); }
+    bool UseT2At(int frame, float income) {
+        return SpecialOn() && frame >= Global::RoleSettings::Front::SpecialPorcMinGameSeconds * SECOND
+            && income >= Global::RoleSettings::Front::SpecialPorcMinMetalIncome;
+    }
+    int SelectedKind() { return UseT2At(ai.frame, Economy::GetMinMetalIncomeLast10s()) ? SPECIAL : AGITATOR; }
+    bool KindOn(int k) { return k == SelectedKind() && (k == AGITATOR ? AgitatorOn() : SpecialOn()); }
 
     void Reset() {
         kinds.resize(0);
         for (int k = 0; k < KINDS; ++k) kinds.insertLast(Kind());
-        t2Labs.resize(0);
-        prepNanos.resize(0); prepLlts.resize(0); committedSpot = -1;
+        ClearPrep();
+        prepNanos.resize(0); prepLlts.resize(0); prepGuns.resize(0);
         lastScan = -100000;
+        nextPrepPlan = -1;
         defsDone = false;
     }
 
@@ -99,12 +104,9 @@ namespace FrontAgitator {
             CCircuitDef@ d = ai.GetCircuitDef(Global::RoleSettings::Front::AgitatorPrepLltUnits[i]);
             if (d !is null) prepLlts.insertLast(d);
         }
-        array<string> labs = UnitHelpers::GetAllT2BotLabs();
-        array<string> veh = UnitHelpers::GetAllT2VehicleLabs();
-        for (uint i = 0; i < veh.length(); ++i) labs.insertLast(veh[i]);
-        for (uint i = 0; i < labs.length(); ++i) {
-            CCircuitDef@ d = ai.GetCircuitDef(labs[i]);
-            if (d !is null) t2Labs.insertLast(d);
+        for (uint i = 0; i < Global::RoleSettings::Front::AgitatorPrepGunUnits.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(Global::RoleSettings::Front::AgitatorPrepGunUnits[i]);
+            if (d !is null) prepGuns.insertLast(d);
         }
     }
 
@@ -140,30 +142,18 @@ namespace FrontAgitator {
         // nothing to sample since 2026-11-03: the agitator gate reads the bank as it stands
     }
 
-    bool T2LabLiving() {
-        for (uint i = 0; i < t2Labs.length(); ++i) if (t2Labs[i].count > 0) return true;
-        return false;
-    }
-
     // "" when the kind's metal gate is open, else why not
     string Gate(int k) {
-        if (k == AGITATOR) {
+        {
             // owner 2026-11-02 17:20Z: the 10 s minimum metal income at least AgitatorMinMetalIncome (35), all factions
             const float ami = Economy::GetMinMetalIncomeLast10s();
-            if (ami < Global::RoleSettings::Front::AgitatorMinMetalIncome)
-                return "10 s minimum metal income +" + int(ami) + " below +" + int(Global::RoleSettings::Front::AgitatorMinMetalIncome);
+            const float minimum = k == SPECIAL ? Global::RoleSettings::Front::SpecialPorcMinMetalIncome : Global::RoleSettings::Front::AgitatorMinMetalIncome;
+            if (k == SPECIAL && ai.frame < Global::RoleSettings::Front::SpecialPorcMinGameSeconds * SECOND) return "waiting for T2 artillery time";
+            if (ami < minimum) return "10 s minimum metal income below +" + int(minimum);
             // owner 2026-11-03: at least AgitatorMinMetalStock (1000) metal stockpiled, instead of a percent of storage
             if (aiEconomyMgr.metal.current >= Global::RoleSettings::Front::AgitatorMinMetalStock) return "";
             return "metal bank " + int(aiEconomyMgr.metal.current) + " below " + int(Global::RoleSettings::Front::AgitatorMinMetalStock);
         }
-        const float storage = aiEconomyMgr.metal.storage;
-        if (storage <= 0.0f || aiEconomyMgr.metal.current <= storage * Global::RoleSettings::Front::SpecialPorcMetalShare)
-            return "metal bank not above " + int(Global::RoleSettings::Front::SpecialPorcMetalShare * 100.0f) + "%";
-        const float mi = Economy::GetMinMetalIncomeLast10s();
-        if (mi <= Global::RoleSettings::Front::SpecialPorcMinMetalIncome)
-            return "10 s minimum metal income +" + int(mi) + " not above +" + int(Global::RoleSettings::Front::SpecialPorcMinMetalIncome);
-        if (!T2LabLiving()) return "no T2 lab standing";
-        return "";
     }
 
     AIFloat3 Centre(const array<AIFloat3>& in points) {
@@ -208,13 +198,151 @@ namespace FrontAgitator {
     // owner 2026-11-02 15:56Z: "if a single FRONT builds a third agitator and similar, it should reclaim the
     // furthest back agitator. This is for commander group." Once AgitatorReclaimAt (3) of our agitators stand
     // finished, the commander group's T1 constructor reclaims the one furthest back along the lane axis.
-    // owner 2026-11-02 16:54Z: "first drop a nano turret and an llt within range of the agitator ... before
-    // proceeding to build the agitator". A spot gets our nano turret, then our LLT (Front::AgitatorPrepNanoUnits /
-    // AgitatorPrepLltUnits, the builder's faction first), each within AgitatorPrepRadius of it, before the gun.
-    // A spot whose prep has begun (committedSpot) skips the metal and advance gates until its gun is ordered.
-    array<CCircuitDef@> prepNanos, prepLlts;
-    array<AIFloat3> nanoAt, lltAt;
-    int committedSpot = -1;
+    // Owner 2026-11-05: nano, LLT, Beamer/Twin Guard/Cacophony, artillery.
+    // Both guns face the enemy ahead of the artillery and nano. All three
+    // structures must fit inside the nano's loaded build distance. One owner
+    // retains the exact formation through callbacks, repairs and tier changes.
+    array<CCircuitDef@> prepNanos, prepLlts, prepGuns;
+
+    // One artillery project owns four exact slots, never borrowed unit handles.
+    // Slot planning is bounded (nine quartets per failed spot, then backoff).
+    // The existing five-second census resolves at most four IDs per owned unit;
+    // task completion invalidates it. No additional owned-unit scan or cadence.
+    class PrepLayout {
+        int kind = AGITATOR, spot = -1;
+        array<CCircuitDef@> defs(4); // nano, LLT, faction light gun, artillery
+        array<AIFloat3> pos(4);
+        array<int> slots = { -1, -1, -1, -1 };
+        array<int> units = { -1, -1, -1, -1 };
+    }
+    PrepLayout@ prep;
+
+    void ClearPrep() {
+        if (prep !is null)
+            for (uint i = 0; i < prep.slots.length(); ++i)
+                if (prep.slots[i] >= 0) aiTerrainMgr.ReleaseReservation(prep.slots[i]);
+        @prep = null;
+    }
+
+    bool Geometry(const array<AIFloat3>& in p, float range) {
+        if (p.length() != 4 || range <= 0.0f) return false;
+        // Both defensive guns must remain in front of BOTH rear structures.
+        const float rear = AiMax(Along(p[0]), Along(p[3]));
+        if (Along(p[1]) <= rear || Along(p[2]) <= rear) return false;
+        const float reach = range - Global::RoleSettings::Front::AgitatorPrepRangeMargin;
+        if (reach <= 0.0f) return false;
+        for (uint i = 1; i < 4; ++i) {
+            const float dy = p[i].y - p[0].y;
+            if (MapHelpers::SqDist(p[0], p[i]) + dy * dy > reach * reach) return false;
+        }
+        return true;
+    }
+
+    bool PlanPrep(int k, Spot@ s, CCircuitUnit@ u, CCircuitDef@ gun) {
+        CCircuitDef@ nano = PrepDef(prepNanos, gun);
+        CCircuitDef@ llt = PrepDef(prepLlts, gun);
+        CCircuitDef@ light = PrepDef(prepGuns, gun);
+        if (nano is null || llt is null || light is null || gun is null || !Axis()) return false;
+        const bool enabled = aiTerrainMgr.IsLayoutEnabled();
+        if (!enabled && !aiTerrainMgr.SetLayoutEnabled(true)) return false;
+        PrepLayout@ plan = PrepLayout();
+        plan.kind = k; plan.spot = s.id;
+        @plan.defs[0] = nano; @plan.defs[1] = llt; @plan.defs[2] = light; @plan.defs[3] = gun;
+        bool found = false;
+        // Translate the complete formation together; failed individual sites
+        // never independently drift into the rear row or out of nano reach.
+        for (int attempt = 0; attempt < 9 && !found; ++attempt) {
+            const float across = float(attempt % 3 - 1) * 128.0f;
+            const float along = float(attempt / 3 - 1) * 128.0f;
+            const AIFloat3 c(s.pos.x - az * across + ax * along, 0.0f, s.pos.z + ax * across + az * along);
+            const float front = Global::RoleSettings::Front::AgitatorPrepFront;
+            const float back = Global::RoleSettings::Front::AgitatorPrepBack;
+            const float side = Global::RoleSettings::Front::AgitatorPrepGunSide;
+            const float ns = Global::RoleSettings::Front::AgitatorPrepNanoSide;
+            plan.pos[0] = AIFloat3(c.x - ax * back - az * ns, 0.0f, c.z - az * back + ax * ns);
+            plan.pos[1] = AIFloat3(c.x + ax * front + az * side, 0.0f, c.z + az * front - ax * side);
+            plan.pos[2] = AIFloat3(c.x + ax * front - az * side, 0.0f, c.z + az * front + ax * side);
+            plan.pos[3] = AIFloat3(c.x - ax * back, 0.0f, c.z - az * back);
+            bool ok = Geometry(plan.pos, nano.GetBuildDistance());
+            for (uint j = 0; j < 4 && ok; ++j) {
+                if (!aiTerrainMgr.CanReachAt(u, plan.pos[j], u.circuitDef.GetBuildDistance())) { ok = false; break; }
+                plan.slots[j] = aiTerrainMgr.ReserveBuilding(plan.defs[j], plan.pos[j], 0);
+                ok = plan.slots[j] >= 0;
+                if (ok) plan.pos[j] = aiTerrainMgr.GetReservationPos(plan.slots[j]);
+            }
+            found = ok && Geometry(plan.pos, nano.GetBuildDistance());
+            if (!found) {
+                for (uint j = 0; j < 4; ++j) {
+                    if (plan.slots[j] >= 0) aiTerrainMgr.ReleaseReservation(plan.slots[j]);
+                    plan.slots[j] = -1;
+                }
+            }
+        }
+        if (!enabled) aiTerrainMgr.SetLayoutEnabled(false);
+        if (!found) return false;
+        @prep = plan;
+        GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] reserved four-step cluster spot=" + s.id
+            + " nano range=" + int(nano.GetBuildDistance()) + " gun=" + gun.GetName(), 1);
+        return true;
+    }
+
+    // T1 crew can prepare the chosen faction's cluster for a T2 gun builder.
+    // Each actual step still requires its assignee to be able to build it.
+    CCircuitDef@ PrepDef(const array<CCircuitDef@>& in defs, CCircuitDef@ gun) {
+        if (gun is null) return null;
+        const string side = UnitHelpers::GetSideForUnitName(gun.GetName());
+        for (uint i = 0; i < defs.length(); ++i)
+            if (UnitHelpers::GetSideForUnitName(defs[i].GetName()) == side) return defs[i];
+        return null;
+    }
+
+    IUnitTask@ PrepWork(CCircuitUnit@ u) {
+        PrepLayout@ plan = prep;
+        if (plan is null || u is null || u.circuitDef is null) return null;
+        Kind@ kd = kinds[plan.kind];
+        int until = -1;
+        if (kd.holds.get("" + plan.spot, until) && ai.frame < until) return null;
+        for (uint j = 0; j < 4; ++j) {
+            CCircuitUnit@ built = ai.GetTeamUnit(plan.units[j]);
+            if (built !is null && built.circuitDef is plan.defs[j] && MapHelpers::SqDist(built.GetPos(ai.frame), plan.pos[j]) <= PrepUnitTolerance * PrepUnitTolerance) {
+                if (built.GetBuildProgress() >= 1.0f) continue;
+            } else @built = null;
+            CCircuitDef@ d = plan.defs[j];
+            if (d is null || !u.circuitDef.CanBuild(d)
+                || !aiTerrainMgr.CanReachAt(u, plan.pos[j], u.circuitDef.GetBuildDistance())) return null;
+            IUnitTask@ task;
+            if (built !is null) {
+                @task = aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, built, OrderTimeoutSeconds * SECOND));
+            } else {
+                // Consumed/destroyed reservations are recreated only at the
+                // same planned footprint. Never issue an unpinned fallback.
+                int slot = plan.slots[j];
+                const int state = aiTerrainMgr.GetReservationState(slot);
+                if (state != 0) {
+                    if (state == 1) return null; // still owned by a live task
+                    if (slot >= 0) aiTerrainMgr.ReleaseReservation(slot);
+                    const bool enabled = aiTerrainMgr.IsLayoutEnabled();
+                    if (!enabled && !aiTerrainMgr.SetLayoutEnabled(true)) return null;
+                    slot = aiTerrainMgr.ReserveBuilding(d, plan.pos[j], 0);
+                    if (!enabled) aiTerrainMgr.SetLayoutEnabled(false);
+                    plan.slots[j] = slot;
+                }
+                if (slot < 0) { kd.holds.set("" + plan.spot, ai.frame + FailHoldSeconds * SECOND); return null; }
+                if (d.maxThisUnit >= 0 && d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
+                if (!d.IsAvailable(ai.frame)) return null;
+                @task = aiBuilderMgr.Enqueue(TaskB::Common(j == 0 ? Task::BuildType::NANO : Task::BuildType::DEFENCE,
+                    Task::Priority::HIGH, d, plan.pos[j], 0.0f, true, OrderTimeoutSeconds * SECOND));
+                if (task !is null && !AiPinReservation(task, slot)) { aiBuilderMgr.AbortTask(task); @task = null; }
+            }
+            if (task is null || task.IsDead()) { kd.holds.set("" + plan.spot, ai.frame + FailHoldSeconds * SECOND); return null; }
+            @kd.order = task; kd.orderSpot = plan.spot; kd.orderWhat = d.GetName();
+            GenericHelpers::LogUtil("[FRONT][" + KindName[plan.kind] + "] step " + (j + 1) + " of 4 orders " + d.GetName()
+                + " at (" + int(plan.pos[j].x) + "," + int(plan.pos[j].z) + ") spot=" + plan.spot, 1);
+            return task;
+        }
+        ClearPrep();
+        return null;
+    }
 
     int finishedAgitators = 0;
     int backmostAgitator = -1;
@@ -227,10 +355,10 @@ namespace FrontAgitator {
         finishedAgitators = 0;
         backmostAgitator = -1;
         float backmostAlong = 1e30f;
-        nanoAt.resize(0); lltAt.resize(0);
+        if (prep !is null) for (uint j = 0; j < 4; ++j) prep.units[j] = -1;
         for (int k = 0; k < KINDS; ++k) { kinds[k].open.resize(0); kinds[k].standing = 0; kinds[k].forwardMost = -1e30f; }
         if (!Axis()) return;
-        array<array<AIFloat3>> placed(KINDS);
+        array<AIFloat3> placed;
         array<Spot@> spots;
         const float minShare = Global::RoleSettings::Front::AgitatorMapShare;
         array<Id>@ ids = ai.GetOwnedUnitIds();
@@ -238,20 +366,21 @@ namespace FrontAgitator {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null) continue;
             const CCircuitDef@ d = u.circuitDef;
+            if (prep !is null)
+                for (uint j = 0; j < 4; ++j)
+                    if (d is prep.defs[j] && MapHelpers::SqDist(u.GetPos(ai.frame), prep.pos[j]) <= PrepUnitTolerance * PrepUnitTolerance) prep.units[j] = u.id;
             const int gk = GunKind(d);
             if (gk >= 0) {   // ours, finished or framed
                 ++kinds[gk].standing;
                 const AIFloat3 gp = u.GetPos(ai.frame);
-                placed[gk].insertLast(gp);
+                placed.insertLast(gp);
                 kinds[gk].forwardMost = AiMax(kinds[gk].forwardMost, Along(gp));
-                if (gk == AGITATOR && u.GetBuildProgress() >= 1.0f) {
+                if (u.GetBuildProgress() >= 1.0f) {
                     ++finishedAgitators;
                     if (Along(gp) < backmostAlong) { backmostAlong = Along(gp); backmostAgitator = u.id; }
                 }
                 continue;
             }
-            if (InDefs(prepNanos, d)) { nanoAt.insertLast(u.GetPos(ai.frame)); continue; }
-            if (InDefs(prepLlts, d)) lltAt.insertLast(u.GetPos(ai.frame));
             if (d.IsMobile() || u.GetBuildProgress() < 1.0f) continue;
             const bool mex = d.GetExtractsMetal() > 0.0f;
             if (!mex && !d.HasSurfToLand()) continue;
@@ -262,12 +391,15 @@ namespace FrontAgitator {
             sp.id = u.id; sp.defName = d.GetName(); sp.pos = p; sp.share = s; sp.mex = mex;
             spots.insertLast(sp);
         }
+        const int total = kinds[AGITATOR].standing + kinds[SPECIAL].standing;
+        const float most = AiMax(kinds[AGITATOR].forwardMost, kinds[SPECIAL].forwardMost);
         for (int k = 0; k < KINDS; ++k) {
             Kind@ kd = kinds[k];
+            kd.standing = total; kd.forwardMost = most;
             const float r = (k == AGITATOR) ? Global::RoleSettings::Front::AgitatorCoverRadius : Global::RoleSettings::Front::SpecialPorcCoverRadius;
             for (uint i = 0; i < spots.length(); ++i) {
                 bool covered = false;
-                for (uint q = 0; q < placed[k].length() && !covered; ++q) covered = MapHelpers::SqDist(spots[i].pos, placed[k][q]) <= r * r;
+                for (uint q = 0; q < placed.length() && !covered; ++q) covered = MapHelpers::SqDist(spots[i].pos, placed[q]) <= r * r;
                 if (covered) continue;
                 uint at = 0;   // most forward first
                 while (at < kd.open.length() && kd.open[at].share >= spots[i].share) ++at;
@@ -302,7 +434,7 @@ namespace FrontAgitator {
             if (done) {
                 kd.fails.delete(key);
                 GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] built " + kd.orderWhat + " at spot " + kd.orderSpot, 1);
-                if (k == AGITATOR && kd.orderWhat != "" && GunKind(ai.GetCircuitDef(kd.orderWhat)) == AGITATOR) committedSpot = -1;
+                if (prep !is null && int(k) == prep.kind && kd.orderWhat == prep.defs[3].GetName()) ClearPrep();
                 return;
             }
             // an &out argument is overwritten even when the key is missing: check the result
@@ -342,30 +474,31 @@ namespace FrontAgitator {
     IUnitTask@ KindWork(int k, CCircuitUnit@ u, bool group = false) {
         Kind@ kd = kinds[k];
         CCircuitDef@ d = GunFor(kd, u);
-        if (d is null) return null;   // this builder cannot make this kind's gun
         if (kd.order !is null && !kd.order.IsDead()) {
             // join the open order (two constructors at most)
             IBuilderTask@ b = cast<IBuilderTask>(kd.order);
             array<CCircuitUnit@>@ on = kd.order.GetUnits();
-            if ((on is null || on.length() < 2) && b !is null && b.buildDef !is null && u.circuitDef.CanBuild(b.buildDef)
+            if ((on is null || on.length() < 2) && b !is null && (b.buildDef is null || u.circuitDef.CanBuild(b.buildDef))
                 && (group || FrontFactoryNanos::Free(u)) && MapHelpers::SqDist(u.GetPos(ai.frame), b.GetBuildPos()) <= 1500.0f * 1500.0f)
                 return kd.order;
             return null;
         }
-        if (kd.open.length() == 0) return null;
-        // a spot whose nano / LLT prep has begun is finished first, past the metal and advance gates
-        Spot@ committed = null;
-        if (k == AGITATOR && committedSpot >= 0) {
-            for (uint i = 0; i < kd.open.length() && committed is null; ++i) if (kd.open[i].id == committedSpot) @committed = kd.open[i];
-            if (committed is null) committedSpot = -1;   // covered, gone or no longer forward
+        // A committed cluster finishes the selected tier through income/time
+        // changes and nanoframe coverage. IDs are resolved by the same census.
+        if (prep !is null) {
+            if (prep.kind != k) return null;
+            if (ai.GetTeamUnit(prep.spot) is null) { ClearPrep(); return null; }
+            return PrepWork(u);
         }
+        if (d is null) return null;   // no artillery this builder can start
+        if (kd.open.length() == 0) return null;
         const int cap = (k == AGITATOR) ? Global::RoleSettings::Front::AgitatorMax : Global::RoleSettings::Front::SpecialPorcMax;
         if (kd.standing >= cap) { Why(kd, k, "cap reached: " + kd.standing + " standing"); return null; }
-        const string gate = (committed !is null) ? "" : Gate(k);
+        const string gate = Gate(k);
         if (gate != "") { Why(kd, k, "waiting: " + gate + " (" + kd.open.length() + " forward spots open)"); return null; }
         // owner 2026-11-01 20:31Z: a further agitator only once the most forward mex / turret is
         // AgitatorAdvance (500) elmos further forward along the lane axis than our most forward agitator
-        const bool advanceGate = (k == AGITATOR && kd.standing > 0 && committed is null);
+        const bool advanceGate = kd.standing > 0;
         const float needAlong = kd.forwardMost + Global::RoleSettings::Front::AgitatorAdvance;
         if (advanceGate && Along(kd.open[0].pos) < needAlong) {
             Why(kd, k, "waiting: most forward spot " + int(Along(kd.open[0].pos) - kd.forwardMost) + " elmos ahead of our most forward agitator, needs "
@@ -377,25 +510,25 @@ namespace FrontAgitator {
         const float reach = group ? Global::RoleSettings::Front::AgitatorGroupReach
             : free ? Global::RoleSettings::Front::AgitatorReach : Global::RoleSettings::Front::AgitatorTakeRadius;
         const AIFloat3 wp = u.GetPos(ai.frame);
+        if (Global::RoleSettings::Front::AgitatorPrep && ai.frame < nextPrepPlan) return null;
         for (uint i = 0; i < kd.open.length(); ++i) {
             Spot@ s = kd.open[i];
-            if (committed !is null && s !is committed) continue;
             if (advanceGate && Along(s.pos) < needAlong) break;   // sorted most forward first
             int until = -1;
             if (kd.holds.get("" + s.id, until) && ai.frame < until) continue;
             if (MapHelpers::SqDist(wp, s.pos) > reach * reach || ai.GetTeamUnit(s.id) is null) continue;
             if (!aiTerrainMgr.CanReachAt(u, s.pos, u.circuitDef.GetBuildDistance())) continue;
-            // owner 2026-11-02: a nano turret, then an LLT, within AgitatorPrepRadius of the spot first
+            // One formation and build chain for either selected artillery tier.
+            if (Global::RoleSettings::Front::AgitatorPrep) {
+                if (!PlanPrep(k, s, u, d)) {
+                    kd.holds.set("" + s.id, ai.frame + FailHoldSeconds * SECOND);
+                    nextPrepPlan = ai.frame + Global::RoleSettings::Front::AgitatorScanSeconds * SECOND;
+                    return null;
+                }
+                return PrepWork(u);
+            }
             CCircuitDef@ what = d;
             string step = "";
-            if (k == AGITATOR && Global::RoleSettings::Front::AgitatorPrep) {
-                const float pr = Global::RoleSettings::Front::AgitatorPrepRadius;
-                CCircuitDef@ nano = PickFor(prepNanos, u);
-                CCircuitDef@ llt = PickFor(prepLlts, u);
-                if (nano !is null && !Near(nanoAt, s.pos, pr)) { @what = nano; step = " (step 1 of 3: nano turret first)"; }
-                else if (llt !is null && !Near(lltAt, s.pos, pr)) { @what = llt; step = " (step 2 of 3: LLT next)"; }
-                else if (committedSpot == s.id) step = " (step 3 of 3)";
-            }
             if (what.maxThisUnit >= 0 && what.maxThisUnit <= what.count) what.maxThisUnit = what.count + 1;
             if (!what.IsAvailable(ai.frame)) return null;
             int n = 0;
@@ -403,18 +536,15 @@ namespace FrontAgitator {
             const float shake = Global::RoleSettings::Front::AgitatorShake + 80.0f * float(n);
             const Task::BuildType bt = (what is d) ? Task::BuildType::DEFENCE
                 : InDefs(prepNanos, what) ? Task::BuildType::NANO : Task::BuildType::DEFENCE;
-            const float prepShake = (what is d) ? shake : AiMin(shake, Global::RoleSettings::Front::AgitatorPrepRadius * 0.6f);
-            @kd.order = aiBuilderMgr.Enqueue(TaskB::Common(bt, Task::Priority::HIGH, what, s.pos, prepShake, true,
+            @kd.order = aiBuilderMgr.Enqueue(TaskB::Common(bt, Task::Priority::HIGH, what, s.pos, shake, true,
                 OrderTimeoutSeconds * SECOND));
             if (kd.order is null) { kd.holds.set("" + s.id, ai.frame + FailHoldSeconds * SECOND); continue; }
             kd.orderSpot = s.id;
             kd.orderWhat = what.GetName();
-            if (k == AGITATOR) committedSpot = (what is d) ? -1 : s.id;
             kd.lastWhy = "";
             const string why = (k == AGITATOR)
                 ? "bank " + int(aiEconomyMgr.metal.current) + ", 10 s min income +" + int(Economy::GetMinMetalIncomeLast10s())
-                : "bank " + int(100.0f * aiEconomyMgr.metal.current / AiMax(1.0f, aiEconomyMgr.metal.storage)) + "%, 10 s min income +"
-                    + int(Economy::GetMinMetalIncomeLast10s()) + ", T2 lab standing";
+                : "T2 artillery, 10 s min income +" + int(Economy::GetMinMetalIncomeLast10s());
             GenericHelpers::LogUtil("[FRONT][" + KindName[k] + "] " + u.circuitDef.GetName() + " " + u.id + " orders " + what.GetName() + step + " at front "
                 + (s.mex ? "mex " : "porc ") + s.defName + " " + s.id + " (" + int(s.pos.x) + "," + int(s.pos.z) + "), "
                 + int(s.share * 100.0f) + "% of the map toward the enemy; " + why + "; " + kd.standing + " standing", 1);
@@ -423,7 +553,8 @@ namespace FrontAgitator {
         return null;
     }
 
-    // Front_BuilderAiMakeTask: special porc first (T2 constructors), then agitators
+    // Front_BuilderAiMakeTask: finish the committed project, otherwise select
+    // the current tier. T1 and T2 constructors can perform different steps.
     IUnitTask@ Work(CCircuitUnit@ u) {
         if (!On() || u is null || u.circuitDef is null || FrontRecovery::Active()) return null;
         if (kinds.length() != uint(KINDS)) Reset();
@@ -433,6 +564,7 @@ namespace FrontAgitator {
         }
         if (UnitHelpers::IsCommander(u.circuitDef) || LolCannon::IsCrew(u.id)) return null;
         Refresh();
+        if (prep !is null) return KindWork(prep.kind, u);
         for (int k = KINDS - 1; k >= 0; --k) {
             if (!KindOn(k)) continue;
             IUnitTask@ t = KindWork(k, u);
@@ -487,7 +619,7 @@ namespace FrontAgitator {
         if (!AgitatorOn()) return null;
         IUnitTask@ r = ReclaimBackmost(u);
         if (r !is null) return r;
-        IUnitTask@ t = KindWork(AGITATOR, u, true);
+        IUnitTask@ t = KindWork(prep !is null ? prep.kind : SelectedKind(), u, true);
         if (t !is null) GenericHelpers::LogUtil("[FRONT][Agitator] commander group constructor " + u.circuitDef.GetName() + " " + u.id + " takes the agitator order", 1);
         return t;
     }
