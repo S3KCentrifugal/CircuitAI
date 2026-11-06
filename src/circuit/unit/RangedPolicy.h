@@ -158,6 +158,9 @@ struct RangedPolicy {
     // spam too: never our priority target, and fire is held while one is in
     // reach (engine autofire took dots, which were mostly fast T1 swarms).
     bool spamRadarDots = false;
+    // Owner 2026-11-06 21:23Z: only a never-identified dot MOVING beyond radar
+    // jiggle is spam; a still dot stays a (blind) target. Elmos per second.
+    float spamDotSpeed = 15.f;
     bool HasSpam() const { return spamMaxCost>0.f || !spamDefs.empty() || spamRadarDots; }
     // Owner 2026-11-02: "stay out of weapon range of ghost images that are
     // porc and wait for other units to give LOS". 0 = off. An armed structure

@@ -594,6 +594,7 @@ void CFactoryManager::ReadConfig()
 				}
 			}
 			boolean("spam_radar_dots", policy.spamRadarDots);
+			number("spam_dot_speed", policy.spamDotSpeed, 0.f, 200.f);
             number("commander_priority", policy.commanderPriority, 1.f, 100.f);
 			boolean("coordinated", policy.coordinated);
             // Fireline holding is an individual forward-arc doctrine. Reject

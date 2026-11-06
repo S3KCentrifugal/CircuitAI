@@ -155,10 +155,11 @@ bool CRangedEngagement::Spam(const RangedPolicy& p,const CRangedWorld::Contact& 
     if(!c.def) {
         if(!p.spamRadarDots || c.ghost || c.airDot) return false;
         // Owner 2026-11-06: a dot we had in LOS keeps that identity for the
-        // spam rule (a Hammer fading to radar stays a target); a dot never
-        // seen is spam.
+        // spam rule (a Hammer fading to radar stays a target). A dot never
+        // seen is spam only while it moves beyond radar jiggle (owner 21:23Z):
+        // a still dot stays a blind target.
         const CCircuitDef* d=c.seenDef;
-        if(d==nullptr) return true;
+        if(d==nullptr) return c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>p.spamDotSpeed*p.spamDotSpeed;
         return d->IsMobile() && ((p.spamMaxCost>0.f && d->GetCostM()<=p.spamMaxCost) || p.spamDefs.count(d->GetId()))
             && !d->IsEnemyRoleAny(CCircuitDef::COMM);
     }
