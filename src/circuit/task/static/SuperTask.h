@@ -178,6 +178,9 @@ private:
 	std::unordered_map<const CCircuitDef*, float> interceptorCoverage;  // def -> coverage radius, 0 none
 	springai::AIFloat3 coverLogPos = springai::AIFloat3(-1.f, 0.f, -1.f);  // last aim point logged with its antinuke cover
 	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
+	float areaReach = 0.f;  // SelectAreaTarget's blast plus chain reach at the last aim (StrikeLedger mark radius)
+	int strikeChecked = -1;  // last frame this silo's pending launches were resolved
+	void ResolveStrikes(CCircuitUnit* unit, int frame);
 public:
 	// D-124: where the silo aims: the attacked unit, else the aimed ground
 	springai::AIFloat3 GetAimPos() const;

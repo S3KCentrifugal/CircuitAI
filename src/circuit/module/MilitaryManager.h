@@ -321,6 +321,15 @@ public:
 		float antinukeFactorOvernuke = 0.85f;  // an overnuke target (the salvo is meant to saturate)
 		float antinukeFloor = 0.05f;
 		float coveredMargin = 64.f;  // added to each coverage radius
+		// Nuke outcome (owner 2026-11-06, strategic::StrikeLedger): a launch whose silo
+		// gains experience within strikeWindowFrames landed; ghosts in its blast plus
+		// chain reach, last seen before it, are worth strikeFactor of their metal until
+		// seen again. One that gains none was intercepted: an interceptor is presumed
+		// within interceptPresumeRadius of the aim for interceptPresumeFrames.
+		float strikeFactor = 0.33f;  // 1 = off
+		int strikeWindowFrames = 60 * FRAMES_PER_SEC;
+		float interceptPresumeRadius = 2000.f;  // 0 = off
+		int interceptPresumeFrames = 600 * FRAMES_PER_SEC;
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
 	strategic::Overnuke& GetOvernuke();  // the ally team's (CAllyTeam::GetOvernuke)

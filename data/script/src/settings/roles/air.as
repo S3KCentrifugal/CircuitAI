@@ -215,7 +215,7 @@ namespace Air {
             // Nuke scouting (owner 2026-10-31): the rush scout and the nuked-spot scouts take
             // 3 radar planes; a package still forming this long outside a base emergency
             // flies with what it has.
-            int NukeScoutRadarCount = 3;
+            int NukeScoutRadarCount = 10;  // owner 2026-11-06: 10 T1 + 10 radar/sonar planes per nuke wave (was 3)
             int ScoutSweepFormSeconds = 90;
             // The early (silo-frame) nuke package waits at staging for the half-stockpile
             // call at most this long, then flies with what it has (owner 2026-11-06).

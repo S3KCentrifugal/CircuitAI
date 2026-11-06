@@ -100,6 +100,79 @@ public:
 private:
     std::vector<Claim> claims;
 };
+// Nuke outcome (owner 2026-11-06). The engine adds experience to the silo for
+// every point of damage its missile deals (BAR modrules experienceMult; the
+// same experience raises its health and cuts its reload), so a launch is
+// pending until its silo's experience rises - the missile landed - or the
+// window closes with none - it was intercepted. A landing marks the area
+// (blast plus chain reach): every ghost in it last seen before the strike is
+// worth `factor` of its metal until it is seen again, i.e. until a scout
+// refreshes the ghosts (a destroyed one then vanishes). An interception
+// presumes an armed interceptor around that aim until one is seen there or
+// the presumption expires. Engine-free; marks and pendings are capped.
+class StrikeLedger {
+public:
+    struct Pending { int silo; Point aim; float radius; int launch, deadline; float exp; };
+    struct Mark { Point pos; float radius; int frame, expires; bool hit; };
+    enum class Outcome { HIT, INTERCEPTED };
+    void Launch(int silo, Point aim, float radius, int frame, int windowFrames, float exp)
+    {
+        if (!Valid(aim)) return;
+        if (pending.size() >= 64) pending.erase(pending.begin());
+        pending.push_back({silo, aim, std::max(0.f, radius), frame, frame + std::max(1, windowFrames), exp});
+    }
+    bool HasPending(int silo) const
+    {
+        return std::any_of(pending.begin(), pending.end(), [=](const Pending& p) { return p.silo == silo; });
+    }
+    // exp: the silo's experience now (exp < 0: the silo is gone, its launches are dropped).
+    // fn(const Pending&, Outcome) for each resolved launch, oldest first; a rise
+    // goes to the silo's oldest pending launch, the rest re-baseline on it.
+    template<class F> void Resolve(int silo, float exp, int frame, int presumeFrames, F&& fn)
+    {
+        for (size_t i = 0; i < pending.size();) {
+            Pending& p = pending[i];
+            if (p.silo != silo) { ++i; continue; }
+            if (exp < 0.f) { pending.erase(pending.begin() + i); continue; }
+            Outcome out;
+            if (exp > p.exp + 1e-7f) out = Outcome::HIT;
+            else if (frame >= p.deadline) out = Outcome::INTERCEPTED;
+            else break;  // the oldest is still in flight: later ones wait for it
+            const Pending done = p;
+            pending.erase(pending.begin() + i);
+            for (Pending& q : pending) if (q.silo == silo) q.exp = exp;
+            if (marks.size() >= 128) marks.erase(marks.begin());
+            marks.push_back({done.aim, done.radius, frame,
+                (out == Outcome::HIT) ? -1 : frame + std::max(1, presumeFrames), out == Outcome::HIT});
+            fn(done, out);
+            if (out == Outcome::HIT) break;  // one rise resolves one launch
+        }
+    }
+    // The ghost factor at p for a ghost last seen at lastSeen (1 outside every struck area).
+    float GhostFactor(Point p, int lastSeen, float factor) const
+    {
+        for (const Mark& m : marks) {
+            if (m.hit && lastSeen < m.frame && DistanceSq(p, m.pos) <= m.radius * m.radius) return factor;
+        }
+        return 1.f;
+    }
+    // A presumed interceptor whose last intercept lies within radius of p and has not expired.
+    bool PresumedCover(Point p, float radius, int frame) const
+    {
+        return std::any_of(marks.begin(), marks.end(), [&](const Mark& m) {
+            return !m.hit && m.expires > frame && DistanceSq(p, m.pos) <= radius * radius;
+        });
+    }
+    // A known interceptor now stands near a presumed one: the known one counts instead.
+    void ClearPresumed(Point p, float radius)
+    {
+        std::erase_if(marks, [&](const Mark& m) { return !m.hit && DistanceSq(p, m.pos) <= radius * radius; });
+    }
+    bool Empty() const { return marks.empty(); }
+private:
+    std::vector<Pending> pending;
+    std::vector<Mark> marks;
+};
 // Overnuke (owner 2026-10-28): with enough silos every one of them fires at
 // one target until `goal` launches have gone at it (the caller rolls 17-30),
 // or no target is left there, then the next. Every `scoutEvery` launches it

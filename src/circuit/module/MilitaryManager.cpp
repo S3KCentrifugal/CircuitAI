@@ -598,6 +598,10 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.antinukeFloor = std::min(1.f, std::max(0.f, nuclear.get("antinuke_floor", 0.05f).asFloat()));
 	nuclearInfo.coveredMargin = std::max(0.f, nuclear.get("antinuke_margin", 64.f).asFloat());
 	nuclearInfo.blastKill = nuclear.get("blast_kill", true).asBool();
+	nuclearInfo.strikeFactor = std::min(1.f, std::max(0.f, nuclear.get("strike_factor", 0.33f).asFloat()));
+	nuclearInfo.strikeWindowFrames = std::max(1, nuclear.get("strike_window_seconds", 60).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.interceptPresumeRadius = std::max(0.f, nuclear.get("intercept_presume_radius", 2000.f).asFloat());
+	nuclearInfo.interceptPresumeFrames = std::max(0, nuclear.get("intercept_presume_seconds", 600).asInt()) * FRAMES_PER_SEC;
 	nuclearInfo.volumeFactor = std::max(0.f, nuclear.get("blast_volume_factor", 0.86f).asFloat());
 	circuit->LOG("CONFIG %s: nuclear antinuke factor=%.2f overnuke factor=%.2f (per covering antinuke) floor=%.2f margin=%.0f",
 			cfgName.c_str(), nuclearInfo.antinukeFactorOrdinary, nuclearInfo.antinukeFactorOvernuke,

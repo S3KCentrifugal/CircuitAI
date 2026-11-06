@@ -32,6 +32,13 @@ namespace NukeRecon {
         earlyFrame=ai.frame;
         GenericHelpers::LogUtil("[TECH][NukeRecon] early call silo frame="+frame.id+" built="+int(frame.GetBuildProgress()*100.0f)+"% AIR="+provider,1);
     }
+    // The completion call (owner 2026-11-06): the moment the first silo is
+    // finished TECH asks AIR to build 10 T1 + 10 radar planes (radar with a T2
+    // plant) and send them across, each type spread evenly over the map's width,
+    // one waypoint at the far buildable edge and back (AirScoutSweep::Urgent
+    // BUILD). The half-stockpile call then only sends a package still forming
+    // with what it has, so it crosses before the first missile.
+    int doneFrame=-1;
     void Tick() {
         NukeScoutProbe::TechTick();
         if (sent || Global::AISettings::Role!=AiRole::TECH || ai.frame-checked<SECOND) return;
@@ -39,20 +46,30 @@ namespace NukeRecon {
         Early();
         CCircuitUnit@ silo=ai.GetTeamUnit(siloId);
         if (silo is null) { siloId=-1; completed=-1; return; }
+        const int provider=LolCannonRecon::Provider(AiRole::AIR);
+        if (provider<0) return; // late AIR announcements retry, no broadcast storm
+        if (doneFrame<0) {
+            AiSendMessage("nukerecon|first|done",provider);
+            doneFrame=ai.frame;
+            GenericHelpers::LogUtil("[TECH][NukeRecon] silo finished silo="+siloId+" AIR="+provider+": 10 T1 + 10 radar across",1);
+        }
         const int halfSeconds=silo.circuitDef.GetName()=="armsilo" ? 60 : 90;
         if (ai.frame-completed<halfSeconds*SECOND && silo.GetStockpile()==0) return;
-        array<Team::Roster::Entry@>@ allies=Team::Roster::WithRole(AiRole::AIR);
-        int provider=-1;
-        for(uint i=0;i<allies.length();++i) if(provider<0 || allies[i].teamId<provider) provider=allies[i].teamId;
-        if (provider<0) return; // late AIR announcements retry, no broadcast storm
-        const AIFloat3 at=aiMilitaryMgr.GetNuclearAim();
-        const string where=(at.x<0.0f) ? "" : "|"+int(at.x)+"|"+int(at.z)+"|"+int(aiMilitaryMgr.GetNuclearAimRadius());
-        AiSendMessage("nukerecon|first"+where,provider);
+        AiSendMessage("nukerecon|first|release",provider);
         sent=true; sentFrame=ai.frame;
-        GenericHelpers::LogUtil("[TECH][NukeRecon] nominal half stockpile silo="+siloId+" AIR="+provider+" seconds="+halfSeconds
-            +(at.x<0.0f ? " aim=none" : " aim=("+int(at.x)+","+int(at.z)+")"),1);
+        GenericHelpers::LogUtil("[TECH][NukeRecon] nominal half stockpile silo="+siloId+" AIR="+provider+" seconds="+halfSeconds+": a forming package flies now",1);
     }
     bool Handle(const string &in msg,int fromTeamId) {
+        if (msg.findFirst("nukerecon|wave|")==0) {
+            // nukerecon|wave|x|z|spread (owner 2026-11-06): every 3rd launch of an ally, a
+            // fresh 10 T1 + 10 radar wave across the map (NukeLaunchRecon)
+            array<string>@ parts=msg.split("|");
+            if (parts.length()<5 || !AirEconomy::Active()) return true;
+            if (fromTeamId!=ai.teamId && Team::Roster::Get(fromTeamId) is null) return true;
+            AirScoutSweep::Nuked(AIFloat3(parseFloat(parts[2]),0,parseFloat(parts[3])),parseFloat(parts[4]));
+            AirScoutSweep::Wave("every 3rd launch from "+fromTeamId);
+            return true;
+        }
         if (msg.findFirst("nukerecon|launch|")==0 || msg.findFirst("nukerecon|scout|")==0) {
             // nukerecon|launch|x|z|spread: an ally's nuke went there (the owed rush package's target);
             // nukerecon|scout|x|z|spread: 10 T1 + 3 radar there now, ungated (NukeLaunchRecon)
@@ -96,8 +113,11 @@ namespace NukeRecon {
             AIFloat3 at(-1,0,-1);
             float spread=0.0f;
             if (parts.length()>=5) { at=AIFloat3(parseFloat(parts[2]),0,parseFloat(parts[3])); spread=parseFloat(parts[4]); }
+            const string kind=parts.length()==3 ? parts[2] : "";
+            if (kind=="done") AirScoutSweep::Wave("silo finished TECH="+fromTeamId);   // 10 T1 + 10 radar across, built first
+            else if (kind=="release") AirScoutSweep::Release();                      // the half-stockpile call
             // nukerecon|first|early: the silo-frame call; the package is held until the half-stockpile call
-            AirScoutSweep::Urgent(at,spread,parts.length()==3 && parts[2]=="early");
+            else AirScoutSweep::Urgent(at,spread,kind=="early");
             GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke request TECH="+fromTeamId+" at=("+int(at.x)+","+int(at.z)+") spread="+int(spread),1);
         }
         return true;
@@ -158,7 +178,7 @@ namespace NukeScoutProbe {
 // Scouting where our nukes land (owner 2026-10-31). Every launch tells the
 // allied AIR where it went (the owed rush package flies there); with fewer
 // silos than an overnuke needs, every NukeLaunchRecon::Every-th launch also asks
-// AIR for 10 T1 + 3 radar at that spot, ungated. With no AIR, TECH builds them
+// AIR for a 10 T1 + 10 radar wave across the map (owner 2026-11-06; was 3 radar at the spot), ungated. With no AIR, TECH builds them
 // (LolCannonRecon::Send). Any role that owns silos runs it.
 namespace NukeLaunchRecon {
     const int Every = 3, OvernukeSilos = 3;  // behaviour.json nuclear.overnuke_silos default
@@ -181,15 +201,16 @@ namespace NukeLaunchRecon {
         const AIFloat3 at = aiMilitaryMgr.GetNuclearLaunchPos();
         if (at.x < 0.0f) return;
         const float spread = aiMilitaryMgr.GetNuclearLaunchRadius();
-        const bool scout = launches % Every == 0 && Silos() < OvernukeSilos;
+        // owner 2026-11-06: every 3rd launch, whatever the silo count, a fresh wave across the map
+        const bool scout = launches % Every == 0;
         const int air = (Global::AISettings::Role == AiRole::AIR) ? ai.teamId : LolCannonRecon::Provider(AiRole::AIR);
         if (air < 0) {
             if (scout) LolCannonRecon::Send(Global::RoleSettings::Air::ScoutSweepT1Count, Global::RoleSettings::Air::NukeScoutRadarCount, at, spread, "nuke launch " + launches);
             return;
         }
-        const string msg = "nukerecon|" + (scout ? "scout" : "launch") + "|" + int(at.x) + "|" + int(at.z) + "|" + int(spread);
+        const string msg = "nukerecon|" + (scout ? "wave" : "launch") + "|" + int(at.x) + "|" + int(at.z) + "|" + int(spread);
         GenericHelpers::LogUtil("[NukeRecon] launch " + launches + " at (" + int(at.x) + "," + int(at.z) + ") told AIR=" + air
-            + (scout ? ": 10 T1 + 3 radar asked" : ""), 1);
+            + (scout ? ": a 10 T1 + 10 radar wave across the map asked" : ""), 1);
         if (air == ai.teamId) NukeRecon::Handle(msg, ai.teamId);
         else AiSendMessage(msg, air);
     }
@@ -210,19 +231,23 @@ namespace NukeLaunchRecon {
 // owes the rest, ungated, as for TECH's nuke rush call (AirScoutSweep::Urgent);
 // with no AIR, TECH builds them (LolCannonRecon::Send).
 namespace OvernukeRecon {
-    const int T1Scouts = 10, RadarScouts = 3;
+    const int T1Scouts = 10;
+    int RadarScouts() { return Global::RoleSettings::Air::NukeScoutRadarCount; }  // owner 2026-11-06: 10 (was 3)
     int seen = 0, checked = -SECOND, seenRounds = 0;
     void Rounds() {
         const int rounds = aiMilitaryMgr.GetOvernukeRounds();
         if (rounds <= seenRounds) return;
         seenRounds = rounds;
-        if (!Global::FrontNukeRush::RoundScouts || !FrontNukeRush::On()) return;
+        // owner 2026-11-06: a full salvo out (round 2 on: every silo emptied, the next
+        // target stocks) always calls a wave at once; the start (round 1) only with the
+        // front nukerush roll, as before
+        if (rounds < 2 && (!Global::FrontNukeRush::RoundScouts || !FrontNukeRush::On())) return;
         const AIFloat3 at = aiMilitaryMgr.GetOvernukePos();
         if (at.x < 0.0f) return;
         const float spread = aiMilitaryMgr.GetOvernukeRadius();
         const string why = rounds == 1 ? "overnuke begins" : "overnuke round " + rounds + ": the last salvo is out, the next stocks";
         const int air = (Global::AISettings::Role == AiRole::AIR) ? ai.teamId : LolCannonRecon::Provider(AiRole::AIR);
-        if (air < 0) { LolCannonRecon::Send(T1Scouts, RadarScouts, at, spread, "nukerush " + why); return; }
+        if (air < 0) { LolCannonRecon::Send(T1Scouts, RadarScouts(), at, spread, "nukerush " + why); return; }
         const string msg = "nukerecon|overnuke|" + int(at.x) + "|" + int(at.z) + "|" + int(spread) + "|" + rounds;
         GenericHelpers::LogUtil("[NukeRush] " + why + " at (" + int(at.x) + "," + int(at.z) + "): AIR=" + air + " asked to scout across the map", 1);
         if (air == ai.teamId) NukeRecon::Handle(msg, ai.teamId);
@@ -237,6 +262,6 @@ namespace OvernukeRecon {
         seen = scouts;
         const AIFloat3 at = aiMilitaryMgr.GetOvernukePos();
         if (at.x < 0.0f) return;
-        LolCannonRecon::Send(T1Scouts, RadarScouts, at, aiMilitaryMgr.GetOvernukeRadius(), "overnuke");
+        LolCannonRecon::Send(T1Scouts, RadarScouts(), at, aiMilitaryMgr.GetOvernukeRadius(), "overnuke");
     }
 }

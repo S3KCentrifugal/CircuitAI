@@ -119,6 +119,10 @@ void CSuperTask::Update()
 		}
 		lastStock = stock;
 	}
+	if (IsNukeSilo(unit->GetCircuitDef()) && (frame - strikeChecked >= FRAMES_PER_SEC)) {
+		strikeChecked = frame;
+		ResolveStrikes(unit, frame);  // once a second: one hash-free walk over the ally team's few pending launches
+	}
 
 	if (unit->Blocker() != nullptr) {
 		return;  // Do not interrupt current action
@@ -605,6 +609,7 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 	}
 
 	areaRank = bestRank;
+	areaReach = std::sqrt(sqReach);  // blast plus chain reach: a landed nuke marks this much (StrikeLedger)
 	SetTarget(nullptr);  // area effect at a position, possibly of a unit we can no longer see
 	const bool isMoved = (targetPos.SqDistance2D(aims[bestIdx]) > SQUARE(1.f));
 	targetPos = aims[bestIdx];
@@ -928,13 +933,26 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	float coverFactor = policy.antinukeFactorOrdinary;  // overnuke: antinukeFactorOvernuke, set below
 	auto scan = [&]() {
 		const auto interceptors = KnownInterceptors();
+		// Nuke outcome (owner 2026-11-06): a ghost in an area a missile of ours landed
+		// on, not seen since, weighs strike_factor; an aim point near an intercept
+		// with no known interceptor counts one presumed interceptor.
+		const strategic::StrikeLedger& strikes = circuit->GetAllyTeam()->GetNuclearStrikes();
+		const bool marked = !strikes.Empty() && (policy.strikeFactor < 1.f);
+		const bool full = strikes.Empty() || (policy.interceptPresumeRadius <= 0.f);
 		const bool found = SelectAreaTarget(unit, cdef, "NUCLEAR", SQUARE(cdef->GetAoe()), 1, 0,
-			[&policy](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
+			[&policy, circuit, &strikes, marked](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
 				if (!strategic::NuclearTarget(d->IsMobile(), true, policy.structuresOnly)) return false;
-				rank = 0; value = e.cost; return true;
+				rank = 0; value = e.cost;
+				if (marked && !e.IsInLOS()) {
+					const CEnemyInfo* info = circuit->GetEnemyInfo(e.id);
+					const int lastSeen = (info == nullptr) ? -1 : info->GetData()->GetLastSeen();
+					value *= strikes.GhostFactor({e.pos.x, e.pos.z}, lastSeen, policy.strikeFactor);
+				}
+				return true;
 			}, floor, true, true, false, true,
-			[&policy, &interceptors, &coverFactor](const AIFloat3& pos) {
-				const int n = CountInterceptorCover(interceptors, pos);
+			[&policy, &interceptors, &coverFactor, &strikes, full, frame](const AIFloat3& pos) {
+				int n = CountInterceptorCover(interceptors, pos);
+				if ((n <= 0) && !full && strikes.PresumedCover({pos.x, pos.z}, policy.interceptPresumeRadius, frame)) n = 1;
 				return (n <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(n)));
 			},
 			[&interceptors](const std::vector<AIFloat3>& targets) {
@@ -1097,6 +1115,39 @@ int CSuperTask::CountInterceptorCover(const std::vector<std::pair<AIFloat3, floa
 	int count = 0;
 	for (const auto& ic : interceptors) if (pos.SqDistance2D(ic.first) < ic.second) ++count;
 	return count;
+}
+
+/*
+ * Nuke outcome (owner 2026-11-06, strategic::StrikeLedger). Once a second per
+ * silo: the silo's experience against its pending launches (a handful). A rise
+ * means the missile dealt damage: the area is marked struck and its ghosts
+ * weigh nuclear.strike_factor until scouted. No rise by the window's end means
+ * it was intercepted: an interceptor is presumed there (aim value x
+ * antinuke_factor) unless a known one already covers the aim.
+ */
+void CSuperTask::ResolveStrikes(CCircuitUnit* unit, int frame)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	strategic::StrikeLedger& strikes = circuit->GetAllyTeam()->GetNuclearStrikes();
+	if (!strikes.HasPending(unit->GetId())) return;
+	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
+	const float exp = unit->GetUnit()->GetExperience();
+	strikes.Resolve(unit->GetId(), exp, frame, policy.interceptPresumeFrames,
+		[&](const strategic::StrikeLedger::Pending& p, strategic::StrikeLedger::Outcome out) {
+			const float seconds = float(frame - p.launch) / FRAMES_PER_SEC;
+			if (out == strategic::StrikeLedger::Outcome::HIT) {
+				circuit->LOG("NUKE: landed from %s(%i) at (%.0f, %.0f) after %.0f s: experience %.5f -> %.5f; ghosts within %.0f x%.2f until scouted",
+						unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), p.aim.x, p.aim.z, seconds, p.exp, exp,
+						p.radius, policy.strikeFactor);
+				return;
+			}
+			const AIFloat3 at(p.aim.x, 0.f, p.aim.z);
+			const int known = CountInterceptorCover(KnownInterceptors(), at);
+			if (known > 0) strikes.ClearPresumed(p.aim, 1.f);  // a known interceptor explains it
+			circuit->LOG("NUKE: intercepted from %s(%i) at (%.0f, %.0f): no experience in %.0f s (%.5f); known antinukes covering=%i%s",
+					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), p.aim.x, p.aim.z, seconds, exp, known,
+					(known > 0 || policy.interceptPresumeRadius <= 0.f) ? "" : ", one presumed there");
+		});
 }
 
 /*
@@ -1457,6 +1508,15 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 		const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
 		circuit->GetAllyTeam()->GetNuclearHistory().Add(unit->GetId(), {aim.x, aim.z},
 			policy.repeatRadius > 0.f ? policy.repeatRadius : d->GetAoe(), frame, policy.repeatFrames, false);
+		if (geom::is_valid(aim)) {
+			// Nuke outcome (owner 2026-11-06): pending until the silo's experience rises or the window closes
+			const float exp = unit->GetUnit()->GetExperience();
+			const float reach = std::max(d->GetAoe(), (aim.SqDistance2D(targetPos) < SQUARE(1.f)) ? areaReach : 0.f);
+			circuit->GetAllyTeam()->GetNuclearStrikes().Launch(unit->GetId(), {aim.x, aim.z}, reach, frame,
+					policy.strikeWindowFrames, exp);
+			circuit->LOG("NUKE: outcome pending %s(%i) at (%.0f, %.0f) reach=%.0f experience=%.5f",
+					d->GetDef()->GetName(), unit->GetId(), aim.x, aim.z, reach, exp);
+		}
 		strategic::Overnuke& over = circuit->GetMilitaryManager()->GetOvernuke();
 		const int scouts = over.Scouts();
 		const bool salvo = over.Salvo();
