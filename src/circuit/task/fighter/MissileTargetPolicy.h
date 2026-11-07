@@ -34,6 +34,11 @@ inline bool IsTimedGhostLauncher(const std::string& name) {
 inline bool IsSpamRetreatLauncher(const std::string& name) {
     return IsSlowMissileLauncher(name) || name == "corhrk" || name == "leghrk";
 }
+// 2026-11-07: the radar-dot pick (stationary unidentified dots, after known
+// targets, before ghosts) by name: those plus Vanguard.
+inline bool IsDotPickLauncher(const std::string& name) {
+    return IsSpamRetreatLauncher(name) || name == "armvang";
+}
 // Velocity is elmos/frame; definition speed is elmos/second.
 inline bool SlowMissileSpeedAllowed(float velocitySq, float maxSpeed, bool identified, float fps) {
     if (!(velocitySq >= 0.f)) return false;

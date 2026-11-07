@@ -72,7 +72,7 @@ bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy)
     if (ArtyT1Exempt(launcher, enemy)) return false;
     if (!IsSlowTargetLauncher(launcher->GetDef()->GetName())) {  // 2026-11-07: + Arbiter
         // Thanatos: an unidentified radar dot only while stationary (same dot rule).
-        if ((enemy != nullptr) && (enemy->GetCircuitDef() == nullptr) && IsSpamRetreatLauncher(launcher->GetDef()->GetName())) {
+        if ((enemy != nullptr) && (enemy->GetCircuitDef() == nullptr) && IsDotPickLauncher(launcher->GetDef()->GetName())) {
             return SlowMissileSpeedAllowed(enemy->GetVel().SqLength2D(), 0.f, false, FRAMES_PER_SEC);
         }
         return true;
@@ -312,7 +312,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	// 2026-11-07: Arbiter/Thanatos take the radar-dot pick like the slow launchers:
 	// known targets, then unidentified (stationary) dots, then ghosts.
 	if ((bestTarget != nullptr) && !bestTarget->IsInRadarOrLOS()
-		&& IsSpamRetreatLauncher(unit->GetCircuitDef()->GetDef()->GetName())
+		&& IsDotPickLauncher(unit->GetCircuitDef()->GetDef()->GetName())
 		&& ArtyRadarDotStep(circuit, unit, frame, pos))
 	{
 		return;
@@ -747,7 +747,8 @@ bool ArtyRadarDotStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const 
 	CMilitaryManager* military = circuit->GetMilitaryManager();
 	const CMilitaryManager::SArtyCommInfo& info = military->GetArtyCommInfo();
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	if (!info.isEnabled || !info.radarDots || (info.defs.count(cdef->GetId()) == 0)) return false;
+	// 2026-11-07: Vanguard by name (not an artillery_commander unit).
+	if (!info.isEnabled || !info.radarDots || ((info.defs.count(cdef->GetId()) == 0) && !IsDotPickLauncher(cdef->GetDef()->GetName()))) return false;
 	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
 	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
 	CEnemyInfo* dot = (st.dotId >= 0) ? circuit->GetEnemyInfo(st.dotId) : nullptr;
@@ -2406,12 +2407,19 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		// 2026-11-07: Arbiter too (IsGhostPickLauncher), same 3/1 volley rule.
 		CMilitaryManager::SArtySnipeState* ghostSt = ArtyGhostPicker(snipeInfo, cdef)
 				? &military->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame()) : nullptr;
+		// 2026-11-07 (@Barscrewl): known (LOS / radar) targets first; ghosts only in a
+		// second pass when no known target is in range (Arbiter, Vanguard: a ghost
+		// never beats a known target by builder role or power). O(2 x enemies).
+		for (int pass = 0; pass < 2; ++pass) {
+		if ((pass == 1) && ((ghostSt == nullptr) || (bestTarget != nullptr) || (commTarget != nullptr)
+			|| (heavyTarget != nullptr) || (mediumTarget != nullptr) || (worstTarget != nullptr))) break;
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
-			if ((ghostSt != nullptr) && enemy->IsInRadarOrLOS()) {
+			if ((pass == 0) && (ghostSt != nullptr) && enemy->IsInRadarOrLOS()) {
 				GhostSeen(*ghostSt, enemy->GetId());  // a fresh sighting (radar or LOS) resets its blind volleys
 			}
 			const bool ghost = !enemy->IsInRadarOrLOS();
+			if (ghost != (pass == 1)) continue;
 			if (enemy->IsHidden()
                 || (enemy->IsInRadarOrLOS() && !MissileTargetAllowed(cdef, enemy))
 				|| (ghost && ((ghostSt == nullptr) || (enemy->GetCircuitDef() == nullptr) || enemy->GetCircuitDef()->IsMobile()
@@ -2489,6 +2497,7 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 				enemyPositions.push_back(enemy->GetPos());
 //			}
 		}
+		}  // pass
 		if (commTarget != nullptr) {
 			bestTarget = commTarget;
 		} else if (heavyTarget != nullptr) {
