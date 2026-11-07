@@ -451,6 +451,11 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
             }
         }
     }
+    // Owner 2026-11-07: porc we cannot see now (a ghost, or a blind hazard from
+    // an unseen shooter) covering the walk to the firing band is unknown
+    // strength: never commit through it (the 380-sight Thug vs 620-reach HLT).
+    if(!uncertain && ((p.cohortGhostPorc && GhostBlocks(g.center,firingPoint,p.safetyMargin,false,0.f,p.ghostPorcRange))
+        || (p.blindHitSeconds>0.f && BlindCovers(g.center,firingPoint,p.safetyMargin,false)))) uncertain=true;
     // Lazy combat-health callbacks are memoized in the frame's Friend entry;
     // overlapping cohorts share those observations. Artillery-only games pay
     // none of this cost. Count only physically useful allied fire support.
@@ -576,6 +581,11 @@ bool CRangedWorld::CohortSafe(CCircuitUnit* unit,const AIFloat3& from,const AIFl
         for(size_t i=0;i<contacts.size();++i) if(blocked(int(i))) { reference=false; break; }
         if(reference!=safe) circuit->LOG("[INVARIANT] INV-173 cohort segment query omitted a known weapon, blast or reclaim exclusion unit=%d",unit->GetId());
     }
+    // Owner 2026-11-07: opted-in cohorts also keep out of ghost porc and of
+    // blind hazards (hits from shooters we cannot see). Escapes still pass.
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    if(safe && p.cohortGhostPorc && GhostBlocks(from,to,margin,escaping,0.f,p.ghostPorcRange)) return false;
+    if(safe && p.blindHitSeconds>0.f && BlindCovers(from,to,margin,escaping)) return false;
     return safe;
 }
 }

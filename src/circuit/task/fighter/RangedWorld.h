@@ -123,6 +123,16 @@ public:
     };
     const CohortPlan& PlanCohort(CCircuitUnit* unit);
     bool IsSustainedRush(int id) const { return rushes.Active(id); }
+    // Owner 2026-11-07: blind hazards of this AI (RangedPolicy::blindHitSeconds).
+    // A hit from an unseen shooter at the estimated origin, reach = that
+    // weapon's range; no def (never a target), static, expires at `until`.
+    void AddBlindHit(const springai::AIFloat3& origin, float reach, int until);
+    // Deepest live blind hazard whose reach (+margin) covers pos, or null;
+    // penetration receives reach+margin-distance for it.
+    const Contact* BlindDanger(const springai::AIFloat3& pos, float margin, float& penetration);
+    // True when a live blind hazard (+margin) blocks the segment from-to
+    // (escaping: same SafeSegment rule as static coverage, so a way out passes).
+    bool BlindCovers(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping);
     bool CohortSafe(CCircuitUnit* unit,const springai::AIFloat3& from,
                     const springai::AIFloat3& to,float margin,bool escaping);
     void ReleaseEscort(int id) { escorts.erase(id); }
@@ -160,6 +170,7 @@ private:
     // Owner 2026-11-02 ghost porc (hazard only), shared in the observation
     // since the D-462 merge: built once per side per contact rebuild.
     const std::vector<Contact>& ghosts;
+    std::vector<Contact> blindHits; std::vector<int> blindUntil; // owner 2026-11-07
     const ranged::SpatialIndex& ghostHazards;
     float largestGhostHazard = 0.f;
     bool GhostBlocks(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, bool escaping, float press, float ghostRange) const;

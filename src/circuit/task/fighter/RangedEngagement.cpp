@@ -36,7 +36,8 @@ using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
 static const bool trace = std::getenv("CIRCUIT_RANGED_TRACE") != nullptr;
 // Owner 2026-11-02: ghost porc reach for this hull; cohorts keep observed-only.
-static float GhostRange(const RangedPolicy& p) { return p.coordinated ? 0.f : p.ghostPorcRange; }
+// Owner 2026-11-07: coordinated cohorts read ghost porc only with cohort_ghost_porc.
+static float GhostRange(const RangedPolicy& p) { return p.coordinated && !p.cohortGhostPorc ? 0.f : p.ghostPorcRange; }
 // Owner 2026-11-04: margin against static coverage (live and ghost porc) for
 // the individual controller; safety_margin unless static_margin is set.
 static float StaticMargin(const RangedPolicy& p) { return (!p.coordinated && p.staticMargin>=0.f) ? p.staticMargin : p.safetyMargin; }
@@ -398,6 +399,33 @@ bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape
     return true;
 }
 
+// Owner 2026-11-07: a hit from a shooter this AI cannot see (no attacker in
+// the enemy manager). Estimate its origin as UnitDamaged does for the threat
+// map (dir towards the shooter x that weapon's range) and leave a blind
+// hazard there; the next decision kites out of it. Opt-in, coordinated only.
+void CRangedEngagement::BlindHit(CCircuitUnit* unit)
+{
+    const auto& policy=unit->GetCircuitDef()->GetRangedPolicy();
+    if(!policy.coordinated || !(policy.blindHitSeconds>0.f) || world.IsSustainedRush(id)) return;
+    // Friendly fire (our own or an ally's splash) is never a blind hit.
+    if(ai->GetDamageAttackerId()>=0 && ai->GetFriendlyUnit(ai->GetDamageAttackerId())!=nullptr) return;
+    const int weaponId=ai->GetDamageWeaponId();
+    const AIFloat3 dir=ai->GetDamageDir();
+    auto* wd=ai->GetWeaponDefSafe(weaponId);
+    if(wd==nullptr || dir.SqLength2D()<1e-4f) return;
+    float range=wd->GetRange();
+    if(!(range>0.f) || range>ranged_policy_defaults::GHOST_PORC_MAX_RANGE) return;
+    const int frame=ai->GetLastFrame();
+    AIFloat3 flat(dir.x,0.f,dir.z); flat.Normalize2D();
+    const AIFloat3 pos=unit->GetPos(frame);
+    AIFloat3 origin=pos+flat*range; CTerrainManager::CorrectPosition(origin);
+    world.AddBlindHit(origin,range+unit->GetCircuitDef()->GetRadius(),frame+int(policy.blindHitSeconds*FRAMES_PER_SEC));
+    if(frame>=blindLogFrame+90) {
+        blindLogFrame=frame;
+        ai->LOG("RANGED: blind hit unit=%d weapon=%d range=%.0f origin=%.0f,%.0f",id,weaponId,range,origin.x,origin.z);
+    }
+    nextFrame=0;
+}
 void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
 {
     const int frame=ai->GetLastFrame();
@@ -410,7 +438,15 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     if(member==group.members.end() || group.members.size()>size_t(policy.cohortSize)) {
         ai->LOG("[INVARIANT] INV-166 coordinated unit has invalid cohort membership unit=%d",id); return;
     }
-    if(group.target<0 && group.mode==cohort::Mode::HOLD && !policy.fireInRange && !policy.commanderFocus) {
+    // Owner 2026-11-07 (Sector 318C replay): 7 Thugs + 5 Aggravators idled ~35 s
+    // at a no-target HOLD 490-610 from a radar-only HLT until all 12 died; the
+    // HOLD branches returned before any danger test. Opted-in cohorts standing
+    // in static coverage (live, ghost or blind) skip them and kite out below.
+    float blindDepth=0.f;
+    const bool staticExposed=policy.cohortGhostPorc && group.target<0 && group.mode==cohort::Mode::HOLD
+        && (!world.Safe(pos,pos,policy.safetyMargin,false,0.f,GhostRange(policy))
+            || (policy.blindHitSeconds>0.f && world.BlindDanger(pos,policy.safetyMargin,blindDepth)!=nullptr));
+    if(group.target<0 && group.mode==cohort::Mode::HOLD && !policy.fireInRange && !policy.commanderFocus && !staticExposed) {
         if(policy.fireAtWill && !policy.alwaysFireAtWill && policy.pokeIn>0.f && unit->GetRequestedFireState()!=CCircuitDef::HOLD)
             unit->TrySetFireState(CCircuitDef::HOLD);
         // Cancel the old approach when a protected contact leaves vision.
@@ -550,6 +586,24 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             }
         }
     }
+    // Owner 2026-11-07 (Sector 318C): ghost porc and blind hazards are static
+    // danger for opted-in cohorts, unless the committed cohort already
+    // approved that ghost as its assault target. Same reach as live porc.
+    if(policy.cohortGhostPorc && GhostRange(policy)>0.f) {
+        world.NearbyGhosts(pos,policy.safetyMargin,GhostRange(policy),0.f,ghostNearby);
+        const auto& ghosts=world.Ghosts();
+        for(int gi:ghostNearby) {
+            const auto& c=ghosts[gi];
+            if(assessed && group.committed && std::find(group.assault.begin(),group.assault.end(),c.id)!=group.assault.end()) continue;
+            const float depth=c.hazardRadius+policy.safetyMargin-std::sqrt(pos.SqDistance2D(c.pos));
+            if(depth>penetration) { danger=&c; penetration=depth; }
+        }
+    }
+    if(policy.blindHitSeconds>0.f) {
+        float depth=0.f;
+        const auto* blind=world.BlindDanger(pos,policy.safetyMargin,depth);
+        if(blind && depth>penetration) { danger=blind; penetration=depth; }
+    }
     if(policy.fireInRange) {
         // Open only once the existing shot geometry admits an in-range target.
         // Engine auto-acquisition includes target radius and can fire earlier,
@@ -558,7 +612,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         const int fire=best>=0?CCircuitDef::FireType::OPEN:CCircuitDef::FireType::HOLD;
         if(unit->GetRequestedFireState()!=fire) unit->TrySetFireState(fire);
     }
-    if(group.target<0 && group.mode==cohort::Mode::HOLD) {
+    if(group.target<0 && group.mode==cohort::Mode::HOLD && !(staticExposed && danger && !danger->mobile)) {
         // Keep the old idle dispersion/movement; only permit defensive fire
         // and priority selection that the former early return skipped.
         if(policy.engagementSeconds>0.f && group.protectedTarget>=0) {
@@ -615,7 +669,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     // base) or already behind it (on the far side from the threat), hold and
     // fight instead. A reclaimer in reach still counts: it would take the hull.
     if(danger && policy.homeHoldRadius>0.f
-        && !(danger->def->IsAbleToReclaim() && std::sqrt(pos.SqDistance2D(danger->pos))<danger->def->GetBuildDistance()+danger->radius+policy.safetyMargin)) {
+        && !(danger->def && danger->def->IsAbleToReclaim() && std::sqrt(pos.SqDistance2D(danger->pos))<danger->def->GetBuildDistance()+danger->radius+policy.safetyMargin)) {
         const AIFloat3& base=ai->GetSetupManager()->GetBasePos();
         AIFloat3 threat=danger->pos-base; threat.y=0.f;
         const bool home=pos.SqDistance2D(base)<policy.homeHoldRadius*policy.homeHoldRadius;
@@ -632,7 +686,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         AIFloat3 away=pos-danger->pos; away.Normalize2D();
         if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
         const bool disengage=!group.committed || group.mode==cohort::Mode::WITHDRAW || !danger->mobile
-            || danger->def->IsEnemyRoleAny(CCircuitDef::COMM) || danger->def->IsAbleToReclaim()
+            || (danger->def && (danger->def->IsEnemyRoleAny(CCircuitDef::COMM) || danger->def->IsAbleToReclaim()))
             || (!(policy.supportAllies && group.supporting)
                 && !cohort::ShortKite(maxRange,danger->groundRange,def->GetSpeed(),policy.reactionSeconds));
         // The engine accepts arrival short of the exact endpoint. A 32-elmo

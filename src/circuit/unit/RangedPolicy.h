@@ -150,6 +150,17 @@ struct RangedPolicy {
     // withdraw (it still is inside its death blast).
     float homeHoldRadius = 0.f;
     bool commanderNoRetreat = false;
+    // Owner 2026-11-07 (Sector 318C): Thugs/Aggravators sat inside a heavy laser
+    // tower's 620 reach while their own sight is 380, so the tower was a ghost
+    // or never seen and the cohort had no danger. cohort_ghost_porc: a
+    // coordinated cohort treats ghost porc (ghost_porc_range) as danger and as
+    // uncertain coverage that blocks commitment, like the individual
+    // controller. blind_hit_seconds > 0: a hit from an attacker we cannot see
+    // leaves a blind hazard at the shot's estimated origin (UnitDamaged dir x
+    // the weapon's range) for that long; hulls of this AI inside its reach back
+    // out and the cohort does not commit through it. 0 = off.
+    bool cohortGhostPorc = false;
+    float blindHitSeconds = 0.f;
     float spamMaxCost = 0.f;
     // Owner 2026-10-27: named spam ("spam_units", def ids resolved at load),
     // in addition to spamMaxCost. Same rules: mobile, never a commander.

@@ -15,6 +15,7 @@ public:
     ~CRangedEngagement();
     void Update(CCircuitUnit* unit);
     void Idle() { nextFrame=0; }
+    void BlindHit(CCircuitUnit* unit); // owner 2026-11-07
     void MoveFailed() { query.reset(); moving=false; completedMove=false; orientUntil=0; nextFrame=0; ++failures; ++rejections; }
     void Release(CCircuitUnit* unit, bool commands=true);
     int Target() const { return target; }
@@ -46,6 +47,7 @@ private:
     std::unordered_map<int, bool> ghostSupport;
     int traceFrame=-150;
     int homeHoldLogFrame=-150;
+    int blindLogFrame=-90;
     bool fireOpen=false; int fireStateFrame=-10000; // individual fire_at_will: last state sent
     size_t pathCursor=0;
     springai::AIFloat3 lastPos, destination;

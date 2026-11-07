@@ -586,6 +586,8 @@ void CFactoryManager::ReadConfig()
 			boolean("commander_focus", policy.commanderFocus);
 			number("home_hold_radius", policy.homeHoldRadius, 0.f, 4000.f);
 			boolean("commander_no_retreat", policy.commanderNoRetreat);
+			boolean("cohort_ghost_porc", policy.cohortGhostPorc);
+			number("blind_hit_seconds", policy.blindHitSeconds, 0.f, 60.f);
 			number("spam_max_cost", policy.spamMaxCost, 0.f, 2000.f);
 			{
 				// Owner 2026-10-27: an explicit spam roster. A name this game

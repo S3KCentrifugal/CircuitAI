@@ -445,6 +445,8 @@ void CArtilleryTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
 	ArtySpamRetreatDamaged(manager->GetCircuit(), unit, attacker);
 	if (ranged) {
+		// Owner 2026-11-07: hit by a shooter we cannot see (Thug vs HLT).
+		if (attacker == nullptr) ranged->BlindHit(unit);
 		ranged->Idle();
         // Script/JSON chooses this doctrine. Forward-only firing-line hulls
         // retain their weapon owner even at low HP; other artillery keeps its

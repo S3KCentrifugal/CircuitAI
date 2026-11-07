@@ -294,6 +294,10 @@ public:
 	// Owner 2026-11-06: the attacker id of the UnitDamaged event being dispatched
 	// (-1 unknown); lets the commander tell friendly fire from an unseen shooter.
 	int GetDamageAttackerId() const { return damageAttackerId; }
+	// Owner 2026-11-07: weapon def id and engine direction (towards the
+	// shooter) of the same UnitDamaged event; -1 / zero when unknown.
+	int GetDamageWeaponId() const { return damageWeaponId; }
+	const springai::AIFloat3& GetDamageDir() const { return damageDir; }
 	int GetSkirmishAIId() const { return skirmishAIId; }
 	int GetTeamId()       const { return teamId; }
 	int GetAllyTeamId()   const { return allyTeamId; }
@@ -374,6 +378,8 @@ private:
 	bool isSlave : 1;
 	int lastFrame;
 	int damageAttackerId = -1;
+	int damageWeaponId = -1;
+	springai::AIFloat3 damageDir;
 	int skirmishAIId;
 	int teamId;
 	int allyTeamId;

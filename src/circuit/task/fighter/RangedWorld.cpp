@@ -335,6 +335,49 @@ bool CRangedWorld::GhostBlocks(const AIFloat3& from,const AIFloat3& to,float mar
         return !(ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))>=radius*radius);
     });
 }
+// Owner 2026-11-07 (Sector 318C): an unseen heavy laser tower hit Thugs
+// whose sight is shorter than its reach. Bounded: at most 32 live hazards per
+// AI, merged when a new origin lies within 128 of an old one; expired on read.
+void CRangedWorld::AddBlindHit(const AIFloat3& origin,float reach,int until)
+{
+    if(!(reach>0.f) || !std::isfinite(origin.x) || !std::isfinite(origin.z)) return;
+    const int now=circuit->GetLastFrame();
+    for(size_t i=0;i<blindHits.size();) {
+        if(blindUntil[i]<=now) { blindHits[i]=blindHits.back(); blindHits.pop_back(); blindUntil[i]=blindUntil.back(); blindUntil.pop_back(); continue; }
+        if(blindHits[i].pos.SqDistance2D(origin)<128.f*128.f) {
+            blindHits[i].hazardRadius=std::max(blindHits[i].hazardRadius,reach);
+            blindHits[i].groundRange=blindHits[i].hazardRadius;
+            blindUntil[i]=std::max(blindUntil[i],until); return;
+        }
+        ++i;
+    }
+    if(blindHits.size()>=32) return;
+    Contact c; c.id=-1; c.def=nullptr; c.pos=origin; c.armed=true; c.mobile=false; c.ghost=true;
+    c.groundRange=reach; c.hazardRadius=reach; c.cost=0.f;
+    blindHits.push_back(c); blindUntil.push_back(until);
+}
+const CRangedWorld::Contact* CRangedWorld::BlindDanger(const AIFloat3& pos,float margin,float& penetration)
+{
+    const int now=circuit->GetLastFrame();
+    const Contact* deepest=nullptr; penetration=0.f;
+    for(size_t i=0;i<blindHits.size();++i) {
+        if(blindUntil[i]<=now) continue;
+        const float depth=blindHits[i].hazardRadius+margin-std::sqrt(pos.SqDistance2D(blindHits[i].pos));
+        if(depth>penetration) { penetration=depth; deepest=&blindHits[i]; }
+    }
+    return deepest;
+}
+bool CRangedWorld::BlindCovers(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping)
+{
+    const int now=circuit->GetLastFrame();
+    for(size_t i=0;i<blindHits.size();++i) {
+        if(blindUntil[i]<=now) continue;
+        const float r=blindHits[i].hazardRadius+margin;
+        if(escaping ? !ranged::SafeSegment(P(from),P(to),P(blindHits[i].pos),r)
+            : ranged::SegmentDistanceSq(P(blindHits[i].pos),P(from),P(to))<r*r) return true;
+    }
+    return false;
+}
 void CRangedWorld::NearbyGhosts(const AIFloat3& pos,float margin,float ghostRange,float press,std::vector<int>& result) const
 {
     result.clear();
