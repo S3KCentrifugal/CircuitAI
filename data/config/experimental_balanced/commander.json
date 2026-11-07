@@ -182,6 +182,16 @@
 		"advance_roles": "FRONT,TACTICAL",
 		"front_repair_combat": 1,
 		"front_solar_income": 400, "front_solar_storage": 0.2, "front_solar_radius": 300,
+		// D-490 (owner): the commander finishes its own construction (never swapped for
+		// another build task), and breaks off assisting another builder for energy or a
+		// mex while the bank is under this share of storage or energy stalls.
+		"front_solar_stall": 1, "front_keep_own_build": 1, "front_assist_break_energy": 0.2,
+		// D-493: after a break the assist offers stay closed this long (one break per stall).
+		"front_assist_close_seconds": 10,
+		// D-492: the group adds artillery near its next site past artillery_local_max
+		// only while the enemy statics in reach outnumber them, so it moves forward with
+		// the front. Fire control is the artillery controller's (behaviour.json, D-493).
+		"artillery_local_max": 2, "artillery_local_radius": 700,
 		"front_ladder": "repair_combat,mex_defence,mex_lane,commander_group,territory_line,advance,reclaim,hold",
 		// D-357 corridor mex sweep: spots within half-width + front_mex_reach (0: build
 		// distance) of the lane, front_mex_behind behind to front_mex_ahead ahead of the

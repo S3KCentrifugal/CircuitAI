@@ -309,6 +309,7 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isMetalEmpty", asOFFSET(CEconomyManager, isMetalEmpty)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isMetalFull", asOFFSET(CEconomyManager, isMetalFull)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isEnergyStalling", asOFFSET(CEconomyManager, isEnergyStalling)); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsEnergyLow(float)", asMETHOD(CEconomyManager, IsEnergyLow), asCALL_THISCALL); ASSERT(r >= 0);  // D-493
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isEnergyEmpty", asOFFSET(CEconomyManager, isEnergyEmpty)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isEnergyFull", asOFFSET(CEconomyManager, isEnergyFull)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "float reclConvertEff", asOFFSET(CEconomyManager, reclConvertEff)); ASSERT(r >= 0);

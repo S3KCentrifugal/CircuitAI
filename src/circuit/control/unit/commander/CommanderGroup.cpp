@@ -322,7 +322,7 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // Every completed/cancelled builder task, not just groupJob, can be the
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
-    for(auto& entry:states) entry.value->work.Retire(task);
+    for(auto& entry:states) { entry.value->work.Retire(task); entry.value->work.RetireOrigin(task); }  // D-493
     // D-481: a guard item ends; a cancelled one is ordered again (GEO_GUARD_RETRIES).
     for(auto& g:geoGuards) for(std::size_t k=0;k<g.tasks.size();++k) if(g.tasks[k]==task) {
         g.tasks[k]=nullptr; g.state[k]=done?2:0;
@@ -510,6 +510,7 @@ IUnitTask* CCommanderController::StartedCommanderConstruction(CCircuitUnit* unit
 }
 IUnitTask* CCommanderController::GroupAssist(CCircuitUnit* unit) {
     if(auto* started=StartedCommanderConstruction(unit)) return started;
+    if(AssistClosed(unit)) return nullptr;   // D-490: low energy, no assist
     if(ExpansionJobCount()==0) return GroupWork(unit);
     // D-476: the expansion job this unit is on, else the first it may work.
     const ExpansionJob* slot=nullptr;
@@ -797,6 +798,12 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     // once-a-second group push would otherwise replace it within a second.
     if(current && !current->IsDead() && dynamic_cast<CBBraceTask*>(current)) return current;
     if(auto* started=StartedCommanderConstruction(unit)) return started;
+    // D-490: the commander's own construction is never swapped for another
+    // build task, started or still walking to its site.
+    if(Handles(unit) && cfg->front.keepOwnBuild>0 && IsOwnConstruction(unit,current)) return current;
+    // D-490: low energy: the commander takes no assist (joins, adopted projects)
+    // and starts no group construction; the ladder's energy and mex rungs act.
+    if(AssistClosed(unit)) return nullptr;
     auto* anchor=GroupCommander();
     if(!anchor) return current;
     // D-480: the seat's T1 constructor collects base, then approach, mexes first.

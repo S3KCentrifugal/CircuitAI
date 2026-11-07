@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include "util/IdMembership.h"
 // D-388: the commander controller, the first unit controller
 // (unit-controller-architecture.md). Formerly CCommanderControl; behaviour is
@@ -17,6 +18,7 @@
 #include "control/kernel/CommanderJammerCoverage.h"
 #include "control/kernel/CommanderJammerPlan.h"
 #include "control/kernel/CommanderPosture.h"
+#include "control/kernel/CommanderTaskOrigin.h"
 #include "control/kernel/DefensePlanner.h"
 #include "spring/RouteCommand.h"
 #include "AIFloat3.h"
@@ -127,6 +129,25 @@ struct CommanderWorkState : commander::WorkIdentity<IUnitTask> {
     // interrupt. timedNext: definition id -> next due frame.
     int lineUntil=-1,lineRetry=0,lineYield=-10000,radarFrame=-10000,lineOutside=-1;
     int reclaimNext=0,idleLogNext=0,idleReason=-1;
+    int assistBreakNext=0; // D-490: next frame the energy assist break may run
+    int assistClosedUntil=0; // D-493: assist offers stay closed until this frame after a break
+    // D-493: where the commander's recent tasks came from (CommanderTaskOrigin.h),
+    // a small ring of task addresses (compared, never dereferenced), retired in
+    // TaskFinished. Eight entries: the commander holds one task at a time.
+    static constexpr int ORIGIN_SLOTS=8;
+    std::array<std::pair<const IUnitTask*,commander::TaskOrigin>,ORIGIN_SLOTS> origins{};
+    int originNext=0;
+    void NoteOrigin(const IUnitTask* t,commander::TaskOrigin o) {
+        if(!t) return;
+        for(auto& e:origins) if(e.first==t) { e.second=o; return; }
+        origins[originNext]={t,o}; originNext=(originNext+1)%ORIGIN_SLOTS;
+    }
+    commander::TaskOrigin OriginOf(const IUnitTask* t) const {
+        for(const auto& e:origins) if(e.first==t) return e.second;
+        return commander::TaskOrigin::None;
+    }
+    void RetireOrigin(const IUnitTask* t) { for(auto& e:origins) if(e.first==t) e={nullptr,commander::TaskOrigin::None}; }
+    int assistLowSince=-1,assistLowLog=0; // D-490: INV-263, assisting with energy low since; next log frame
     float reclaimMetalRoom=0,reclaimEnergyRoom=0;
     const char* reclaimReason="not_offered"; // static labels, no allocation/feature ownership
     bool lineDone=false,radarCovered=false,held=false; // held: offered under a fallback
@@ -264,6 +285,12 @@ struct CommanderFrontConfig {
     float distance=1600,standoff=650,radius=500,threat=3;
     float repairCombat=0;
     float solarIncome=0,solarStorage=.2f,solarRadius=300,solarDef=-1;
+    // D-490: solarStall>0 also offers the emergency solar while energy stalls
+    // above solarIncome; keepOwnBuild>0 keeps the commander on its own
+    // construction through a re-evaluation; assistBreakEnergy is the bank share
+    // under which (or stalling) an assisting commander breaks off (0: off).
+    float solarStall=0,keepOwnBuild=0,assistBreakEnergy=0;
+    float assistCloseSeconds=0;  // D-493: assist offers stay closed this long after a break
     float mexSeconds=0,stallSeconds=10,detourSeconds=0; // 0: no detour backoff
     float mexAA=-1,mexLos=0,radarSpacing=500;
     float persistent=0,mexDefence=0,lineEnabled=0;
@@ -400,6 +427,9 @@ public:
     void MexFinished(CCircuitUnit* commander, CCircuitUnit* mex);
     bool GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& site) const;
     bool CanResumeFrontTask(CCircuitUnit* unit, IUnitTask* task) const;
+    // D-490: true when IBuilderTask::Reevaluate must not re-ask the policy for
+    // this FRONT commander, because the task is its own construction.
+    bool KeepsOwnConstruction(CCircuitUnit* unit,IUnitTask* task) const;
     std::vector<commander::DefenceExclusion> DefenceExclusions(CCircuitUnit* unit,CCircuitDef* def,
         const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr) const;
 
@@ -447,6 +477,13 @@ private:
     IUnitTask* tacticalJob=nullptr;
     std::vector<int> tacticalDefs;          // launchers, script-owned, first buildable wins
     std::vector<int> artilleryT2Defs,artilleryT1Defs;  // D-479: static artillery, script-owned
+    // D-492 / D-493 (CommanderArtillery.cpp): the tactical queue's crowding
+    // rule; fire control is the artillery controller's. Script levers
+    // (SetOption): the crowding count and radius (0 off).
+    mutable int artilleryCrowdLog=0;
+    float artilleryLocalMax=0,artilleryLocalRadius=0;
+    bool IsArtilleryDef(const CCircuitDef* def) const;
+    bool ArtilleryCrowded(const CCircuitDef* def) const;
     // D-479: one reserved block per definition (T1 and T2 footprints differ).
     struct TacticalBlock { int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0; };
     std::map<int,TacticalBlock> tacticalBlocks;
@@ -662,9 +699,19 @@ private:
     void CheckPerimeter(CCircuitUnit* unit,const State& state,const springai::AIFloat3& goal,int frame,const char* source) const;
     // D-299 work ladder (CommanderWork.cpp). Kinds 5..16; see FrontWork. The
     // script names them in commander.json front_ladder (CommanderFront::Work).
-    enum WorkKind { WORK_LINE=5,WORK_REPAIR_DEFENCE=6,WORK_REPAIR_UNITS=7,WORK_RECLAIM=8,
+    enum WorkKind { WORK_ASSIST=0,WORK_LINE=5,WORK_REPAIR_DEFENCE=6,WORK_REPAIR_UNITS=7,WORK_RECLAIM=8,
         WORK_TIMED=9,WORK_RADAR=10,WORK_FACTORY=11,WORK_BASE=12,WORK_MEX=13,WORK_ADVANCE=14,WORK_HOLD=15,
-        WORK_MEX_LANE=16, WORK_TERRITORY_LINE=17, WORK_MEX_DEFENCE=18, WORK_REPAIR_COMBAT=21, WORK_SOLAR=22 };
+        WORK_MEX_LANE=16, WORK_TERRITORY_LINE=17, WORK_MEX_DEFENCE=18, WORK_GROUP_ASSIST=20, WORK_REPAIR_COMBAT=21, WORK_SOLAR=22 };
+    // D-490 (CommanderAssist.cpp): own construction against assisting, and the low-energy break.
+    bool IsOwnConstruction(CCircuitUnit* unit,IUnitTask* task) const;
+    bool IsAssisting(CCircuitUnit* unit,IUnitTask* task) const;
+    bool AssistEnergyLow() const;
+    bool AssistClosed(CCircuitUnit* unit) const;
+    bool AssistEnergyBreak(CCircuitUnit* unit,State& state,int frame);
+    // D-493: records the origin of a task handed to a controlled commander.
+    // Group tasks: own when nobody else works it, else an assist.
+    IUnitTask* Handed(CCircuitUnit* unit,IUnitTask* task,commander::TaskOrigin origin);
+    IUnitTask* HandedGroup(CCircuitUnit* unit,IUnitTask* task);
     IUnitTask* LadderWork(CCircuitUnit* unit,State& state,int kind,CCircuitDef* buildDef,float radius,int frame);
     // D-357: the corridor mex sweep (WORK_MEX_LANE) and its dry probe (INV-235).
     IUnitTask* LaneMexWork(CCircuitUnit* unit,State& state,CCircuitDef* turretDef,int frame);

@@ -16,6 +16,7 @@
 #include "map/ThreatMap.h"
 #include "module/BuilderManager.h"
 #include "control/core/ControllerRegistry.h"
+#include "control/unit/artillery/ArtilleryController.h"
 #include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
 #include "module/EconomyManager.h"
@@ -690,6 +691,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     // per-type assignment (after the managers: roles are read by then).
     controllers=std::make_unique<CControllerRegistry>(this);
     commanderController=controllers->Add(std::make_unique<CCommanderController>(this));
+    artilleryCensus=controllers->Add(std::make_unique<CArtilleryController>(this));  // D-493
     controllers->ReadConfig(setupManager->GetConfig());
     // D-300: before script init, so AiMain can already publish widget state.
     widgetState=std::make_unique<CWidgetState>(this);

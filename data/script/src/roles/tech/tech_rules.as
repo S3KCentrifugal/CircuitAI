@@ -388,6 +388,9 @@ namespace TechRules {
     IUnitTask@ DoGrowth(Ctx@ c) { return TechGrowth::Work(c.u,c.eco,c.building); }
     IUnitTask@ DoRushBootstrap(Ctx@ c) { return RushBootstrap::TravelTask(c.u); }
     IUnitTask@ DoClusterBatch(Ctx@ c) { return EconomyCluster::BatchWork(c.u); }
+    IUnitTask@ DoSeatTurret(Ctx@ c) { return TechSurplusSeats::TurretWork(c.u); }        // D-489
+    IUnitTask@ DoPinpointer(Ctx@ c) { return TechPinpointers::Work(c.u); }               // D-492
+    IUnitTask@ DoSeatConverter(Ctx@ c) { return TechSurplusSeats::ConverterWork(c.u); }  // D-489
     IUnitTask@ DoConverter(Ctx@ c)
     {
         string why;
@@ -531,6 +534,9 @@ namespace TechRules {
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
         table.insertLast(Rule("rush.bootstrap", CON_T1, W0(), @DoRushBootstrap, "retain one safe support-bootstrap journey without claiming a building"));
+        table.insertLast(Rule("seat.turret",       CON_T1,       W0(), @DoSeatTurret,   "D-489 (owner): metal floats past the T2 lab: one T1 constructor at base builds only construction turrets on free economy slots"));
+        table.insertLast(Rule("pinpointer",        CON_T2,       W0(), @DoPinpointer,   "D-492 (owner): the team has artillery and no Pinpointer: three on the layout"));
+        table.insertLast(Rule("seat.converter",    CON_T2,       W0(), @DoSeatConverter, "D-489 (owner): energy floats: one T2 constructor at base builds only advanced energy converters, metal-full admission waived"));
         table.insertLast(Rule("eco.cluster.batch", CON_T1, W0(), @DoClusterBatch, "funded local economy cluster: up to ten distinct turret projects, nearby T1 aircraft only"));
         table.insertLast(Rule("eco.growth", CONSTRUCTORS, W0(), @DoGrowth, "T1 energy retirement: one turret, AFUS and converter worker; air takes over without aborting construction"));
         table.insertLast(Rule("mex.upgrade", CON_T2, W0(), @DoMexUpgrade, "reachable owned mex upgrades before discretionary assistance"));
