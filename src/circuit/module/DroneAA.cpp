@@ -220,7 +220,12 @@ void CMilitaryManager::DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker)
 		for (int id : friendlies) {
 			CCircuitDef* fdef = circuit->GetCircuitDefSafe(clb->Unit_GetDefId(id));
 			if ((fdef == nullptr) || fdef->IsMobile() || !fdef->HasSurfToAir()) continue;
-			if ((tier == 1) && (fdef->GetMaxRange(CCircuitDef::RangeType::AIR) < droneAA.heavyMinRange)) continue;
+			if ((tier == 1) && (fdef->GetMaxRange(CCircuitDef::RangeType::AIR) < droneAA.heavyMinRange)) {
+				// A listed T1.5 counts whatever its parsed air range (Lupara's AA is a VTOL-only cannon).
+				const std::string fname = fdef->GetDef()->GetName();
+				auto listed = [&fname](const std::vector<std::string>& v) { return std::find(v.begin(), v.end(), fname) != v.end(); };
+				if (!listed(droneAA.longUnits) && !listed(droneAA.hardUnits)) continue;
+			}
 			++covered;
 		}
 		// Entries leave droneAATasks in CBuilderManager::DequeueTask, before the task is freed.

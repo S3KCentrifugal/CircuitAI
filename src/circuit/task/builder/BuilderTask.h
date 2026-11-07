@@ -77,6 +77,9 @@ public:
 	virtual bool CanAssignTo(CCircuitUnit* unit) const override;
 	virtual void AssignTo(CCircuitUnit* unit) override;
 	virtual void RemoveAssignee(CCircuitUnit* unit) override;
+	// Drone AA (owner 2026-11-07): a drone AA tower order keeps its builder
+	// against policy swaps; retreat, fights, player orders and NOW tasks win.
+	virtual bool KeepsAssignee(const IUnitTask* next) const override;
 	// D-112 crash: a unit about to be freed leaves every set of this task (the
 	// update loop iterates `traveled`), without RemoveAssignee's reassignment
 	virtual bool ForgetUnit(CCircuitUnit* unit) override {

@@ -968,6 +968,22 @@ bool IBuilderTask::LeavePorc(CCircuitUnit* unit, const AIFloat3& spot, const cha
 	return true;  // the task may be dead now: callers must not touch it again
 }
 
+bool IBuilderTask::KeepsAssignee(const IUnitTask* next) const
+{
+	// Fixture (run_drone_aa.py --hives 2, 11-07): the FRONT energy seat's base
+	// mex rung re-tasked the drone AA constructor within 1-2 s of each order,
+	// so the light and T1.5 orders died unbuilt. Same rule as CBRestoreTask.
+	if (IsDead() || units.empty()) return false;
+	CMilitaryManager* militaryMgr = manager->GetCircuit()->GetMilitaryManager();
+	if ((militaryMgr == nullptr) || !militaryMgr->IsDroneAATask(this)) return false;
+	if (next != nullptr) {
+		const IUnitTask::Type type = next->GetType();
+		if ((type != Type::BUILDER) && (type != Type::WAIT) && (type != Type::IDLE)) return false;
+		if ((type == Type::BUILDER) && (static_cast<const IBuilderTask*>(next)->GetPriority() == Priority::NOW)) return false;
+	}
+	return true;
+}
+
 bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 {
 	CCircuitAI* circuit = manager->GetCircuit();

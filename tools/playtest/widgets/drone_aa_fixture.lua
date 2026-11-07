@@ -17,7 +17,7 @@ local myTeam
 local frameNow=0
 local finished=false
 local aa={}          -- unitID -> {def,x,z,created,done,builder}
-local aaDefs={armrl=true,corrl=true,legrl=true}
+local aaDefs={armrl=true,corrl=true,legrl=true,armcir=true,corerad=true,leglupara=true,armferret=true,cormadsam=true,legrhapsis=true}
 local deaths={}
 local hostUnits={}   -- unitID -> def (hive, porc, drones)
 local inReach={}     -- builder unitID -> true while inside the porc's reach
@@ -137,10 +137,10 @@ local function gameFrame(f)
         echo(string.format("AI structures at (%d,%d): %d",cfg.sx,cfg.sz,#cfg.ai))
     end
     if f==(cfg.hiveAt or 450) then
-        give("leghive",myTeam,cfg.hx,cfg.hz)
+        for _,h in ipairs(cfg.hives or {{cfg.hx,cfg.hz}}) do give("leghive",myTeam,h[1],h[2]) end
         give(cfg.porc,myTeam,cfg.px,cfg.pz)
         for _,e in ipairs(cfg.power or {}) do give(e[1],myTeam,e[2],e[3]) end
-        echo(string.format("hive at (%d,%d), %s at (%d,%d)",cfg.hx,cfg.hz,cfg.porc,cfg.px,cfg.pz))
+        echo(string.format("hives %d, first at (%d,%d), %s at (%d,%d)",#(cfg.hives or {1}),cfg.hx,cfg.hz,cfg.porc,cfg.px,cfg.pz))
     end
     if #queue>0 then Spring.SendCommands(table.remove(queue,1)) end
     if f%15==0 and f>(cfg.aiAt or 240) then scan(f) end

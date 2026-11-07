@@ -41,6 +41,7 @@ def main():
     p.add_argument('--side', choices=sorted(SIDE_UNITS), default='cortex')
     p.add_argument('--porc', choices=sorted(PORC), default='leglht')
     p.add_argument('--porc-from-hive', type=int, default=150, help='porc distance from the Hive toward SITE')
+    p.add_argument('--hives', type=int, choices=[1, 2], default=1, help='2: a second Hive 850 from SITE at a right angle to the first (more than 6 drones at once; one Hive holds at most 6)')
     p.add_argument('--los', action='store_true', help='global LOS for the AI from frame 60: the Hive is a seen (identified) carrier before its drones arrive')
     p.add_argument('--minutes', type=float, default=7)
     p.add_argument('--wall-minutes', type=float, default=20)
@@ -75,17 +76,18 @@ def main():
     u = math.sqrt(0.5)
     hive = (SITE[0] + HIVE_DIST * u, SITE[1] + HIVE_DIST * u)
     porc = (hive[0] - a.porc_from_hive * u, hive[1] - a.porc_from_hive * u)
+    hives = [hive] + ([(SITE[0] - HIVE_DIST * u, SITE[1] + HIVE_DIST * u)] if a.hives == 2 else [])
     lab, solar, mex, con = SIDE_UNITS[a.side]
     ai = [(lab, 0, 0), (solar, -200, 60), (mex, 60, -200), (con, -260, -260)]
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     lua = lambda rows: '{' + ','.join('{"%s",%d,%d}' % r for r in rows) + '}'
     conf = ('return {side="%s", sx=%d, sz=%d, hx=%d, hz=%d, porc="%s", px=%d, pz=%d, porcRange=%d, ai=%s, '
-            'power={{"armafus",%d,%d}}, aiLos=%s, aiAt=240, hiveAt=450, timeoutMin=%s}\n') % (
+            'hives={%s}, power={{"armafus",%d,%d}}, aiLos=%s, aiAt=240, hiveAt=450, timeoutMin=%s}\n') % (
         a.side, SITE[0], SITE[1], hive[0], hive[1], a.porc, porc[0], porc[1], PORC[a.porc], lua(ai),
-        HOST_START[0] - 300, HOST_START[1] - 300, 'true' if a.los else 'false', a.minutes - 0.2)
+        ','.join('{%d,%d}' % h for h in hives), HOST_START[0] - 300, HOST_START[1] - 300, 'true' if a.los else 'false', a.minutes - 0.2)
     (d / 'LuaUI/Config/drone_aa.lua').write_text(conf)
     (d / 'scenario.json').write_text(json.dumps({'dll': a.dll, 'map': MAP, 'side': a.side, 'site': SITE, 'hive': hive,
-        'los': a.los, 'porc': a.porc, 'porc_at': porc, 'porc_range': PORC[a.porc], 'ai': ai}, indent=2))
+        'hives': hives, 'los': a.los, 'porc': a.porc, 'porc_at': porc, 'porc_range': PORC[a.porc], 'ai': ai}, indent=2))
     if a.stage_only:
         return 0
     from playtest import running_pids
