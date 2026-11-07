@@ -127,7 +127,7 @@ namespace Military {
 		if (t !is null) return t;
 		@t = TechCapitalRush::MilitaryTask(u);   // a capital bomber waits at home for its wave
 		if (t !is null) return t;
-		@t = TechHeavyDelivery::MilitaryTask(u);   // variant: our heavy delivery to a FRONT
+		@t = TechHeavyDelivery::MilitaryTask(u);   // owner 2026-11-06: our heavy delivery to a FRONT kept over D-457
         if (t !is null) return t;
         @t = AmphibiousOps::MilitaryTask(u);
         if (t !is null) return t;
