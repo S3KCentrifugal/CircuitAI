@@ -9,8 +9,13 @@
 #define SRC_CIRCUIT_TASK_STATIC_SUPERTASK_H_
 
 #include "task/fighter/FighterTask.h"
+#include "task/static/TierTargeting.h"
 
+#include <algorithm>
 #include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace circuit {
 
@@ -30,6 +35,29 @@ public:
 
 	// Script hooks
 	void SetTargetPos(const springai::AIFloat3& pos);
+	// Tiered fire (lolcannons, owner 2026-10-26): once any def has a tier the
+	// task fires only at roster defs in range, best tier first (TierTargeting.h),
+	// and otherwise stops; the script holds the unit's fire so the engine never
+	// picks a target of its own. tier <= 0 takes a def off the roster.
+	void SetTargetTier(const CCircuitDef* edef, int tier);
+	void SetTierRetarget(int frames) { tierRetargetFrames = std::max(1, frames); }
+	int GetTierTargetId() const { return tierTargetId; }
+	int GetTierCount() const { return int(tierByDef.size()); }
+	// Area rotation (owner 2026-10-27): the roster targets in range are grouped
+	// into areas of `radius` (TierTargeting.h BuildAreas) and the gun works down
+	// the top `areas` of them: dwellShots > 0 shots on each (Starfall), else
+	// dwellFrames (Ragnarok, Calamity), then back to the top. Fresh scouting
+	// that changes the top area sends it back to the top at once. areas <= 1:
+	// best target first, as before.
+	void SetTierRotation(int areas, int dwellFrames, int dwellShots, float radius);
+	// The ranked areas at the last scan, for any script to read: index 0 is the
+	// highest rated. Out of range: an invalid position, -1, 0.
+	int GetTierAreaCount() const { return int(tierAreas.size()); }
+	int GetTierAreaIndex() const { return tierAreas.empty() ? -1 : tierRotation.index; }
+	springai::AIFloat3 GetTierAreaPos(int i) const;
+	int GetTierAreaTier(int i) const { return ValidArea(i) ? tierAreas[i].tier : -1; }
+	float GetTierAreaMetal(int i) const { return ValidArea(i) ? tierAreas[i].metal : 0.f; }
+	int GetTierAreaTargetId(int i) const { return ValidArea(i) ? tierAreaTargets[i] : -1; }
 
 private:
 	void ExecuteAttack(CCircuitUnit* unit);
@@ -67,6 +95,13 @@ private:
 	bool SelectSuspectedJammer(CCircuitUnit* unit, CCircuitDef* cdef);
 	// EMP: the most valuable target the shot can actually hold, structures first.
 	bool SelectEmpTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	// Tiered fire: the roster scan and the order; see SetTargetTier.
+	void UpdateTiered(CCircuitUnit* unit);
+	// Area rotation: which candidate to fire at, -1 none; see SetTierRotation.
+	int PickTierArea(CCircuitUnit* unit, const std::vector<tier::Candidate>& candidates);
+	bool ValidArea(int i) const { return (i >= 0) && (i < int(tierAreas.size())); }
+	// A shot from a tiered gun (the weapon-fired event): one per burst.
+	void CountTierShot(CCircuitUnit* unit, int frame);
 
 	int targetFrame;
 	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
@@ -74,6 +109,8 @@ public:
 	// D-124: where the silo aims: the attacked unit, else the aimed ground
 	springai::AIFloat3 GetAimPos() const;
 	static bool IsNukeSilo(CCircuitDef* cdef);
+	// Ragnarok, Calamity, Starfall (systems/construction/lolcannon.as CANNONS)
+	static bool IsLolCannon(CCircuitDef* cdef);
 	// D-124: a launch seen (the weapon-fired event, or a stockpile drop): the
 	// smiley over the aim, once per launch
 	void OnLaunch(CCircuitUnit* unit, const char* how);
@@ -83,6 +120,23 @@ private:
 	bool isTargetOverride;
 	int stockSinceFrame;  // first frame a shot has been waiting; -1 while the tube is empty
 	int lastStrategicLaunch = -1000000;
+	// Tiered fire. tierByDef: def id -> tier, set once per weapon by the script.
+	std::unordered_map<int, int> tierByDef;
+	int tierRetargetFrames = 60;      // a roster scan at most this often while a target lives
+	int tierTargetId = -1;            // the enemy under fire, -1 none
+	int tierOrderFrame = -1000000;    // the last attack order, re-issued before its timeout
+	bool tierOrderOnUnit = false;     // that order was on the unit (else on its ground)
+	int tierAreaMax = 1;              // the areas the rotation works through; 1 = off
+	int tierDwellFrames = 0;
+	int tierDwellShots = 0;
+	float tierAreaRadius = 300.f;
+	tier::Rotation tierRotation;
+	std::vector<tier::Area> tierAreas;      // ranked, at the last scan
+	std::vector<int> tierAreaTargets;       // each area's aim, as an enemy id
+	std::unordered_set<int> tierSeenNow;            // candidate ids of this scan
+	std::unordered_map<int, int> tierLastSeen;      // candidate id -> the last scan that had it, kept TIER_SEEN_FRAMES
+	int tierShotFrame = -1000000;     // the last shot counted
+	int tierShotGap = -1;             // frames between two shots of the main weapon's salvos; -1 not yet known
 };
 
 } // namespace circuit

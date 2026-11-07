@@ -174,6 +174,28 @@ namespace Air {
             float StrikeImmediatePriority = 4.0f; // visible local AFUS interrupts a committed raid; 0 disables
             float StrikeImmediateRadius = 1800.0f;
             int RadarWaveSize = 20;
+            // Mixed sweeps supersede the old continuous twenty-radar controller.
+            bool ScoutSweepEnabled = true;
+            int ScoutSweepT1Count = 10;
+            int ScoutSweepRadarCount = 4;
+            int ScoutSweepFirstSeconds = 120;
+            int ScoutSweepIntervalSeconds = 300;
+            int ScoutSweepTimeoutSeconds = 240;
+            float ScoutSweepMetal = 60.0f;
+            float ScoutSweepEnergy = 2000.0f;
+            // Drafted scouting (owner 2026-10-31): an urgent package takes 3 radar planes;
+            // a package still forming this long outside a base emergency flies with what
+            // it has (the clock stops while the base defends).
+            int NukeScoutRadarCount = 3;
+            int ScoutSweepFormSeconds = 90;
+            // Base emergency (owner 2026-11-03): when the base response's contact goes on
+            // while a package is forming or due, the scouts and radar planes already built
+            // fly it at once (never fighters: the base needs them); the rest is owed and
+            // forms while the base defends, flying once the emergency is over. A new
+            // emergency within ScoutSweepEmergencyRearmSeconds of the last draft drafts
+            // nothing (the contact can flip every few seconds).
+            bool ScoutSweepEmergencyDraft = true;
+            int ScoutSweepEmergencyRearmSeconds = 30;
             int RadarWaveIntervalSeconds = 600;
             int RadarMaxWaitSeconds = 90; // launch available planes even below the full cohort
             int RadarPatrolCheckSeconds = 2;

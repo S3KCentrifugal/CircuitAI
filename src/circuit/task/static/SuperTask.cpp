@@ -18,6 +18,7 @@
 #include "Command.h"
 #include "Sim/Units/CommandAI/Command.h"
 #include "task/static/StrategicTargeting.h"
+#include "task/static/TierTargeting.h"
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitWDef.h"
 
@@ -27,6 +28,8 @@
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "spring/SpringCallback.h"
+#include "WeaponMount.h"
+#include "WeaponDef.h"
 
 #include "spring/SpringMap.h"
 
@@ -105,6 +108,11 @@ void CSuperTask::Update()
 
 	if (unit->Blocker() != nullptr) {
 		return;  // Do not interrupt current action
+	}
+
+	if (!tierByDef.empty()) {
+		UpdateTiered(unit);
+		return;
 	}
 
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -817,6 +825,12 @@ bool CSuperTask::IsNukeSilo(CCircuitDef* cdef)
 	return (name == "armsilo") || (name == "corsilo") || (name == "legsilo");
 }
 
+bool CSuperTask::IsLolCannon(CCircuitDef* cdef)
+{
+	const std::string name = cdef->GetDef()->GetName();
+	return (name == "armvulc") || (name == "corbuzz") || (name == "legstarfall");
+}
+
 AIFloat3 CSuperTask::GetAimPos() const
 {
 	if (!isTargetOverride && (GetTarget() != nullptr)) {
@@ -830,6 +844,7 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitDef* d = unit->GetCircuitDef();
+	CountTierShot(unit, frame);
 	const bool nuke = IsNukeSilo(d), pulse = IsPulse(d);
 	if (!nuke && !pulse) return;
 	if (frame - lastStrategicLaunch <= SMILEY_DEDUPE_EVENT) return;
@@ -862,6 +877,225 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	circuit->LOG("NUKE: launched from %s(%i) at (%.0f, %.0f) (%s): a smiley on the target (D-124)",
 			unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), at.x, at.z, how);
 	circuit->DrawSmiley(at, SMILEY_RADIUS);
+}
+
+void CSuperTask::SetTargetTier(const CCircuitDef* edef, int tier)
+{
+	if (edef == nullptr) return;
+	if (tier > 0) tierByDef[edef->GetId()] = tier;
+	else tierByDef.erase(edef->GetId());
+}
+
+/*
+ * Tiered fire (lolcannons, owner 2026-10-26). One pass over the enemy datas
+ * (hostile and peaceful: an advanced fusion is unarmed) every
+ * tierRetargetFrames, at once when the target under fire is gone: O(enemies)
+ * with one hash lookup each, per lolcannon, so a few hundred lookups every two
+ * seconds for the one or two an AI owns. Mobile roster units count only while
+ * in radar or LOS; structures also at their remembered position. Orders: one
+ * attack on a new target, else one every 30 s before the 60 s order timeout,
+ * or when a target seen only as ground comes into sight. No roster unit in
+ * range: one stop, then nothing, and the script's hold fire keeps the engine
+ * from spending the gun on spam.
+ */
+void CSuperTask::UpdateTiered(CCircuitUnit* unit)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	if ((tierTargetId >= 0) && (circuit->GetEnemyInfo(tierTargetId) == nullptr)) {
+		targetFrame = frame - tierRetargetFrames;  // the target is gone: the next one now
+	}
+	if ((tierAreaMax > 1) && (tierDwellShots <= 0) && !tierAreas.empty()
+		&& (frame - tierRotation.since >= tierDwellFrames))
+	{
+		targetFrame = frame - tierRetargetFrames;  // the dwell is up: the next area now
+	}
+	if (targetFrame + tierRetargetFrames > frame) {
+		return;
+	}
+	targetFrame = frame;
+
+	const bool byArea = (tierAreaMax > 1);
+	std::vector<tier::Candidate> candidates;
+	std::vector<const SEnemyData*> candidateDatas;
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	const int canTargetCat = cdef->GetTargetCategory();
+	tier::Candidate best{-1, 0, 0.f, 0.f};
+	const SEnemyData* bestData = nullptr;
+	const auto* enemies = circuit->GetEnemyManager();
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
+		for (const SEnemyData& e : *pool) {
+			if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore() || (e.cdef == nullptr)) {
+				continue;
+			}
+			const auto it = tierByDef.find(e.cdef->GetId());
+			if ((it == tierByDef.end()) || (!byArea && (bestData != nullptr) && (it->second > best.tier))) {
+				continue;
+			}
+			if (((canTargetCat & e.cdef->GetCategory()) == 0) || (e.cdef->IsMobile() && !e.IsInRadarOrLOS())) {
+				continue;
+			}
+			const float sqDist = position.SqDistance2D(e.pos);
+			if (sqDist >= maxSqRange) {
+				continue;
+			}
+			const tier::Candidate c{e.id, it->second, e.cost, sqDist, e.pos.x, e.pos.z};
+			if (byArea) {
+				candidates.push_back(c);
+				candidateDatas.push_back(&e);
+				continue;
+			}
+			if (tier::Better(c, (bestData == nullptr) ? nullptr : &best, tierTargetId)) {
+				best = c;
+				bestData = &e;
+			}
+		}
+	}
+	if (byArea) {
+		const int pick = PickTierArea(unit, candidates);
+		if (pick >= 0) {
+			best = candidates[pick];
+			bestData = candidateDatas[pick];
+		}
+	}
+
+	if (bestData == nullptr) {
+		if ((tierTargetId >= 0) || (State::ENGAGE == state)) {
+			TRY_UNIT(circuit, unit,
+				unit->CmdStop();
+			)
+			circuit->LOG("TIER: team=%i %s(%i): no roster target in range (%.0f); holding fire",
+					circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange());
+		}
+		tierTargetId = -1;
+		SetTarget(nullptr);
+		state = State::ROAM;
+		return;
+	}
+
+	CEnemyInfo* info = circuit->GetEnemyInfo(bestData->id);
+	const bool onUnit = (info != nullptr) && info->IsInRadarOrLOS() && !circuit->IsCheating();
+	const bool isNew = (bestData->id != tierTargetId);
+	if (!isNew && (State::ENGAGE == state) && (onUnit == tierOrderOnUnit)
+		&& (frame - tierOrderFrame < FRAMES_PER_SEC * 30))
+	{
+		return;  // still on it
+	}
+	if (isNew) {
+		circuit->LOG("TIER: team=%i frame=%i %s(%i): tier %i %s(%i) cost=%.0f at (%i,%i), %.0f away%s",
+				circuit->GetTeamId(), frame, cdef->GetDef()->GetName(), unit->GetId(), best.tier, bestData->cdef->GetDef()->GetName(), bestData->id,
+				bestData->cost, int(bestData->pos.x), int(bestData->pos.z), std::sqrt(best.sqDist), onUnit ? "" : " (last seen)");
+	}
+	tierTargetId = bestData->id;
+	isTargetOverride = false;
+	SetTarget(info);
+	targetPos = bestData->pos;
+	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
+	ExecuteAttack(unit);
+	tierOrderFrame = frame;
+	tierOrderOnUnit = onUnit;
+}
+
+void CSuperTask::SetTierRotation(int areas, int dwellFrames, int dwellShots, float radius)
+{
+	tierAreaMax = std::max(1, areas);
+	tierDwellFrames = std::max(1, dwellFrames);
+	tierDwellShots = std::max(0, dwellShots);
+	tierAreaRadius = std::max(1.f, radius);
+	tier::Restart(tierRotation, manager->GetCircuit()->GetLastFrame());
+}
+
+AIFloat3 CSuperTask::GetTierAreaPos(int i) const
+{
+	if (!ValidArea(i)) return -RgtVector;
+	return AIFloat3(tierAreas[i].x, 0.f, tierAreas[i].z);
+}
+
+/*
+ * The area rotation (owner 2026-10-27): rank the areas, restart at the top when
+ * fresh scouting changed the top one (TopChanged), else move on once the dwell
+ * is up. One log line, with the whole ranking, whenever the area changes.
+ */
+int CSuperTask::PickTierArea(CCircuitUnit* unit, const std::vector<tier::Candidate>& candidates)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	tierAreas = tier::BuildAreas(candidates, tierAreaRadius, tierTargetId, size_t(tierAreaMax));
+	tierAreaTargets.clear();
+	for (const tier::Area& a : tierAreas) tierAreaTargets.push_back(candidates[a.aim].id);
+	tierSeenNow.clear();
+	for (const tier::Candidate& c : candidates) tierSeenNow.insert(c.id);
+	// "Seen" spans TIER_SEEN_FRAMES (a3: commanders flickering in and out of
+	// radar restarted the rotation 19 times in 29): the old top still counts
+	// while it lives and was a candidate that recently; only a target new for
+	// that long is fresh news.
+	constexpr int TIER_SEEN_FRAMES = FRAMES_PER_SEC * 30;
+	auto seenLately = [this, frame](int id) {
+		const auto it = tierLastSeen.find(id);
+		return (it != tierLastSeen.end()) && (frame - it->second <= TIER_SEEN_FRAMES);
+	};
+	const int oldTop = tierRotation.topId;
+	const bool oldTopStill = (tierSeenNow.count(oldTop) > 0)
+		|| ((oldTop >= 0) && (circuit->GetEnemyInfo(oldTop) != nullptr) && seenLately(oldTop));
+	const int top = tierAreas.empty() ? -1 : tierAreas[0].seedId;
+	const bool topSeenBefore = seenLately(top);
+	for (const tier::Candidate& c : candidates) tierLastSeen[c.id] = frame;
+	for (auto it = tierLastSeen.begin(); it != tierLastSeen.end();) {
+		if (frame - it->second > TIER_SEEN_FRAMES) it = tierLastSeen.erase(it); else ++it;
+	}
+	const int oldIndex = tierRotation.index;
+	const char* why = nullptr;
+	if (tier::TopChanged(oldTop, top, oldTopStill, topSeenBefore)) {
+		tier::Restart(tierRotation, frame);
+		why = "the top area changed";
+	} else if (tier::Advance(tierRotation, int(tierAreas.size()), frame, tierDwellFrames, tierDwellShots)) {
+		why = (tierRotation.index == 0) ? "back to the top" : "next area";
+	}
+	tierRotation.topId = top;
+	if (tierAreas.empty()) {
+		return -1;
+	}
+	if ((why != nullptr) || (oldIndex != tierRotation.index)) {
+		std::string ranking;
+		for (size_t i = 0; i < tierAreas.size(); ++i) {
+			const tier::Area& a = tierAreas[i];
+			ranking += std::format("{}#{} t{} {:.0f}m ({},{})", i ? "; " : "", i + 1, a.tier, a.metal, int(a.x), int(a.z));
+		}
+		circuit->LOG("TIER: team=%i frame=%i %s(%i): area %i of %i (%s): %s",
+				circuit->GetTeamId(), frame, unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
+				tierRotation.index + 1, int(tierAreas.size()), (why != nullptr) ? why : "fewer areas", ranking.c_str());
+	}
+	return tierAreas[tierRotation.index].aim;
+}
+
+void CSuperTask::CountTierShot(CCircuitUnit* unit, int frame)
+{
+	if (tierByDef.empty() || (tierAreaMax <= 1) || (tierDwellShots <= 0)) return;
+	// A salvo raises one event per projectile: shots closer than the main
+	// weapon's salvo plus half its reload are one shot. The def's own reload
+	// time is its quickest weapon's (b3: the Starfall moved on after 1-7 s).
+	if (tierShotGap < 0) {
+		float reload = 0.f, salvo = 0.f;
+		auto mounts = unit->GetCircuitDef()->GetDef()->GetWeaponMounts();
+		for (springai::WeaponMount* mount : mounts) {
+			springai::WeaponDef* wd = mount->GetWeaponDef();
+			if (wd->GetReload() > reload) {
+				reload = wd->GetReload();
+				salvo = wd->GetSalvoDelay() * std::max(0, wd->GetSalvoSize() - 1);
+			}
+			delete wd;
+			delete mount;
+		}
+		tierShotGap = std::max(FRAMES_PER_SEC / 2, int((salvo + reload * 0.5f) * FRAMES_PER_SEC));
+		manager->GetCircuit()->LOG("TIER: %s(%i): one shot = fire events within %i frames (reload %.1f s, salvo %.1f s)",
+				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), tierShotGap, reload, salvo);
+	}
+	if (frame - tierShotFrame < tierShotGap) return;
+	tierShotFrame = frame;
+	if (++tierRotation.shots >= tierDwellShots) {
+		targetFrame = frame - tierRetargetFrames;  // the next area at the next update
+	}
 }
 
 void CSuperTask::SetTargetPos(const AIFloat3& pos)
