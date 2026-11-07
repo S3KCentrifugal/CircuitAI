@@ -221,6 +221,32 @@ struct CommanderGroupConfig {
     float tacticalT2=0,tacticalMetal=4000,tacticalEnergy=.25f;
     float tacticalCols=3,tacticalRows=3,tacticalMinFill=.5f,tacticalRear=300;
     float tacticalRetrySeconds=10,tacticalOrderSeconds=300;
+    // D-479: static artillery in the tactical queue. T2 (Rattlesnake class)
+    // from artilleryT2Income metal/s; the T1 fallback (Gauntlet class) from
+    // artilleryT1Income, below the T2 income or with no T2 seat. Both need the
+    // metal floating (bank >= artilleryBank of storage, or spare income >=
+    // artillerySpare), the energy bank >= artilleryEnergy of storage without a
+    // stall and, with artilleryEnergyCover, spare energy income covering the
+    // turret's build draw. Incomes 0: off.
+    float artilleryT2Income=0,artilleryT1Income=0,artilleryBank=.75f,artillerySpare=15;
+    float artilleryEnergy=.5f,artilleryEnergyCover=1;
+    // D-480: the FRONT seat's T1 constructor in the group takes every open mex
+    // it owns in its base (seatBaseRadius of the start), then every one along
+    // its lane up to the commander (seatApproachAhead past it), before any
+    // other group work. seatMex 0: off.
+    float seatMex=0,seatBaseRadius=1200,seatApproachAhead=0;
+    // A blocked spot: features within seatClearRadius are reclaimed first; any
+    // other blocker skips the spot for seatSkipSeconds.
+    float seatClearRadius=64,seatSkipSeconds=30;
+    // D-481: a T2 group constructor upgrades our own front-line T1 geo to the
+    // fortified one (Prude, Cerberus, Rampart). Front line: in the group lane band
+    // and within group radius plus build reach of the commander (where it places
+    // porc) to start; kept while within geoFrontRadius. geoFortify 0: off.
+    float geoFortify=0,geoIncome=20,geoFrontRadius=1800;
+    // After a guard geo (Cerberus) finishes: geoGuardFront light lasers
+    // geoGuardFrontOffset ahead along the lane, geoGuardSpacing apart, and
+    // one flak geoGuardSideOffset to each side; plan dropped after geoGuardSeconds.
+    float geoGuardFront=2,geoGuardFrontOffset=192,geoGuardSpacing=128,geoGuardSideOffset=192,geoGuardSeconds=240;
     // D-476: expansion jobs the group runs at once (one per constructor); 1
     // keeps the single shared job of D-470 and earlier.
     float expansionJobs=1;
@@ -406,18 +432,37 @@ private:
     // TaskFinished. The block is the layout group its slots come from; not
     // serialized (after a load a new block is reserved).
     IUnitTask* tacticalJob=nullptr;
-    std::vector<int> tacticalDefs;          // script-owned, first buildable wins
-    int tacticalGroup=0,tacticalNext=0;     // reservation group; next block try (frame)
-    springai::AIFloat3 tacticalCentre{-1,0,-1};
-    float tacticalRadius=0;                 // half-diagonal of the reserved block
+    std::vector<int> tacticalDefs;          // launchers, script-owned, first buildable wins
+    std::vector<int> artilleryT2Defs,artilleryT1Defs;  // D-479: static artillery, script-owned
+    // D-479: one reserved block per definition (T1 and T2 footprints differ).
+    struct TacticalBlock { int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0; };
+    std::map<int,TacticalBlock> tacticalBlocks;
+    // D-480: seat mex spots blocked by a unit or structure, and the frame each skip ends.
+    std::vector<std::pair<springai::AIFloat3,int>> seatMexSkip;
+    // D-481: the one fortified-geo job, its definitions (script-owned) and the
+    // guard plans of finished guard geos. Task pointers clear in TaskFinished.
+    IUnitTask* geoJob=nullptr;
+    int geoNext=0;
+    std::vector<int> geoDefs,geoGuardDefs,geoGuardFrontDefs,geoGuardSideDefs;
+    struct GeoGuard { springai::AIFloat3 pos; float fx=0,fz=1; int next=0,until=0; IUnitTask* task=nullptr; };
+    std::vector<GeoGuard> geoGuards;
+    int tacticalNext=0;                     // next block search (frame)
     bool IsTacticalDef(const CCircuitDef* def) const;
+    float TacticalBlockRadius(const CCircuitDef* def) const;
+    bool OnTacticalBlock(const CCircuitDef* def,const springai::AIFloat3& site) const;
     int GroupT2Count() const;
-    bool TacticalEconomy() const;
+    bool TacticalEconomy() const;           // the launcher gate (D-475)
+    bool ArtilleryEconomy(CCircuitUnit* unit,CCircuitDef* def) const;
+    CCircuitDef* TacticalChoice(CCircuitUnit* unit) const;
     bool TacticalJobAllowed(CCircuitUnit* unit,IUnitTask* task,CCircuitUnit* anchor) const;
     bool ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,int frame);
     IUnitTask* GroupTacticalWork(CCircuitUnit* unit,CCircuitUnit* anchor,bool nearby);
+    IUnitTask* GroupSeatMexWork(CCircuitUnit* unit,CCircuitUnit* anchor);
+    bool GeoFrontLine(CCircuitUnit* anchor,const springai::AIFloat3& pos,float radius) const;
+    bool GeoJobAllowed(CCircuitUnit* unit,CCircuitUnit* anchor) const;
+    IUnitTask* GroupGeoWork(CCircuitUnit* unit,CCircuitUnit* anchor);
+    IUnitTask* GroupGeoGuardWork(CCircuitUnit* unit,CCircuitUnit* anchor);
     bool TacticalSplit(CCircuitUnit* unit) const;
-    bool CanBuildTactical(CCircuitUnit* unit) const;
     springai::AIFloat3 groupNanoSite{-1,0,-1};
     bool groupNanoDue=false;
     unsigned groupNanoOwed=0;

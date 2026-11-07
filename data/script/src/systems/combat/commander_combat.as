@@ -144,6 +144,51 @@ namespace CommanderCombat {
             Option("commander_group_tactical_order_seconds",300.f);
             // D-476: expansion jobs at once (one per constructor); 1 keeps the single job.
             Option("commander_group_expansion_jobs",1.f);
+            // D-479: static artillery on the tactical queue (incomes 0: off).
+            Option("commander_group_artillery_t2_income",0.f);
+            Option("commander_group_artillery_t1_income",0.f);
+            Option("commander_group_artillery_bank",.75f);
+            Option("commander_group_artillery_spare",15.f);
+            Option("commander_group_artillery_energy",.5f);
+            Option("commander_group_artillery_energy_cover",1.f);
+            // D-480: the seat's T1 constructor collects base, then approach, mexes first (0: off).
+            Option("commander_group_seat_mex",0.f);
+            Option("commander_group_seat_base_radius",1200.f);
+            Option("commander_group_seat_approach_ahead",0.f);
+            Option("commander_group_seat_clear_radius",64.f);
+            Option("commander_group_seat_skip_seconds",30.f);
+            // D-481: front-line geo fortification and the Cerberus guard (0: off).
+            Option("commander_group_geo_fortify",0.f);
+            Option("commander_group_geo_income",20.f);
+            Option("commander_group_geo_front_radius",1800.f);
+            Option("commander_group_geo_guard_front",2.f);
+            Option("commander_group_geo_guard_front_offset",192.f);
+            Option("commander_group_geo_guard_spacing",128.f);
+            Option("commander_group_geo_guard_side_offset",192.f);
+            Option("commander_group_geo_guard_seconds",240.f);
+            {
+                const array<string> keys={"commander_group_geo_definition","commander_group_geo_guard_definition",
+                    "commander_group_geo_guard_front_definition","commander_group_geo_guard_side_definition"};
+                const array<string> defaults={"armgmm,corbhmth,legrampart","corbhmth","armllt,corllt,leglht","armflak,corflak,legflak"};
+                for(uint k=0;k<keys.length();++k) {
+                    aiBuilderMgr.SetCommanderCombatOption(keys[k],-1.f);
+                    array<string>@ names=aiSetupMgr.ConfigString("commander/combat/"+keys[k]+"s",defaults[k]).split(",");
+                    for(uint i=0;i<names.length();++i) {
+                        CCircuitDef@ def=ai.GetCircuitDef(names[i]);
+                        if(def !is null) aiBuilderMgr.SetCommanderCombatOption(keys[k],float(def.id));
+                    }
+                }
+            }
+            for(uint tier=0;tier<2;++tier) {
+                const string key=tier==0?"commander_group_artillery_t2_definition":"commander_group_artillery_t1_definition";
+                aiBuilderMgr.SetCommanderCombatOption(key,-1.f);
+                array<string>@ names=aiSetupMgr.ConfigString("commander/combat/"+key+"s",
+                    tier==0?"armamb,cortoast,legacluster":"armguard,corpun,legcluster").split(",");
+                for(uint i=0;i<names.length();++i) {
+                    CCircuitDef@ gun=ai.GetCircuitDef(names[i]);
+                    if(gun !is null) aiBuilderMgr.SetCommanderCombatOption(key,float(gun.id));
+                }
+            }
             aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",-1.f);
             array<string>@ tacticalNames=aiSetupMgr.ConfigString("commander/combat/commander_group_tactical_definitions",
                 "armemp,cortron,legperdition").split(",");

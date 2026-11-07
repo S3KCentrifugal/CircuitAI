@@ -116,6 +116,25 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::tacticalRetrySeconds>("commander_group_tactical_retry_seconds",1,600),
         Group<&GC::tacticalOrderSeconds>("commander_group_tactical_order_seconds",30,1200),
         Group<&GC::expansionJobs>("commander_group_expansion_jobs",1,6),
+        Group<&GC::artilleryT2Income>("commander_group_artillery_t2_income",0,100000),
+        Group<&GC::artilleryT1Income>("commander_group_artillery_t1_income",0,100000),
+        Group<&GC::artilleryBank>("commander_group_artillery_bank",0,1),
+        Group<&GC::artillerySpare>("commander_group_artillery_spare",0,100000),
+        Group<&GC::artilleryEnergy>("commander_group_artillery_energy",0,1),
+        Group<&GC::artilleryEnergyCover>("commander_group_artillery_energy_cover",0,1),
+        Group<&GC::seatMex>("commander_group_seat_mex",0,1),
+        Group<&GC::seatBaseRadius>("commander_group_seat_base_radius",0,6000),
+        Group<&GC::seatApproachAhead>("commander_group_seat_approach_ahead",-2000,4000),
+        Group<&GC::seatClearRadius>("commander_group_seat_clear_radius",0,256),
+        Group<&GC::seatSkipSeconds>("commander_group_seat_skip_seconds",0,600),
+        Group<&GC::geoFortify>("commander_group_geo_fortify",0,1),
+        Group<&GC::geoIncome>("commander_group_geo_income",0,1000),
+        Group<&GC::geoFrontRadius>("commander_group_geo_front_radius",0,6000),
+        Group<&GC::geoGuardFront>("commander_group_geo_guard_front",0,4),
+        Group<&GC::geoGuardFrontOffset>("commander_group_geo_guard_front_offset",0,1000),
+        Group<&GC::geoGuardSpacing>("commander_group_geo_guard_spacing",0,1000),
+        Group<&GC::geoGuardSideOffset>("commander_group_geo_guard_side_offset",0,1000),
+        Group<&GC::geoGuardSeconds>("commander_group_geo_guard_seconds",0,1200),
         Group<&GC::jammerEdge>("commander_group_jammer_edge",0,1000),
         Group<&GC::jammerGain>("commander_group_jammer_gain",0,1),
         Group<&GC::jammerSpacing>("commander_group_jammer_spacing",0,2),
@@ -325,6 +344,25 @@ float CCommanderController::GetDeficit() const {
 }
 bool CCommanderController::SetOption(const std::string& name,float value) {
     if(!std::isfinite(value)) return false;
+    if(name=="commander_group_artillery_t2_definition" || name=="commander_group_artillery_t1_definition") {  // D-479
+        auto& defs=name=="commander_group_artillery_t2_definition"?artilleryT2Defs:artilleryT1Defs;
+        if(value==-1) {defs.clear();return true;}
+        if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
+        if(std::find(defs.begin(),defs.end(),int(value))==defs.end()) defs.push_back(int(value));
+        return true;
+    }
+    {  // D-481: fortified geo, guard trigger, guard front and side lists; -1 clears, else append
+        std::vector<int>* defs=name=="commander_group_geo_definition"?&geoDefs
+            :name=="commander_group_geo_guard_definition"?&geoGuardDefs
+            :name=="commander_group_geo_guard_front_definition"?&geoGuardFrontDefs
+            :name=="commander_group_geo_guard_side_definition"?&geoGuardSideDefs:nullptr;
+        if(defs) {
+            if(value==-1) {defs->clear();return true;}
+            if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
+            if(std::find(defs->begin(),defs->end(),int(value))==defs->end()) defs->push_back(int(value));
+            return true;
+        }
+    }
     if(name=="commander_group_tactical_definition") {  // D-475: -1 clears, else append
         if(value==-1) {tacticalDefs.clear();return true;}
         if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;

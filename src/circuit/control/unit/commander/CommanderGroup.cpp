@@ -15,11 +15,12 @@
 #include "unit/ally/AllyTeam.h"
 #include "spring/SpringCallback.h"
 #include "spring/SpringUnit.h"
+#include "spring/SpringMap.h"
 #include "task/common/WaitTask.h"
 #include "task/common/RepairTask.h"
 #include "task/builder/RepairTask.h"
 #include "setup/SetupManager.h"
-#include "spring/SpringMap.h"
+#include "resource/EnergyManager.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "Log.h"
@@ -32,6 +33,14 @@
 namespace circuit {
 using springai::AIFloat3;
 using BT=IBuilderTask::BuildType;
+// D-480: spots tried per seat ask before it falls through to group work.
+constexpr int MAX_SEAT_MEX_ATTEMPTS=3;
+// D-481: a geo plant stands within this of its vent (elmos).
+constexpr float GEO_VENT_RADIUS=64.f;
+// D-481: build-site search around each guard structure's ideal spot (elmos).
+constexpr float GEO_GUARD_SEARCH=160.f;
+// D-481: lane look-ahead (elmos) for a guard geo's forward direction.
+constexpr float GEO_LANE_AHEAD=256.f;
 
 
 bool CCommanderController::IsGroupMember(int id) const {
@@ -244,7 +253,7 @@ bool CCommanderController::GroupBuildSiteAllowed(CCircuitUnit* unit,const CCircu
     if(GroupSiteAllowed(unit,site)) return true;
     // D-475: a launcher on the tactical block (reserved behind the commander,
     // which may be outside the lane polygon) is the group's own plan.
-    if(tacticalGroup>0 && IsTacticalDef(def) && site.SqDistance2D(tacticalCentre)<=SQUARE(tacticalRadius)) return true;
+    if(OnTacticalBlock(def,site)) return true;
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1));
     if(!unit || !def || cfg->front.mexMinIncome<=0) return false;
     // D-470: every planned defence was refused when the commander stood
@@ -262,7 +271,7 @@ bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,con
     if(!IsGroupMember(unit->GetId())) return true;
     auto* anchor=GroupCommander();
     return anchor && def && commander::GroupJobInRange(site.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
-        cfg->group.radius+(IsTacticalDef(def)?tacticalRadius:0.f),unit->GetCircuitDef()->GetBuildDistance(),
+        cfg->group.radius+(IsTacticalDef(def)?TacticalBlockRadius(def):0.f),unit->GetCircuitDef()->GetBuildDistance(),
         IsExpansionJob(unit->GetTask()) || (tacticalJob && unit->GetTask()==tacticalJob));
 }
 int CCommanderController::ExpansionCap() const {
@@ -314,6 +323,33 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
     for(auto& entry:states) entry.value->work.Retire(task);
+    for(auto& g:geoGuards) if(g.task==task) g.task=nullptr;  // D-481: next guard item
+    if(task==geoJob) {  // D-481
+        geoJob=nullptr;
+        auto* build=dynamic_cast<IBuilderTask*>(task);
+        auto* def=build?build->GetBuildDef():nullptr;
+        ai->LOG("[CommanderGroup] job_end queue=geo done=%i team=%i def=%s",int(done),ai->GetTeamId(),def?def->GetDef()->GetName():"none");
+        if(done && def && std::find(geoGuardDefs.begin(),geoGuardDefs.end(),def->GetId())!=geoGuardDefs.end()) {
+            GeoGuard guard;
+            guard.pos=build->GetBuildPos();
+            // Forward: along the front lane at the geo; else base -> geo.
+            auto* battle=ai->GetBattle();
+            commander::Point fwd{};
+            if(battle->GetFrontLaneLength()>0.f) {
+                const float progress=battle->GetFrontLaneProgress(guard.pos);
+                const auto ahead=battle->GetFrontLanePoint(std::min(progress+GEO_LANE_AHEAD,battle->GetFrontLaneLength()));
+                if(OnMap(ahead)) fwd=commander::Normal(commander::Point{ahead.x-guard.pos.x,ahead.z-guard.pos.z});
+            }
+            const auto base=ai->GetSetupManager()->GetBasePos();
+            if(commander::Length(fwd)<.1f) fwd=commander::Normal(commander::Point{guard.pos.x-base.x,guard.pos.z-base.z});
+            if(commander::Length(fwd)<.1f) fwd={0,1};
+            guard.fx=fwd.x; guard.fz=fwd.z;
+            guard.until=ai->GetLastFrame()+int(cfg->group.geoGuardSeconds*FRAMES_PER_SEC);
+            geoGuards.push_back(guard);
+            ai->LOG("[CommanderGroup] geo_guard_plan def=%s x=%.0f z=%.0f",def->GetDef()->GetName(),guard.pos.x,guard.pos.z);
+        }
+        return;
+    }
     if(task==tacticalJob) {  // D-475: the tactical queue's slot is free again
         tacticalJob=nullptr;
         const auto* build=dynamic_cast<IBuilderTask*>(task);
@@ -664,7 +700,56 @@ commander::Point TacticalP(const AIFloat3& p) { return {p.x,p.z}; }
 AIFloat3 TacticalF(commander::Point p) { return {p.x,0.f,p.z}; }
 }
 bool CCommanderController::IsTacticalDef(const CCircuitDef* def) const {
-    return def && std::find(tacticalDefs.begin(),tacticalDefs.end(),def->GetId())!=tacticalDefs.end();
+    if(!def) return false;
+    const int id=def->GetId();
+    for(const auto* defs:{&tacticalDefs,&artilleryT2Defs,&artilleryT1Defs})
+        if(std::find(defs->begin(),defs->end(),id)!=defs->end()) return true;
+    return false;
+}
+float CCommanderController::TacticalBlockRadius(const CCircuitDef* def) const {
+    if(!def) return 0.f;
+    const auto it=tacticalBlocks.find(def->GetId());
+    return (it!=tacticalBlocks.end() && it->second.group>0)?it->second.radius:0.f;
+}
+bool CCommanderController::OnTacticalBlock(const CCircuitDef* def,const AIFloat3& site) const {
+    if(!def || !IsTacticalDef(def)) return false;
+    const auto it=tacticalBlocks.find(def->GetId());
+    return it!=tacticalBlocks.end() && it->second.group>0 && site.SqDistance2D(it->second.centre)<=SQUARE(it->second.radius);
+}
+// D-479: static artillery may start when the metal is floating and the energy
+// carries it. The draw is this builder's own rate on the turret: energy cost
+// over (build time / its build power).
+bool CCommanderController::ArtilleryEconomy(CCircuitUnit* unit,CCircuitDef* def) const {
+    auto* eco=ai->GetEconomyManager();
+    const float spare=eco->GetAvgMetalIncome()-eco->GetMetalPullCor();
+    const float store=std::max(1.f,eco->GetMetalStore());
+    const bool floating=eco->GetMetalCur()>=cfg->group.artilleryBank*store || spare>=cfg->group.artillerySpare;
+    if(!floating || eco->IsEnergyStalling() || eco->GetEnergyCur()<cfg->group.artilleryEnergy*eco->GetEnergyStore()) return false;
+    if(cfg->group.artilleryEnergyCover>0) {
+        const float seconds=def->GetBuildTime()/std::max(1.f,unit->GetWorkerTime());
+        const float draw=def->GetCostE()/std::max(1.f,seconds);
+        if(eco->GetAvgEnergyIncome()-eco->GetEnergyPullCor()<draw) return false;
+    }
+    return true;
+}
+// D-479: what this constructor would build on the tactical queue now, or null.
+// Launchers under the D-475 gate first, then T2 artillery, then the T1 fallback
+// (below the T2 income, or no T2 seat in the group). At most a dozen defs.
+CCircuitDef* CCommanderController::TacticalChoice(CCircuitUnit* unit) const {
+    const int frame=ai->GetLastFrame();
+    const auto buildable=[&](int id) -> CCircuitDef* {
+        auto* def=ai->GetCircuitDefSafe(id);
+        return (def && unit->GetCircuitDef()->CanBuild(def) && def->IsAvailable(frame))?def:nullptr;
+    };
+    if(cfg->group.tacticalT2>0 && GroupT2Count()>=int(cfg->group.tacticalT2) && TacticalEconomy())
+        for(int id:tacticalDefs) if(auto* def=buildable(id)) return def;
+    const float income=ai->GetEconomyManager()->GetAvgMetalIncome();
+    if(cfg->group.artilleryT2Income>0 && income>=cfg->group.artilleryT2Income)
+        for(int id:artilleryT2Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def)) return def; break; }
+    if(cfg->group.artilleryT1Income>0 && income>=cfg->group.artilleryT1Income
+        && (income<cfg->group.artilleryT2Income || cfg->group.artilleryT2Income<=0 || GroupT2Count()==0))
+        for(int id:artilleryT1Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def)) return def; break; }
+    return nullptr;
 }
 int CCommanderController::GroupT2Count() const {
     // The three T2 seats only (radar, jammer and decoy seats are not workers).
@@ -695,6 +780,7 @@ bool CCommanderController::TacticalJobAllowed(CCircuitUnit* unit,IUnitTask* task
             cfg->group.radius,unit->GetCircuitDef()->GetBuildDistance(),unit->GetTask()==task);
 }
 bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,int frame) {
+    auto& block=tacticalBlocks[def->GetId()];
     if(frame<tacticalNext) return false;
     tacticalNext=frame+int(cfg->group.tacticalRetrySeconds*FRAMES_PER_SEC);
     auto* terrain=ai->GetTerrainManager();
@@ -735,8 +821,8 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
         const int group=terrain->ReserveGrid(def,front,facing,cols,rows,0);
         if(group<=0) {++grid;continue;}
         if(terrain->GetGroupCount(group,false)<minimum) { terrain->ReleaseGroup(group); ++fill; continue; }
-        tacticalGroup=group; tacticalCentre=centre;
-        tacticalRadius=.5f*std::sqrt(across*across+along*along)+size;
+        block.group=group; block.centre=centre;
+        block.radius=.5f*std::sqrt(across*across+along*along)+size;
         ai->LOG("[CommanderGroup] tactical_block group=%i slots=%i def=%s at=%.0f,%.0f facing=%i",group,
             terrain->GetGroupCount(group,false),def->GetDef()->GetName(),centre.x,centre.z,facing);
         return true;
@@ -746,63 +832,48 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
     return false;
 }
 // D-476 (the owner's rule): expansion jobs come first for every group
-// constructor, except that above tactical_metal one constructor that can build
-// a launcher works the tactical queue while the rest keep porcing ("split").
-// A constructor on a started expansion frame is not taken off it; the next
-// free one is. Below tactical_metal tactical work is overflow only (GroupWork's
+// constructor, except that one constructor with tactical work it can start
+// (TacticalChoice: launchers above tactical_metal, D-479 artillery when the
+// metal floats) works the tactical queue while the rest keep porcing
+// ("split"). A constructor on a started expansion frame is not taken off it;
+// the next free one is. Otherwise tactical work is overflow only (GroupWork's
 // last step). Seven seats at most, no scan.
-bool CCommanderController::CanBuildTactical(CCircuitUnit* unit) const {
-    const int frame=ai->GetLastFrame();
-    for(int defId:tacticalDefs) {
-        auto* def=ai->GetCircuitDefSafe(defId);
-        if(def && unit->GetCircuitDef()->CanBuild(def) && def->IsAvailable(frame)) return true;
-    }
-    return false;
-}
 bool CCommanderController::TacticalSplit(CCircuitUnit* unit) const {
     // A constructor on the live tactical job finishes it, whatever the seat
     // count or the bank does meanwhile (played, factory-b12: a T2 seat died, the
     // count fell under tactical_t2 and the half-built launcher was abandoned).
     const bool live=tacticalJob && !tacticalJob->IsDead();
     if(live && unit->GetTask()==tacticalJob && IsGroupMember(unit->GetId())) return true;
-    if(!IsGroupMember(unit->GetId()) || cfg->group.tacticalT2<=0 || tacticalDefs.empty()
-        || GroupT2Count()<int(cfg->group.tacticalT2)) return false;
-    if(!TacticalEconomy() || !CanBuildTactical(unit)) return false;
+    if(!IsGroupMember(unit->GetId()) || TacticalChoice(unit)==nullptr) return false;
     if(live && !tacticalJob->GetAssignees().empty()) return false;  // one constructor holds the split
     auto* build=dynamic_cast<IBuilderTask*>(unit->GetTask());
     return !(build && IsExpansionJob(build) && build->GetTarget());
 }
 IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUnit* anchor,bool nearby) {
-    // D-476: any group constructor that can build a launcher, once the group
-    // has tactical_t2 T2 seats (formerly the T2 seats only).
+    // D-476/D-479: any group constructor, for whatever TacticalChoice allows it.
     const int id=unit->GetId();
     // Its own live job first: finished regardless of the opening gates below.
     if(tacticalJob && !tacticalJob->IsDead() && unit->GetTask()==tacticalJob && IsGroupMember(id))
         return TacticalJobAllowed(unit,tacticalJob,anchor)?tacticalJob:nullptr;
-    if(!IsGroupMember(id) || cfg->group.tacticalT2<=0 || tacticalDefs.empty() || !unit->GetCircuitDef()->IsBuilder()
-        || GroupT2Count()<int(cfg->group.tacticalT2) || !CanBuildTactical(unit)) return nullptr;
+    if(!IsGroupMember(id) || !unit->GetCircuitDef()->IsBuilder()) return nullptr;
     const int frame=ai->GetLastFrame();
     if(tacticalJob && !tacticalJob->IsDead()) {
-        if(unit->GetTask()==tacticalJob) return TacticalJobAllowed(unit,tacticalJob,anchor)?tacticalJob:nullptr;
         if(nearby && TacticalJobAllowed(unit,tacticalJob,anchor) && tacticalJob->CanAssignTo(unit)) return tacticalJob;
         return nullptr;
     }
-    if(!nearby || HealthRetreat(unit) || EnergyRetreat(unit) || !TacticalEconomy()) return nullptr;
-    CCircuitDef* def=nullptr;
-    for(int defId:tacticalDefs) {
-        auto* candidate=ai->GetCircuitDefSafe(defId);
-        if(candidate && unit->GetCircuitDef()->CanBuild(candidate) && candidate->IsAvailable(frame)) {def=candidate;break;}
-    }
+    if(!nearby || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    CCircuitDef* def=TacticalChoice(unit);
     if(!def) return nullptr;
     auto* builder=ai->GetBuilderManager();
     auto* terrain=ai->GetTerrainManager();
     const auto center=anchor->GetPos(frame);
+    auto& block=tacticalBlocks[def->GetId()];
     // A block the commander left behind is released (its unbuilt slots only
     // matter while the group is there); a full block gives way to a new one.
-    if(tacticalGroup>0 && (tacticalCentre.SqDistance2D(center)>SQUARE(cfg->group.radius+tacticalRadius)
-        || terrain->GetGroupCount(tacticalGroup,true)<=0)) {
-        // An unfinished launcher in the old block is finished first.
-        if(auto* frameUnit=builder->FindUnfinishedNear(tacticalCentre,tacticalRadius,def)) {
+    if(block.group>0 && (block.centre.SqDistance2D(center)>SQUARE(cfg->group.radius+block.radius)
+        || terrain->GetGroupCount(block.group,true)<=0)) {
+        // An unfinished turret in the old block is finished first.
+        if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def)) {
             auto* repair=builder->EnqueueRepairFor(frameUnit,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC),unit);
             if(repair && TacticalJobAllowed(unit,repair,anchor) && (unit->GetTask()==repair || repair->CanAssignTo(unit))) {
                 tacticalJob=repair;
@@ -811,12 +882,18 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
             }
             if(repair) builder->DiscardUnusedTask(repair);
         }
-        terrain->ReleaseGroup(tacticalGroup);
-        tacticalGroup=0;
+        terrain->ReleaseGroup(block.group);
+        block.group=0;
     }
-    if(tacticalGroup<=0 && !ReserveTacticalBlock(unit,anchor,def,frame)) return nullptr;
-    const int slot=terrain->NextSlotAny(tacticalGroup,unit->GetPos(frame));
+    if(block.group<=0 && !ReserveTacticalBlock(unit,anchor,def,frame)) return nullptr;
+    const int slot=terrain->NextSlotAny(block.group,unit->GetPos(frame));
     if(slot<0) return nullptr;
+    // A builder task aborts at once, silently, when the walk to its site is not
+    // safe at the builder's power (IBuilderTask::UpdatePath). Played (artillery-b19,
+    // the owner's game on b18): a job per seat per second was made and dropped
+    // in the same frame, 37 of 45 artillery jobs. Do not start one it would drop.
+    if(!terrain->CanReachAtSafe(unit,terrain->GetReservationPos(slot),unit->GetCircuitDef()->GetBuildDistance(),
+        unit->GetCircuitDef()->GetPower())) return nullptr;
     auto* task=builder->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,terrain->GetReservationPos(slot),
         0.f,true,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC)));
     if(!task) return nullptr;
@@ -826,6 +903,208 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     ai->LOG("[CommanderGroup] job_start queue=tactical def=%s slot=%i x=%.0f z=%.0f unit=%i team=%i",
         def->GetDef()->GetName(),slot,at.x,at.z,id,ai->GetTeamId());
     return task;
+}
+/*
+ * D-480 (the owner's rule, played: an 8v8 on All That Glitters, the FRONT
+ * group skipped two mexes): before anything else the FRONT seat's T1
+ * constructor in the group (groupUnit) collects every open mex it owns in its
+ * base, then every one along its lane from the base up to the commander.
+ * EnqueueMexWithin applies the territory (never an ally's spot), hands back an
+ * order already queued, and takes the spot nearest the builder first.
+ * A spot the engine refuses (seatmex-b23 on Glitters: the mex task fell back
+ * to patrol and the spot reopened every second) is cleared by an area reclaim
+ * when features stand on it, otherwise skipped for seatSkipSeconds.
+ * Cost: at most MAX_SEAT_MEX_ATTEMPTS spot searches and feature queries per
+ * ask (once a second from the group push, plus the script's asks).
+ */
+IUnitTask* CCommanderController::GroupSeatMexWork(CCircuitUnit* unit,CCircuitUnit* anchor) {
+    if(cfg->group.seatMex<=0 || groupUnit<0 || unit->GetId()!=groupUnit || !unit->GetCircuitDef()->IsBuilder()
+        || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    auto* current=unit->GetTask();
+    // A mex order in hand, its clearing reclaim, or any frame already started, is finished first.
+    if(auto* build=dynamic_cast<IBuilderTask*>(current); build && !build->IsDead()) {
+        if(build->GetBuildType()==BT::MEX || (build->GetBuildType()==BT::RECLAIM && build->recoveryControlled)) return current;
+        if(build->GetTarget()!=nullptr) return nullptr;
+    }
+    auto* eco=ai->GetEconomyManager();
+    auto* builder=ai->GetBuilderManager();
+    const int frame=ai->GetLastFrame();
+    seatMexSkip.erase(std::remove_if(seatMexSkip.begin(),seatMexSkip.end(),
+        [frame](const auto& s) { return s.second<=frame; }),seatMexSkip.end());
+    std::vector<AIFloat3> skipped;
+    skipped.reserve(seatMexSkip.size()+MAX_SEAT_MEX_ATTEMPTS);
+    for(const auto& s:seatMexSkip) skipped.push_back(s.first);
+    const float threat=cfg->front.threat;
+    const auto safe=[this,unit,threat](const AIFloat3& p) { return ai->GetThreatMap()->GetThreatAt(unit,p)<=threat; };
+    auto* battle=ai->GetBattle();
+    const auto find=[&](const char*& phase) -> IBuilderTask* {
+        phase="base";
+        IBuilderTask* task=nullptr;
+        if(cfg->group.seatBaseRadius>0)
+            task=eco->EnqueueMexWithin(unit,ai->GetSetupManager()->GetBasePos(),cfg->group.seatBaseRadius,0,true,skipped,safe);
+        if(task || !anchor || battle->GetFrontLaneLength()<=0.f) return task;
+        phase="approach";
+        const AIFloat3 at=unit->GetPos(frame);
+        const float width=battle->GetFrontLaneWidth()+unit->GetCircuitDef()->GetBuildDistance();
+        const float limit=battle->GetFrontLaneProgress(anchor->GetPos(frame))+cfg->group.seatApproachAhead;
+        const auto approach=[battle,width,limit,&safe](const AIFloat3& p) {
+            return battle->GetFrontLaneDistance(p)<=width && battle->GetFrontLaneProgress(p)<=limit && safe(p);
+        };
+        // The whole route from the base to the commander lies within this disc.
+        const float radius=std::sqrt(at.SqDistance2D(anchor->GetPos(frame)))
+            +std::sqrt(at.SqDistance2D(ai->GetSetupManager()->GetBasePos()))+width;
+        return eco->EnqueueMexWithin(unit,at,radius,0,true,skipped,approach);
+    };
+    // Bounded: each refused spot joins the skip list, so the search ends.
+    for(int attempt=0;attempt<MAX_SEAT_MEX_ATTEMPTS;++attempt) {
+        const char* phase="";
+        IBuilderTask* task=find(phase);
+        if(!task) return nullptr;
+        const AIFloat3 pos=task->GetBuildPos();
+        if(!task->GetBuildDef() || task->GetTarget()
+            || ai->GetMap()->IsPossibleToBuildAt(task->GetBuildDef()->GetDef(),pos,task->GetFacing())) {
+            if(task!=current) ai->LOG("[CommanderGroup] seat_mex unit=%i phase=%s x=%.0f z=%.0f",unit->GetId(),phase,pos.x,pos.z);
+            return task;
+        }
+        const float clear=cfg->group.seatClearRadius;
+        if(clear>0 && unit->GetCircuitDef()->IsAbleToReclaim() && ai->GetCallback()->IsFeaturesIn(pos,clear)) {
+            if(IBuilderTask* claim=builder->GetReclaimFeatureTask(pos,clear); claim && !claim->IsDead()) {
+                if(claim->recoveryControlled && claim->GetAssignees().empty()) return claim;
+            } else if(auto* reclaim=builder->Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH,pos,0.f,
+                    int(cfg->group.seatSkipSeconds*FRAMES_PER_SEC),clear,false))) {
+                // The seat owns this clearing: never retargeted to another feature.
+                reclaim->recoveryControlled=true;
+                ai->LOG("[CommanderGroup] seat_mex_clear unit=%i phase=%s x=%.0f z=%.0f",unit->GetId(),phase,pos.x,pos.z);
+                return reclaim;
+            }
+        }
+        ai->LOG("[CommanderGroup] seat_mex_skip unit=%i phase=%s x=%.0f z=%.0f",unit->GetId(),phase,pos.x,pos.z);
+        seatMexSkip.emplace_back(pos,frame+int(cfg->group.seatSkipSeconds*FRAMES_PER_SEC));
+        skipped.push_back(pos);
+    }
+    return nullptr;
+}
+/*
+ * D-481 (the owner's rule): a T2 group constructor upgrades our own T1 geo on
+ * the front line to the fortified one (Prude, Cerberus, Rampart); backline
+ * geos stay with the economy, which may still build the hazardous advanced
+ * geo there. Front line is where the group places porc: inside the group lane
+ * band (GroupSiteAllowed) and within group radius plus build reach of the
+ * commander to start; a started job is kept while within geoFrontRadius.
+ * After a guard geo (Cerberus) finishes, the group puts light lasers ahead of
+ * it along the lane and a flak to each side, one structure at a time.
+ * Cost: one pass over the map's geo vents (tens) at most once a second, one
+ * friendly-unit query per vent in range; guard work is a few vector reads.
+ */
+bool CCommanderController::GeoFrontLine(CCircuitUnit* anchor,const AIFloat3& pos,float radius) const {
+    return anchor && pos.SqDistance2D(anchor->GetPos(ai->GetLastFrame()))<=SQUARE(radius) && GroupSiteAllowed(anchor,pos);
+}
+bool CCommanderController::GeoJobAllowed(CCircuitUnit* unit,CCircuitUnit* anchor) const {
+    auto* build=dynamic_cast<IBuilderTask*>(geoJob);
+    return build && !build->IsDead() && !HealthRetreat(unit) && !EnergyRetreat(unit)
+        && GeoFrontLine(anchor,build->GetBuildPos(),cfg->group.geoFrontRadius)
+        && ai->GetThreatMap()->GetThreatAt(unit,build->GetBuildPos())<=cfg->front.threat;
+}
+IUnitTask* CCommanderController::GroupGeoWork(CCircuitUnit* unit,CCircuitUnit* anchor) {
+    if(cfg->group.geoFortify<=0 || geoDefs.empty() || !unit->GetCircuitDef()->IsBuilder()) return nullptr;
+    if(geoJob) return GeoJobAllowed(unit,anchor) && geoJob->CanAssignTo(unit)?geoJob:nullptr;
+    const int frame=ai->GetLastFrame();
+    if(frame<geoNext || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    geoNext=frame+FRAMES_PER_SEC;
+    auto* eco=ai->GetEconomyManager();
+    if(eco->GetAvgMetalIncome()<cfg->group.geoIncome) return nullptr;
+    CCircuitDef* def=nullptr;
+    for(int id:geoDefs) {
+        auto* d=ai->GetCircuitDefSafe(id);
+        if(d && unit->GetCircuitDef()->CanBuild(d) && d->IsBuildAllowed() && d->IsAvailable(frame)) {def=d;break;}
+    }
+    if(!def) return nullptr;
+    auto* builder=ai->GetBuilderManager();
+    auto* terrain=ai->GetTerrainManager();
+    const float reach=unit->GetCircuitDef()->GetBuildDistance();
+    const float start=cfg->group.radius+reach;
+    const auto& vents=ai->GetEnergyManager()->GetSpots();
+    const AIFloat3 from=unit->GetPos(frame);
+    int chosen=-1;
+    float best=std::numeric_limits<float>::max();
+    for(size_t i=0;i<vents.size();++i) {
+        const AIFloat3& pos=vents[i];
+        if(!GeoFrontLine(anchor,pos,start) || ai->GetThreatMap()->GetThreatAt(unit,pos)>cfg->front.threat) continue;
+        const float sq=from.SqDistance2D(pos);
+        if(sq>=best) continue;
+        bool busy=false;
+        for(auto* task:builder->GetTasks(BT::GEO)) if(task->GetPosition().SqDistance2D(pos)<SQUARE(GEO_VENT_RADIUS)) {busy=true;break;}
+        if(busy) continue;
+        // Only our own finished plant that the fortified geo out-produces is upgraded.
+        bool upgrade=false;
+        for(int id:ai->GetCallback()->GetFriendlyUnitIdsIn(pos,GEO_VENT_RADIUS,false)) {
+            auto* own=ai->GetTeamUnit(id);
+            auto* friendly=ai->GetFriendlyUnit(id);
+            if(!friendly || !friendly->GetCircuitDef()->GetDef()->IsNeedGeo()) continue;
+            upgrade=own && own->IsFinished() && eco->GetEnergyMake(own->GetCircuitDef())<eco->GetEnergyMake(def);
+            break;
+        }
+        if(!upgrade || !terrain->CanReachAtSafe(unit,pos,reach,unit->GetCircuitDef()->GetPower())) continue;
+        best=sq; chosen=int(i);
+    }
+    if(chosen<0) return nullptr;
+    geoJob=builder->Enqueue(TaskB::Spot(BT::GEO,IBuilderTask::Priority::HIGH,def,vents[chosen],chosen));
+    if(geoJob) ai->LOG("[CommanderGroup] geo_fortify unit=%i def=%s x=%.0f z=%.0f",unit->GetId(),def->GetDef()->GetName(),
+        vents[chosen].x,vents[chosen].z);
+    return geoJob;
+}
+IUnitTask* CCommanderController::GroupGeoGuardWork(CCircuitUnit* unit,CCircuitUnit* anchor) {
+    if(geoGuards.empty() || !unit->GetCircuitDef()->IsBuilder() || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    const int frame=ai->GetLastFrame();
+    geoGuards.erase(std::remove_if(geoGuards.begin(),geoGuards.end(),[frame](const GeoGuard& g) {
+        return g.task==nullptr && g.until<=frame; }),geoGuards.end());
+    const int front=int(cfg->group.geoGuardFront);
+    const int items=front+2;
+    for(auto& g:geoGuards) {
+        if(g.task) {
+            if(unit->GetTask()==g.task) return g.task;
+            if(!g.task->IsDead() && g.task->CanAssignTo(unit)
+                && unit->GetPos(frame).SqDistance2D(g.pos)<=SQUARE(cfg->group.radius+unit->GetCircuitDef()->GetBuildDistance())) return g.task;
+            continue;
+        }
+        while(g.next<items) {
+            const bool light=g.next<front;
+            const auto& defs=light?geoGuardFrontDefs:geoGuardSideDefs;
+            CCircuitDef* def=nullptr;
+            for(int id:defs) {
+                auto* d=ai->GetCircuitDefSafe(id);
+                if(d && d->IsBuildAllowed() && d->IsAvailable(frame)) { if(unit->GetCircuitDef()->CanBuild(d)) {def=d;break;} }
+            }
+            bool someone=false;  // another group builder may build this item: leave it
+            if(!def) {
+                for(int id:{groupUnit,groupMembers[0],groupMembers[1],groupMembers[2]}) {
+                    auto* other=ai->GetTeamUnit(id);
+                    if(!other || other==unit) continue;
+                    for(int d:defs) if(auto* dd=ai->GetCircuitDefSafe(d); dd && other->GetCircuitDef()->CanBuild(dd)) someone=true;
+                }
+                if(auto* commander=ai->GetTeamUnit(groupAnchorId); commander && commander!=unit)
+                    for(int d:defs) if(auto* dd=ai->GetCircuitDefSafe(d); dd && commander->GetCircuitDef()->CanBuild(dd)) someone=true;
+                if(someone) break;
+                ++g.next; continue;  // nobody in the group can build it
+            }
+            // Front: ahead along the lane, spaced across; sides: across the lane.
+            const float across=light?(float(g.next)-.5f*float(front-1))*cfg->group.geoGuardSpacing
+                :(g.next==front?-1.f:1.f)*cfg->group.geoGuardSideOffset;
+            const float ahead=light?cfg->group.geoGuardFrontOffset:0.f;
+            AIFloat3 site(g.pos.x+g.fx*ahead-g.fz*across,g.pos.y,g.pos.z+g.fz*ahead+g.fx*across);
+            if(OnMap(site)) site=ai->GetTerrainManager()->FindBuildSite(def,site,GEO_GUARD_SEARCH,0);
+            if(!OnMap(site)) { ++g.next; continue; }
+            g.task=ai->GetBuilderManager()->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,site,0.f,true,
+                int(cfg->group.geoGuardSeconds*FRAMES_PER_SEC)));
+            ++g.next;
+            if(!g.task) continue;
+            ai->LOG("[CommanderGroup] geo_guard unit=%i def=%s x=%.0f z=%.0f",unit->GetId(),def->GetDef()->GetName(),site.x,site.z);
+            return g.task;
+        }
+    }
+    geoGuards.erase(std::remove_if(geoGuards.begin(),geoGuards.end(),[items](const GeoGuard& g) {
+        return g.task==nullptr && g.next>=items; }),geoGuards.end());
+    return nullptr;
 }
 IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     if(!unit || !role.frontDuty || (!IsGroupMember(unit->GetId()) && !Handles(unit)) || !unit->IsFinished()) return nullptr;
@@ -839,6 +1118,14 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     if(auto* started=StartedCommanderConstruction(unit)) return started;
     auto* anchor=GroupCommander();
     if(!anchor) return current;
+    // D-480: the seat's T1 constructor collects base, then approach, mexes first.
+    if(auto* mex=GroupSeatMexWork(unit,anchor)) return mex;
+    // D-481: front-line geo fortification, then the guard geo's turrets.
+    if(unit->GetCircuitDef()->IsBuilder()) {
+        if(geoJob && current==geoJob && GeoJobAllowed(unit,anchor)) return current;
+        if(auto* guard=GroupGeoGuardWork(unit,anchor)) return guard;
+        if(!geoJob) if(auto* geo=GroupGeoWork(unit,anchor)) return geo;
+    }
     const int frame=ai->GetLastFrame();
     const auto center=anchor->GetPos(frame);
     const bool builder=unit->GetCircuitDef()->IsBuilder();
@@ -886,6 +1173,7 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     // D-476: nothing new to start: help an expansion job with room, then
     // tactical work as overflow (any constructor), then follow.
     if(builder && room) if(auto* job=JoinExpansionJob(unit,nearby)) return job;
+    if(builder && geoJob) if(auto* geo=GroupGeoWork(unit,anchor)) return geo;  // D-481: help the geo
     if(builder) if(auto* task=GroupTacticalWork(unit,anchor,nearby)) return task;
     return IsGroupMember(unit->GetId())?GroupFollow(unit,anchor):nullptr;
 }
@@ -910,6 +1198,10 @@ void CCommanderController::UpdateCommanderGroup() {
             if(std::getenv("CIRCUIT_COMMANDER_TRACE")) ai->LOG("[CommanderGroup] orphan_project_rejected");
             orphan->GetManager()->AbortTask(orphan); // dequeue clears borrowed identity
         }
+    }
+    if(anchor && geoJob && geoJob->GetAssignees().empty()) {  // D-481
+        auto* build=dynamic_cast<IBuilderTask*>(geoJob);
+        if(!build || !GeoFrontLine(anchor,build->GetBuildPos(),cfg->group.geoFrontRadius)) geoJob->GetManager()->AbortTask(geoJob);
     }
     if(anchorId!=groupAnchorId) {
         groupAnchorId=anchorId;

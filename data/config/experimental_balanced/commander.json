@@ -81,6 +81,48 @@
         "commander_group_tactical_retry_seconds": 10,
         "commander_group_tactical_order_seconds": 300,
         "commander_group_tactical_definitions": "armemp,cortron,legperdition",
+        // D-479: static artillery on the tactical queue, built by one group
+        // constructor while the rest keep expansion. T2 (Rattlesnake, Persecutor,
+        // Eviscerator) from 45 metal/s; T1 (Gauntlet, Agitator, Amputator) from
+        // 25 by a T1 constructor, below 45 or with no T2 seat. Metal floating:
+        // bank >= artillery_bank of storage or spare income >= artillery_spare.
+        // Energy: bank >= artillery_energy of storage, no stall, and (cover 1)
+        // spare energy income covering the turret's build draw.
+        // D-480: before any other group work, the FRONT seat's T1 constructor
+        // takes every open mex it owns within seat_base_radius of its base, then
+        // every one along its lane up to the commander (seat_approach_ahead past).
+        "commander_group_seat_mex": 1,
+        "commander_group_seat_base_radius": 1200,
+        "commander_group_seat_approach_ahead": 0,
+        // A blocked spot: features within clear_radius are reclaimed first;
+        // a unit or structure on it skips the spot for skip_seconds.
+        "commander_group_seat_clear_radius": 64,
+        "commander_group_seat_skip_seconds": 30,
+        // D-481: a T2 group constructor upgrades our own front-line T1 geo (lane
+        // band, within group radius plus reach of the commander, kept while within
+        // geo_front_radius) to the first buildable geo_definition. After a
+        // guard geo finishes: guard_front light lasers ahead along the lane and
+        // a flak on each side. Backline geos keep the normal economy.
+        "commander_group_geo_fortify": 1,
+        "commander_group_geo_income": 20,
+        "commander_group_geo_front_radius": 1800,
+        "commander_group_geo_definitions": "armgmm,corbhmth,legrampart",
+        "commander_group_geo_guard_definitions": "corbhmth",
+        "commander_group_geo_guard_front_definitions": "armllt,corllt,leglht",
+        "commander_group_geo_guard_side_definitions": "armflak,corflak,legflak",
+        "commander_group_geo_guard_front": 2,
+        "commander_group_geo_guard_front_offset": 192,
+        "commander_group_geo_guard_spacing": 128,
+        "commander_group_geo_guard_side_offset": 192,
+        "commander_group_geo_guard_seconds": 240,
+        "commander_group_artillery_t2_income": 45,
+        "commander_group_artillery_t1_income": 25,
+        "commander_group_artillery_bank": 0.75,
+        "commander_group_artillery_spare": 15,
+        "commander_group_artillery_energy": 0.5,
+        "commander_group_artillery_energy_cover": 1,
+        "commander_group_artillery_t2_definitions": "armamb,cortoast,legacluster",
+        "commander_group_artillery_t1_definitions": "armguard,corpun,legcluster",
         // Optional replacement: existing factory only, income gates rechecked.
         "commander_group_decoy_metal": 100, "commander_group_decoy_energy": 2000,
         "commander_group_decoy_seconds": 60,
