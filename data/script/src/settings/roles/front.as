@@ -29,14 +29,6 @@ namespace Front {
             float GeothermalIncomeFraction = 0.5f;
             float GeothermalBootstrapEnergy = 120.0f;
 
-            // First factory at the spawn (owner, 2026-10-19; systems/construction/front_spawn_factory.as).
-            // Off here; experimental_balanced turns it on. Until a factory is framed: commander jobs further
-            // than the leash radius from the spawn become a solar at the spawn; from SpawnFactorySeconds,
-            // while energy income is short of native's start check, every non-energy job does too.
-            bool SpawnFactoryEnabled = false;
-            int SpawnFactorySeconds = 45;
-            float SpawnFactoryLeashRadius = 700.0f;   // 0 = no leash
-            int SpawnFactoryLeashMaxSeconds = 180;    // after this, native as before
             // D-463: the T1 energy seat. It first builds a free geothermal
             // vent within EnergySeatGeoRadius of the factory that produced it.
             // When the map's average wind ((min + max) / 2) is above

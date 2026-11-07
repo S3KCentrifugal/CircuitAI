@@ -76,7 +76,6 @@
     "data/script/src/systems/construction/front_eco_ladder.as",
     "data/script/src/systems/construction/front_reclaim.as",
     "data/script/src/systems/construction/front_recovery.as",
-    "data/script/src/systems/construction/front_spawn_factory.as",
     "data/script/src/systems/construction/layout.as",
     "data/script/src/systems/production/factory_configs/factory_configs_vehicle.as",
     "data/script/src/systems/sea/sea_operations.as",

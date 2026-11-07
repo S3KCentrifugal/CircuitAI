@@ -30,7 +30,6 @@
 #include "../../systems/construction/front_layout.as"
 #include "../../systems/production/front_factory_support.as"
 #include "../../systems/construction/commander_front.as"
-#include "../../systems/construction/front_spawn_factory.as"
 // Builder state and helpers for enqueueing structures like nanos
 #include "../../manager/builder.as"
 #include "../../manager/economy.as"
@@ -57,7 +56,6 @@ namespace RoleFront {
         FrontLabPorc::Reset();
         FrontAgitator::Reset();
         FrontTactical::Reset();
-        FrontSpawnFactory::Reset();
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
         // Apply FRONT role settings
@@ -737,12 +735,6 @@ namespace RoleFront {
         const CCircuitDef@ udef = builder.circuitDef;
         if (udef is null) return defaultTask;
 
-        // Owner (2026-10-19): until the first factory is framed, the commander stays near the spawn
-        // and builds energy there, so native's plop factory goes up at home (front_spawn_factory.as)
-        if (UnitHelpers::IsCommander(udef)) {
-            IUnitTask@ steered = FrontSpawnFactory::Steer(builder, defaultTask);
-            if (steered !is defaultTask) return steered;
-        }
         // Early return: if the default task represents a resource expansion (MEX/GEO variants), keep it.
         IBuilderTask@ defaultBuilderTask = cast<IBuilderTask>(defaultTask);
         if (defaultBuilderTask !is null) {

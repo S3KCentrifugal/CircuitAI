@@ -112,7 +112,6 @@ namespace Main {
         Global::RoleSettings::Front::OverflowFullBankParallel = 2;
         Global::RoleSettings::Front::OverflowPullSeconds = 5;
         Global::RoleSettings::Front::OverflowExtraT2Seconds = 20;
-        Global::RoleSettings::Front::SpawnFactoryEnabled = true;
         Global::RoleSettings::Front::T2FactoryNanos = 6; // owner 2026-10-25: a T2 lab's turrets from its frame (front_factory_nanos.as)
         Global::RoleSettings::Front::T2FactoryNanosMax = 14; // owner 2026-10-25: up to 14 as the metal bank nears overflow
         Global::RoleSettings::Front::LabCorridor = true; // owner 2026-10-30: every T2 lab keeps a corridor to the enemy base, mexes only (front_lab_porc.as)
