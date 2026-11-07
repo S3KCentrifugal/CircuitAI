@@ -418,18 +418,54 @@ namespace Spam {
         for (uint i = 0; i < allies.length(); ++i) {
             if (allies[i].spotIndex >= 0) taken.set("" + allies[i].spotIndex, true);
         }
-        array<float> dist;
+        // Owner, 2026-11-07 (All That Glitters, live): the lobby's start boxes
+        // need not fit the map's spots - left/right half boxes on a top/bottom
+        // map kept 2 of the 8 enemy spots, so the back-edge rim walk (needs an
+        // enemy start within RimBackReach) stopped a third of the way along and
+        // the return leg's "far corner" was planned at x 2248 of 6144. When the
+        // box keeps fewer spots than the enemy has teams, it does not describe
+        // where they start: take the untaken spots furthest from our team instead.
+        array<int> free, boxed;
         for (uint i = 0; i < spots.length(); ++i) {
             if (taken.exists("" + i)) continue;
-            if (aiSetupMgr.EnemyStartBoxAt(spots[i].pos) == 0) continue;
-            const float d = MapHelpers::SqDist(Global::Map::StartPos, spots[i].pos);
+            free.insertLast(int(i));
+            if (aiSetupMgr.EnemyStartBoxAt(spots[i].pos) != 0) boxed.insertLast(int(i));
+        }
+        const int enemies = ai.GetEnemyTeamSize();
+        array<int>@ pick = @boxed;
+        if (enemies > 0 && int(boxed.length()) < enemies && int(free.length()) > int(boxed.length())) {
+            float cx = Global::Map::StartPos.x, cz = Global::Map::StartPos.z;
+            for (uint i = 0; i < allies.length(); ++i) { cx += allies[i].startPos.x; cz += allies[i].startPos.z; }
+            const AIFloat3 c(cx / float(allies.length() + 1), 0.0f, cz / float(allies.length() + 1));
+            array<float> far;
+            array<int> order;
+            for (uint i = 0; i < free.length(); ++i) {
+                const float d = MapHelpers::SqDist(c, spots[free[i]].pos);
+                uint pos = 0;
+                while (pos < far.length() && far[pos] >= d) ++pos;
+                order.insertAt(pos, free[i]);
+                far.insertAt(pos, d);
+            }
+            if (int(order.length()) > enemies) order.resize(uint(enemies));
+            @pick = @order;
+            if (!boxMismatchLogged) {
+                boxMismatchLogged = true;
+                GenericHelpers::LogUtil("[Spam] enemy start box holds " + boxed.length() + " of " + free.length()
+                    + " free map spots for " + enemies + " enemy team(s): using the " + order.length() + " spots furthest from us", 1);
+            }
+        }
+        array<float> dist;
+        for (uint k = 0; k < pick.length(); ++k) {
+            const AIFloat3 q = spots[pick[k]].pos;
+            const float d = MapHelpers::SqDist(Global::Map::StartPos, q);
             uint pos = 0;
             while (pos < dist.length() && dist[pos] <= d) ++pos;
-            result.insertAt(pos, spots[i].pos);
+            result.insertAt(pos, q);
             dist.insertAt(pos, d);
         }
         return result;
     }
+    bool boxMismatchLogged = false;
 
     AIFloat3 _MirrorOfStart()
     {
