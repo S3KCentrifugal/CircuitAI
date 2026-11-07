@@ -1279,6 +1279,15 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 				|| circuit->GetEconomyManager()->IsMetalConverter(ti.buildDef))) {
 		return nullptr;
 	}
+	// D-484: a front-line vent gets the fortified geo, whoever builds it.
+	if ((ti.type == IBuilderTask::BuildType::GEO) && (ti.buildDef != nullptr)) {
+		CCircuitDef* front = circuit->GetCommanderController()->FrontGeoDef(ti.buildDef, ti.position);
+		if (front != ti.buildDef) {
+			auto swapped = ti;
+			swapped.buildDef = front;
+			return Enqueue(swapped);
+		}
+	}
 	IBuilderTask* task;
 
 	switch (ti.type) {

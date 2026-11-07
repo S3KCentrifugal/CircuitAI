@@ -448,6 +448,13 @@ bool CCommanderController::LaneMexSiteAllowed(CCircuitUnit* unit,const AIFloat3&
 IUnitTask* CCommanderController::LaneMexWork(CCircuitUnit* unit,State& s,CCircuitDef* turretDef,int frame) {
     const auto* battle=ai->GetBattle();
     if(battle->GetFrontLaneLength()<=0.f) return nullptr;
+    // D-482 (KI-767): the commander's own live mex order is kept. The spot
+    // search below skips a task that has an assignee, so while the commander
+    // held its lane mex this rung returned nothing, the ladder fell through to
+    // adopting an ally's frame, and each re-evaluation swapped back: 3,030
+    // swaps in one frame and a stack overflow (nano-b27, Glitters, F18543).
+    if(auto* own=dynamic_cast<IBuilderTask*>(unit->GetTask()); own && !own->IsDead() && own->GetBuildType()==BT::MEX)
+        return own;
     const AIFloat3 pos=unit->GetPos(frame);
     auto* builder=ai->GetBuilderManager();
     auto* clb=ai->GetCallback();
@@ -487,7 +494,25 @@ IUnitTask* CCommanderController::LaneMexWork(CCircuitUnit* unit,State& s,CCircui
     const auto accept=LaneMexAccept(ai,unit,battle,width,own-(cfg->front.mexLos>0?radius:cfg->front.mexBehind),
         std::min(own+(cfg->front.mexLos>0?radius:cfg->front.mexAhead),LaneMexAheadLimit(unit,s,frame,own)),
         cfg->front.mexCaptureEnemy>0,cfg->front.threat,cfg->front.mexEnemyHome,cfg->front.mexLos>0);
-    IBuilderTask* task=ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,radius,0,true,{},accept);
+    // D-482: a spot the engine refuses is skipped for commander_group_seat_skip_seconds
+    // (the seat sweep's lever). The mex task falls back to patrol on such a spot
+    // and reopens it; the owner's geo-b25 game overflowed the stack there.
+    auto& skip=s.front.laneMexSkip;
+    skip.erase(std::remove_if(skip.begin(),skip.end(),[frame](const auto& e){return e.second<=frame;}),skip.end());
+    std::vector<AIFloat3> skipped;
+    skipped.reserve(skip.size()+1);
+    for(const auto& e:skip) skipped.push_back(e.first);
+    const auto refused=[this,unit,&skip,&skipped,frame](IBuilderTask* t) {
+        if(!t || !t->GetBuildDef() || t->GetTarget()
+            || ai->GetMap()->IsPossibleToBuildAt(t->GetBuildDef()->GetDef(),t->GetBuildPos(),t->GetFacing())) return false;
+        ai->LOG("[CommanderFront] unit=%i lane_mex_skip x=%.0f z=%.0f",unit->GetId(),t->GetBuildPos().x,t->GetBuildPos().z);
+        skip.emplace_back(t->GetBuildPos(),frame+int(cfg->group.seatSkipSeconds*FRAMES_PER_SEC));
+        skipped.push_back(t->GetBuildPos());
+        return true;
+    };
+    IBuilderTask* task=ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,radius,0,true,skipped,accept);
+    if(refused(task)) task=ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,radius,0,true,skipped,accept);
+    if(refused(task)) task=nullptr;
     if(!task && cfg->front.mexAdoptRadius>0) {
         // D-478 (the owner's rule): the lane traced from an AIR or TECH start has
         // no FRONT seat; its spots are this commander's adopted lane territory
@@ -502,7 +527,8 @@ IUnitTask* CCommanderController::LaneMexWork(CCircuitUnit* unit,State& s,CCircui
             if(ai->GetCallback()->GetEnemyUnitIdsIn(p,64.f,false).empty()) return true;
             return capture && ai->GetThreatMap()->GetThreatAt(unit,p)<=threat;
         };
-        task=economy->EnqueueMexWithin(unit,pos,cfg->front.mexAdoptRadius,0,true,{},adopted);
+        task=economy->EnqueueMexWithin(unit,pos,cfg->front.mexAdoptRadius,0,true,skipped,adopted);
+        if(refused(task)) task=nullptr;
         // Logged once per new spot (the call returns a standing order again).
         if(task && task->GetPosition().SqDistance2D(s.front.laneMexLast)>64.f*64.f)
             ai->LOG("[CommanderFront] unit=%i adopted_mex x=%.0f z=%.0f",unit->GetId(),

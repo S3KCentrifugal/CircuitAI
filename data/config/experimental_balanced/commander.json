@@ -98,6 +98,11 @@
         // a unit or structure on it skips the spot for skip_seconds.
         "commander_group_seat_clear_radius": 64,
         "commander_group_seat_skip_seconds": 30,
+        // D-483: one construction turret per T1 defence, four packed around a
+        // T2 defence, none for radar, jammer or mex upgrade jobs.
+        "commander_group_nano_t1": 1,
+        "commander_group_nano_t2": 4,
+        "commander_group_nano_other": 0,
         // D-481: a T2 group constructor upgrades our own front-line T1 geo (lane
         // band, within group radius plus reach of the commander, kept while within
         // geo_front_radius) to the first buildable geo_definition. After a

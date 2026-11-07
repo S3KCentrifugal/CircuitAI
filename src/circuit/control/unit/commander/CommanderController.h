@@ -102,6 +102,9 @@ struct CommanderFrontState {
     int laneMexCount=0; bool laneMexTurret=false;
     int expansionMexNext=0;
     springai::AIFloat3 laneMexLast{-1,0,-1};
+    // D-482: lane mex spots the engine refused (a structure stands there), and
+    // the frame each skip ends; cleared as they expire, at most a few entries.
+    std::vector<std::pair<springai::AIFloat3,int>> laneMexSkip;
     // Completion-owned IDs, never borrowed unit pointers. Released with the
     // commander; destroyed/transferred mexes are removed on a work offer.
     std::vector<int> unfortifiedMexes;
@@ -238,6 +241,9 @@ struct CommanderGroupConfig {
     // A blocked spot: features within seatClearRadius are reclaimed first; any
     // other blocker skips the spot for seatSkipSeconds.
     float seatClearRadius=64,seatSkipSeconds=30;
+    // D-483: construction turrets a finished group job owes: a T1 defence
+    // nanoT1, a T2 defence (BAR techlevel 2+) nanoT2, any other job nanoOther.
+    float nanoT1=1,nanoT2=1,nanoOther=1;
     // D-481: a T2 group constructor upgrades our own front-line T1 geo to the
     // fortified one (Prude, Cerberus, Rampart). Front line: in the group lane band
     // and within group radius plus build reach of the commander (where it places
@@ -361,6 +367,9 @@ public:
     bool HealthRetreat(CCircuitUnit* unit) const;
     int FrontCommanderId() const;
     void TaskFinished(IUnitTask* task,bool done);
+    // D-484: the geo definition to build at pos: a T2 geo outside the fortified
+    // list on a front-line vent becomes its faction's fortified geo.
+    CCircuitDef* FrontGeoDef(CCircuitDef* def,const springai::AIFloat3& pos) const;
     bool OwnsGroupProject(const IUnitTask* task) const { return IsExpansionJob(task); }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);

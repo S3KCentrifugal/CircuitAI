@@ -378,8 +378,27 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
         if(groupNanoOwed>0) --groupNanoOwed;
         groupNanoDue=groupNanoOwed>0;return;
     }
+    // D-483 (the owner's rule): one construction turret per T1 defence and four,
+    // packed around it, per T2 defence; other group jobs (radar, jammer, mex
+    // upgrade) owe none in the balanced profile. The nano site search starts at
+    // the defence, so the four land beside it. One custom-parameter read per
+    // finished job.
+    const auto* def=build->GetBuildDef();
+    unsigned owed=unsigned(std::max(0.f,cfg->group.nanoOther));
+    // Radars and jammers (some are DEFENCE builds) are not porc.
+    const bool sensor=def && (def->GetId()==groupRadar || def->GetId()==groupRadar2
+        || def->GetId()==groupJammer || def->GetId()==groupJammer2 || def->IsRadar() || def->GetDef()->GetJammerRadius()>0);
+    if(def && !sensor && (build->GetBuildType()==BT::DEFENCE || build->GetBuildType()==BT::BUNKER)) {
+        const auto& params=def->GetDef()->GetCustomParams();
+        const auto it=params.find("techlevel");
+        const int tier=it!=params.end()?utils::string_to_int(it->second):1;
+        owed=unsigned(std::max(0.f,tier>=2?cfg->group.nanoT2:cfg->group.nanoT1));
+    }
     const auto at=build->GetPosition();
-    if(OnMap(at)) {groupNanoSite=at;++groupNanoOwed;groupNanoDue=true;}
+    if(owed>0 && OnMap(at)) {
+        groupNanoSite=at;groupNanoOwed+=owed;groupNanoDue=true;
+        ai->LOG("[CommanderGroup] nano_owed def=%s owed=%u total=%u",def?def->GetDef()->GetName():"none",owed,groupNanoOwed);
+    }
 }
 IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,const AIFloat3& site,bool nano,int defenseSlot,bool surplus) {
     if(!def || !unit->GetCircuitDef()->CanBuild(def)) return nullptr;
@@ -996,6 +1015,32 @@ IUnitTask* CCommanderController::GroupSeatMexWork(CCircuitUnit* unit,CCircuitUni
  * Cost: one pass over the map's geo vents (tens) at most once a second, one
  * friendly-unit query per vent in range; guard work is a few vector reads.
  */
+// D-484 (the owner's rule): a front-line vent gets the fortified geo whichever
+// T2 constructor reaches it first. Every geo task passes CBuilderManager::Enqueue,
+// which asks here; a T2 geo (BAR techlevel 2) not in the fortified list, on a
+// vent inside the group lane band within geoFrontRadius of the commander,
+// becomes the fortified definition of the same faction (name prefix: armageo to
+// armgmm, corageo to corbhmth, legageo to legrampart). Every T2 constructor
+// that builds the advanced geo also builds the fortified one (BAR buildoptions).
+// Cost: per geo task created, one lane query and a list of three.
+CCircuitDef* CCommanderController::FrontGeoDef(CCircuitDef* def,const AIFloat3& pos) const {
+    if(!def || cfg->group.geoFortify<=0 || geoDefs.empty() || !role.frontDuty || !role.frontReady) return def;
+    if(std::find(geoDefs.begin(),geoDefs.end(),def->GetId())!=geoDefs.end()) return def;
+    const auto& params=def->GetDef()->GetCustomParams();
+    const auto it=params.find("techlevel");
+    if(it==params.end() || utils::string_to_int(it->second)<2) return def;  // a T1 geo stays
+    auto* anchor=GroupCommander();
+    if(!GeoFrontLine(anchor,pos,cfg->group.geoFrontRadius)) return def;
+    const std::string name=def->GetDef()->GetName();
+    for(int id:geoDefs) {
+        auto* fortified=ai->GetCircuitDefSafe(id);
+        if(fortified && fortified->IsBuildAllowed() && name.compare(0,3,fortified->GetDef()->GetName(),0,3)==0) {
+            ai->LOG("[CommanderGroup] geo_front_swap def=%s to=%s x=%.0f z=%.0f",name.c_str(),fortified->GetDef()->GetName(),pos.x,pos.z);
+            return fortified;
+        }
+    }
+    return def;
+}
 bool CCommanderController::GeoFrontLine(CCircuitUnit* anchor,const AIFloat3& pos,float radius) const {
     return anchor && pos.SqDistance2D(anchor->GetPos(ai->GetLastFrame()))<=SQUARE(radius) && GroupSiteAllowed(anchor,pos);
 }

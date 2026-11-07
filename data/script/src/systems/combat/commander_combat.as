@@ -157,6 +157,10 @@ namespace CommanderCombat {
             Option("commander_group_seat_approach_ahead",0.f);
             Option("commander_group_seat_clear_radius",64.f);
             Option("commander_group_seat_skip_seconds",30.f);
+            // D-483: construction turrets owed per finished T1 defence, T2 defence, other job.
+            Option("commander_group_nano_t1",1.f);
+            Option("commander_group_nano_t2",1.f);
+            Option("commander_group_nano_other",1.f);
             // D-481: front-line geo fortification and the Cerberus guard (0: off).
             Option("commander_group_geo_fortify",0.f);
             Option("commander_group_geo_income",20.f);
