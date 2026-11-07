@@ -184,6 +184,8 @@ namespace LolCannon {
     array<IUnitTask@> recruitsAir;   // air crew orders in flight
     array<IUnitTask@> recruitsGround;   // T1 ground crew orders in flight
     bool turretsOpen = true;         // a turret slot is still neither standing nor given up (Advance, once a second)
+    dictionary orphanHand;           // "<list>:<slot>" -> times its unworked order was handed out
+    dictionary orphanSince;          // "<list>:<slot>" -> frame of that order's first hand-out
     dictionary groundLabs;           // lab id -> true: labs given a T2 ground stand-in order
     int nextCrewOrder = 0;
 
@@ -247,6 +249,12 @@ namespace LolCannon {
     array<array<int>> extraRes(3);
     array<array<IUnitTask@>> extraTask(3);
     array<array<int>> extraMiss(3);
+    array<array<AIFloat3>> extraBase(3), extraSide(3), extraAlong(3);   // each slot's laid-out spot and axes, for a re-pick
+    array<array<bool>> extraAhead(3);
+    array<array<int>> extraRepicks(3);
+    array<AIFloat3> badExtraSpots;
+    AIFloat3 extraFwd(0.0f, 0.0f, 1.0f);   // the line to the enemy start the cover is laid along
+    int nextExtraFix = 0;
     int extrasStarted = 0, extrasUntil = 0, nextExtrasLog = 0;
     int blockFails = 0;              // cannon order failures on a site whose turret block stands
 
@@ -935,6 +943,7 @@ namespace LolCannon {
         turretTask.resize(0); turretMiss.resize(0);
         for (uint i = 0; i < turretPos.length(); ++i) { turretTask.insertLast(null); turretMiss.insertLast(0); }
         storeTask.resize(0); storeMiss.resize(0); storeDead.resize(0); badStoreSpots.resize(0);
+        orphanHand.deleteAll(); orphanSince.deleteAll();
         gunTryFrom = -1; quickEnds = 0;
         turretsOpen = true; nextHold = 0; nextTurretWaitLog = 0; blockFails = 0;
         nextTurretRetry = ai.frame + Global::LolCannon::TurretRetrySeconds * SECOND;
@@ -976,6 +985,38 @@ namespace LolCannon {
         return Ordered(t);
     }
 
+    // A live build order of the list with no frame down and nobody on it, else null.
+    // Its first hand-out starts a clock: once it has gone out 3 times with nobody
+    // staying on it, or 45 s pass with no frame down (11-07 test: crews took storage 7
+    // in turn for 300 s and never framed it), it is aborted, so its slot counts a miss
+    // and is ordered again, then moved after 3, like any failed order.
+    IUnitTask@ Unworked(array<IUnitTask@>@ tasks, const string &in list, bool &out first)
+    {
+        first = false;
+        for (uint k = 0; k < tasks.length(); ++k) {
+            if (tasks[k] is null || tasks[k].IsDead()) continue;
+            IBuilderTask@ b = cast<IBuilderTask>(tasks[k]);
+            const string key = list + ":" + k;
+            if (b is null || b.target !is null) { orphanHand.delete(key); orphanSince.delete(key); continue; }
+            if (b.GetUnits().length() > 0) continue;
+            int64 n = 0, since = 0;
+            if (!orphanHand.get(key, n)) n = 0;
+            if (!orphanSince.get(key, since)) since = ai.frame;
+            if (n >= 3 || ai.frame - since > 45 * SECOND) {
+                orphanHand.delete(key); orphanSince.delete(key);
+                aiBuilderMgr.AbortTask(tasks[k]);
+                GenericHelpers::LogUtil("[LolCannon] " + list + " " + (k + 1) + ": its order went out " + n + " time(s) over "
+                    + ((ai.frame - since) / SECOND) + " s with no frame down; aborted", 1);
+                continue;
+            }
+            first = n == 0;
+            orphanHand.set(key, n + 1);
+            if (first) orphanSince.set(key, int64(ai.frame));
+            return tasks[k];
+        }
+        return null;
+    }
+
     IUnitTask@ Wait(int seconds) { return aiBuilderMgr.Enqueue(TaskB::Wait(seconds * SECOND)); }
 
     // A slot list's next piece of work: finish an unfinished one, order a free slot
@@ -989,7 +1030,19 @@ namespace LolCannon {
         if (d is null || !u.circuitDef.CanBuild(d)) return null;
         CCircuitUnit@ unf = aiBuilderMgr.FindUnfinishedNear(centre, near, d);
         if (unf !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, unf, 30 * SECOND));
-        if (full) return null;
+        if (full) {
+            // once the cannon stands, an order nobody works (its crew member was taken off
+            // it, to the cannon or by a native re-ask) is still counted in flight, so with
+            // `full` it was never handed out again (All That Glitters 2026-11-06: storage 7's
+            // order sat unworked from the cannon's finish to the game's end, 58 crew idle on
+            // the 300 s timer). Not while building: there units leave fresh orders at once
+            // (11-07 test) and native hands them on as before.
+            bool first = false;
+            IUnitTask@ orphan = (phase == STORES) ? Unworked(tasks, what, first) : null;
+            if (first)
+                GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " takes an unworked " + what + " order", 1);
+            return orphan;
+        }
         int flying = 0;
         IUnitTask@ help = null;
         for (uint k = 0; k < tasks.length(); ++k)
@@ -1004,6 +1057,7 @@ namespace LolCannon {
                 ids[k] = -1;
             }
             @tasks[k] = OrderAt(type, d, at[k], ids[k]);
+            orphanHand.delete(what + ":" + k); orphanSince.delete(what + ":" + k);
             if (tasks[k] is null) { ++misses[k]; continue; }
             GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " orders " + what + " " + (k + 1) + " of "
                 + at.length() + " at (" + int(at[k].x) + ", " + int(at[k].z) + ")", 2);
@@ -1715,33 +1769,121 @@ namespace LolCannon {
 
     // ---------------------------------------------------------------- the cover
 
-    // The cover's slot for def d centred on `base`: the nearest spot round it that
-    // reserves (rings of the def's pitch, up to 3 out, along side/fwd), else `base`
-    // itself, unpinned. With `ahead`, only spots nearer the enemy start than the cannon
-    // (by 64) are taken (Scylla test 2026-10-31: a ring slide put a heavy porc behind it).
-    void PlaceExtra(CCircuitDef@ d, const AIFloat3 &in base, int g, const AIFloat3 &in side, const AIFloat3 &in fwd, bool ahead)
+    // A free spot for cover group g's def d round `base`: rings rFrom..rTo of the def's
+    // pitch along side/fwd, nearest first, that reserves, is clear of allied buildings
+    // and buildable. ExtraSpotOk keeps each group where it does its job; spots near an
+    // earlier failed one are skipped.
+    bool FindExtraSpot(CCircuitDef@ d, const AIFloat3 &in base, int g, const AIFloat3 &in side, const AIFloat3 &in fwd, bool ahead,
+        int rFrom, int rTo, AIFloat3 &out at, int &out id)
     {
-        const float limit = (ahead && siteTarget.x >= 0.0f) ? site.distance2D(siteTarget) - 64.0f : -1.0f;
-        const float step = AiMax(LolCannonMath::Pitch(Layout::Across(d, facing)), LolCannonMath::Pitch(Layout::Along(d, facing))) + 16.0f;
+        id = -1;
+        const float step = ExtraStep(d);
         const float w = float(AiTerrainWidth()), h = float(AiTerrainHeight());
-        for (int r = 0; r <= 3; ++r) {
+        for (int r = rFrom; r <= rTo; ++r) {
             for (int a = -r; a <= r; ++a) {
                 for (int b = -r; b <= r; ++b) {
                     if (AiMax(a, -a) != r && AiMax(b, -b) != r) continue;   // the ring only
                     const AIFloat3 q = At(base, side, float(a) * step, fwd, float(b) * step);
                     if (q.x < 64.0f || q.z < 64.0f || q.x > w - 64.0f || q.z > h - 64.0f) continue;
-                    if (limit >= 0.0f && q.distance2D(siteTarget) > limit) continue;
+                    if (!ExtraSpotOk(g, q, base, ahead, step)) continue;
+                    if (aiTerrainMgr.IsAllyLayoutBlocked(d, q, facing)) continue;
                     if (!aiTerrainMgr.CanReserveBuilding(d, q, facing)) continue;
-                    const int id = aiTerrainMgr.ReserveBuilding(d, q, facing);
-                    if (id < 0) continue;
-                    extraPos[g].insertLast(aiTerrainMgr.GetReservationPos(id));
-                    extraRes[g].insertLast(id);
-                    return;
+                    const int r2 = aiTerrainMgr.ReserveBuilding(d, q, facing);
+                    if (r2 < 0) continue;
+                    if (!aiTerrainMgr.IsReservationBuildable(r2)) { aiTerrainMgr.ReleaseReservation(r2); continue; }
+                    at = aiTerrainMgr.GetReservationPos(r2);
+                    id = r2;
+                    return true;
                 }
             }
         }
-        extraPos[g].insertLast(base);
-        extraRes[g].insertLast(-1);
+        return false;
+    }
+
+    float ExtraStep(CCircuitDef@ d)
+    {
+        return AiMax(LolCannonMath::Pitch(Layout::Across(d, facing)), LolCannonMath::Pitch(Layout::Along(d, facing))) + 16.0f;
+    }
+
+    // Where cover group g may go (owner 2026-11-07: when the best spots are blocked by
+    // allied buildings or terrain, a new spot that still lets the shields cover the
+    // cannon and keeps the heavy porc staggered forward towards the enemy).
+    //   with `ahead`: nearer the enemy start than the cannon by 64 (Scylla 2026-10-31)
+    //   shields: within ExtraShieldReach of the cannon
+    //   heavy porc: no further back along the line to the enemy than its laid-out
+    //     spot less one pitch
+    //   all: inside ExtraCountRadius (less 64), where they are counted
+    //   none within 48 of a spot whose orders failed
+    bool ExtraSpotOk(int g, const AIFloat3 &in q, const AIFloat3 &in base, bool ahead, float step)
+    {
+        if (q.distance2D(site) > Global::LolCannon::ExtraCountRadius - 64.0f) return false;
+        if (ahead && siteTarget.x >= 0.0f && q.distance2D(siteTarget) > site.distance2D(siteTarget) - 64.0f) return false;
+        if (g == 0 && q.distance2D(site) > Global::LolCannon::ExtraShieldReach) return false;
+        if (g == 1) {
+            const float qa = (q.x - site.x) * extraFwd.x + (q.z - site.z) * extraFwd.z;
+            const float ba = (base.x - site.x) * extraFwd.x + (base.z - site.z) * extraFwd.z;
+            if (qa < ba - step) return false;
+        }
+        for (uint i = 0; i < badExtraSpots.length(); ++i)
+            if (MapHelpers::SqDist(badExtraSpots[i], q) < 48.0f * 48.0f) return false;
+        return true;
+    }
+
+    // The cover's slot for def d centred on `base`: the nearest good spot round it
+    // (3 rings), else further out (to ExtraRepickRings), else `base` itself, unpinned.
+    void PlaceExtra(CCircuitDef@ d, const AIFloat3 &in base, int g, const AIFloat3 &in side, const AIFloat3 &in fwd, bool ahead)
+    {
+        AIFloat3 at;
+        int id = -1;
+        bool ok = FindExtraSpot(d, base, g, side, fwd, ahead, 0, 3, at, id);
+        if (!ok) ok = FindExtraSpot(d, base, g, side, fwd, ahead, 4, Global::LolCannon::ExtraRepickRings, at, id);
+        extraPos[g].insertLast(ok ? at : base);
+        extraRes[g].insertLast(ok ? id : -1);
+        extraBase[g].insertLast(base);
+        extraSide[g].insertLast(side);
+        extraAlong[g].insertLast(fwd);
+        extraAhead[g].insertLast(ahead);
+        extraRepicks[g].insertLast(0);
+    }
+
+    // Once every 10 s in EXTRAS: a slot whose orders came to nothing three times, with
+    // nothing of its group standing on it, gets a new spot (up to ExtraRepicks times).
+    void ReplaceExtras()
+    {
+        if (ai.frame < nextExtraFix) return;
+        nextExtraFix = ai.frame + 10 * SECOND;
+        const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
+        bool switched = false;
+        for (int g = 0; g < 3; ++g) {
+            CCircuitDef@ d = ExtraDef(g);
+            if (d is null) continue;
+            for (uint k = 0; k < extraPos[g].length(); ++k) {
+                if (extraMiss[g][k] < 3 || extraRepicks[g][k] >= Global::LolCannon::ExtraRepicks) continue;
+                if (extraTask[g][k] !is null && !extraTask[g][k].IsDead()) continue;
+                if (aiBuilderMgr.FindOwnNear(extraPos[g][k], 40.0f, d) !is null) continue;
+                if (!switched && !layoutOn) {
+                    if (!aiTerrainMgr.SetLayoutEnabled(true)) return;
+                    switched = true;
+                }
+                const AIFloat3 old = extraPos[g][k];
+                badExtraSpots.insertLast(old);
+                if (extraRes[g][k] >= 0) { aiTerrainMgr.ReleaseReservation(extraRes[g][k]); extraRes[g][k] = -1; }
+                ++extraRepicks[g][k];
+                AIFloat3 at;
+                int id = -1;
+                if (!FindExtraSpot(d, extraBase[g][k], g, extraSide[g][k], extraAlong[g][k], extraAhead[g][k], 0,
+                        Global::LolCannon::ExtraRepickRings, at, id)) {
+                    extraRepicks[g][k] = Global::LolCannon::ExtraRepicks;   // nowhere left: given up
+                    GenericHelpers::LogUtil("[LolCannon] cover " + ExtraWhat(g) + " " + (k + 1) + " of " + extraPos[g].length() + " at (" + int(old.x)
+                        + ", " + int(old.z) + "): 3 failed orders and no other free spot; given up", 1);
+                    continue;
+                }
+                extraPos[g][k] = at; extraRes[g][k] = id; extraMiss[g][k] = 0; @extraTask[g][k] = null;
+                GenericHelpers::LogUtil("[LolCannon] cover " + ExtraWhat(g) + " " + (k + 1) + " of " + extraPos[g].length() + " moved from (" + int(old.x)
+                    + ", " + int(old.z) + ") to (" + int(at.x) + ", " + int(at.z) + ") after 3 failed orders, " + int(at.distance2D(site)) + " from the cannon", 1);
+            }
+        }
+        if (switched) aiTerrainMgr.SetLayoutEnabled(false);
     }
 
     // The cover's slots round the cannon, facing the enemy start it is sited against
@@ -1755,6 +1897,7 @@ namespace LolCannon {
         CCircuitDef@ st = Store();
         for (int g = 0; g < 3; ++g) {
             extraPos[g].resize(0); extraRes[g].resize(0); extraTask[g].resize(0); extraMiss[g].resize(0);
+            extraBase[g].resize(0); extraSide[g].resize(0); extraAlong[g].resize(0); extraAhead[g].resize(0); extraRepicks[g].resize(0);
         }
         if (gun is null) return;
         const int f = facing;
@@ -1780,6 +1923,9 @@ namespace LolCannon {
             }
         }
         const float frontT = front / cosT;
+        extraFwd = tFwd;
+        badExtraSpots.resize(0);
+        nextExtraFix = 0;
         // the reservations need the layout on (FRONT runs none: switched on for this only)
         const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
         if (!layoutOn && !aiTerrainMgr.SetLayoutEnabled(true)) {
@@ -1836,8 +1982,9 @@ namespace LolCannon {
         const int want = int(extraPos[g].length());
         if (done >= want) return true;
         if (ExtraFlying(g) > 0 || (ExtraDef(g) !is null && aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g)) !is null)) return false;
-        for (uint k = 0; k < extraMiss[g].length(); ++k) if (extraMiss[g][k] < 3) return false;
-        return true;   // every short slot came to nothing three times
+        for (uint k = 0; k < extraMiss[g].length(); ++k)
+            if (extraMiss[g][k] < 3 || extraRepicks[g][k] < Global::LolCannon::ExtraRepicks) return false;
+        return true;   // every short slot came to nothing three times, on each spot it was given
     }
 
     // The cover begins (owner 2026-10-31): the turrets, the storages and the cannon
@@ -1880,7 +2027,13 @@ namespace LolCannon {
             if (d is null || !u.circuitDef.CanBuild(d)) continue;
             int done, all;
             ExtraCount(g, done, all);
-            if (all + ExtraFlying(g) >= int(extraPos[g].length())) continue;   // full: as many stand, are framed or ordered as slots
+            if (all + ExtraFlying(g) >= int(extraPos[g].length())) {   // full: as many stand, are framed or ordered as slots
+                bool first = false;
+                IUnitTask@ orphan = Unworked(extraTask[g], "cover " + ExtraWhat(g), first);   // but one nobody works is handed out (see SlotWork)
+                if (orphan is null) continue;
+                if (first) GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " takes an unworked cover " + ExtraWhat(g) + " order", 1);
+                return orphan;
+            }
             for (uint k = 0; k < extraPos[g].length(); ++k) {
                 IUnitTask@ t = extraTask[g][k];
                 if ((t !is null && !t.IsDead()) || extraMiss[g][k] >= 3) continue;
@@ -1893,6 +2046,7 @@ namespace LolCannon {
                 }
                 const Task::BuildType type = (g == 1) ? Task::BuildType::BUNKER : Task::BuildType::DEFENCE;
                 @extraTask[g][k] = OrderAt(type, d, extraPos[g][k], extraRes[g][k]);
+                orphanHand.delete("cover " + ExtraWhat(g) + ":" + k); orphanSince.delete("cover " + ExtraWhat(g) + ":" + k);
                 if (extraTask[g][k] is null) { ++extraMiss[g][k]; continue; }
                 extraRes[g][k] = -1;   // pinned (TECH) or let go (FRONT): the order owns the spot now
                 GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " orders cover " + ExtraWhat(g) + " " + d.GetName()
@@ -2011,6 +2165,7 @@ namespace LolCannon {
             return;
         }
         if (phase == EXTRAS) {
+            ReplaceExtras();
             FinishExtras();
             return;
         }
