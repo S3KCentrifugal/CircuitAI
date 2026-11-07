@@ -2009,6 +2009,9 @@ namespace Builder {
             if (FrontConstructors::Eligible(u)) {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
                     || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
+                // D-486: floating metal fills the reserved factory turret slots first.
+                IUnitTask@ fill = FrontConstructors::FillWork(u);
+                if (fill !is null) return fill;
                 if (FrontConstructors::Seat(u.id) == FrontConstructors::ENERGY) return FrontConstructors::EnergyWork(u);
                 if (FrontConstructors::Seat(u.id) == FrontConstructors::CONVERTER) return FrontConstructors::ConverterWork(u);   // D-463
                 if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
