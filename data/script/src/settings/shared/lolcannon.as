@@ -154,5 +154,12 @@ namespace LolCannon {
     float ExtraPorcSpread = 480.0f;     // elmos between the heavy porc, across the facing
     float ExtraCountRadius = 900.0f;    // our cover structures this near the cannon count, wherever they went up
     int ExtrasFinishSeconds = 900;
+    // a blocked cover slot (allied buildings, terrain, or 3 failed orders) is re-picked
+    // up to ExtraRepicks times, out to ExtraRepickRings rings of its def's pitch; the
+    // shields stay within ExtraShieldReach of the cannon so they still cover it, the
+    // heavy porc no further back than laid out (owner 2026-11-07)
+    int ExtraRepicks = 2;
+    int ExtraRepickRings = 8;
+    float ExtraShieldReach = 420.0f;
 }
 }
