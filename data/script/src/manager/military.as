@@ -127,7 +127,7 @@ namespace Military {
 		if (t !is null) return t;
 		@t = TechCapitalRush::MilitaryTask(u);   // a capital bomber waits at home for its wave
 		if (t !is null) return t;
-		@t = TechHeavyRush::MilitaryTask(u);   // D-449 (smrt-test): TECH keeps its heavies on the spam lanes
+		@t = TechHeavyDelivery::MilitaryTask(u);   // variant: our heavy delivery to a FRONT
         if (t !is null) return t;
         @t = AmphibiousOps::MilitaryTask(u);
         if (t !is null) return t;
@@ -190,7 +190,7 @@ namespace Military {
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
         CommanderGroup::OnRemoved(unit);
-        TechHeavyRush::Removed(unit);
+        TechHeavyDelivery::Removed(unit);
         TechCapitalRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site

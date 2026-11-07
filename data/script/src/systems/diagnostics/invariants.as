@@ -20,6 +20,19 @@ namespace Invariants {
     bool inv50Done = false;   // D-120
     bool inv51Done = false;   // D-121
     // INV-189 (heavy delivery arrival) retired with the donation path, D-457.
+    // Event-time check only: heavy combat gifts remain TECH-owned through travel.
+    // Re-resolve the anchor at handover, including a commander lost mid-flight.
+    bool HeavyDeliveryArrival(CCircuitUnit@ unit, int recipient, int carrierId) {
+        const AIFloat3 anchor = TechHeavyDelivery::ArrivalAnchor(unit is null ? -1 : unit.id,recipient);
+        const float radius = TechHeavyDelivery::ArrivalRadius();
+        const bool valid = unit !is null && carrierId < 0 && Team::IsAlly(recipient)
+            && recipient != ai.teamId && anchor.x >= 0.0f && anchor.z >= 0.0f
+            && anchor.x < AiTerrainWidth() && anchor.z < AiTerrainHeight()
+            && MapHelpers::SqDist(unit.GetPos(ai.frame), anchor) <= radius * radius;
+        if (!valid) Violation("INV-189", unit is null ? "missing" : "" + unit.id,
+            "heavy delivery attempted outside authorized arrival area or before carrier release");
+        return valid;
+    }
     dictionary inv53Idle;     // D-123: air constructor id -> samples in a row it did nothing
     dictionary turretBlockedSince;   // D-289: INV-200 - waiting turret id -> first check with an assistable factory in reach
     void Violation(const string &in id, const string &in key, const string &in msg)
