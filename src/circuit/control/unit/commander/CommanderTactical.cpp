@@ -107,10 +107,10 @@ CCircuitDef* CCommanderController::TacticalChoice(CCircuitUnit* unit) const {
         for(int id:tacticalDefs) if(auto* def=buildable(id)) return def;
     const float income=ai->GetEconomyManager()->GetAvgMetalIncome();
     if(cfg->group.artilleryT2Income>0 && income>=cfg->group.artilleryT2Income)
-        for(int id:artilleryT2Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def)) return def; break; }
+        for(int id:artilleryT2Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def) && !ArtilleryCrowded(def)) return def; break; }
     if(cfg->group.artilleryT1Income>0 && income>=cfg->group.artilleryT1Income
         && (income<cfg->group.artilleryT2Income || cfg->group.artilleryT2Income<=0 || GroupT2Count()==0))
-        for(int id:artilleryT1Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def)) return def; break; }
+        for(int id:artilleryT1Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def) && !ArtilleryCrowded(def)) return def; break; }
     return nullptr;
 }
 int CCommanderController::GroupT2Count() const {

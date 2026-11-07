@@ -156,6 +156,21 @@ void TestPackBeforeOrder()
 	Check(PackBefore(a, b, false) && !PackBefore(b, a, false), "equal turret distance: the anchor breaks the tie");
 }
 
+// D-491: the core packs touching first: a touching site beats a nearer-turret
+// one with a gap; equal gaps fall back to the turret, then the anchor.
+void TestCoreTouchingFirst()
+{
+	const CoreKey touching{0, 900.f, 900.f}, gapped{2, 10.f, 10.f};
+	Check(CoreBefore(touching, gapped) && !CoreBefore(gapped, touching), "core: touching beats a gap, whatever the turret distance");
+	const CoreKey nearTurret{1, 10.f, 900.f}, farTurret{1, 900.f, 10.f};
+	Check(CoreBefore(nearTurret, farTurret), "core: equal gap, the nearer turret wins");
+	const CoreKey a{1, 10.f, 5.f}, b{1, 10.f, 50.f};
+	Check(CoreBefore(a, b) && !CoreBefore(b, a), "core: equal gap and turret, the anchor breaks the tie");
+	const CellRect lab{0, 0, 6, 6}, fusion{6, 0, 10, 4}, apart{9, 0, 13, 4};
+	Check(EdgeGap(lab, fusion) == 0, "core: a footprint sharing an edge touches");
+	Check(EdgeGap(lab, apart) == 3, "core: three free cells between footprints");
+}
+
 // D-085: planned slots count only near the seed when any is near; served ones
 // weigh three and count anywhere in reach.
 void TestWeightedSlots()
@@ -369,6 +384,7 @@ int main()
 	TestServedOutranksPlanned();
 	TestSameDefGrowsARectangle();
 	TestPackBeforeOrder();
+	TestCoreTouchingFirst();
 	TestWeightedSlots();
 	TestSiteNearestSeedPastEnough();
 	TestSiteFlushBeforeNearer();

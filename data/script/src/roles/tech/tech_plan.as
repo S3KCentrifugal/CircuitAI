@@ -115,11 +115,10 @@ namespace TechPlan {
             }
         } else if (plan == "t3rush") {
             if (phase == 1) {
-                if (TechGantry::EarlyEnabled()) {
-                    if (!restoreAfus) s.insertLast(TechChain::Step("afus", TechChain::DefFor("afus"), 1));
-                    s.insertLast(TechChain::Step("earlygantry", TechChain::DefFor("gantry"), 1));
-                }
+                if (TechGantry::EarlyEnabled() && !restoreAfus) s.insertLast(TechChain::Step("afus", TechChain::DefFor("afus"), 1));
+                // D-489 (owner): the T1 aircraft lab right after the first advanced fusion, before the early gantry
                 s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
+                if (TechGantry::EarlyEnabled()) s.insertLast(TechChain::Step("earlygantry", TechChain::DefFor("gantry"), 1));
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
                 s.insertLast(TechChain::Step("income", "", gantryAt));
                 s.insertLast(TechChain::Step("gantry", TechChain::DefFor("gantry"), 1));
@@ -135,6 +134,15 @@ namespace TechPlan {
                 s.insertLast(TechChain::Step("lrpc", TechChain::DefFor("lrpc"), 1));
             } else if (phase == 2) {
                 s.insertLast(TechChain::Step("income", "", gate500));
+            }
+        } else if (plan == "eco" && Global::AISettings::Role == AiRole::TECH) {
+            if (phase == 1) {
+                // D-489 (owner, 2026-11-07): the eco plan had no aircraft lab at all.
+                // The T1 aircraft lab follows the first advanced fusion; the T2 aircraft
+                // lab waits for its income (RequiredMetalIncomeForT2AircraftPlant).
+                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));
+                s.insertLast(TechChain::Step("income", "", int(Global::RoleSettings::Tech::RequiredMetalIncomeForT2AircraftPlant)));
+                s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
             }
         }
         if (restoreAfus && (s.length() == 0 || s[0].key != "afus"))

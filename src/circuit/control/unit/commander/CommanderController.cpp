@@ -179,6 +179,8 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::repairCombat>("front_repair_combat",0,1),
         Front<&FC::solarIncome>("front_solar_income",0,10000),Front<&FC::solarStorage>("front_solar_storage",0,1),
         Front<&FC::solarRadius>("front_solar_radius",32,600),Front<&FC::solarDef>("front_solar_def",-1,100000),
+        Front<&FC::solarStall>("front_solar_stall",0,1),Front<&FC::keepOwnBuild>("front_keep_own_build",0,1),
+        Front<&FC::assistBreakEnergy>("front_assist_break_energy",0,1),
         Front<&FC::mexSeconds>("front_mex_seconds",0,30),Front<&FC::stallSeconds>("front_stall_seconds",3,60),
         Front<&FC::detourSeconds>("front_detour_seconds",0,3),
         T3<&TC::declineGate>("t3_decline_gate",0,1),
@@ -348,6 +350,17 @@ float CCommanderController::GetDeficit() const {
 }
 bool CCommanderController::SetOption(const std::string& name,float value) {
     if(!std::isfinite(value)) return false;
+    {  // D-492: artillery fire control and crowding levers
+        float* lever=name=="artillery_fire_control"?&artilleryFireControl
+            :name=="artillery_heavy_cost"?&artilleryHeavyCost
+            :name=="artillery_local_max"?&artilleryLocalMax
+            :name=="artillery_local_radius"?&artilleryLocalRadius:nullptr;
+        if(lever) {
+            if(value<0 || value>100000) return false;
+            *lever=value;
+            return true;
+        }
+    }
     if(name=="commander_group_artillery_t2_definition" || name=="commander_group_artillery_t1_definition") {  // D-479
         auto& defs=name=="commander_group_artillery_t2_definition"?artilleryT2Defs:artilleryT1Defs;
         if(value==-1) {defs.clear();return true;}
@@ -715,6 +728,7 @@ void CCommanderController::Update() {
     // D-389: keep the side's combat snapshot alive while commanders read it.
     if(role.enabled && !states.Empty()) ai->GetAllyTeam()->GetCombatSnapshot().Want(frame);
     UpdateCommanderGroup();
+    UpdateArtillery();   // D-492
     for(auto& entry:states) {
         const int id=entry.id; auto& s=*entry.value;
         auto* unit=ai->GetTeamUnit(id); if(!unit || unit->IsDead()) continue;
@@ -944,6 +958,8 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
         }
     }
     if(Fallback(unit,s,current,frame)) return;
+    // D-490: low energy ends an assist (never the commander's own construction).
+    if(AssistEnergyBreak(unit,s,frame)) return;
     if(seeds.empty() && threats.empty()) {
         s.budget=0;
         if(Deploy(unit,s,frame)) return;
@@ -1198,7 +1214,8 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
         if(goal.x<0 || Exposure(P(pos),P(pos),1.f,pos.y)>unit->GetUnit()->GetHealth()*.12f) return false;
         // Emergency energy precedes returning to productive front work. This
         // uses the same offer as the script, including its local retry/claim.
-        if(auto* solar=FrontWork(unit,WORK_SOLAR,nullptr,0)) {
+        // D-490: never over the commander's own construction.
+        if(auto* solar=IsOwnConstruction(unit,unit->GetTask())?nullptr:FrontWork(unit,WORK_SOLAR,nullptr,0)) {
             if(unit->GetTask()!=solar) ai->GetBuilderManager()->AssignTask(unit,solar);
             return true;
         }
@@ -1217,6 +1234,10 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 ai->LOG("[INVARIANT] INV-234 lane push goal beyond its bound unit=%i progress=%.0f bound=%.0f screens=%i",
                     unit->GetId(),progress,bound,s.front.pushScreens);
         }
+        // D-490: the commander's own construction (started or walking to its
+        // site) holds against every rung below: group assist, the en-route mex
+        // (played, b51: an emergency solar and a lane mex swapped every 4 s).
+        if(cfg->front.keepOwnBuild>0 && IsOwnConstruction(unit,unit->GetTask())) return true;
         if(ExpansionJobCount()>0 && StartedCommanderConstruction(unit)) return true;
         if(unit->GetTask()==s.work.task && !unit->GetTask()->IsDead()
             && (s.work.kind==WORK_MEX_DEFENCE || s.work.kind==WORK_TERRITORY_LINE || s.work.kind==WORK_REPAIR_COMBAT)

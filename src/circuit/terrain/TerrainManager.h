@@ -613,6 +613,14 @@ public:
 	// factory facing the front (else a side, never away), exit clear; an air
 	// factory any facing, no exit test. -1 when no turret stands or no site
 	int PackFactoryFlush(CCircuitDef* cdef, const springai::AIFloat3& anchor);
+	// D-491: cdef inside a turret's reach of nanoGroup (zone and its ring),
+	// touching the footprints of the reserved slots coreA/coreB when the
+	// ground allows, else the smallest edge gap up to maxGapCells (CoreBefore).
+	// A ground factory keeps its exit clear; an air factory takes any facing
+	// (anyFacing). Exit lanes and pockets are refused as by PackNearGroup.
+	// -1 when no core slot exists or nothing fits within maxGapCells.
+	int PackBesideCore(int zone, CCircuitDef* cdef, int nanoGroup, int facing, bool anyFacing,
+			int coreA, int coreB, int maxGapCells, float minNanoDist);
 	static bool MakesAircraft(CCircuitAI* circuit, CCircuitDef* cdef);
 	// D-101: the next unserved slot of cdef in a set, nearest its turret first; -1
 	int NextSetSlot(CCircuitDef* cdef) const;
