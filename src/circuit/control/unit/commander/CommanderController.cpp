@@ -148,6 +148,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::pushHomeRiot>("front_push_home_riot",0,100000),Front<&FC::laneMargin>("front_lane_margin",0,2000),
         // D-357 corridor mex sweep
         Front<&FC::mexReach>("front_mex_reach",0,2000),Front<&FC::mexBehind>("front_mex_behind",0,4000),
+        Front<&FC::mexAdoptRadius>("front_mex_adopt_radius",0,6000),
         Front<&FC::mexAhead>("front_mex_ahead",0,4000),Front<&FC::mexCaptureEnemy>("front_mex_capture_enemy",0,1),
         Front<&FC::mexTurretEvery>("front_mex_turret_every",0,20),Front<&FC::mexEnemyHome>("front_mex_enemy_home",0,4000),
         Front<&FC::distance>("front_distance",200,10000),Front<&FC::standoff>("front_standoff",200,1500),
@@ -1122,7 +1123,14 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
     // was destroyed, braces here: below every rule Tick ran before Deploy
     // (energy and health retreat, jamming, T3 intercept, unseen fire,
     // fallback, D-gun combat), above front deployment and its work.
-    if(ai->GetBuilderManager()->TakeCommanderBrace(unit)) return true;
+    // Not while the unseen-fire withdrawal holds (its cloaked step back comes
+    // first). A brace is uncloaked work: the controller clears its own cloak
+    // request and returns to support (played, factory-b12: a brace replaced the
+    // withdrawal with the cloak still requested, INV-246).
+    if(frame>=s.conceal.unseenUntil && ai->GetBuilderManager()->TakeCommanderBrace(unit)) {
+        if(s.mode!=Mode::SUPPORT) { Conceal(unit,s,false); Transition(unit,s,Mode::SUPPORT,frame); }
+        return true;
+    }
     if(role.frontDuty) {
         // INV-236 (D-356): front duty is a FRONT-only policy; the script sets
         // "advance" for the roles in commander.json advance_roles and front_duty

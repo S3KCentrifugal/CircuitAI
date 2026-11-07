@@ -140,6 +140,9 @@
 		// commander, en route every front_mex_seconds; enemy extractors there are
 		// captured; one line turret per front_mex_turret_every corridor mexes.
 		"front_mex_seconds": 3, "front_mex_reach": 0, "front_mex_behind": 400, "front_mex_ahead": 600,
+		// D-478: the FRONT commander also takes the mexes it owns on a lane with no
+		// FRONT seat (the lane from an AIR or TECH start) within this radius.
+		"front_mex_adopt_radius": 2500,
 		"front_mex_capture_enemy": 1, "front_mex_turret_every": 0, "front_mex_enemy_home": 1100,
 		"front_radar_spacing": 500, "front_laser_spacing": 300,
 		"front_detour_seconds": 1, "move_resend_seconds": 1,

@@ -252,6 +252,10 @@ struct CommanderFrontConfig {
     // ahead of it; enemy extractors on those spots are captured when
     // mexCaptureEnemy; one line turret per mexTurretEvery corridor mexes.
     float mexReach=0,mexBehind=400,mexAhead=600,mexCaptureEnemy=0,mexTurretEvery=0;
+    // D-478: radius (elmos) within which the FRONT commander also takes the
+    // spots of an orphan lane (no FRONT/SUPPORT seat on it) that it owns, when
+    // its own lane sweep finds nothing. 0 keeps the sweep to its own lane.
+    float mexAdoptRadius=0;
     float mexEnemyHome=0; // spots this close to an enemy start are never swept (0 = off)
 };
 struct CommanderT3Config {

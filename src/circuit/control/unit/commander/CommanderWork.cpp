@@ -488,6 +488,26 @@ IUnitTask* CCommanderController::LaneMexWork(CCircuitUnit* unit,State& s,CCircui
         std::min(own+(cfg->front.mexLos>0?radius:cfg->front.mexAhead),LaneMexAheadLimit(unit,s,frame,own)),
         cfg->front.mexCaptureEnemy>0,cfg->front.threat,cfg->front.mexEnemyHome,cfg->front.mexLos>0);
     IBuilderTask* task=ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,radius,0,true,{},accept);
+    if(!task && cfg->front.mexAdoptRadius>0) {
+        // D-478 (the owner's rule): the lane traced from an AIR or TECH start has
+        // no FRONT seat; its spots are this commander's adopted lane territory
+        // (owned through MexTerritory's lane rule). Played, Clyde Cells
+        // 2026-11-06: those edge mexes waited 23-25 min. Same threat and
+        // enemy-on-spot rules as the lane sweep; one more bounded spot search.
+        auto* economy=ai->GetEconomyManager();
+        const bool capture=cfg->front.mexCaptureEnemy>0;
+        const float threat=cfg->front.threat;
+        const auto adopted=[this,unit,economy,capture,threat](const AIFloat3& p) {
+            if(!economy->IsAdoptedLaneSpot(p)) return false;
+            if(ai->GetCallback()->GetEnemyUnitIdsIn(p,64.f,false).empty()) return true;
+            return capture && ai->GetThreatMap()->GetThreatAt(unit,p)<=threat;
+        };
+        task=economy->EnqueueMexWithin(unit,pos,cfg->front.mexAdoptRadius,0,true,{},adopted);
+        // Logged once per new spot (the call returns a standing order again).
+        if(task && task->GetPosition().SqDistance2D(s.front.laneMexLast)>64.f*64.f)
+            ai->LOG("[CommanderFront] unit=%i adopted_mex x=%.0f z=%.0f",unit->GetId(),
+                task->GetPosition().x,task->GetPosition().z);
+    }
     if(task) {
         const AIFloat3 at=task->GetPosition();
         if(at.SqDistance2D(s.front.laneMexLast)>64.f*64.f) {

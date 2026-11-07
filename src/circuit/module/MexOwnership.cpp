@@ -739,6 +739,24 @@ float CEconomyManager::MexLaneWidth(int lane) {
     RebuildMexTerritory();
     return lane >= 0 && std::size_t(lane) < mexLanes.lanes.size() && std::isfinite(mexLanes.lanes[lane].width) ? mexLanes.lanes[lane].width : 0.f;
 }
+bool CEconomyManager::MexLaneOrphan(int lane) {
+    if (!mexTheatresEnabled || lane < 0) return false;
+    RebuildMexTerritory();
+    // Some start joined the lane and none of them is a FRONT/SUPPORT seat; a
+    // lane no start joined is not adopted (it keeps the walking rule).
+    bool seated = false;
+    for (const auto& [team, claim] : mexClaims) {
+        if (claim.lane != lane) continue;
+        if (claim.laneSpots) return false;
+        seated = true;
+    }
+    return seated;
+}
+// O(claims) per call: eight seats at most; the resolved table is shared.
+bool CEconomyManager::IsAdoptedLaneSpot(const AIFloat3& pos) {
+    const auto* r = MexResolvedAt(pos);
+    return (r != nullptr) && (r->owner == circuit->GetTeamId()) && (r->lane >= 0) && MexLaneOrphan(r->lane);
+}
 bool CEconomyManager::MexLaneMember(int lane, int team) {
     if (!mexTheatresEnabled) return false;
     RebuildMexTerritory();

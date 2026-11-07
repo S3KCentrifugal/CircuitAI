@@ -760,10 +760,13 @@ bool CCommanderController::CanBuildTactical(CCircuitUnit* unit) const {
     return false;
 }
 bool CCommanderController::TacticalSplit(CCircuitUnit* unit) const {
+    // A constructor on the live tactical job finishes it, whatever the seat
+    // count or the bank does meanwhile (played, factory-b12: a T2 seat died, the
+    // count fell under tactical_t2 and the half-built launcher was abandoned).
+    const bool live=tacticalJob && !tacticalJob->IsDead();
+    if(live && unit->GetTask()==tacticalJob && IsGroupMember(unit->GetId())) return true;
     if(!IsGroupMember(unit->GetId()) || cfg->group.tacticalT2<=0 || tacticalDefs.empty()
         || GroupT2Count()<int(cfg->group.tacticalT2)) return false;
-    const bool live=tacticalJob && !tacticalJob->IsDead();
-    if(live && unit->GetTask()==tacticalJob) return true;
     if(!TacticalEconomy() || !CanBuildTactical(unit)) return false;
     if(live && !tacticalJob->GetAssignees().empty()) return false;  // one constructor holds the split
     auto* build=dynamic_cast<IBuilderTask*>(unit->GetTask());
@@ -773,6 +776,9 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     // D-476: any group constructor that can build a launcher, once the group
     // has tactical_t2 T2 seats (formerly the T2 seats only).
     const int id=unit->GetId();
+    // Its own live job first: finished regardless of the opening gates below.
+    if(tacticalJob && !tacticalJob->IsDead() && unit->GetTask()==tacticalJob && IsGroupMember(id))
+        return TacticalJobAllowed(unit,tacticalJob,anchor)?tacticalJob:nullptr;
     if(!IsGroupMember(id) || cfg->group.tacticalT2<=0 || tacticalDefs.empty() || !unit->GetCircuitDef()->IsBuilder()
         || GroupT2Count()<int(cfg->group.tacticalT2) || !CanBuildTactical(unit)) return nullptr;
     const int frame=ai->GetLastFrame();

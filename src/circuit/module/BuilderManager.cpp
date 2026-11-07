@@ -1557,6 +1557,15 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 	switch (task->GetType()) {
 		case IUnitTask::Type::BUILDER: {
 			IBuilderTask* taskB = static_cast<IBuilderTask*>(task);
+			// D-477: every frame mapped to this task goes, queued or detached.
+			// A detached task (D-474's brace) is never in buildTasks, so the
+			// erase below skipped it and its turret frame kept naming the freed
+			// task (played, factory-b14: UnitDestroyed of that frame read it).
+			// O(unfinished frames) per dequeue; no per-frame work.
+			for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
+				if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
+				else ++itu;
+			}
 			if (taskB->GetBuildType() >= IBuilderTask::BuildType::_SIZE_) {
 				break;
 			}

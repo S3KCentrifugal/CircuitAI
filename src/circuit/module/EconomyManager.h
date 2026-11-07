@@ -197,6 +197,11 @@ public:
 	springai::AIFloat3 MexLaneMidpoint(int lane);
 	float MexLaneWidth(int lane);
 	bool MexLaneMember(int lane, int team);
+	// D-478: a lane no FRONT or SUPPORT seat stands on (the lane traced from an
+	// AIR or TECH start), and a spot of such a lane that this AI owns: the
+	// nearest FRONT seat's adopted lane territory.
+	bool MexLaneOrphan(int lane);
+	bool IsAdoptedLaneSpot(const springai::AIFloat3& pos);
 	std::vector<springai::AIFloat3> MexLaneSpine(int lane, int step);
 	std::string DescribeMexTerritory();
 	void DumpMexTerritory(const char* why);

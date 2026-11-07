@@ -162,6 +162,7 @@ namespace CommanderCombat {
             Option("front_lane_margin",0.f);
             Option("front_mex_reach",0.f);
             Option("front_mex_behind",400.f);
+            Option("front_mex_adopt_radius",0.f); // D-478: orphan-lane spots this AI owns (0: off)
             Option("front_mex_ahead",600.f);
             Option("front_mex_capture_enemy",0.f);
             Option("front_mex_turret_every",0.f);
