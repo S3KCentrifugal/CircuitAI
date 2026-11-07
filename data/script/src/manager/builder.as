@@ -18,6 +18,7 @@
 #include "../systems/construction/layout.as"
 #include "../systems/construction/front_energy.as"
 #include "../systems/team/sea_assist.as"
+#include "../systems/construction/lolcannon.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).
@@ -2026,6 +2027,8 @@ namespace Builder {
 				return null;
 			}
 		}
+		// owner, 2026-10-21: the lolcannon crew builds only the lolcannon program
+		{ IUnitTask@ lc = LolCannon::BuilderTask(u); if (lc !is null) return lc; }
 		// New gating via BuilderTaskTrack: grace window, then gate if added, else allow; hard timeout clears
 		BuilderTaskTrack@ tr = GetTrackForBuilder(u);
 		if (tr !is null) {
@@ -2075,6 +2078,7 @@ namespace Builder {
 
 	void AiTaskAdded(IUnitTask@ task)
 	{
+		LolCannon::TaskAdded(task);   // owner, 2026-10-21: a lolcannon outside its program is aborted
 		if (Global::AISettings::Role == AiRole::TECH && Global::RoleSettings::Tech::ExperimentalBuild)
 			Invariants::ConstructionAdmitted(task);
 		if (Global::AISettings::Role == AiRole::TECH) TechReclaim::Audit(task);   // D-290: every reclaim of ours, named by path
@@ -2409,6 +2413,7 @@ namespace Builder {
 		if (unit is null) return;
 
 		if (Team::Recovery::OnUnitAdded(unit)) return;
+		LolCannon::UnitAdded(unit);   // owner, 2026-10-21: the lolcannon crew is claimed as it comes out
 
 		// Role-independent, like the mex bookkeeping in AiTaskAdded: SEA counts
 		// its construction ships here, TACTICAL unlocks its shipyard caps the
@@ -2798,6 +2803,7 @@ namespace Builder {
 		if (unit is null) return;
 
 		Team::SeaAssist::OnUnitRemoved(unit);
+		LolCannon::UnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
         CommanderGroup::OnRemoved(unit);
 

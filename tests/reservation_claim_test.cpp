@@ -4,6 +4,13 @@
 
 int main()
 {
+    using circuit::reservation::AllowsReservedCell;
+    assert(AllowsReservedCell(1, 1, false));
+    assert(AllowsReservedCell(1, 1, true));
+    assert(AllowsReservedCell(1, 0, true)); // reclaimed opening, then exact claim
+    assert(!AllowsReservedCell(1, 0, false)); // no authority over another mark
+    assert(!AllowsReservedCell(1, 2, true)); // another corridor remains protected
+    assert(!AllowsReservedCell(0, 0, true)); // unscoped placement is unchanged
     std::set<int> claimed{7}; // Another task owns seven.
     int own = -1;
     int calls = 0;

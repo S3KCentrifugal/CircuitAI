@@ -169,6 +169,13 @@ public:
 	int ReserveNanoBlock(CCircuitUnit* factory, CCircuitDef* nanoDef, int cols, int rows, int gap);
 	// Dry run of ReserveBuilding: would it be accepted? No marks, no log.
 	bool CanReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+    bool IsAlliedSpaceFree(const CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
+    bool StrictReservationAllowed(int id) const;
+    int NextSupportSlot(CCircuitUnit* builder, const CCircuitDef* def, int group, const springai::AIFloat3& seed, int budget);
+    int PackReachable(CCircuitUnit* builder, const CCircuitDef* def, int zone, int supportGroup,
+        int facing, const springai::AIFloat3& seed, int budget);
+    int ReserveCoastalSupport(CCircuitUnit* builder, const CCircuitDef* support, int zone, int group,
+        const springai::AIFloat3& anchor, float radius, int budget, int maximum);
 	// Fraction of a rectangle - centred at `centre`, halfAcross to each side of
 	// `facing`, halfAlong forward and back - on which cdef could be placed now:
 	// in the map, not blocked or reserved, terrain-typed for it and accepted
@@ -179,6 +186,9 @@ public:
 	void ReleaseGroup(int group);
 	bool IsReserved(const springai::AIFloat3& pos) const;
 	int GetReservationCount(CCircuitDef* cdef) const;  // unconsumed
+    // Callback-local view, invalidated by reservation mutation. Script copies
+    // IDs and rechecks live state; no iterator may escape the callback.
+    const std::set<int>& GetScopedReservationIds(int zone, int group, const CCircuitDef* def) const;
 	// Handshake with IBuilderTask: a FindBuildSite that served a reserved site
 	// leaves the reservation's id and facing here for the caller to take.
 	int TakeReservedId() { const int id = lastReservedId; lastReservedId = -1; return id; }
@@ -225,6 +235,11 @@ public:
 	// halfAlong forward and back. Free cells are marked, blocked ones are
 	// holes. Returns the zone id, 0 when nothing could be marked.
 	int ReserveZone(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, bool corridor);
+    void SetLayoutPriority(int priority);
+    bool PlanEconomySpine(const std::string& name, CCircuitDef* nano, CCircuitDef* reactor,
+        CCircuitDef* converter, const springai::AIFloat3& origin, int facing,
+        int maximumRows, int serviceDepth, int candidateLimit, float searchRadius, float neighbourClearance, int reactorLimit,
+        const std::vector<springai::AIFloat3>& preferences, float preferenceRadius);
 	// D-343 (SEA): as ReserveZone, but a rectangle touching a teammate's
 	// reservation is shrunk until it touches none instead of being refused.
 	// The zone never covers allied ground (INV-088).
@@ -533,6 +548,8 @@ private:
     void ClearLostReservation(int id);
     void IndexReservation(int id);
     void EraseReservation(int id);
+    bool CanActivateZone(int id) const;
+    std::set<int> activeLayoutZones; // derived from named ints on load; no strings on slot queries
 public:
 	// D-101: the unserved slots of cdef's sets released; how many
 	int ReleaseSetSlots(CCircuitDef* cdef);

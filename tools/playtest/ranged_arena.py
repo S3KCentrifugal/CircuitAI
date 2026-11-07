@@ -75,6 +75,8 @@ def prepare(args):
     # Declared per-case mod options (e.g. the Legion faction for legscout).
     for key, value in case.get('modoptions', {}).items():
         stage += ['--modoption', f'{key}={value}']
+    if case.get('commander_idle_probe'):
+        stage += ['--extra-widget',str(HERE/'widgets/commander_idle_watch.lua')]
     if args.headless: stage += ['--headless']
     # No --game: playtest.py resolves the lobby's last game archive, so a
     # pinned archive name does not go stale when the installed BAR updates.
@@ -93,6 +95,10 @@ def prepare(args):
     staged = directory/'AI/Skirmish/BARbTest/test'
     pool_symbols(staged)
     # Explicit correctness-fixture policy levers; never mutate source/live data.
+    if case.get('commander_idle_probe'):
+        config_path=staged/'config'/args.profile/'commander.json'
+        config_path.write_text(re.sub(r'("front_ladder"\s*:\s*)"[^"]*"',
+            r'\1"advance,reclaim,hold"',config_path.read_text()))
     if case.get('commander_policy'):
         config_path=staged/'config'/args.profile/'commander.json'
         config_path.write_text(group_fixture_policy(config_path.read_text(),case['commander_policy']))

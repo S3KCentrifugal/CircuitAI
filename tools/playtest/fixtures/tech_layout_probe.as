@@ -18,6 +18,9 @@ namespace TechLayoutProbe {
                 if(name=="corca") worker=ids[i];
                 if(name=="corack") anchor=ids[i];
             }
+            // This fixture supplies legacy all-sided packing zones explicitly;
+            // do not route its AFUS through an unrelated startup spine bank.
+            Layout::spineActive=false;
             @Layout::nano=ai.GetCircuitDef("cornanotc");Layout::nano.maxThisUnit=100;
             Layout::planned=true;Layout::fallback=false;Layout::facing=0;Layout::extraZones.resize(0);
             Layout::boxCentre=AIFloat3(5000,0,1500);Layout::fwdCentre=AIFloat3(5000,0,3000);

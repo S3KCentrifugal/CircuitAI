@@ -5,11 +5,13 @@ local names={armada={"armaca","armafus","armflak","armarad"},cortex={"coraca","c
 local units=names[side]
 local built,created={},{}
 local completed,total,phase,at=0,0,0,0
+local firstBuilder,firstFrame,killedBuilder=nil,nil,false
 local function emit(s) Spring.Echo("[EcoFlakTest] "..s) end
 local function give(name,x,z) Spring.SendCommands("give 1 "..name.." 0 @"..x..","..Spring.GetGroundHeight(x,z)..","..z) end
 function widget:UnitCreated(id,def,team,builder)
     if team==0 and UnitDefs[def].name==units[3] and builder then
         created[id]=true; total=total+1
+        if not firstBuilder then firstBuilder=builder;firstFrame=Spring.GetGameFrame() end
         if Spring.GetGameFrame()<600 then emit("FAIL flak before first AFUS") end
     end
 end
@@ -23,6 +25,7 @@ function widget:GameFrame(f)
     if f==240 then
         for i=0,5 do give(units[1],1500+i*48,10200) end
         give(units[4],1700,10000)
+        give(side=="armada" and "armwin" or side=="cortex" and "corwin" or "legwin",1500,10000)
     end
     if f==570 and total==0 then emit("PASS no pre-AFUS construction") end
     if f==600 then give(units[2],1400,10400) end
@@ -30,6 +33,11 @@ function widget:GameFrame(f)
         if f==3600 then emit(total==0 and "PASS disabled profile" or "FAIL disabled profile built flak") end
         return
     end
+    if firstBuilder and not killedBuilder and f>=firstFrame+60 then
+        Spring.SelectUnitArray({firstBuilder},false);Spring.SendCommands("destroy");Spring.SelectUnitArray({},false)
+        killedBuilder=true
+    end
+    if phase==0 and completed==1 and killedBuilder then emit("PASS builder loss recovered") end
     if phase==0 and completed==1 then phase=1;at=f;emit("PASS first AFUS minimum") end
     -- Keep observed air pressure present after the first minimum. Supplied
     -- planes can be shot down; their deaths never stand in for completion.

@@ -13,6 +13,7 @@
 #include "control/kernel/CommanderCombat.h"
 #include "control/kernel/CommanderFortification.h"
 #include "control/kernel/CommanderGroupWork.h"
+#include "control/kernel/CommanderIdleWork.h"
 #include "control/kernel/CommanderJammerPlan.h"
 #include "control/kernel/CommanderPosture.h"
 #include "control/kernel/DefensePlanner.h"
@@ -80,6 +81,7 @@ struct CommanderT3State {
 struct CommanderFrontState {
     springai::AIFloat3 point{-1,0,-1};
     int frame=-10000,yield=0,mexFrame=-10000,progressFrame=0,arrived=-1;
+    commander::AdvanceReason reason=commander::AdvanceReason::NO_GOAL;
     int solarNext=0; // failed local placement retry, no recurring timer
     springai::AIFloat3 progressPos;
     // D-356 lane push census of the last FrontPosition: corridor combat
@@ -119,6 +121,9 @@ struct CommanderWorkState : commander::WorkIdentity<IUnitTask> {
     // (address compared only, never dereferenced) that Deploy must not
     // interrupt. timedNext: definition id -> next due frame.
     int lineUntil=-1,lineRetry=0,lineYield=-10000,radarFrame=-10000,lineOutside=-1;
+    int reclaimNext=0,idleLogNext=0,idleReason=-1;
+    float reclaimMetalRoom=0,reclaimEnergyRoom=0;
+    const char* reclaimReason="not_offered"; // static labels, no allocation/feature ownership
     bool lineDone=false,radarCovered=false,held=false; // held: offered under a fallback
     springai::AIFloat3 lineAnchor{-1,0,-1},lineThreat,radarPos{-1,0,-1};
     commander::FallbackBoundary boundary; // perimeter when task was offered
@@ -257,6 +262,7 @@ struct CommanderFallbackConfig {
 struct CommanderWorkConfig {
     // D-299 FRONT work ladder. radius 0 = the commander's own LOS.
     float radius=0,clearance=400,repairHealth=.98f,reclaimStorage=.95f,reclaimMetal=1;
+    float reclaimEnergy=25,reclaimEnergyStorage=.9f,reclaimEnergyPerMetal=60,reclaimRetry=3;
     float lineIncome=20,lineMin=1,lineMax=6,lineRadius=400,lineSpacing=80,lineHoldSeconds=60,lineRetrySeconds=5;
     float timedInterval=30,timedUntil=300,radarCoverage=.8f,baseRadius=1500;
 };
@@ -525,7 +531,7 @@ private:
         const springai::AIFloat3* coveragePoint=nullptr);
 
     IUnitTask* RepairWork(CCircuitUnit* unit,const State& state,bool defence,float radius,int frame,bool stationary=false);
-    IUnitTask* ReclaimWork(CCircuitUnit* unit,const State& state,float radius,int frame);
+    IUnitTask* ReclaimWork(CCircuitUnit* unit,State& state,float radius,int frame);
     IUnitTask* LineWork(CCircuitUnit* unit,State& state,CCircuitDef* buildDef,int frame);
     IUnitTask* RadarWork(CCircuitUnit* unit,State& state,CCircuitDef* buildDef,int frame);
     bool RadarCovered(CCircuitUnit* unit,State& state,int frame);

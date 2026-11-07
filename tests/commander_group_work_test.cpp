@@ -1,10 +1,38 @@
 #include "control/kernel/CommanderGroupWork.h"
+#include "control/kernel/CommanderIdleWork.h"
+#include <vector>
+#include <limits>
 #include <cassert>
 #include <iostream>
 #include <new>
 #include <array>
 using namespace circuit::commander;
 int main() {
+    assert(!ShouldStartDeployment(250.f*250.f,250));
+    assert(ShouldStartDeployment(251.f*251.f,250));
+    assert(!ShouldStartDeployment(std::numeric_limits<float>::infinity(),250));
+    assert(ReclaimHeadroom(900,1000,.9f)==0);
+    assert(ReclaimHeadroom(100,1000,.9f)==800);
+    const auto tree=ResourceReclaimValue(0,600,0,1000,1,25,60,10);
+    assert(tree.score>0 && !tree.metal && tree.value==600);
+    assert(ResourceReclaimValue(20,600,0,0,1,25,60,10).score==0);
+    assert(ResourceReclaimValue(0,0,100,1000,1,25,60,0).score==0);
+    assert(ResourceReclaimValue(.5f,20,100,1000,1,25,60,0).score==0);
+    assert(ResourceReclaimValue(100,600,1000,1000,1,25,60,10).metal);
+    assert(!ResourceReclaimValue(100,600,0,1000,1,25,60,10).metal);
+    // Differential oracle: bounded selection equals a full stable ranking,
+    // regardless of incoming feature order, including ties and empty input.
+    std::vector<ReclaimCandidate> input;
+    for(int id=0;id<64;++id)input.push_back({0,0,0,float(id%7+1),float(id%3),1,id,true});
+    auto ordered=input;std::sort(ordered.begin(),ordered.end(),BetterReclaim);
+    for(int shift=0;shift<64;++shift) {
+        LocalReclaimCandidates top;
+        for(int i=0;i<64;++i)top.Add(input[(i+shift)%64]);
+        assert(top.count==4);
+        for(size_t i=0;i<4;++i)assert(top.items[i].id==ordered[i].id);
+    }
+    LocalReclaimCandidates empty;empty.Add({});assert(empty.count==0);
+
     for(bool front:{false,true}) for(bool anchor:{false,true}) for(bool member:{false,true}) {
         assert(SupportBoundaryApplies(front,anchor,member)==(!front && anchor && member));
     }

@@ -27,7 +27,35 @@ namespace EcoFlakProbe {
         Check(EcoFlak::Enabled()==__ENABLED__,"profile gate");
         active=true; return true;
     }
-    void Tick() { if (active) EcoFlak::Tick(); }
+    int checkFrame = -1;
+    bool checkedWorker = false, checkedWindBefore = false, checkedWindAfter = false;
+    void Tick() {
+        if (!active) return;
+        EcoFlak::Tick();
+        if (ai.frame < checkFrame + SECOND) return;
+        checkFrame = ai.frame;
+        int assigned = 0;
+        CCircuitDef@ flak = EcoFlak::Definition();
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ unit = ai.GetTeamUnit(ids[i]);
+            if (unit is null || !unit.circuitDef.IsMobile()) continue;
+            IBuilderTask@ task = cast<IBuilderTask>(unit.task);
+            if (task !is null && task.buildDef is flak) ++assigned;
+        }
+        if (assigned > 1) Check(false, "single flak constructor");
+        if (assigned == 1 && !checkedWorker) { checkedWorker=true; Check(true,"single flak constructor"); }
+        CCircuitDef@ wind = ai.GetCircuitDef(UnitHelpers::GetWindNameForSide(Global::AISettings::Side));
+        CCircuitUnit@ target = aiBuilderMgr.FindOwnNear(Layout::BaseCentre(),4000.f,wind);
+        if (target is null) return;
+        const bool afus = TechBuild::FinishedOf(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side)) > 0;
+        if (!afus && !checkedWindBefore) {
+            checkedWindBefore=true; Check(!TechReclaim::Allowed(target,"probe"),"wind protected before AFUS");
+        }
+        if (afus && !checkedWindAfter) {
+            checkedWindAfter=true; Check(TechReclaim::Allowed(target,"probe"),"wind eligible after AFUS");
+        }
+    }
     IUnitTask@ Task(CCircuitUnit@ u) {
         if (active && ai.teamId==0 && UnitHelpers::IsAirConstructor(u.circuitDef)) {
             if (compact && compactGroup==0) {
@@ -49,9 +77,12 @@ namespace EcoFlakProbe {
                     +" canBuild="+u.circuitDef.CanBuild(d)+" allowed="+d.IsBuildAllowed()+" available="+d.IsAvailable(ai.frame),1);
             }
             if(t !is null) {
-                Check(ai.frame-lastOrder>=30*SECOND,"order cooldown"); lastOrder=ai.frame;
-                const AIFloat3 p=aiTerrainMgr.GetReservationPos(AiTaskReservationId(t));
-                Check(EcoFlak::OutsideEconomy(p),"physical order outside economy");
+                IBuilderTask@ build = cast<IBuilderTask>(t);
+                if (build !is null && build.GetBuildType() < int(Task::BuildType::REPAIR) && t !is u.task) {
+                    Check(ai.frame-lastOrder>=30*SECOND,"order cooldown"); lastOrder=ai.frame;
+                    const AIFloat3 p=aiTerrainMgr.GetReservationPos(AiTaskReservationId(t));
+                    Check(EcoFlak::OutsideEconomy(p),"physical order outside economy");
+                }
                 if (compact) Check(aiTerrainMgr.GetGroupCount(compactGroup,false)==1,"compact economy unchanged");
                 return t;
             }

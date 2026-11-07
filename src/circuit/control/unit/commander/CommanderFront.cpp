@@ -27,12 +27,13 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
     // Positions expire after one second; combat still observes every 3 frames.
     if(frame<s.front.frame+30) return s.front.point;
     s.front.frame=frame;
+    s.front.reason=commander::AdvanceReason::ADVANCE;
     auto* battle=ai->GetBattle();
     if(battle->GetFrontLaneLength()>0.f) {
         // D-356: the meta's "com forward until the first riot units appear,
         // then home". Once home, the lane has no front for this commander:
         // the ladder's base rungs (assist, plants) keep it busy at home.
-        if(PushHome(unit,s,frame)) { s.front.pushBound=-1; s.front.pushGoalProgress=-1; return s.front.point={-1,0,-1}; }
+        if(PushHome(unit,s,frame)) { s.front.reason=commander::AdvanceReason::HOME; s.front.pushBound=-1; s.front.pushGoalProgress=-1; return s.front.point={-1,0,-1}; }
         const float length=battle->GetFrontLaneLength();
         const float limit=std::max(0.f,length-cfg->front.standoff);
         const float own=battle->GetFrontLaneProgress(unit->GetPos(frame));
@@ -74,6 +75,7 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
         for(const auto& group:ai->GetEnemyManager()->GetEnemyGroups())
             if(battle->GetFrontLaneDistance(group.pos)<=battle->GetFrontLaneWidth()) {
                 const float boundary=std::max(0.f,battle->GetFrontLaneProgress(group.pos)-cfg->front.standoff);
+                if(boundary<advance)s.front.reason=commander::AdvanceReason::CONTACT;
                 advance=std::min(advance,boundary);reachableBound=std::min(reachableBound,boundary);
             }
         // Enemy groups behind the commander may stop a push, but must not
@@ -81,7 +83,11 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
         if(cfg->front.persistent>0) { advance=std::max(own,advance);reachableBound=std::max(own,reachableBound); }
         // Lane assessment is an additional bound; local combat still owns
         // withdrawal and existing screen/reach limits remain authoritative.
-        advance=battle->LimitLaneAdvance(own,advance);
+        bool stale=false;
+        const float limited=battle->AssessLaneAdvance(own,advance,&stale);
+        if(stale)s.front.reason=commander::AdvanceReason::STALE;
+        else if(limited<advance)s.front.reason=commander::AdvanceReason::LANE_BOUND;
+        advance=limited;
         reachableBound=std::min(reachableBound,battle->LimitLaneAdvance(own,reachableBound));
         auto anchor=battle->GetFrontLanePoint(advance);
         anchor.y=ai->GetMap()->GetElevationAt(anchor.x,anchor.z);
@@ -117,6 +123,7 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
         }
         if(!reachable
             || ai->GetThreatMap()->GetThreatAt(unit,anchor)>cfg->front.threat) {
+            s.front.reason=reachable?commander::AdvanceReason::THREAT:commander::AdvanceReason::NO_ROUTE;
             // A retained deployment anchor must obey newly observed contact
             // too. Otherwise the legacy unreachable-site fallback can revive
             // a goal beyond the new bound after the front has moved back.
@@ -160,7 +167,7 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
     const auto home=ai->GetSetupManager()->GetStartPos();
     auto enemy=ai->GetEnemyManager()->GetNearestGroupPos(unit->GetPos(frame),cfg->combat.minValue);
     if(enemy.x<0) enemy=ai->GetEnemyManager()->GetEnemyPos();
-    if(enemy.x<0 || home.SqDistance2D(enemy)<1) return s.front.point={-1,0,-1};
+    if(enemy.x<0 || home.SqDistance2D(enemy)<1) {s.front.reason=commander::AdvanceReason::NO_GOAL;return s.front.point={-1,0,-1};}
     const auto delta=enemy-home;
     const float distance=delta.Length2D();
     const auto direction=delta/distance;
@@ -181,8 +188,9 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
         if(projection>advance && projection<=limit) { advance=projection; anchor=p-direction*100.f; }
     }
     anchor.y=ai->GetMap()->GetElevationAt(anchor.x,anchor.z);
-    if(!OnMap(anchor) || !ai->GetTerrainManager()->CanReachAt(unit,anchor,64)
-        || ai->GetThreatMap()->GetThreatAt(unit,anchor)>cfg->front.threat) {
+    const bool reachable=OnMap(anchor) && ai->GetTerrainManager()->CanReachAt(unit,anchor,64);
+    if(!reachable || ai->GetThreatMap()->GetThreatAt(unit,anchor)>cfg->front.threat) {
+        s.front.reason=reachable?commander::AdvanceReason::THREAT:commander::AdvanceReason::NO_ROUTE;
         // Keep the last safe front; local combat can withdraw from it. Never
         // treat an unreachable/exposed destination as permission to idle home.
         return s.front.point;
@@ -304,7 +312,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
             || (frame<s.work.lineUntil && !s.work.lineDone)
             || (s.front.territoryPending && cfg->front.fortifyAdvance<=0)) return nullptr;
         const auto anchor=FrontPosition(unit,s,frame),pos=unit->GetPos(frame);
-        if(anchor.x<0 || pos.SqDistance2D(anchor)<=cfg->front.radius*cfg->front.radius*.25f) return nullptr;
+        if(anchor.x<0 || !commander::ShouldStartDeployment(pos.SqDistance2D(anchor),cfg->front.radius*.5f)) return nullptr;
         auto* build=dynamic_cast<IBuilderTask*>(unit->GetTask());
         if(build && !build->IsDead() && build->GetBuildDef() && CanResumeFrontTask(unit,build)
             && ((build->GetTarget() && !build->GetTarget()->IsFinished()) || build==s.work.task)
@@ -330,6 +338,15 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         const auto anchor=FrontPosition(unit,s,frame);
         if(cfg->front.persistent<=0 && (anchor.x<0 || unit->GetPos(frame).SqDistance2D(anchor)>
             cfg->front.radius*cfg->front.radius*.25f)) return nullptr;
+        if(s.front.reason==commander::AdvanceReason::ADVANCE)
+            s.front.reason=commander::AdvanceReason::ARRIVED;
+        const int reason=int(s.front.reason);
+        if(reason!=s.work.idleReason || frame>=s.work.idleLogNext) {
+            s.work.idleReason=reason;s.work.idleLogNext=frame+30*FRAMES_PER_SEC;
+            ai->LOG("[CommanderIdle] unit=%i reason=%i posture=%s defense=%s metal_room=%.0f energy_room=%.0f group_job=%i reclaim=%s",
+                unit->GetId(),reason,s.conceal.postureReason,defenseReason.c_str(),
+                s.work.reclaimMetalRoom,s.work.reclaimEnergyRoom,groupJob?1:0,s.work.reclaimReason);
+        }
         auto* hold=static_cast<IWaitTask*>(ai->GetBuilderManager()->Enqueue(
             TaskB::Wait(int(std::clamp(radius,1.f,30.f)*FRAMES_PER_SEC))));
         hold->SetStationary(true);

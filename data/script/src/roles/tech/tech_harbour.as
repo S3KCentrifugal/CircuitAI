@@ -200,12 +200,15 @@ namespace TechHarbour {
     // gate never opened). The land stays for the labs and the fusions
     IUnitTask@ CommanderFloat(CCircuitUnit@ u)
     {
-        if (!Enabled() || u is null || !UnitHelpers::IsCommander(u.circuitDef) || !aiEconomyMgr.isEnergyFull) return null;
+        if (!Enabled() || u is null || !UnitHelpers::IsCommander(u.circuitDef)) return null;
+        if (!TechEconomyMath::OffshoreConversionAllowed(aiEconomyMgr.isEnergyFull, aiEconomyMgr.isEnergyStalling,
+            aiEconomyMgr.isMetalFull, aiEconomyMgr.energy.income, aiEconomyMgr.energy.pull,
+            Global::RoleSettings::Tech::HarbourCommanderSurplus)) return null;
         if (aiEconomyMgr.energy.income < Global::RoleSettings::Tech::HarbourCommanderMinEnergy) return null;   // the start bank is full, not floating
         CCircuitDef@ fmkr = Def(UnitHelpers::GetNavalEnergyConverterNameForSide(Side()));
         if (fmkr is null || !u.circuitDef.CanBuild(fmkr) || Queued(fmkr, Task::BuildType::CONVERT) > 0) return null;
         if (fmkr.count >= Global::RoleSettings::Tech::HarbourCommanderConverters) return null;
-        IUnitTask@ t = Builder::EnqueueT1NavalEnergyConverter(Side(), u.GetPos(ai.frame), Global::RoleSettings::Tech::HarbourCommanderReach, 60 * SECOND);
+        IUnitTask@ t = Builder::EnqueueT1NavalEnergyConverter(Side(), Layout::HomeCentre(), Global::RoleSettings::Tech::HarbourCommanderReach, 60 * SECOND);
         if (t !is null && ai.frame - logFrame > 60 * SECOND) { logFrame = ai.frame; Say("energy floats: the commander puts converters on the water (" + fmkr.count + " stand)"); }
         return t;
     }
@@ -230,6 +233,20 @@ namespace TechHarbour {
         {
             IUnitTask@ keep = TechBuild::KeepCurrent(u);
             if (keep !is null) return keep;
+        }
+
+        // Coastal support belongs to the home economy's funding and concurrency
+        // budget, not an independent harbour quota.
+        const float metal = Economy::GetMinMetalIncomeLast10s();
+        if (metal >= Global::RoleSettings::Tech::EcoTurretMinMetalIncome && !aiEconomyMgr.isEnergyStalling
+            && TechEconomyMath::CapacityNeeded(EcoPlanner::TargetBuildPower(metal,aiEconomyMgr.isMetalFull),
+                aiBuilderMgr.GetStaticBuildPowerNear(Layout::BaseCentre(),Global::RoleSettings::Tech::EcoBuildPowerRadius),
+                Layout::TurretPowerInFlight(),false)) {
+            CCircuitDef@ support = Layout::CoastalDefinition(u);
+            if (support !is null && aiEconomyMgr.metal.current >= support.costM * Global::RoleSettings::Tech::EcoTurretBankFraction) {
+                IUnitTask@ coast = Layout::CoastalNanoTask(u,Task::Priority::HIGH);
+                if (coast !is null) return coast;
+            }
         }
 
         // 1. the advanced shipyard (owner: the priority after the second advanced fusion)
