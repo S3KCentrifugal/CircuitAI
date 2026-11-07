@@ -147,6 +147,17 @@ private:
         bool hold = false, naval = false;
     };
     std::map<CCircuitUnit*, Dispatch> dispatches;
+    // Spam lanes (resumeAhead), owner 2026-11-07: how many of the unit's own
+    // dispatched moves are still queued - 1 means the final waypoint is the
+    // current one. Read from the live queue's length while it still ends at our
+    // final move, and only ever lowered for one dispatch; reset when a new queue is sent.
+    // IsAtEnd needs it: a retrace lane's final point can lie within the
+    // arrival radius of an earlier waypoint (the edge lane's first one), and
+    // distance alone released units there with 2-3 waypoints still to go.
+    mutable std::map<CCircuitUnit*, unsigned int> movesLeft;
+    void ObserveProgress(CCircuitUnit* unit) const;
+    // The route index the unit is heading to by movesLeft (0 when unknown)
+    unsigned int ProgressIndex(CCircuitUnit* unit) const;
     struct IssueTrace { int frame=-1, count=0, reported=-30; };
     std::map<CCircuitUnit*, IssueTrace> issueTrace;
     void TraceIssue(CCircuitUnit* unit, unsigned int fromIndex, bool direct);

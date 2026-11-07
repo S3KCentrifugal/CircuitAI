@@ -109,6 +109,7 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	engaging.erase(unit);
     issuedVersion.erase(unit);
     dispatches.erase(unit);
+    movesLeft.erase(unit);
     issueTrace.erase(unit);
     if (holdPosition) unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
     if (ManagedControl() && hadAssignee && units.empty()) manager->AbortTask(this);
@@ -193,6 +194,7 @@ void CRouteTask::Update()
 	for (CCircuitUnit* unit : units) {
 		CCircuitAI* circuit = manager->GetCircuit();
 		CCircuitDef* def = unit->GetCircuitDef();
+		ObserveProgress(unit);  // spam lanes: which waypoint the live queue is on
 		// Owner 2026-11-03: the artillery snipe comes before range micro and
 		// ghost fire; the route resumes (below) once it lets go.
 		if (ArtySpamRetreatStep(circuit, unit, circuit->GetLastFrame())) {
@@ -271,7 +273,9 @@ void CRouteTask::Update()
 		if (patrol) IssueRoute(unit, 0);
 		// Spam lanes (retry after idle, range resume): the queue from where the
 		// unit is; IssueDirect would cut every remaining bend (the lane's L) short.
-		else if (resumeAhead) IssueRoute(unit, AheadIndex(unit));
+		// Never behind the waypoint its own queue had reached (owner 2026-11-07:
+		// a retrace end near an earlier waypoint must not skip the legs between).
+		else if (resumeAhead) IssueRoute(unit, std::max(AheadIndex(unit), ProgressIndex(unit)));
 		else if (preserveWaypoints) IssueRoute(unit, NearestAheadIndex(unit));
 		else IssueDirect(unit);
 	}
@@ -480,7 +484,49 @@ bool CRouteTask::IsAtEnd(CCircuitUnit* unit) const
         const auto& last=sent->second.commands.back();
         goal=AIFloat3(last.x,last.y,last.z);
     }
-    return unit->GetPos(frame).SqDistance2D(goal) < SQUARE(radius);
+    if (unit->GetPos(frame).SqDistance2D(goal) >= SQUARE(radius)) return false;
+    if (!resumeAhead) return true;
+    // Owner 2026-11-07: near the final point is not enough - the final move
+    // must be the current order. A unit passing the end on an earlier leg
+    // (retrace / jackknife lanes) keeps its queue.
+    ObserveProgress(unit);
+    const auto left=movesLeft.find(unit);
+    if (left==movesLeft.end()) return true;  // never dispatched here: distance only
+    if (left->second<=1) return true;
+    // Queue already empty (finished, or stopped): only accepted when the
+    // final move was next in line - two waypoints consumed between checks.
+    return left->second==2 && !manager->GetCircuit()->GetCallback()->Unit_HasCommands(unit->GetId());
+}
+
+void CRouteTask::ObserveProgress(CCircuitUnit* unit) const
+{
+    if (!resumeAhead) return;
+    const auto left=movesLeft.find(unit);
+    const auto sent=dispatches.find(unit);
+    if (left==movesLeft.end() || sent==dispatches.end() || sent->second.commands.empty()) return;
+    auto* circuit=manager->GetCircuit();
+    const int count=circuit->GetUnitAPI()->GetCMDQueueSize(unit->GetId());
+    if (count<=0 || unsigned(count)>=left->second) return;
+    // Lowered only while the live queue still ends at our final move: a
+    // foreign order (range micro, snipe) replaces the queue and proves nothing.
+    // Looser than the exact-suffix match (HasRouteIntent) on purpose: a
+    // lag-dropped leg or a changed option/height must not freeze the count,
+    // and the release only needs "one queued command, at our final point".
+    const auto& last=sent->second.commands.back();
+    if (!circuit->GetUnitAPI()->LastMoveAt(unit->GetId(),count,last.x,last.z,8.f)) return;
+    left->second=unsigned(count);
+    // Opt-in diagnosis only (CIRCUIT_TRACE_ROUTE), as TraceIssue
+    static const bool trace=std::getenv("CIRCUIT_TRACE_ROUTE")!=nullptr;
+    if (trace) circuit->LOG("[RouteProgress] frame=%d unit=%d movesLeft=%u of %u",
+        circuit->GetLastFrame(),unit->GetId(),left->second,unsigned(sent->second.commands.size()));
+}
+
+unsigned int CRouteTask::ProgressIndex(CCircuitUnit* unit) const
+{
+    const auto left=movesLeft.find(unit);
+    const unsigned int size=RouteFor(unit).size();
+    if (left==movesLeft.end() || left->second==0 || left->second>size) return 0;
+    return size-left->second;  // dispatches end at the route's end
 }
 
 unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
@@ -562,6 +608,7 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 		unit->CmdMoveTo(goal, 0, timeout);
         dispatch.commands.push_back({CMD_MOVE,0,timeout,goal.x,goal.y,goal.z});
         dispatch.version = version;
+        movesLeft[unit] = 1;
 	)
     issuing.erase(unit);
 }
@@ -637,12 +684,14 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
             unit->CmdWantedSpeed(NO_SPEED_LIMIT);
             if (same && circuit->GetUnitAPI()->HasRouteIntent(unit->GetId(),remaining,circuit->GetLastFrame())) {
                 old.version = version;
+                movesLeft[unit] = unsigned(remaining.size());
                 sent = true;
             } else {
                 // Clear first: a partial/rejected dispatch cannot be claimed
                 // as an authoritative queue on the next recovery attempt.
                 old.commands.clear(); old.version = -1;
                 for (const auto& c:commands) unit->CmdMoveTo({c.x,c.y,c.z},c.options,c.timeout);
+                movesLeft[unit] = unsigned(commands.size());
                 old.commands=std::move(commands); old.version=version; old.target=seaTarget; old.naval=navalTarget; old.hold=holdPosition;
                 sent = true;
             }
@@ -652,6 +701,7 @@ void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
         return;
     }
 	dispatches.erase(unit);
+	movesLeft.erase(unit);
 	TRY_UNIT(circuit, unit,
 		unit->CmdWantedSpeed(NO_SPEED_LIMIT);
 		for (unsigned int i = fromIdx; i < route.size(); ++i) {

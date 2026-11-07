@@ -24,6 +24,9 @@ public:
 	int GetCMD(int unitId, int commandIdx = 0);
     bool HasQueuedCommand(int unitId, int commandId) const;
     bool HasRouteIntent(int unitId, const std::vector<routecommand::Command>& issued, int frame) const;
+    // The live queue's last command is a MOVE within `tolerance` (2D) of (x, z).
+    // O(1): two callbacks plus one params copy.
+    bool LastMoveAt(int unitId, int count, float x, float z, float tolerance) const;
 	bool HasGuardIntent(int unitId, int targetId, int frame) const;
 	// Callback-thread snapshots, without allocating per-unit C++ wrappers.
 	// The buffer retains MAX_UNITS elements; only the returned prefix is valid.

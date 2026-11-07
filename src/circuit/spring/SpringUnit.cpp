@@ -115,6 +115,16 @@ bool CUnitAPI::HasGuardIntent(int unitId, int targetId, int frame) const
 	});
 }
 
+bool CUnitAPI::LastMoveAt(int unitId, int count, float x, float z, float tolerance) const
+{
+    if (count <= 0) return false;
+    if (sAICallback->Unit_CurrentCommand_getId(skirmishAIId, unitId, count - 1) != CMD_MOVE) return false;
+    float params[4] = {};
+    if (sAICallback->Unit_CurrentCommand_getParams(skirmishAIId, unitId, count - 1, params, 4) < 3) return false;
+    const float dx = params[0] - x, dz = params[2] - z;
+    return dx * dx + dz * dz <= tolerance * tolerance;
+}
+
 bool CUnitAPI::HasRouteIntent(int unitId, const std::vector<routecommand::Command>& issued, int frame) const
 {
     const int count = sAICallback->Unit_getCurrentCommands(skirmishAIId, unitId);
