@@ -640,6 +640,8 @@ public:
 		int ghostShots = 0;
 		int ghostNeed = 3;      // its volleys: `volleys` for a heavy, ghost_volleys_other otherwise
 		bool ghostHeavy = true;
+		int ghostTick = -1;     // timed ghost fire (Tremor): last frame counted
+		int ghostTickAim = -1;  // ... and the ghost it was counted for
 		// Owner 2026-11-03 21:04Z synced volley: a gathered group walks in with
 		// fire held and all open fire in one frame (see ArtySnipeStep stage 2).
 		bool syncWait = false;  // stage 2: walking in, waiting for the group's volley

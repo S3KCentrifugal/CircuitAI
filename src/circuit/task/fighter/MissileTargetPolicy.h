@@ -2,13 +2,15 @@
 #include <algorithm>
 #include <string>
 namespace circuit {
+// 2026-11-07 (@Barscrewl): Tremor (cortrem) runs the Ambassador rules too
+// (except the snipe sequence: it outranges those threats; ghost fire is timed).
 inline bool IsSlowMissileLauncher(const std::string& name) {
-    return name == "armmerl" || name == "corvroc" || name == "legavroc";
+    return name == "armmerl" || name == "corvroc" || name == "legavroc" || name == "cortrem";
 }
 // 2026-11-06: launchers that leave identified, idle or slow T1 mobiles alone
 // (Ambassador, Negotiator, Boreas, Arbiter).
 inline bool IsT1ExemptLauncher(const std::string& name) {
-    return name == "armmerl" || name == "corvroc" || name == "legavroc" || name == "corhrk";
+    return IsSlowMissileLauncher(name) || name == "corhrk";
 }
 // 2026-11-07 (@Barscrewl): launchers that pick only stationary or slow targets
 // (SlowMissileSpeedAllowed): the three slow launchers plus Arbiter. Arbiter keeps
@@ -18,8 +20,14 @@ inline bool IsSlowTargetLauncher(const std::string& name) {
 }
 // 2026-11-07: ghost structures in the default pick (3 blind volleys at heavy
 // porc, 1 at other porc) for Arbiter too, besides the close-in snipe units.
+// 2026-11-07: + Vanguard (armvang, 5 volleys at heavy porc, 1 at other porc).
 inline bool IsGhostPickLauncher(const std::string& name) {
-    return IsSlowMissileLauncher(name) || name == "corhrk";
+    return IsSlowMissileLauncher(name) || name == "corhrk" || name == "armvang";
+}
+// 2026-11-07: Tremor fires on a ghost for a time, not a volley count (it fires
+// continuously, 0.5 s reload): heavy porc 105 s, anything else 45 s.
+inline bool IsTimedGhostLauncher(const std::string& name) {
+    return name == "cortrem";
 }
 // 2026-11-07: spam retreat and the stationary-only radar-dot rule for the three
 // slow launchers plus Arbiter and Thanatos.

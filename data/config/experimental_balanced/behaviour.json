@@ -242,7 +242,8 @@
 			"enabled": true,
 			"units": ["armmerl", "corvroc", "legavroc",   // Ambassador, Negotiator, Boreas
 				"corhrk", "leghrk",                       // Arbiter, Thanatos (T2 rocket bots)
-				"armmship", "cormship"],                  // Longbow, Messenger (rocket ships)
+				"armmship", "cormship",                   // Longbow, Messenger (rocket ships)
+				"cortrem"],                               // Tremor (owner 2026-11-07: Ambassador rules)
 			"max_speed": 12,
 			// Owner 2026-11-01: next after a slow commander (and before any building), these
 			// heavy units in range when moving at most heavy_speed_fraction of their own top
@@ -2502,9 +2503,9 @@
 				"power": 1.0
 			},
 			"cortrem": {
+				// owner 2026-11-07: Ambassador rules in the artillery task (DLL, by name), not the ranged controller
 				"role": ["artillery", "heavy"],
-				"attribute": ["siege", "ranged"],
-				"ranged": {"always_fire_at_will": true, "target_mode": "bombardment", "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false},
+				"attribute": ["siege"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

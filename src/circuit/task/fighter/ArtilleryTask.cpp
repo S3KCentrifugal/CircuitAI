@@ -85,10 +85,23 @@ static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEne
 static bool GhostGone(CCircuitAI* circuit, int enemyId);
 static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame);
 // Owner 2026-11-04 20:08Z: one ghost volley count per unit and ghost dark period.
-static int GhostNeedFor(const CMilitaryManager::SArtySnipeInfo& si, const CCircuitDef* d)
+// 2026-11-07: per launcher. Vanguard 5 volleys at heavy porc (1 other); Tremor is
+// timed, so its need is in frames (105 s heavy, 45 s other).
+static int GhostNeedFor(const CMilitaryManager::SArtySnipeInfo& si, const CCircuitDef* d, const CCircuitDef* launcher = nullptr)
 {
 	const bool heavy = (d != nullptr) && ((si.threats.count(d->GetId()) > 0) || (si.directThreats.count(d->GetId()) > 0));
+	const std::string ln = (launcher != nullptr) ? launcher->GetDef()->GetName() : std::string();
+	if (IsTimedGhostLauncher(ln)) return FRAMES_PER_SEC * (heavy ? 105 : 45);
+	if (ln == "armvang") return heavy ? 5 : 1;
 	return heavy ? si.volleys : si.ghostVolleysOther;
+}
+// 2026-11-07: a unit that gives ghost structures blind fire in its default pick:
+// the close-in snipe units, plus Arbiter, Tremor and Vanguard by name.
+static bool ArtyGhostPicker(const CMilitaryManager::SArtySnipeInfo& si, const CCircuitDef* cdef)
+{
+	if (!si.isEnabled || (cdef == nullptr)) return false;
+	if (IsGhostPickLauncher(cdef->GetDef()->GetName())) return true;
+	return (si.defs.count(cdef->GetId()) > 0) && (cdef->GetMaxRange(CCircuitDef::RangeType::LAND) >= si.closeMinRange);
 }
 static bool GhostDoneHas(const CMilitaryManager::SArtySnipeState& st, const CEnemyUnit* e)
 {
@@ -277,7 +290,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	{
 		CMilitaryManager* gm = circuit->GetMilitaryManager();
 		const CMilitaryManager::SArtySnipeInfo& gsi = gm->GetArtySnipeInfo();
-		if (gsi.isEnabled && (gsi.defs.count(unit->GetCircuitDef()->GetId()) > 0)) {
+		if (ArtyGhostPicker(gsi, unit->GetCircuitDef())) {
 			CMilitaryManager::SArtySnipeState& g = gm->GetArtySnipeState(unit->GetId(), frame);
 			if (bestTarget == nullptr) {
 				g.ghostAim = -1;  // its volleys are not counted against an old aim
@@ -318,7 +331,7 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		// counts the volleys against it.
 		const bool ghost = !bestTarget->IsInRadarOrLOS();
 		CMilitaryManager* military = circuit->GetMilitaryManager();
-		if (military->GetArtySnipeInfo().isEnabled && (military->GetArtySnipeInfo().defs.count(unit->GetCircuitDef()->GetId()) > 0)) {
+		if (ArtyGhostPicker(military->GetArtySnipeInfo(), unit->GetCircuitDef())) {
 			CMilitaryManager::SArtySnipeState& gst = military->GetArtySnipeState(unit->GetId(), frame);
 			if (!ghost) {
 				gst.ghostAim = -1;
@@ -330,12 +343,35 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 				// Owner 20:08Z: counted per dark period, kept across re-picks.
 				const CMilitaryManager::SArtySnipeInfo& si = military->GetArtySnipeInfo();
 				gst.ghostHeavy = (edef != nullptr) && ((si.threats.count(edef->GetId()) > 0) || (si.directThreats.count(edef->GetId()) > 0));
-				gst.ghostNeed = GhostNeedFor(si, edef);
+				gst.ghostNeed = GhostNeedFor(si, edef, unit->GetCircuitDef());
 				gst.ghostShots = GhostCountRef(gst, bestTarget->GetData());
 				circuit->LOG("ARTYPICK: %s %i tier ghost target %i", unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), bestTarget->GetId());
 				circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f), volleys %i/%i", unit->GetCircuitDef()->GetDef()->GetName(),
 						unit->GetId(), (edef != nullptr) ? edef->GetDef()->GetName() : "?", bestTarget->GetId(),
 						bestTarget->GetPos().x, bestTarget->GetPos().z, gst.ghostShots, gst.ghostNeed);
+			}
+			// 2026-11-07: Tremor's ghost fire is timed: the frames it holds this ghost
+			// order count (at most 1 s per call, per dark period, kept across re-picks).
+			if (ghost && IsTimedGhostLauncher(unit->GetCircuitDef()->GetDef()->GetName())) {
+				int& n = GhostCountRef(gst, bestTarget->GetData());
+				if ((gst.ghostTickAim == bestTarget->GetId()) && (gst.ghostTick >= 0)) n += std::min(frame - gst.ghostTick, FRAMES_PER_SEC);
+				gst.ghostTick = frame;
+				gst.ghostTickAim = bestTarget->GetId();
+				gst.ghostShots = n;
+				if (n >= gst.ghostNeed) {
+					GhostDoneSet(gst, bestTarget->GetData());
+					circuit->LOG("SNIPE: %s %i fired %.0f s (%s) at ghost %i, leaves it until seen", unit->GetCircuitDef()->GetDef()->GetName(),
+							unit->GetId(), float(n) / FRAMES_PER_SEC, gst.ghostHeavy ? "heavy" : "other", bestTarget->GetId());
+					gst.ghostAim = -1;
+					gst.ghostShots = 0;
+					gst.ghostTickAim = -1;
+					TRY_UNIT(circuit, unit,
+						unit->CmdStop();
+					)
+					return;
+				}
+			} else {
+				gst.ghostTickAim = -1;
 			}
 		}
 		TRY_UNIT(circuit, unit,
@@ -1068,7 +1104,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
             // End this ground-fire order after one detected volley, so a fast
             // reload cannot silently repeat it beyond the configured budget.
             if (volleyLimit > 0) { TRY_UNIT(circuit, unit, unit->CmdStop();) }
-			const int need = volleyLimit > 0 ? volleyLimit : GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef());
+			const int need = volleyLimit > 0 ? volleyLimit : GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef(), cdef);
 			circuit->LOG("ARTY: %s %i ghost volley %i/%i at %i", cdef->GetDef()->GetName(), unit->GetId(), n, need, track.target);
 			if (n >= need) {
 				GhostDoneSet(gfs, ge);
@@ -1359,7 +1395,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	const bool isSnipe = info.isEnabled && (info.defs.count(cdef->GetId()) > 0);
 	const CMilitaryManager::SArtyCommInfo& commInfo = military->GetArtyCommInfo();
 	const bool isPriority = commInfo.isEnabled && (commInfo.defs.count(cdef->GetId()) > 0);
-	if (!isSnipe && !isPriority) {
+	// 2026-11-07: ghost pickers (Arbiter, Tremor, Vanguard) need the volley count and
+	// the slow launchers (Tremor) the live pick, even outside both unit lists.
+	if (!isSnipe && !isPriority && !ArtyGhostPicker(info, cdef) && !IsSlowMissileLauncher(cdef->GetDef()->GetName())) {
 		return false;
 	}
 	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
@@ -1402,7 +1440,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// Owner 2026-11-03 21:36Z: a ghost picked by the default target
 			// choice gets `volleys` blind volleys, then is left until a fresh
 			// LOS sighting (CArtilleryTask::FindTarget / Execute).
-			const CEnemyUnit* ga = ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil))
+			const CEnemyUnit* ga = ((st.stage == 0) && (st.ghostAim >= 0) && (frame >= st.hvUntil)
+					&& !IsTimedGhostLauncher(cdef->GetDef()->GetName()))  // 2026-11-07: Tremor counts time, in Execute
 					? circuit->GetEnemyManager()->GetEnemyUnit(st.ghostAim) : nullptr;
 			if ((ga != nullptr) && ga->NotInRadarAndLOS()) {
 				int& n = GhostCountRef(st, ga);
@@ -1853,7 +1892,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					st.targetGhost = false;  // shown again: shoot until dead
 				}
 				// owner 20:08Z: a ghost prep target gets 3 if heavy, else 1
-				const int cap = st.targetGhost ? GhostNeedFor(info, target->GetCircuitDef()) : info.visibleMaxVolleys;  // 0: until dead
+				const int cap = st.targetGhost ? GhostNeedFor(info, target->GetCircuitDef(), cdef) : info.visibleMaxVolleys;  // 0: until dead
 				if ((cap > 0) && (st.volleys >= cap)) why = st.targetGhost ? "ghost volleys fired" : "volley cap";
 				else if (st.drifts >= 2) why = "cannot be hit from outside the threats' reach";
 				else if (frame - std::max(st.targetFrame, st.lastVolley) > info.stageFrames) why = "no volley, gives up";
@@ -2365,8 +2404,7 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		CMilitaryManager* military = circuit->GetMilitaryManager();
 		const CMilitaryManager::SArtySnipeInfo& snipeInfo = military->GetArtySnipeInfo();
 		// 2026-11-07: Arbiter too (IsGhostPickLauncher), same 3/1 volley rule.
-		CMilitaryManager::SArtySnipeState* ghostSt = (snipeInfo.isEnabled && (snipeInfo.defs.count(cdef->GetId()) > 0)
-				&& ((cdef->GetMaxRange(CCircuitDef::RangeType::LAND) >= snipeInfo.closeMinRange) || IsGhostPickLauncher(cdef->GetDef()->GetName())))
+		CMilitaryManager::SArtySnipeState* ghostSt = ArtyGhostPicker(snipeInfo, cdef)
 				? &military->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame()) : nullptr;
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
