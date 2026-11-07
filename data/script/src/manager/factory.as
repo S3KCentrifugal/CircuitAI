@@ -741,6 +741,7 @@ namespace Factory {
 		if (gantry is null) return null;
 		const CCircuitDef@ facDef = gantry.circuitDef; if (facDef is null) return null;
 		CCircuitDef@ heavyDef = null;
+		int picked = -1;
 		for (uint i = 0; i < candidates.length(); ++i) {
 			CCircuitDef@ candidate = ai.GetCircuitDef(candidates[i]);
 			if (candidate is null) {
@@ -757,6 +758,7 @@ namespace Factory {
 				continue;
 			}
 			@heavyDef = candidate;
+			picked = int(i);
 			break;
 		}
 		if (heavyDef is null) {
@@ -772,9 +774,11 @@ namespace Factory {
 			);
 		}
 		lastGantryBatchUnit = heavyDef.GetName();   // read by the caller's level-1 trace
+		lastGantryBatchIndex = picked;               // position in candidates: a rotation with repeats tracks this, not the name
 		GenericHelpers::LogUtil("[FACTORY] Gantry enqueued x" + n + " '" + lastGantryBatchUnit + "' from " + facDef.GetName(), 2);
 		return last;
 	}
 	string lastGantryBatchUnit;   // the unit of the last successful EnqueueGantryBatchFrom
+	int lastGantryBatchIndex = -1; // its index in the candidates passed in
 
 }  // namespace Factory

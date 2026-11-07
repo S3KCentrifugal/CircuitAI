@@ -93,7 +93,7 @@ namespace Main {
         Global::RoleSettings::Tech::NukeLimit = 15;
         Global::RoleSettings::Tech::HeavyAlternate = true; // owner 2026-10-22: late heavy batches alternate Thor / Titan (land and amphibious)
         // owner 2026-10-26: after the t3rush units, every TECH gantry alternates these pairs, first unit first, on every map
-        Global::RoleSettings::Tech::HeavyPairArmada = array<string> = {"armthor", "armbanth", "armvang"}; // owner 2026-10-27: Thor, Titan, Vanguard in turn
+        Global::RoleSettings::Tech::HeavyPairArmada = array<string> = {"armbanth", "armthor", "armbanth", "armvang"}; // owner 2026-11-07: Titan, Thor, Titan, Vanguard on repeat
         Global::RoleSettings::Tech::HeavyMoatedArmada = array<string> = {"armbanth"};                 // owner 2026-10-27: moated: only Titans (Thors cannot cross the water)
         Global::RoleSettings::Tech::HeavyPairCortex = array<string> = {"corkorg", "corcat"};           // Juggernaut, Catapult
         Global::RoleSettings::Tech::HeavyPairLegion = array<string> = {"legeheatraymech", "legelrpcmech"}; // Sol Invictus, Astraeus

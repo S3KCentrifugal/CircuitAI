@@ -696,9 +696,10 @@ namespace TechHeavyChoice {
                     if (moatedList[i].length() > 0 && cached.find(moatedList[i]) < 0) cached.insertLast(moatedList[i]);
             } else if (pair.length() > 0) {
                 // HeavyPair<Side> (owner, 2026-10-26): the pair on a map with a land route; a
-                // moated start without HeavyMoated<Side> builds only the pair's first unit
+                // moated start without HeavyMoated<Side> builds only the pair's first unit.
+                // owner, 2026-11-07: a unit may repeat in the rotation (Titan, Thor, Titan, Vanguard)
                 for (uint i = 0; i < pair.length(); ++i) {
-                    if (pair[i].length() == 0 || cached.find(pair[i]) >= 0) continue;
+                    if (pair[i].length() == 0) continue;
                     cached.insertLast(pair[i]);
                     if (terrain == 1) break;
                 }
@@ -718,22 +719,29 @@ namespace TechHeavyChoice {
     array<string> alternated;    // reused ordering for LateBatch
     // owner, 2026-10-26: per gantry, so each gantry starts with the pair's first unit and
     // rotates on its own (one AI-wide memory left one gantry on Titans and the next on Thors)
-    dictionary lastBatchUnit;    // gantry id -> the unit its last successful late batch built
+    // owner, 2026-11-07: the rotation may repeat a unit (Titan, Thor, Titan, Vanguard), so the
+    // gantry's place is kept as a list position, not a unit name
+    dictionary lastBatchPos;     // gantry id -> list position its last successful late batch built
+    int batchStart = 0;          // list position of BatchOrder()'s first entry, read by LateBatch
+    bool batchRotated = false;   // BatchOrder() returned a rotation (positions are tracked)
     array<string>@ BatchOrder(const string& in side, int gantryId) {
         array<string>@ c = Candidates(side);
-        if (!Global::RoleSettings::Tech::HeavyAlternate || !cachedRotates || c.length() < 2) return @c;
-        string last;
-        lastBatchUnit.get("" + gantryId, last);
-        const int at = c.find(last);
-        if (at < 0 || uint(at) + 1 == c.length()) return @c;   // a new gantry, or after the last unit: the first
+        batchStart = 0;
+        batchRotated = Global::RoleSettings::Tech::HeavyAlternate && cachedRotates && c.length() >= 2;
+        if (!batchRotated) return @c;
+        int at = -1;
+        if (!lastBatchPos.get("" + gantryId, at) || at < 0 || uint(at) >= c.length()) at = -1;   // a new gantry: the first
+        batchStart = int((uint(at + 1)) % c.length());
+        if (batchStart == 0) return @c;
         alternated.resize(0);
-        for (uint i = 1; i <= c.length(); ++i) alternated.insertLast(c[(uint(at) + i) % c.length()]);
+        for (uint i = 0; i < c.length(); ++i) alternated.insertLast(c[(uint(batchStart) + i) % c.length()]);
         return @alternated;
     }
     // One level-1 line per batch (one batch per gantry ask, five units each).
     IUnitTask@ LateBatch(CCircuitUnit@ gantry, const string& in side, int count) {
         IUnitTask@ task = Factory::EnqueueGantryBatchFrom(gantry, BatchOrder(side, gantry.id), count, Task::Priority::HIGH);
-        if (task !is null) lastBatchUnit.set("" + gantry.id, Factory::lastGantryBatchUnit);
+        if (task !is null && batchRotated && Factory::lastGantryBatchIndex >= 0)
+            lastBatchPos.set("" + gantry.id, int((uint(batchStart + Factory::lastGantryBatchIndex)) % Candidates(side).length()));
         if (task !is null)
             GenericHelpers::LogUtil("[TECH][Heavy] batch side=" + side + " terrain=" + Terrain()
                 + " unit=" + Factory::lastGantryBatchUnit + " gantry=" + gantry.circuitDef.GetName() + " " + gantry.id + " x" + count, 1);

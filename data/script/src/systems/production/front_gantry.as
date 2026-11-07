@@ -17,7 +17,7 @@ Without a first product the GantryFallback repeat had nothing to repeat and
 the lane waypoints had no unit to send.
 
 FRONT now builds TECH's late heavies, one unit per ask: HeavyPair<Side>
-(Armada Thor, Titan, Vanguard), rotating per gantry; on a moated start
+(Armada Titan, Thor, Titan, Vanguard), rotating per gantry; on a moated start
 HeavyMoated<Side> (Armada: Titans). An empty pair falls back to the side's
 signature unit. Each candidate still passes the gantry's CanBuild and the
 unit cap in Factory::EnqueueGantryBatchFrom. With no candidate buildable the
@@ -25,8 +25,10 @@ native picker runs as before.
 
 ******************************************************************************/
 namespace FrontGantry {
-    dictionary lastUnit;     // gantry id -> the unit its last order built
+    dictionary lastPos;      // gantry id -> list position its last order built (a unit may repeat, owner 2026-11-07)
     array<string> order;     // reused candidate order
+    int orderStart = 0;      // list position of Order()'s first entry
+    bool orderRotated = false;
 
     array<string>@ List(const string &in side, bool moated)
     {
@@ -46,16 +48,18 @@ namespace FrontGantry {
         const bool moated = StrategicSites::Moated();
         array<string>@ list = List(side, moated);
         order.resize(0);
+        orderStart = 0; orderRotated = false;
         if (list.length() == 0) {
             const string signature = UnitHelpers::GetGantrySignatureUnitForSide(side);
             if (signature.length() > 0) order.insertLast(signature);
             return @order;
         }
-        string last;
-        lastUnit.get("" + g.id, last);
-        const int at = moated ? -1 : list.find(last);   // a moated list never rotates
-        for (uint i = 1; i <= list.length(); ++i)
-            order.insertLast(list[(uint(at + int(list.length())) + i) % list.length()]);
+        int at = -1;
+        if (moated || !lastPos.get("" + g.id, at) || at < 0 || uint(at) >= list.length()) at = -1;   // a moated list never rotates
+        orderRotated = !moated;
+        orderStart = int(uint(at + 1) % list.length());
+        for (uint i = 0; i < list.length(); ++i)
+            order.insertLast(list[(uint(orderStart) + i) % list.length()]);
         return @order;
     }
 
@@ -67,7 +71,8 @@ namespace FrontGantry {
         if (pending !is null) return pending;
         IUnitTask@ task = Factory::EnqueueGantryBatchFrom(g, Order(g, side), 1, Task::Priority::HIGH);
         if (task is null) return null;
-        lastUnit.set("" + g.id, Factory::lastGantryBatchUnit);
+        if (orderRotated && Factory::lastGantryBatchIndex >= 0)
+            lastPos.set("" + g.id, int(uint(orderStart + Factory::lastGantryBatchIndex) % order.length()));
         GenericHelpers::LogUtil("[FRONT][Gantry] gantry=" + g.circuitDef.GetName() + " " + g.id
             + " unit=" + Factory::lastGantryBatchUnit + (StrategicSites::Moated() ? " (moated)" : ""), 1);
         return task;
