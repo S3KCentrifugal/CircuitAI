@@ -9,6 +9,7 @@
 #include "geo_release.as"
 #include "commander_energy.as"
 #include "../world/coverage_lanes.as"
+#include "lolcannon_recon.as"
 #include "engineering_lanes.as"
 
 namespace Team {
@@ -50,6 +51,7 @@ namespace Team {
             return;
         }
         if (SeaTech::Handle(msg, fromTeamId)) return;
+        if (LolCannonRecon::Handle(msg, fromTeamId)) return;
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim
