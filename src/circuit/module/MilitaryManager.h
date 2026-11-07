@@ -957,11 +957,13 @@ private:
 	 * preferably outside the drone carrier's own reach. Event driven: work
 	 * happens only on a drone hit, at most once per `interval` per AI.
 	 * Config: behaviour root "drone_aa" {enabled, count, units, interval,
-	 * pull_radius, cover_margin, carrier_margin, timeout}.
+	 * pull_radius, cover_margin, carrier_margin, timeout, swarm_count,
+	 * swarm_seconds, swarm_radius, heavy_count, heavy_min_range, long_income,
+	 * long_bank, long_units, hard_units}.
 	 */
 public:
 	bool IsDroneAATask(const IUnitTask* task) const { return (task != nullptr) && (droneAATasks.count(task) > 0); }
-	void DroneAATaskGone(const IUnitTask* task) { droneAATasks.erase(task); }
+	void DroneAATaskGone(const IUnitTask* task) { droneAATasks.erase(task); }  // also covers T1.5 tasks
 private:
 	void ReadDroneAAConfig();
 	void DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker);
@@ -975,10 +977,21 @@ private:
 		float coverMargin = 150.f;  // a tower stands within its AA range minus this of the hit structure
 		float carrierMargin = 96.f;
 		int timeout = 90 * FRAMES_PER_SEC;
+		// T1.5 AA once more than swarmCount drones attack at once (owner 2026-11-07)
+		int swarmCount = 6;
+		int swarmWindow = 6 * FRAMES_PER_SEC;
+		float swarmRadius = 1500.f;
+		int heavyCount = 1;
+		float heavyMinRange = 900.f;  // existing static AA this far-reaching counts as T1.5 cover
+		float longIncome = 25.f;
+		float longBank = 900.f;
+		std::vector<std::string> longUnits;  // long-range T1.5 AA
+		std::vector<std::string> hardUnits;  // bomb-resistant T1.5 AA
 	} droneAA;
 	int droneAANext = 0;
 	int droneAALogFrame = -1000;
-	std::unordered_set<const IUnitTask*> droneAATasks;
+	std::unordered_map<const IUnitTask*, int> droneAATasks;  // task -> tier (0 light, 1 T1.5)
+	std::unordered_map<int, std::pair<int, springai::AIFloat3>> droneAAHits;  // drone id -> last hit on us (frame, position)
 	std::unordered_map<int, float> carrierReach;  // def id -> drone reach, < 0 when not a carrier
 };
 

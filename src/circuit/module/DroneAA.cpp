@@ -9,6 +9,11 @@
  * structure, a site inside the carrier's reach (never inside gun porc) is used,
  * because the carrier itself has no gun and the drones are what the tower is for.
  *
+ * Owner 2026-11-07: when more than 6 distinct drones hit our units within 6 s
+ * near the struck structure, one T1.5 AA is added (long-range Chainsaw /
+ * Eradicator / Lupara when metal income >= 25 or the bank >= 900, else the
+ * bomb-resistant Ferret / SAM / Rhapsis), placed by the same rules.
+ *
  * Cost: event driven. Nothing runs without a drone hit on a structure; then at
  * most one evaluation per `interval` (2 s) per AI: one bounded friendly-unit
  * query (AA cover radius), one pass over the enemy structure list for carriers,
@@ -38,6 +43,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <iterator>
 #include <memory>
 
 namespace circuit {
@@ -55,6 +61,22 @@ void CMilitaryManager::ReadDroneAAConfig()
 	droneAA.coverMargin = std::max(0.f, cfg.get("cover_margin", 150.f).asFloat());
 	droneAA.carrierMargin = std::max(0.f, cfg.get("carrier_margin", 96.f).asFloat());
 	droneAA.timeout = std::max(10, int(cfg.get("timeout", 90.f).asFloat() * FRAMES_PER_SEC));
+	droneAA.swarmCount = std::max(0, cfg.get("swarm_count", 6).asInt());
+	droneAA.swarmWindow = std::max(1, int(cfg.get("swarm_seconds", 6.f).asFloat() * FRAMES_PER_SEC));
+	droneAA.swarmRadius = std::max(0.f, cfg.get("swarm_radius", 1500.f).asFloat());
+	droneAA.heavyCount = std::max(0, cfg.get("heavy_count", 1).asInt());
+	droneAA.heavyMinRange = std::max(0.f, cfg.get("heavy_min_range", 900.f).asFloat());
+	droneAA.longIncome = std::max(0.f, cfg.get("long_income", 25.f).asFloat());
+	droneAA.longBank = std::max(0.f, cfg.get("long_bank", 900.f).asFloat());
+	auto readList = [&cfg](const char* key, std::vector<std::string>& out, std::vector<std::string> fallback) {
+		out.clear();
+		const Json::Value& list = cfg[key];
+		if (list.isArray()) {
+			for (const Json::Value& name : list) if (name.isString()) out.push_back(name.asString());
+		} else out = std::move(fallback);
+	};
+	readList("long_units", droneAA.longUnits, {"armcir", "corerad", "leglupara"});  // Chainsaw, Eradicator, Lupara
+	readList("hard_units", droneAA.hardUnits, {"armferret", "cormadsam", "legrhapsis"});  // Ferret, SAM, Rhapsis
 	droneAA.units.clear();
 	const Json::Value& units = cfg["units"];
 	if (units.isArray()) {
@@ -91,12 +113,20 @@ bool CMilitaryManager::IsCarrierDef(CCircuitDef* cdef, float* reach)
 
 void CMilitaryManager::DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
-	if (!droneAA.enabled || (droneAA.count <= 0) || (attacker == nullptr) || (unit == nullptr)) return;
+	if (!droneAA.enabled || (attacker == nullptr) || (unit == nullptr)) return;
 	CCircuitDef* udef = unit->GetCircuitDef();
-	if ((udef == nullptr) || udef->IsMobile()) return;  // structures only
 	CCircuitDef* adef = attacker->GetCircuitDef();
-	if ((adef == nullptr) || !adef->IsDrone()) return;
+	if ((udef == nullptr) || (adef == nullptr) || !adef->IsDrone()) return;
 	const int frame = circuit->GetLastFrame();
+	// Swarm memory (owner 2026-11-07): every drone hit on any of our units,
+	// one entry per drone (bounded by the live drone count), pruned below.
+	droneAAHits[attacker->GetId()] = {frame, unit->GetPos(frame)};
+	if (droneAAHits.size() > 256) {  // drones die and respawn with new ids: keep the memory bounded
+		for (auto it = droneAAHits.begin(); it != droneAAHits.end();) {
+			it = (frame - it->second.first > droneAA.swarmWindow) ? droneAAHits.erase(it) : std::next(it);
+		}
+	}
+	if (udef->IsMobile()) return;  // towers answer hits on structures only
 	if (frame < droneAANext) return;
 	droneAANext = frame + droneAA.interval;
 
@@ -105,15 +135,21 @@ void CMilitaryManager::DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker)
 	CEconomyManager* economyMgr = circuit->GetEconomyManager();
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 
+	// Drones attacking at the same time: distinct drones that hit our units
+	// within swarm_seconds, near this structure.
+	int swarm = 0;
+	for (auto it = droneAAHits.begin(); it != droneAAHits.end();) {
+		if (frame - it->second.first > droneAA.swarmWindow) { it = droneAAHits.erase(it); continue; }
+		if (it->second.second.SqDistance2D(strike) <= SQUARE(droneAA.swarmRadius)) ++swarm;
+		++it;
+	}
+
 	auto logLine = [&](const char* fmt, auto... args) {
 		if (frame - droneAALogFrame < FRAMES_PER_SEC * 5) return;
 		droneAALogFrame = frame;
 		circuit->LOG(fmt, args...);
 	};
 
-	// The nearest free builder decides which light AA is built (its faction).
-	CCircuitDef* aaDef = nullptr;
-	float aaRange = 0.f;
 	auto freeBuilder = [&](CCircuitUnit* w, CCircuitDef* def) {
 		if ((w == nullptr) || w->IsDead() || !w->GetCircuitDef()->CanBuild(def)) return false;
 		IUnitTask* t = w->GetTask();
@@ -133,43 +169,7 @@ void CMilitaryManager::DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker)
 		if (d <= pullSq) nearby.emplace_back(d, w);
 	}
 	std::sort(nearby.begin(), nearby.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-	for (const auto& kv : nearby) {
-		for (const std::string& name : droneAA.units) {
-			CCircuitDef* def = circuit->GetCircuitDef(name.c_str());
-			if ((def != nullptr) && def->IsAvailable(frame) && freeBuilder(kv.second, def)) { aaDef = def; break; }
-		}
-		if (aaDef != nullptr) break;
-	}
-	if (aaDef == nullptr) {
-		logLine("[DroneAA] %s drone hit %s %i at (%.0f,%.0f): no free builder within %.0f can build light AA",
-			adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z, droneAA.pullRadius);
-		return;
-	}
-	aaRange = aaDef->GetMaxRange(CCircuitDef::RangeType::AIR);
-	const float cover = std::max(160.f, aaRange - droneAA.coverMargin);
-
-	// Already answered? AA structures (ours or allied, built or under
-	// construction) covering the struck structure, plus our drone AA tasks
-	// whose tower has not been started yet.
-	int covered = 0;
-	COOAICallback* clb = circuit->GetCallback();
-	const std::vector<int> friendlies = clb->GetFriendlyUnitIdsIn(strike, cover, false);  // copy: the callback reuses its buffer
-	for (int id : friendlies) {
-		CCircuitDef* fdef = circuit->GetCircuitDefSafe(clb->Unit_GetDefId(id));
-		if ((fdef != nullptr) && !fdef->IsMobile() && fdef->HasSurfToAir()) ++covered;
-	}
-	// Entries leave droneAATasks in CBuilderManager::DequeueTask, before the task is freed.
-	for (const IUnitTask* ut : droneAATasks) {
-		const IBuilderTask* t = static_cast<const IBuilderTask*>(ut);
-		if (!t->IsDead() && (t->GetTarget() == nullptr)
-			&& (t->GetPosition().SqDistance2D(strike) <= SQUARE(cover + 200.f))) ++covered;
-	}
-	const int need = droneAA.count - covered;
-	if (need <= 0) {
-		logLine("[DroneAA] %s drone hit %s %i at (%.0f,%.0f): %i AA already cover it",
-			adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z, covered);
-		return;
-	}
+	std::vector<bool> taken(nearby.size(), false);
 
 	// Carriers in sight or remembered (ghosts): their drone reach is a soft limit.
 	struct SCarrier { AIFloat3 pos; float reach; };
@@ -190,72 +190,133 @@ void CMilitaryManager::DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker)
 		return best;
 	};
 	auto skipCarrier = [this](CCircuitDef* d) { return IsCarrierDef(d, nullptr); };
+	COOAICallback* clb = circuit->GetCallback();
 
-	// Candidate sites: 4 rings x 16 bearings inside AA cover of the structure.
-	struct SSite { AIFloat3 pos; float score; bool inCarrier; float gunClear; };
-	std::vector<SSite> sites;
-	const float rings[4] = {0.25f, 0.45f, 0.65f, 0.85f};
-	for (float f : rings) {
-		const float r = std::max(96.f, cover * f);
-		for (int i = 0; i < 16; ++i) {
-			const float a = (i + ((f == 0.45f || f == 0.85f) ? 0.5f : 0.f)) * 0.39269908f;
-			AIFloat3 p(strike.x + std::cos(a) * r, strike.y, strike.z + std::sin(a) * r);
-			CTerrainManager::CorrectPosition(p);
-			if (p.SqDistance2D(strike) > SQUARE(cover)) continue;
-			const float gunClear = economyMgr->EnemyPorcClearance(p, skipCarrier);
-			if (gunClear < 0.f) continue;  // never inside enemy gun porc reach
-			if (!builderMgr->IsBuildPositionAllowed(aaDef, p) || !terrainMgr->CanBeBuiltAtSafe(aaDef, p)) continue;
-			const bool inCarrier = carrierClear(p) < 0.f;
-			// Close to the structure (cover over it); a site farther from
-			// the drones' carrier is a little better, ties by distance.
-			sites.push_back({p, std::sqrt(p.SqDistance2D(strike)), inCarrier, gunClear});
-		}
-	}
-	std::sort(sites.begin(), sites.end(), [](const SSite& a, const SSite& b) {
-		if (a.inCarrier != b.inCarrier) return !a.inCarrier;
-		return a.score < b.score;
-	});
-
-	std::vector<const SSite*> chosen;
-	for (const SSite& s : sites) {
-		if ((int)chosen.size() >= need) break;
-		bool spaced = true;
-		for (const SSite* c : chosen) spaced = spaced && (c->pos.SqDistance2D(s.pos) >= SQUARE(192.f));
-		if (spaced) chosen.push_back(&s);
-	}
-	if (chosen.empty()) {
-		logLine("[DroneAA] %s drone hit %s %i at (%.0f,%.0f): no %s site within %.0f outside enemy porc reach",
-			adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z,
-			aaDef->GetDef()->GetName(), cover);
-		return;
-	}
-
-	size_t next = 0;
-	for (const SSite* s : chosen) {
-		IBuilderTask* task = builderMgr->Enqueue(TaskB::Common(IBuilderTask::BuildType::DEFENCE,
-				IBuilderTask::Priority::HIGH, aaDef, s->pos, SQUARE_SIZE * 2, true, droneAA.timeout));
-		if (task == nullptr) continue;
-		droneAATasks.insert(task);
-		// Hand it to the nearest free builder now; the rest of the queue
-		// (another builder, or this one after its first tower) is native.
-		CCircuitUnit* worker = nullptr;
-		for (; next < nearby.size(); ++next) {
-			CCircuitUnit* w = nearby[next].second;
-			if (freeBuilder(w, aaDef) && task->CanAssignTo(w) && !task->IsPorcBlocked(w)
-				&& terrainMgr->CanReachAt(w, s->pos, w->GetCircuitDef()->GetBuildDistance()))
-			{
-				worker = w;
-				++next;
-				break;
+	// One answer: `want` towers of tier (0 light, 1 T1.5) from `names`,
+	// the nearest free builder's faction deciding the definition.
+	auto respond = [&](int tier, const std::vector<std::string>& names, int want, const char* label) {
+		CCircuitDef* aaDef = nullptr;
+		for (size_t i = 0; (i < nearby.size()) && (aaDef == nullptr); ++i) {
+			if (taken[i]) continue;
+			for (const std::string& name : names) {
+				CCircuitDef* def = circuit->GetCircuitDef(name.c_str());
+				if ((def != nullptr) && def->IsAvailable(frame) && freeBuilder(nearby[i].second, def)) { aaDef = def; break; }
 			}
 		}
-		if (worker != nullptr) builderMgr->AssignTask(worker, task);
-		circuit->LOG("[DroneAA] %s drone hit %s %i at (%.0f,%.0f): %s at (%.0f,%.0f) gun_clear=%.0f carrier=%s builder=%s %i (need %i, covered %i)",
-			adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z,
-			aaDef->GetDef()->GetName(), s->pos.x, s->pos.z, std::isfinite(s->gunClear) ? s->gunClear : -1.f,
-			s->inCarrier ? "inside" : "outside",
-			(worker != nullptr) ? worker->GetCircuitDef()->GetDef()->GetName() : "queue",
-			(worker != nullptr) ? worker->GetId() : -1, need, covered);
+		if (aaDef == nullptr) {
+			logLine("[DroneAA] %s drone hit %s %i at (%.0f,%.0f) swarm=%i: no free builder within %.0f can build %s AA",
+				adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z, swarm,
+				droneAA.pullRadius, label);
+			return;
+		}
+		const float aaRange = aaDef->GetMaxRange(CCircuitDef::RangeType::AIR);
+		const float cover = std::max(160.f, aaRange - droneAA.coverMargin);
+
+		// Already answered? Static AA (ours or allied, built or under
+		// construction; for T1.5 only air range >= heavy_min_range) covering
+		// the struck structure, plus our unstarted drone AA tasks of the tier.
+		int covered = 0;
+		const std::vector<int> friendlies = clb->GetFriendlyUnitIdsIn(strike, cover, false);  // copy: the callback reuses its buffer
+		for (int id : friendlies) {
+			CCircuitDef* fdef = circuit->GetCircuitDefSafe(clb->Unit_GetDefId(id));
+			if ((fdef == nullptr) || fdef->IsMobile() || !fdef->HasSurfToAir()) continue;
+			if ((tier == 1) && (fdef->GetMaxRange(CCircuitDef::RangeType::AIR) < droneAA.heavyMinRange)) continue;
+			++covered;
+		}
+		// Entries leave droneAATasks in CBuilderManager::DequeueTask, before the task is freed.
+		for (const auto& kv : droneAATasks) {
+			if (kv.second != tier) continue;
+			const IBuilderTask* t = static_cast<const IBuilderTask*>(kv.first);
+			if (!t->IsDead() && (t->GetTarget() == nullptr)
+				&& (t->GetPosition().SqDistance2D(strike) <= SQUARE(cover + 200.f))) ++covered;
+		}
+		const int need = want - covered;
+		if (need <= 0) {
+			logLine("[DroneAA] %s drone hit %s %i at (%.0f,%.0f) swarm=%i: %i %s AA already cover it",
+				adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z, swarm, covered, label);
+			return;
+		}
+
+		// Candidate sites: 4 rings x 16 bearings inside AA cover of the structure.
+		struct SSite { AIFloat3 pos; float score; bool inCarrier; float gunClear; };
+		std::vector<SSite> sites;
+		const float rings[4] = {0.25f, 0.45f, 0.65f, 0.85f};
+		for (int ri = 0; ri < 4; ++ri) {
+			const float r = std::max(96.f, cover * rings[ri]);
+			for (int i = 0; i < 16; ++i) {
+				const float a = (i + ((ri % 2) ? 0.5f : 0.f)) * 0.39269908f;
+				AIFloat3 p(strike.x + std::cos(a) * r, strike.y, strike.z + std::sin(a) * r);
+				CTerrainManager::CorrectPosition(p);
+				if (p.SqDistance2D(strike) > SQUARE(cover)) continue;
+				const float gunClear = economyMgr->EnemyPorcClearance(p, skipCarrier);
+				if (gunClear < 0.f) continue;  // never inside enemy gun porc reach
+				if (!builderMgr->IsBuildPositionAllowed(aaDef, p) || !terrainMgr->CanBeBuiltAtSafe(aaDef, p)) continue;
+				const bool inCarrier = carrierClear(p) < 0.f;
+				sites.push_back({p, std::sqrt(p.SqDistance2D(strike)), inCarrier, gunClear});
+			}
+		}
+		// Outside the carrier's reach first, then closest to the structure.
+		std::sort(sites.begin(), sites.end(), [](const SSite& a, const SSite& b) {
+			if (a.inCarrier != b.inCarrier) return !a.inCarrier;
+			return a.score < b.score;
+		});
+		std::vector<const SSite*> chosen;
+		for (const SSite& st : sites) {
+			if ((int)chosen.size() >= need) break;
+			bool spaced = true;
+			for (const SSite* c : chosen) spaced = spaced && (c->pos.SqDistance2D(st.pos) >= SQUARE(192.f));
+			// Away from our other open drone AA sites too (light and T1.5 apart).
+			for (const auto& kv : droneAATasks) {
+				spaced = spaced && (static_cast<const IBuilderTask*>(kv.first)->GetPosition().SqDistance2D(st.pos) >= SQUARE(128.f));
+			}
+			if (spaced) chosen.push_back(&st);
+		}
+		if (chosen.empty()) {
+			logLine("[DroneAA] %s drone hit %s %i at (%.0f,%.0f) swarm=%i: no %s site within %.0f outside enemy porc reach",
+				adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z, swarm,
+				aaDef->GetDef()->GetName(), cover);
+			return;
+		}
+
+		for (const SSite* st : chosen) {
+			IBuilderTask* task = builderMgr->Enqueue(TaskB::Common(IBuilderTask::BuildType::DEFENCE,
+					IBuilderTask::Priority::HIGH, aaDef, st->pos, SQUARE_SIZE * 2, true, droneAA.timeout));
+			if (task == nullptr) continue;
+			droneAATasks[task] = tier;
+			// Hand it to the nearest free builder now; the rest of the queue
+			// (another builder, or this one after its first tower) is native.
+			CCircuitUnit* worker = nullptr;
+			for (size_t i = 0; i < nearby.size(); ++i) {
+				if (taken[i]) continue;
+				CCircuitUnit* w = nearby[i].second;
+				if (freeBuilder(w, aaDef) && task->CanAssignTo(w) && !task->IsPorcBlocked(w)
+					&& terrainMgr->CanReachAt(w, st->pos, w->GetCircuitDef()->GetBuildDistance()))
+				{
+					worker = w;
+					taken[i] = true;
+					break;
+				}
+			}
+			if (worker != nullptr) builderMgr->AssignTask(worker, task);
+			circuit->LOG("[DroneAA] %s drone hit %s %i at (%.0f,%.0f) swarm=%i: %s %s at (%.0f,%.0f) gun_clear=%.0f carrier=%s builder=%s %i (need %i, covered %i)",
+				adef->GetDef()->GetName(), udef->GetDef()->GetName(), unit->GetId(), strike.x, strike.z, swarm,
+				label, aaDef->GetDef()->GetName(), st->pos.x, st->pos.z, std::isfinite(st->gunClear) ? st->gunClear : -1.f,
+				st->inCarrier ? "inside" : "outside",
+				(worker != nullptr) ? worker->GetCircuitDef()->GetDef()->GetName() : "queue",
+				(worker != nullptr) ? worker->GetId() : -1, need, covered);
+		}
+	};
+
+	if (droneAA.count > 0) respond(0, droneAA.units, droneAA.count, "light");
+
+	// Owner 2026-11-07: more than swarm_count drones attacking at once adds a
+	// T1.5 AA. Long-range (Chainsaw / Eradicator / Lupara) when the economy
+	// carries it - its 1100-1200 range also sits farther from the drones and
+	// the carrier - else bomb-resistant (Ferret / SAM / Rhapsis).
+	if ((droneAA.heavyCount > 0) && (swarm > droneAA.swarmCount)) {
+		const bool rich = (economyMgr->GetAvgMetalIncome() >= droneAA.longIncome)
+			|| (economyMgr->GetMetalCur() >= droneAA.longBank);
+		respond(1, rich ? droneAA.longUnits : droneAA.hardUnits, droneAA.heavyCount, rich ? "T1.5 long-range" : "T1.5 bomb-resistant");
 	}
 }
 
