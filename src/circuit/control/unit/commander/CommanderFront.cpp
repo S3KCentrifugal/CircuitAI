@@ -213,8 +213,13 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
             || current->GetType()==IUnitTask::Type::PLAYER || current->GetType()==IUnitTask::Type::RETREAT) return nullptr;
         if((state.work.kind==WORK_SOLAR || state.work.kind==WORK_REPAIR_COMBAT)
             && current==state.work.task && !current->IsDead()) return current;
+        // D-490: the commander's own construction (a mex, a turret) is finished first.
+        if(cfg->front.keepOwnBuild>0 && IsOwnConstruction(unit,current)) return nullptr;
         auto* eco=ai->GetEconomyManager();
-        if(eco->GetAvgEnergyIncome()>=cfg->front.solarIncome || eco->GetEnergyStore()<=0
+        // D-490: front_solar_stall also offers it while energy stalls above front_solar_income.
+        const bool incomeLow=eco->GetAvgEnergyIncome()<cfg->front.solarIncome
+            || (cfg->front.solarStall>0 && eco->IsEnergyStalling());
+        if(!incomeLow || eco->GetEnergyStore()<=0
             || eco->GetEnergyCur()>=eco->GetEnergyStore()*cfg->front.solarStorage) return nullptr;
         // Priority-two repairs retain precedence over emergency economy. Only
         // ask the existing bounded repair selector when a solar is eligible;

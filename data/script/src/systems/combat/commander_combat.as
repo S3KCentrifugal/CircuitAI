@@ -225,6 +225,13 @@ namespace CommanderCombat {
             Option("front_solar_income",0.f);
             Option("front_solar_storage",.2f);
             Option("front_solar_radius",300.f);
+            Option("artillery_fire_control",0.f);     // D-492: aim our artillery structures (support, heavy, longest-range static)
+            Option("artillery_heavy_cost",0.f);       // D-492: a mobile enemy at this metal cost is heavy (0: heavy role only)
+            Option("artillery_local_max",0.f);        // D-492: the group holds artillery back past this many near its commander (0: off)
+            Option("artillery_local_radius",0.f);     // D-492: ... within this of the commander
+            Option("front_solar_stall",0.f);          // D-490: the emergency solar also while energy stalls
+            Option("front_keep_own_build",0.f);       // D-490: never swap the commander off its own construction
+            Option("front_assist_break_energy",0.f);  // D-490: bank share under which an assist is broken off (0: off)
             Option("front_mex_seconds",Global::Commander::FrontMexSeconds);
             Option("front_stall_seconds",Global::Commander::FrontStallSeconds);
             Option("front_detour_seconds",0.f);

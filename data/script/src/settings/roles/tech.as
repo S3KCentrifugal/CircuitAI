@@ -11,6 +11,30 @@ namespace Tech {
             int RushBootstrapRetrySeconds = 5;
             int RushBootstrapStallSeconds = 30;
             bool GrowthEnabled = true;
+            // D-489 (owner, 2026-11-07): surplus seats. While metal floats, one T1
+            // constructor at base only builds construction turrets on free economy
+            // slots; while energy floats, one T2 constructor at base only builds
+            // advanced energy converters (metal-full admission waived for it).
+            // D-491 (owner, 2026-11-07): the first advanced lab, fusion and T1 aircraft lab
+            // stand together, touching on open flat ground, at most CoreMaxGapCells apart
+            bool CoreLayoutEnabled = true;
+            int CoreMaxGapCells = 4;                     // layout cells (16 elmos); beyond this the ordinary packer places it
+            // D-492 (owner, 2026-11-07): the team's artillery needs Pinpointers
+            bool PinpointerEnabled = true;
+            int PinpointerTarget = 3;                    // TECH's own, ordered or standing
+            string PinpointerDefinitions = "armtarg,cortarg,legtarg";
+            string PinpointerTriggerDefinitions = "armamb,cortoast,legacluster,armbrtha,corint,leglrpc,armvulc,corbuzz,legstarfall";   // T2 artillery or better
+            int PinpointerCheckSeconds = 5;
+            int PinpointerGraceSeconds = 180;            // INV-266
+            bool SurplusSeatsEnabled = true;
+            float SurplusSeatBaseRadius = 1400.f;        // a constructor within this of the base centre is at base
+            float SurplusSeatMetalBank = 1000.f;         // owner, 2026-11-07: a metal bank at or over this is a surplus (turret seat)
+            float SurplusSeatEnergyShare = .9f;          // owner, 2026-11-07: an energy bank at or over this share of storage is excess (converter seat)
+            float SurplusSeatLowEnergyShare = .2f;       // energy is low under this share of storage, or stalling: no turret seat
+            int SurplusSeatReleaseSeconds = 20;          // a seat outlives its surplus by this, so a dip does not churn it
+            int SurplusSeatRetrySeconds = 15;            // after a seat finds no slot, no claim for this long
+            int SurplusSeatIdleReleaseSeconds = 5;       // a seat holder idle this long gives the seat up
+            int SurplusSeatIdleSeconds = 10;             // INV-260: a held seat idle this long is broken
             bool ClusterEconomyEnabled = true;
             int ClusterTurretParallel = 10;
             float ClusterWorkerRadius = 640.f;
@@ -721,7 +745,7 @@ namespace Tech {
 
             // T2 Aircraft Plant thresholds (TECH role)
             // Mirrors AIR role defaults; scoped to TECH so roles don't cross-reference
-            float RequiredMetalIncomeForT2AircraftPlant = 200.0f;
+            float RequiredMetalIncomeForT2AircraftPlant = 100.0f;   // owner, 2026-11-07 (D-489): was 200
             float RequiredEnergyIncomeForT2AircraftPlant = 2000.0f;
 
             /******************** LANDLOCKED WATER EXPANSION ********************/
