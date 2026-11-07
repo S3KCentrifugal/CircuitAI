@@ -133,6 +133,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::geoFortify>("commander_group_geo_fortify",0,1),
         Group<&GC::geoIncome>("commander_group_geo_income",0,1000),
         Group<&GC::geoFrontRadius>("commander_group_geo_front_radius",0,6000),
+        Group<&GC::geoReclaim>("commander_group_geo_reclaim",0,1),
         Group<&GC::geoGuardFront>("commander_group_geo_guard_front",0,4),
         Group<&GC::geoGuardFrontOffset>("commander_group_geo_guard_front_offset",0,1000),
         Group<&GC::geoGuardSpacing>("commander_group_geo_guard_spacing",0,1000),

@@ -165,6 +165,7 @@ namespace CommanderCombat {
             Option("commander_group_geo_fortify",0.f);
             Option("commander_group_geo_income",20.f);
             Option("commander_group_geo_front_radius",1800.f);
+            Option("commander_group_geo_reclaim",1.f);
             Option("commander_group_geo_guard_front",2.f);
             Option("commander_group_geo_guard_front_offset",192.f);
             Option("commander_group_geo_guard_spacing",128.f);

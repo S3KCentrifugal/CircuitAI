@@ -1,0 +1,68 @@
+{
+  "stop_minute": 12,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "swap",
+      "pattern": "\\[CommanderGroup\\] geo_front_swap def=corageo to=corbhmth",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "cerberus",
+      "pattern": "\\[RangedArena\\].*finished id=\\d+ team=0 unit=corbhmth",
+      "scope": "any",
+      "by_minute": 9,
+      "after_key": "swap"
+    },
+    {
+      "key": "guard plan",
+      "pattern": "\\[CommanderGroup\\] geo_guard_plan def=corbhmth",
+      "scope": "any",
+      "by_minute": 9,
+      "after_key": "cerberus"
+    },
+    {
+      "key": "light laser",
+      "pattern": "\\[CommanderGroup\\] geo_guard unit=\\d+ def=corllt",
+      "scope": "any",
+      "by_minute": 12,
+      "after_key": "guard plan"
+    },
+    {
+      "key": "flak",
+      "pattern": "\\[CommanderGroup\\] geo_guard unit=\\d+ def=corflak",
+      "scope": "any",
+      "by_minute": 12,
+      "after_key": "guard plan"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\] INV-(?!254 |237 )",
+      "scope": "any",
+      "note": "INV-254 (the commander waiting on a seat-only defence) fires on the pre-branch build in commander-group-t2-defence as well: KI-757. INV-237 (a front corridor segment over closed ground) fires for this start pair on All That Glitters: KI-768."
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

@@ -111,6 +111,7 @@
         "commander_group_geo_fortify": 1,
         "commander_group_geo_income": 20,
         "commander_group_geo_front_radius": 1800,
+        "commander_group_geo_reclaim": 1,
         "commander_group_geo_definitions": "armgmm,corbhmth,legrampart",
         "commander_group_geo_guard_definitions": "corbhmth",
         "commander_group_geo_guard_front_definitions": "armllt,corllt,leglht",

@@ -1281,11 +1281,21 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 	}
 	// D-484: a front-line vent gets the fortified geo, whoever builds it.
 	if ((ti.type == IBuilderTask::BuildType::GEO) && (ti.buildDef != nullptr)) {
-		CCircuitDef* front = circuit->GetCommanderController()->FrontGeoDef(ti.buildDef, ti.position);
+		int facing = UNIT_NO_FACING;
+		AIFloat3 site = ti.position;
+		CCircuitDef* front = circuit->GetCommanderController()->FrontGeoDef(ti.buildDef, site, facing);
+		if (front == nullptr) {
+			return nullptr;  // D-488: a forward vent takes only its fortified geo
+		}
 		if (front != ti.buildDef) {
 			auto swapped = ti;
 			swapped.buildDef = front;
-			return Enqueue(swapped);
+			swapped.position = site;  // D-488: the stack position over the plant below
+			IBuilderTask* task = Enqueue(swapped);
+			if (task != nullptr) {
+				task->SetFacing(facing);  // the facing the fortified geo fits at
+			}
+			return task;
 		}
 	}
 	IBuilderTask* task;

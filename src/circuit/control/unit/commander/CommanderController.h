@@ -249,6 +249,8 @@ struct CommanderGroupConfig {
     // and within group radius plus build reach of the commander (where it places
     // porc) to start; kept while within geoFrontRadius. geoFortify 0: off.
     float geoFortify=0,geoIncome=20,geoFrontRadius=1800;
+    // D-488: 1 reclaims our plant on a forward vent when the fortified geo does not stack on it.
+    float geoReclaim=1;
     // After a guard geo (Cerberus) finishes: geoGuardFront light lasers
     // geoGuardFrontOffset ahead along the lane, geoGuardSpacing apart, and
     // one flak geoGuardSideOffset to each side; plan dropped after geoGuardSeconds.
@@ -369,7 +371,9 @@ public:
     void TaskFinished(IUnitTask* task,bool done);
     // D-484: the geo definition to build at pos: a T2 geo outside the fortified
     // list on a front-line vent becomes its faction's fortified geo.
-    CCircuitDef* FrontGeoDef(CCircuitDef* def,const springai::AIFloat3& pos) const;
+    // facing: set to the engine facing the fortified geo fits at (unchanged when def is kept).
+    // D-488: only on a forward vent; pos moves to the stack site; nullptr: order nothing there.
+    CCircuitDef* FrontGeoDef(CCircuitDef* def,springai::AIFloat3& pos,int& facing) const;
     bool OwnsGroupProject(const IUnitTask* task) const { return IsExpansionJob(task); }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);
@@ -458,9 +462,23 @@ private:
     // D-481: the one fortified-geo job, its definitions (script-owned) and the
     // guard plans of finished guard geos. Task pointers clear in TaskFinished.
     IUnitTask* geoJob=nullptr;
+    springai::AIFloat3 geoJobPos;  // D-488: the vent of geoJob (a build or a reclaim)
     int geoNext=0;
+    // D-481: per vent, the frame until which a vent the engine or an ally plan refused is not ordered again.
+    std::vector<int> geoVentSkip;
+    // D-484: vents FrontGeoDef swapped to a fortified geo (front line when ordered);
+    // a guard geo finished on one is guarded. Mutable: recorded from a const query.
+    // fails: swapped orders there that ended unbuilt; at FRONT_GEO_FAILS the vent keeps its geo.
+    static constexpr int FRONT_GEO_FAILS=2;
+    struct FrontGeoSite { springai::AIFloat3 pos; int fails=0; };
+    mutable std::vector<FrontGeoSite> frontGeoSites;
     std::vector<int> geoDefs,geoGuardDefs,geoGuardFrontDefs,geoGuardSideDefs;
-    struct GeoGuard { springai::AIFloat3 pos; float fx=0,fz=1; int next=0,until=0; IUnitTask* task=nullptr; };
+    // D-481: one plan per guarded geo; each item (front light lasers, then the
+    // two side flak) has its own task, so builders work items in parallel.
+    // state: 0 to order, 1 ordered, 2 done or given up; retries per item.
+    static constexpr int MAX_GEO_GUARD_ITEMS=6;
+    struct GeoGuard { springai::AIFloat3 pos; float fx=0,fz=1; int until=0;
+        std::array<IUnitTask*,MAX_GEO_GUARD_ITEMS> tasks{}; std::array<char,MAX_GEO_GUARD_ITEMS> state{},retries{}; };
     std::vector<GeoGuard> geoGuards;
     int tacticalNext=0;                     // next block search (frame)
     bool IsTacticalDef(const CCircuitDef* def) const;

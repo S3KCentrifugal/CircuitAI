@@ -37,6 +37,10 @@ using BT=IBuilderTask::BuildType;
 constexpr int MAX_SEAT_MEX_ATTEMPTS=3;
 // D-485: seconds the seat sweep waits after a search that found nothing.
 constexpr int SEAT_MEX_IDLE_SECONDS=5;
+// D-481: times a cancelled guard item is ordered again.
+constexpr int GEO_GUARD_RETRIES=1;
+// D-484: a finished geo within this of a swapped vent is that vent's (elmos).
+constexpr float FRONT_GEO_SITE_RADIUS=64.f;
 
 
 bool CCommanderController::IsGroupMember(int id) const {
@@ -319,7 +323,35 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
     for(auto& entry:states) entry.value->work.Retire(task);
-    for(auto& g:geoGuards) if(g.task==task) g.task=nullptr;  // D-481: next guard item
+    // D-481: a guard item ends; a cancelled one is ordered again (GEO_GUARD_RETRIES).
+    for(auto& g:geoGuards) for(std::size_t k=0;k<g.tasks.size();++k) if(g.tasks[k]==task) {
+        g.tasks[k]=nullptr; g.state[k]=done?2:0;
+        if(!done && ++g.retries[k]>GEO_GUARD_RETRIES) g.state[k]=2;
+    }
+    // D-484: a Cerberus finished by any of our GEO tasks on the front line is
+    // guarded too (played, commander-group-geo b35: the swap built it and no
+    // guard followed); the group's own job is handled below.
+    // The vent was front line when the swap ordered it; the commander may have
+    // walked on since, so the recorded site decides, not the current window.
+    // D-488: and any guard geo finished on a forward vent (ForwardGeo's own orders).
+    if(done && task!=geoJob && role.frontDuty) if(auto* geoBuild=dynamic_cast<IBuilderTask*>(task);
+        geoBuild && geoBuild->GetBuildType()==BT::GEO && geoBuild->GetBuildDef()) {
+        const AIFloat3 at=geoBuild->GetBuildPos();
+        const auto site=std::find_if(frontGeoSites.begin(),frontGeoSites.end(),
+            [&at](const FrontGeoSite& p){return p.pos.SqDistance2D(at)<SQUARE(FRONT_GEO_SITE_RADIUS);});
+        const bool forward=ai->GetEconomyManager()->IsGeoForward(ai->GetEconomyManager()->GeoSpotAt(at));
+        if(site!=frontGeoSites.end()) frontGeoSites.erase(site);
+        if(site!=frontGeoSites.end() || forward) PlanGeoGuard(geoBuild->GetBuildDef(),at);
+    }
+    // D-484: a swapped order that ended unbuilt counts against its vent.
+    if(!done && task!=geoJob) if(auto* geoBuild=dynamic_cast<IBuilderTask*>(task); geoBuild && geoBuild->GetBuildType()==BT::GEO) {
+        const AIFloat3 at=geoBuild->GetBuildPos();
+        for(auto& site:frontGeoSites) if(site.pos.SqDistance2D(at)<SQUARE(FRONT_GEO_SITE_RADIUS)) {
+            if(++site.fails==FRONT_GEO_FAILS)
+                ai->LOG("[CommanderGroup] geo_front_keep x=%.0f z=%.0f reason=unbuilt fails=%i",site.pos.x,site.pos.z,site.fails);
+            break;
+        }
+    }
     if(task==geoJob) {  // D-481
         geoJob=nullptr;
         auto* build=dynamic_cast<IBuilderTask*>(task);
@@ -850,8 +882,7 @@ void CCommanderController::UpdateCommanderGroup() {
         }
     }
     if(anchor && geoJob && geoJob->GetAssignees().empty()) {  // D-481
-        auto* build=dynamic_cast<IBuilderTask*>(geoJob);
-        if(!build || !GeoFrontLine(anchor,build->GetBuildPos(),cfg->group.geoFrontRadius)) geoJob->GetManager()->AbortTask(geoJob);
+        if(!GeoFrontLine(anchor,geoJobPos,cfg->group.geoFrontRadius)) geoJob->GetManager()->AbortTask(geoJob);
     }
     if(anchorId!=groupAnchorId) {
         groupAnchorId=anchorId;

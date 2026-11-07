@@ -17,6 +17,7 @@
 #include "../systems/team/ferry.as"
 #include "../systems/construction/layout.as"
 #include "../systems/construction/front_energy.as"
+#include "../systems/construction/forward_geothermal.as"
 #include "../systems/team/sea_assist.as"
 
 namespace Builder {
@@ -1999,6 +2000,7 @@ namespace Builder {
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
         IUnitTask@ foundry = TechAirFoundry::Work(u);
         if (foundry !is null) return foundry;
+        ForwardGeo::Update(); // D-488: judges the vents once; withdraws them on a role change
         // FRONT ownership precedes generic edge/spam/economy providers and
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
@@ -2012,6 +2014,9 @@ namespace Builder {
                 // D-486: floating metal fills the reserved factory turret slots first.
                 IUnitTask@ fill = FrontConstructors::FillWork(u);
                 if (fill !is null) return fill;
+                // D-488: a T2 constructor puts the fortified geo on forward vents.
+                IUnitTask@ geo = ForwardGeo::Work(u);
+                if (geo !is null) return geo;
                 if (FrontConstructors::Seat(u.id) == FrontConstructors::ENERGY) return FrontConstructors::EnergyWork(u);
                 if (FrontConstructors::Seat(u.id) == FrontConstructors::CONVERTER) return FrontConstructors::ConverterWork(u);   // D-463
                 if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
@@ -2057,7 +2062,8 @@ namespace Builder {
 		}
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		@t = SeaCoast::Build(u); // SEA-only lost-water recovery precedes discretionary spam.
+		@t = ForwardGeo::Work(u); // D-488: FRONT and AIR fortify forward vents first
+		if (t is null) @t = SeaCoast::Build(u); // SEA-only lost-water recovery precedes discretionary spam.
 		if (t is null) @t = EdgeLanes::BuilderTask(u); // owner, 2026-10-17: two FRONTs build the edge lane labs
 		if (t is null) @t = Spam::BuilderMakeTask(u);
 		if (t is null && MetalEconomy::Active() && !SeaLayout::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
