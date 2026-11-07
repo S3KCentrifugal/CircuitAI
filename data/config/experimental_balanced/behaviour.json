@@ -1446,9 +1446,10 @@
 			// t1 botlab
 	
 			"armpw": {
-				"role": ["raider", "spam", "anti_spam"],
-				"attribute": ["scout", "rare", "spam"],
-				"ignore": true,
+				"role": ["raider", "skirmish", "spam", "anti_spam"],
+				"attribute": ["rare", "spam"],
+				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"power": 1.0,
 				"retreat": 0
 			},
 			"armrectr": {

@@ -55,12 +55,52 @@ int main() {
     assert(Evaluate(r,p,e,0,0).reason==Reason::COVERED);
     assert(Evaluate(r,p,e,1,r.limit).reason==Reason::LIMIT);
     e.metalIncome=49;assert(Evaluate(r,p,e,1,0).reason==Reason::INCOME);e.metalIncome=50;
-    e.energyPull=999;assert(Evaluate(r,p,e,1,0).reason==Reason::ENERGY);e.energyPull=100;
+    // D-469: spare income short of the firing cost is covered by a bank that
+    // holds the shortfall for the window beyond the build's own energy.
+    e.energyPull=999;assert(Evaluate(r,p,e,1,0).reason==Reason::READY); // 9 E/s x 30 s from 8000 - 1000
+    e.energy=1500;assert(Evaluate(r,p,e,1,0).reason==Reason::ENERGY);   // 1200 usable - 1000 build < 270
+    e.energy=1600;assert(Evaluate(r,p,e,1,0).reason==Reason::READY);    // 1280 - 1000 >= 270
+    e.energy=10000;e.energyPull=100;
+    assert(BankedFiring(p,e,r)==0);
+    {
+        Settings s; // D-469: only mobile ground channels use the approach margin
+        assert(CoverRange(LIGHT,430,s)==430);
+        s.approach=600;
+        assert(CoverRange(LIGHT,430,s)==1030 && CoverRange(HEAVY,430,s)==1030);
+        assert(CoverRange(AIR,430,s)==430 && CoverRange(STATIC,430,s)==430);
+        s.approach=-5;assert(CoverRange(LIGHT,430,s)==430);
+    }
+    {
+        Rule fallback;fallback.fallbackFor=0;Rule plain;
+        assert(FallbackOpen(plain,Reason::READY) && FallbackOpen(fallback,Reason::NO_BUILDER));
+        assert(!FallbackOpen(fallback,Reason::READY) && !FallbackOpen(fallback,Reason::DISABLED)
+            && !FallbackOpen(fallback,Reason::TOO_LATE));
+    }
+    {
+        Evaluation choice;choice.reason=Reason::READY;choice.band=2; // D-470
+        Evaluation own=choice;
+        assert(OwnChoiceOpen(false,5,5,own,choice));
+        assert(!OwnChoiceOpen(true,5,5,own,choice));   // the asker builds the choice itself
+        assert(!OwnChoiceOpen(false,4.9f,5,own,choice)); // a seat still has time to start it
+        own.band=1;assert(!OwnChoiceOpen(false,9,5,own,choice)); // less urgent work never replaces it
+        own.band=3;own.reason=Reason::ENERGY;assert(!OwnChoiceOpen(false,9,5,own,choice));
+        own.reason=Reason::READY;assert(OwnChoiceOpen(false,0,-1,own,choice));
+    }
     p.shotEnergy=10000;assert(Evaluate(r,p,e,1,0).reason==Reason::ENERGY);p.shotEnergy=100;
     p.warmup=100;assert(Evaluate(r,p,e,1,0).reason==Reason::TOO_LATE);p.warmup=0;
     p.buildPower=0;assert(Evaluate(r,p,e,1,0).reason==Reason::NO_BUILDER);
     r.priority=0;assert(Evaluate(r,p,e,1,0).reason==Reason::DISABLED);
     assert(std::string(Name(Reason::TOO_LATE))=="ready_too_late" && !Better(Evaluation{},good));
+    {   // D-476: spare metal income admits surplus with a small bank
+        Settings s; s.enabled=1; s.surplusMetal=2000; s.surplusIncome=10;
+        Rule r; r.def=1; r.minMetal=50; r.minEnergy=500; r.surplusPriority=4;
+        Project p{500,1000,1000,100,0,50,100,0};
+        Economy e{600,10000,40,1000,25,100};   // 15 metal/s spare, 600 banked
+        assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::READY);
+        e.metalPull=31; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED); // 9 spare, small bank
+        e.metal=2001; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::READY);      // the bank alone
+        s.surplusIncome=0; s.surplusMetal=0; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED);
+    }
     {
         Settings s; s.enabled=1; s.surplusMetal=2000;
         Rule r; r.def=1; r.minMetal=50; r.minEnergy=500; r.surplusPriority=4;

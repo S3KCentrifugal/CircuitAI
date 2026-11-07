@@ -8,6 +8,7 @@
 #include "../../helpers/objectives/objective_executor.as"
 #include "../../types/strategic_objectives.as"
 #include "../../helpers/construction/sea_constructor_helpers.as"
+#include "../../systems/construction/tactical_layout.as"
 
 namespace RoleTactical {
 
@@ -168,6 +169,7 @@ namespace RoleTactical {
 			string hoverFac = UnitHelpers::GetT1HoverPlantForSide(side); // armhp/corhp/leghp
 
 			if (hoverFac.length() > 0) {
+				TacticalLayout::Plan(hoverFac, pos);
 				GenericHelpers::LogUtil("[Tactical][SelectFactory] Start: choosing land hover plant '" + hoverFac + "' (side=" + side + ")", 2);
 				return hoverFac;
 			}
@@ -445,6 +447,7 @@ namespace RoleTactical {
 	}
 
 	void Tactical_BuilderAiTaskAdded(IUnitTask@ task) {
+		TacticalLayout::Prepare(task);
 		GenericHelpers::LogUtil("[Tactical_BuilderAiTaskAdded] called for task", 3);
 	}
 
@@ -621,6 +624,8 @@ namespace RoleTactical {
 		RoleConfig@ cfg = RoleConfig(AiRole::TACTICAL, cast<MainUpdateDelegate@>(@Tactical_MainUpdate));
 
 		@cfg.InitHandler = cast<InitDelegate@>(@Tactical_Init);
+		@cfg.LayoutPlanHandler = cast<LayoutPlanDelegate@>(@TacticalLayout::Init);
+		@cfg.FactoryAiUnitAdded = cast<AiUnitAddedDelegate@>(@TacticalLayout::FactoryAdded);
 
 		@cfg.AiIsSwitchTimeHandler = cast<AiIsSwitchTimeDelegate@>(@Tactical_AiIsSwitchTime);
 		@cfg.AiIsSwitchAllowedHandler = cast<AiIsSwitchAllowedDelegate@>(@Tactical_AiIsSwitchAllowed);

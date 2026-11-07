@@ -16,23 +16,6 @@ namespace TechTransport {
 
     bool WantsCarrier(const CCircuitDef@ carrier) {
         if (Global::AISettings::Role != AiRole::TECH || carrier is null) return false;
-        if (TechHeavyRush::Selected()) {
-            CCircuitDef@ cargo = ai.GetCircuitDef(TechHeavyRush::UnitName());
-            if (Compatible(carrier, cargo)) {
-                if (TechHeavyRush::Pending() && TechHeavyRush::engineUnitLimit > 0) return true;
-                // Production completing does not end a delivery obligation.
-                // The finite batch ledger is bounded by the configured rush,
-                // never by army size. Lost/transferred/landed cargo needs no spare.
-                for (int index = 0; index < TechHeavyRush::completed; ++index) {
-                    const int id = aiTerrainMgr.GetLayoutInt(TechHeavyRush::StateKey + "gift." + index, -1);
-                    CCircuitUnit@ unit = ai.GetTeamUnit(id);
-                    if (unit is null || aiTerrainMgr.GetLayoutInt(TechHeavyRush::StateKey + "sent." + index, 0) != 0) continue;
-                    TechHeavyDelivery::Delivery@ delivery;
-                    TechHeavyDelivery::deliveries.get("" + id, @delivery);
-                    if (delivery is null || (!delivery.removed && !delivery.landed && !delivery.giving)) return true;
-                }
-            }
-        }
         if (TechPlan::Choose() != "t3rush") return false;
         const string side = Global::AISettings::Side;
         CCircuitDef@ gantry = ai.GetCircuitDef(UnitHelpers::GetLandGantryForSide(side));

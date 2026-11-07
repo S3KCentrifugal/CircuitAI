@@ -55,6 +55,13 @@ template<auto M> Field Work(const char* n,float lo,float hi) { return {n,[](Comm
 using CC=CommanderCombatConfig; using SC=CommanderSafetyConfig; using KC=CommanderCloakConfig;
 using GC=CommanderGroupConfig; using FC=CommanderFrontConfig; using TC=CommanderT3Config;
 using BC=CommanderFallbackConfig; using WC=CommanderWorkConfig;
+// D-472: the bank never sits at full storage while anything is built, so a
+// reserve above this share of storage counts as one the team cannot hold.
+static constexpr float ENERGY_RESERVE_STORABLE_SHARE=.9f;
+// D-472: INV-255 allows this long past cloak_energy_release (one tick and a
+// retreat-task update); one line per commander per ENERGY_INVARIANT_LOG_FRAMES.
+static constexpr float ENERGY_RELEASE_INVARIANT_SLACK_SECONDS=3.f;
+static constexpr int ENERGY_INVARIANT_LOG_FRAMES=30*FRAMES_PER_SEC;
 
 const control::CConfigTable<CommanderConfig>& ConfigTable() {
     static const control::CConfigTable<CommanderConfig> table({
@@ -75,6 +82,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Safety<&SC::jamSafe>("jam_safe",0,1),Safety<&SC::jamHeavyCost>("jam_heavy_cost",0,100000),
         Safety<&SC::cloakEnergyRetreat>("cloak_energy_retreat",0,1),
         Safety<&SC::cloakRetreatDistance>("cloak_retreat_distance",128,2000),
+        Safety<&SC::cloakEnergyRelease>("cloak_energy_release",0,600),
         Safety<&SC::healthRetreat>("health_retreat",0,1),Safety<&SC::healthShotSeconds>("health_shot_seconds",0,5),
         Safety<&SC::decoyHealthRetreat>("decoy_health_retreat",0,1),Safety<&SC::decoyHealthRecover>("decoy_health_recover",0,1),
         Safety<&SC::decoyBait>("decoy_bait",0,1),
@@ -98,6 +106,39 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::maintenance>("commander_group_maintenance",0,1),
         Group<&GC::lineReviewSeconds>("commander_group_line_review_seconds",1,60),
         Group<&GC::projectHoldSeconds>("commander_group_project_hold_seconds",0,120),
+        Group<&GC::tacticalT2>("commander_group_tactical_t2",0,3),
+        Group<&GC::tacticalMetal>("commander_group_tactical_metal",0,1000000),
+        Group<&GC::tacticalEnergy>("commander_group_tactical_energy",0,1),
+        Group<&GC::tacticalCols>("commander_group_tactical_cols",1,6),
+        Group<&GC::tacticalRows>("commander_group_tactical_rows",1,6),
+        Group<&GC::tacticalMinFill>("commander_group_tactical_min_fill",0,1),
+        Group<&GC::tacticalRear>("commander_group_tactical_rear",0,2000),
+        Group<&GC::tacticalRetrySeconds>("commander_group_tactical_retry_seconds",1,600),
+        Group<&GC::tacticalOrderSeconds>("commander_group_tactical_order_seconds",30,1200),
+        Group<&GC::expansionJobs>("commander_group_expansion_jobs",1,6),
+        Group<&GC::artilleryT2Income>("commander_group_artillery_t2_income",0,100000),
+        Group<&GC::artilleryT1Income>("commander_group_artillery_t1_income",0,100000),
+        Group<&GC::artilleryBank>("commander_group_artillery_bank",0,1),
+        Group<&GC::artillerySpare>("commander_group_artillery_spare",0,100000),
+        Group<&GC::artilleryEnergy>("commander_group_artillery_energy",0,1),
+        Group<&GC::artilleryEnergyCover>("commander_group_artillery_energy_cover",0,1),
+        Group<&GC::seatMex>("commander_group_seat_mex",0,1),
+        Group<&GC::seatBaseRadius>("commander_group_seat_base_radius",0,6000),
+        Group<&GC::seatApproachAhead>("commander_group_seat_approach_ahead",-2000,4000),
+        Group<&GC::seatClearRadius>("commander_group_seat_clear_radius",0,256),
+        Group<&GC::seatSkipSeconds>("commander_group_seat_skip_seconds",0,600),
+        Group<&GC::nanoT1>("commander_group_nano_t1",0,8),
+        Group<&GC::nanoT2>("commander_group_nano_t2",0,8),
+        Group<&GC::nanoOther>("commander_group_nano_other",0,8),
+        Group<&GC::geoFortify>("commander_group_geo_fortify",0,1),
+        Group<&GC::geoIncome>("commander_group_geo_income",0,1000),
+        Group<&GC::geoFrontRadius>("commander_group_geo_front_radius",0,6000),
+        Group<&GC::geoReclaim>("commander_group_geo_reclaim",0,1),
+        Group<&GC::geoGuardFront>("commander_group_geo_guard_front",0,4),
+        Group<&GC::geoGuardFrontOffset>("commander_group_geo_guard_front_offset",0,1000),
+        Group<&GC::geoGuardSpacing>("commander_group_geo_guard_spacing",0,1000),
+        Group<&GC::geoGuardSideOffset>("commander_group_geo_guard_side_offset",0,1000),
+        Group<&GC::geoGuardSeconds>("commander_group_geo_guard_seconds",0,1200),
         Group<&GC::jammerEdge>("commander_group_jammer_edge",0,1000),
         Group<&GC::jammerGain>("commander_group_jammer_gain",0,1),
         Group<&GC::jammerSpacing>("commander_group_jammer_spacing",0,2),
@@ -130,6 +171,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::pushHomeRiot>("front_push_home_riot",0,100000),Front<&FC::laneMargin>("front_lane_margin",0,2000),
         // D-357 corridor mex sweep
         Front<&FC::mexReach>("front_mex_reach",0,2000),Front<&FC::mexBehind>("front_mex_behind",0,4000),
+        Front<&FC::mexAdoptRadius>("front_mex_adopt_radius",0,6000),
         Front<&FC::mexAhead>("front_mex_ahead",0,4000),Front<&FC::mexCaptureEnemy>("front_mex_capture_enemy",0,1),
         Front<&FC::mexTurretEvery>("front_mex_turret_every",0,20),Front<&FC::mexEnemyHome>("front_mex_enemy_home",0,4000),
         Front<&FC::distance>("front_distance",200,10000),Front<&FC::standoff>("front_standoff",200,1500),
@@ -242,13 +284,34 @@ void CCommanderController::OnPresetAssigned(int defId,int preset) {
 }
 bool CCommanderController::RetreatCloakFunded(CCircuitUnit* unit) const {
     if(!Handles(unit) || !unit->GetCircuitDef()->IsAbleToCloak()) return false;
+    return ai->GetEconomyManager()->GetEnergyCur()>=RetreatCloakReserve(unit);
+}
+float CCommanderController::RetreatCloakReserve(CCircuitUnit* unit) const {
     Bind bound(this,PresetOfUnit(unit->GetId()));
     const auto& cap=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(unit->GetCircuitDef());
-    return ai->GetEconomyManager()->GetEnergyCur()>=cap.cloakMoving*cfg->combat.escapeSeconds+cfg->combat.margin;
+    return cap.cloakMoving*cfg->combat.escapeSeconds+cfg->combat.margin;
+}
+// D-472: every faction commander moves cloaked at 1000 E/s and stores 500 E,
+// so with balanced's 4.3 s escape the reserve is 4450 E: storable only while
+// energy storage buildings stand. Cost: one storage read per call.
+bool CCommanderController::RetreatCloakStorable(CCircuitUnit* unit) const {
+    return RetreatCloakReserve(unit)<=ai->GetEconomyManager()->GetEnergyStore()*ENERGY_RESERVE_STORABLE_SHARE;
 }
 bool CCommanderController::EnergyRetreat(CCircuitUnit* unit) const {
     const State* s=states.Find(unit->GetId());
     return s && s->retreat.energy;
+}
+// INV-255 (D-472): a commander whose escape reserve the team cannot store is
+// never held in energy retreat longer than cloak_energy_release (+ slack)
+// after its last threat. Called on each tick of a held latch; constant work;
+// one line per commander every ENERGY_INVARIANT_LOG_FRAMES.
+void CCommanderController::CheckEnergyRelease(CCircuitUnit* unit,State& s,int frame) {
+    if(!s.retreat.energy || cfg->safety.cloakEnergyRelease<=0 || frame<s.retreat.energyLogNext) return;
+    const float calm=float(frame-s.retreat.energyThreat)/FRAMES_PER_SEC;
+    if(calm<cfg->safety.cloakEnergyRelease+ENERGY_RELEASE_INVARIANT_SLACK_SECONDS || RetreatCloakStorable(unit)) return;
+    s.retreat.energyLogNext=frame+ENERGY_INVARIANT_LOG_FRAMES;
+    ai->LOG("[INVARIANT] INV-255 commander %i held in energy retreat %.0f s without threat; reserve %.0f > storage %.0f",
+        unit->GetId(),calm,RetreatCloakReserve(unit),ai->GetEconomyManager()->GetEnergyStore());
 }
 void CCommanderController::Damaged(CCircuitUnit* unit) {
     State* found=states.Find(unit->GetId());
@@ -285,6 +348,32 @@ float CCommanderController::GetDeficit() const {
 }
 bool CCommanderController::SetOption(const std::string& name,float value) {
     if(!std::isfinite(value)) return false;
+    if(name=="commander_group_artillery_t2_definition" || name=="commander_group_artillery_t1_definition") {  // D-479
+        auto& defs=name=="commander_group_artillery_t2_definition"?artilleryT2Defs:artilleryT1Defs;
+        if(value==-1) {defs.clear();return true;}
+        if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
+        if(std::find(defs.begin(),defs.end(),int(value))==defs.end()) defs.push_back(int(value));
+        return true;
+    }
+    {  // D-481: fortified geo, guard trigger, guard front and side lists; -1 clears, else append
+        std::vector<int>* defs=name=="commander_group_geo_definition"?&geoDefs
+            :name=="commander_group_geo_guard_definition"?&geoGuardDefs
+            :name=="commander_group_geo_guard_front_definition"?&geoGuardFrontDefs
+            :name=="commander_group_geo_guard_side_definition"?&geoGuardSideDefs:nullptr;
+        if(defs) {
+            if(value==-1) {defs->clear();return true;}
+            if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
+            if(std::find(defs->begin(),defs->end(),int(value))==defs->end()) defs->push_back(int(value));
+            return true;
+        }
+    }
+    if(name=="commander_group_tactical_definition") {  // D-475: -1 clears, else append
+        if(value==-1) {tacticalDefs.clear();return true;}
+        if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
+        if(std::find(tacticalDefs.begin(),tacticalDefs.end(),int(value))==tacticalDefs.end())
+            tacticalDefs.push_back(int(value));
+        return true;
+    }
     if(name=="front_defence_definition") {
         if(value==-1) {frontDefenceDefs.clear();return true;}
         if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
@@ -700,9 +789,25 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     // returns; no extra scan and no peaceful low-energy evacuation.
     const bool threatened=(s.lastDamage>=0 && frame-s.lastDamage<FRAMES_PER_SEC)
         || Exposure(P(pos),P(pos),cfg->combat.escapeSeconds,pos.y)>0.f;
+    // D-472: the latch outlives the threat only while the reserve fits in the
+    // team's storage. A commander whose base storage is gone could never fund
+    // the reserve again and stayed in retreat for the rest of the game
+    // (played: base destroyed, commander parked beside an ally, no rebuild).
+    // Unstorable, it ends after cloak_energy_release seconds without threat;
+    // a new threat latches it again (the D-373 entry rule is unchanged).
+    bool released=false;
+    if(s.retreat.energy && !threatened && cfg->safety.cloakEnergyRelease>0
+        && frame-s.retreat.energyThreat>=int(cfg->safety.cloakEnergyRelease*FRAMES_PER_SEC)
+        && !RetreatCloakFunded(unit) && !RetreatCloakStorable(unit)) {
+        released=true;
+        ai->LOG("[Commander] unit=%i cloak_energy_release frame=%i calm=%.0f reserve=%.0f storage=%.0f",unit->GetId(),frame,
+            float(frame-s.retreat.energyThreat)/FRAMES_PER_SEC,RetreatCloakReserve(unit),ai->GetEconomyManager()->GetEnergyStore());
+    }
     if(cfg->safety.cloakEnergyRetreat>0 && def->IsAbleToCloak()
-        && !RetreatCloakFunded(unit) && (threatened || s.retreat.energy)) {
+        && !RetreatCloakFunded(unit) && (threatened || (s.retreat.energy && !released))) {
         s.conceal.postureCloak=false;
+        if(threatened || !s.retreat.energy) s.retreat.energyThreat=frame;
+        CheckEnergyRelease(unit,s,frame);
         if(!s.retreat.energy) {
             ai->LOG("[Commander] unit=%i cloak_energy_retreat frame=%i",unit->GetId(),frame);
             // Clear the cloak request once so the bank can refill, and return
@@ -1056,6 +1161,18 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_DEPLOY);
     auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
     if(FallbackActive(s,frame)) return false; // the porc line bounds exploration
+    // D-474: a commander that was hit, or whose structure under construction
+    // was destroyed, braces here: below every rule Tick ran before Deploy
+    // (energy and health retreat, jamming, T3 intercept, unseen fire,
+    // fallback, D-gun combat), above front deployment and its work.
+    // Not while the unseen-fire withdrawal holds (its cloaked step back comes
+    // first). A brace is uncloaked work: the controller clears its own cloak
+    // request and returns to support (played, factory-b12: a brace replaced the
+    // withdrawal with the cloak still requested, INV-246).
+    if(frame>=s.conceal.unseenUntil && ai->GetBuilderManager()->TakeCommanderBrace(unit)) {
+        if(s.mode!=Mode::SUPPORT) { Conceal(unit,s,false); Transition(unit,s,Mode::SUPPORT,frame); }
+        return true;
+    }
     if(role.frontDuty) {
         // INV-236 (D-356): front duty is a FRONT-only policy; the script sets
         // "advance" for the roles in commander.json advance_roles and front_duty
@@ -1100,7 +1217,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 ai->LOG("[INVARIANT] INV-234 lane push goal beyond its bound unit=%i progress=%.0f bound=%.0f screens=%i",
                     unit->GetId(),progress,bound,s.front.pushScreens);
         }
-        if(groupJob && StartedCommanderConstruction(unit)) return true;
+        if(ExpansionJobCount()>0 && StartedCommanderConstruction(unit)) return true;
         if(unit->GetTask()==s.work.task && !unit->GetTask()->IsDead()
             && (s.work.kind==WORK_MEX_DEFENCE || s.work.kind==WORK_TERRITORY_LINE || s.work.kind==WORK_REPAIR_COMBAT)
             && CanResumeFrontTask(unit,unit->GetTask())) return true;
@@ -1124,7 +1241,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
         // Construction is a group objective. Let the selected worker establish
         // its frame before moving the anchor away; safety/fallback ran first.
         // GroupAssist bounds pre-frame holding by the project's original lease.
-        if(groupJob && GroupProjectAllowed(unit,groupJob)) {
+        if(ExpansionJobCount()>0) {
             if(auto* assist=GroupAssist(unit)) {
                 if(unit->GetTask()!=assist) ai->GetBuilderManager()->AssignTask(unit,assist);
                 return true;
@@ -1218,7 +1335,10 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 -ai->GetBattle()->GetFrontLaneProgress(pos):0.f;
             if(assignedLane)next=ai->GetBattle()->GetFrontLaneGoal(pos,std::clamp(laneRemaining,-240.f,240.f));
             next.y=ai->GetMap()->GetElevationAt(next.x,next.z);
-            if(Route(unit,pos,next)) { s.detourFails=0; Move(unit,s,next,frame,cfg->front.pushAhead>0); }
+            const auto destinationFree=[&](const AIFloat3& p) {
+                return ai->GetTerrainManager()->IsMovementDestinationFree(unit->GetCircuitDef(),p);
+            };
+            if(destinationFree(next) && Route(unit,pos,next)) { s.detourFails=0; Move(unit,s,next,frame,cfg->front.pushAhead>0); }
             else if(role.frontRecovery) {
                 // A blocked straight step is not an unreachable destination.
                 // Let Recoil route around terrain; local combat still preempts
@@ -1228,7 +1348,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                 // A detour that brought the commander 64 elmos closer since the
                 // last one is working, not failing: it does not spend retries.
                 auto detourGoal=assignedLane?next:goal;
-                bool reachable=ai->GetTerrainManager()->CanReachAt(unit,detourGoal,64);
+                bool reachable=destinationFree(detourGoal) && ai->GetTerrainManager()->CanReachAt(unit,detourGoal,64);
                 if(assignedLane && !reachable && (cfg->front.detourSeconds<=0 || s.detourFails<3)) {
                     // A coarse terrain cell at a bend can be unreachable for
                     // this UnitDef even when the corridor continues beyond it.
@@ -1237,10 +1357,14 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                     // coverage-front-supreme exercises this at its north bend.
                     const float remaining=std::abs(laneRemaining);
                     for(float ahead:{480.f,720.f,960.f}) {
-                        auto probe=ai->GetBattle()->GetFrontLaneGoal(pos,std::copysign(std::min(ahead,remaining),laneRemaining));
+                        // Rejoin may itself be inside a newly completed factory.
+                        // Advance from projected progress: GetFrontLaneGoal(from)
+                        // deliberately returns that same rejoin while off lane.
+                        auto probe=ai->GetBattle()->GetFrontLanePoint(ai->GetBattle()->GetFrontLaneProgress(pos)
+                            +std::copysign(std::min(ahead,remaining),laneRemaining));
                         if(probe.SqDistance2D(detourGoal)<64.f*64.f)continue;
                         probe.y=ai->GetMap()->GetElevationAt(probe.x,probe.z);
-                        if(ai->GetTerrainManager()->CanReachAt(unit,probe,64)) {
+                        if(destinationFree(probe) && ai->GetTerrainManager()->CanReachAt(unit,probe,64)) {
                             detourGoal=probe;reachable=true;break;
                         }
                     }

@@ -27,14 +27,27 @@ namespace circuit {
 
 using namespace springai;
 
+static IUnitTask* EnqueueWorkerEnergy(CEconomyManager* economy, CCircuitUnit* builder)
+{
+    if (!builder) return nullptr;
+    return economy->UpdateEnergyTasks(builder->GetPos(economy->GetCircuit()->GetLastFrame()), builder, true);
+}
+
 // Explicit script opt-in. BAR permits an advanced geo over an owned T1 geo;
 // its upgrade gadget retires/refunds the old unit on completion. Never reclaim
 // the source here. Scan immutable vent positions, then only local occupants.
-static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builder,
-        CCircuitDef* definition, const AIFloat3& center, float radius)
+// D-465: airOnly serves only vents no ground claimant reaches (an AIR air
+// constructor's theatre vents); those may lie inside an ally's zone, which
+// that ally cannot build. Ground builders additionally need a 3D build stance
+// (CanReachMex): CanReachAtSafe alone accepted a vent on a cliff-ringed
+// plateau next to a connected sector (KI-640), and the builder stalled below.
+static IUnitTask* EnqueueGeo(CEconomyManager* economy, CCircuitUnit* builder,
+        CCircuitDef* definition, const AIFloat3& center, float radius, bool airOnly)
 {
     if (!builder || !definition || radius <= 0.f || !definition->GetDef()->IsNeedGeo()
         || !builder->GetCircuitDef()->CanBuild(definition)) return nullptr;
+    const bool flying = builder->GetCircuitDef()->IsAbleToFly();
+    if (airOnly && !flying) return nullptr;
     auto* circuit = economy->GetCircuit();
     auto* manager = circuit->GetBuilderManager();
     auto* terrain = circuit->GetTerrainManager();
@@ -46,8 +59,10 @@ static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builde
     for (size_t index = 0; index < sites.size(); ++index) {
         const auto& position = sites[index];
         const float distance = position.SqDistance2D(center);
-        if (distance > best || terrain->IsZoneAlly(position)
+        if (distance > best || (!airOnly && terrain->IsZoneAlly(position))
             || !terrain->CanReachAtSafe(builder, position, builder->GetCircuitDef()->GetBuildDistance())
+            || (!flying && !economy->CanReachMex(builder, position))
+            || (airOnly && !economy->IsGeoAirOnly(position))
             || !terrain->CanBeBuiltAtSafe(definition, position)
             || terrain->IsAllyLayoutBlocked(definition, position, UNIT_NO_FACING)) continue;
         bool occupied = false;
@@ -72,6 +87,61 @@ static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builde
     return manager->Enqueue(TaskB::Spot(IBuilderTask::BuildType::GEO,
         IBuilderTask::Priority::HIGH, definition, sites[chosen], chosen));
 }
+
+static IUnitTask* EnqueueLocalGeo(CEconomyManager* economy, CCircuitUnit* builder,
+        CCircuitDef* definition, const AIFloat3& center, float radius)
+{
+    return EnqueueGeo(economy, builder, definition, center, radius, false);
+}
+
+static IUnitTask* EnqueueAirGeo(CEconomyManager* economy, CCircuitUnit* builder,
+        CCircuitDef* definition, const AIFloat3& center, float radius)
+{
+    return EnqueueGeo(economy, builder, definition, center, radius, true);
+}
+
+static bool IsGeoAirOnly(CEconomyManager* economy, const AIFloat3& pos) { return economy->IsGeoAirOnly(pos); }
+
+// D-488: an order already queued within this distance of a vent owns it
+// (matches GeoFortify.cpp).
+static constexpr float FORTIFIED_GEO_TASK_RADIUS = 64.f;
+
+// D-488: the CEconomyManager::GeoFortify code for builder and def at a forward vent.
+static int GeoFortifyState(CEconomyManager* economy, CCircuitUnit* builder, CCircuitDef* definition,
+        int spot, float maxThreat)
+{
+    AIFloat3 site;
+    int facing = UNIT_NO_FACING;
+    return static_cast<int>(economy->CheckGeoFortify(builder, definition, spot, maxThreat, site, facing));
+}
+
+// D-488: orders the fortified geo where it fits (over the standing plant when
+// it stacks there); an order already at the vent is returned when builder can
+// join it. Null otherwise; the script reads GeoFortifyState for the reason.
+static IUnitTask* EnqueueFortifiedGeo(CEconomyManager* economy, CCircuitUnit* builder, CCircuitDef* definition,
+        int spot, float maxThreat)
+{
+    AIFloat3 site;
+    int facing = UNIT_NO_FACING;
+    const auto state = economy->CheckGeoFortify(builder, definition, spot, maxThreat, site, facing);
+    auto* circuit = economy->GetCircuit();
+    auto* manager = circuit->GetBuilderManager();
+    if (state == CEconomyManager::GeoFortify::BUSY) {
+        const AIFloat3& vent = circuit->GetEnergyManager()->GetSpots()[spot];
+        for (auto* task : manager->GetTasks(IBuilderTask::BuildType::GEO)) {
+            if (task->GetPosition().SqDistance2D(vent) < SQUARE(FORTIFIED_GEO_TASK_RADIUS)
+                && !task->IsDead() && task->CanAssignTo(builder)) return task;
+        }
+        return nullptr;
+    }
+    if (state != CEconomyManager::GeoFortify::READY) return nullptr;
+    IBuilderTask* task = manager->Enqueue(TaskB::Spot(IBuilderTask::BuildType::GEO,
+        IBuilderTask::Priority::HIGH, definition, site, spot));
+    if (task != nullptr) task->SetFacing(facing);  // the facing the site test accepted
+    return task;
+}
+
+static CCircuitUnit* OwnGeoAt(CEconomyManager* economy, int spot) { return economy->OwnGeoAt(spot); }
 
 static void CEconomyManager_SetEnergyCondition(CEconomyManager* mgr, const CCircuitDef* cdef, int limit, float mi, float ei)
 {
@@ -218,7 +288,16 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 
 	r = engine->RegisterObjectType("CEconomyManager", 0, asOBJ_REF | asOBJ_NOHANDLE); ASSERT(r >= 0);
 	r = engine->RegisterGlobalProperty("CEconomyManager aiEconomyMgr", manager); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueWorkerEnergy(CCircuitUnit@)", asFUNCTION(EnqueueWorkerEnergy), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueLocalGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueLocalGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueAirGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueAirGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsGeoAirOnly(const AIFloat3& in)", asFUNCTION(IsGeoAirOnly), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "void SetGeoForward(int, bool)", asMETHOD(CEconomyManager, SetGeoForward), asCALL_THISCALL); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsGeoForward(int) const", asMETHOD(CEconomyManager, IsGeoForward), asCALL_THISCALL); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GeoFortifyState(CCircuitUnit@, CCircuitDef@, int, float)", asFUNCTION(GeoFortifyState), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueFortifiedGeo(CCircuitUnit@, CCircuitDef@, int, float)", asFUNCTION(EnqueueFortifiedGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "CCircuitUnit@ OwnGeoAt(int)", asFUNCTION(OwnGeoAt), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool CanSpareGeo(CCircuitUnit@)", asMETHOD(CEconomyManager, CanSpareGeo), asCALL_THISCALL); ASSERT(r >= 0);  // D-488
 	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMetalMap() const", asMETHOD(CEconomyManager, IsMetalMap), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEffectiveUnitLimit() const", asMETHOD(CEconomyManager, GetEffectiveUnitLimit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetFieldMexCount(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetFieldMexCount), asCALL_THISCALL); ASSERT(r >= 0);

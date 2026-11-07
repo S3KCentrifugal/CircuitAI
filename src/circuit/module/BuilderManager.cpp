@@ -45,6 +45,8 @@
 #include "task/builder/PatrolTask.h"
 #include "task/builder/GuardTask.h"
 #include "task/builder/CombatTask.h"
+#include "task/builder/BraceTask.h"
+#include "control/kernel/ConstructorBrace.h"
 #include "control/core/ControlledTask.h"
 #include "control/core/ControllerRegistry.h"
 #include "control/unit/commander/CommanderController.h"
@@ -57,6 +59,7 @@
 #include "json/json.h"
 
 #include "spring/SpringCallback.h"
+#include "spring/SpringMap.h"
 #include "spring/ResurrectionClaim.h"
 
 #include "Log.h"
@@ -157,7 +160,14 @@ void CBuilderManager::InitHandlers()
 			unit->GetTask()->OnUnitIdle(unit);
 		}
 	};
-	auto workerDamagedHandler = [](CCircuitUnit* unit, CEnemyInfo* attacker) {
+	auto workerDamagedHandler = [this](CCircuitUnit* unit, CEnemyInfo* attacker) {
+		// D-474: before the task's own handler. Above the retreat threshold
+		// the builder may switch to a brace (whose handler then ignores the
+		// hit); at or below it nothing starts and the task retreats as before.
+		if (brace.enabled) {
+			const AIFloat3 at = (attacker != nullptr) ? attacker->GetPos() : AIFloat3();
+			BraceTrigger(unit, (attacker != nullptr) ? &at : nullptr, "damaged");
+		}
 		unit->GetTask()->OnUnitDamaged(unit, attacker);
 	};
 	auto workerDestroyedHandler = [this](CCircuitUnit* unit, CEnemyInfo* attacker) {
@@ -177,6 +187,7 @@ void CBuilderManager::InitHandlers()
 		workers.erase(unit);
 		costQueries.erase(unit);
 		dangerTime.erase(unit);
+		braceUnits.erase(unit->GetId());
 		if (unit->GetCircuitDef()->IsAbleToAssist()) {
 			--assistCount;
 		}
@@ -336,6 +347,8 @@ void CBuilderManager::ReadConfig()
 {
 	const Json::Value& root = circuit->GetSetupManager()->GetConfig();
 	const std::string& cfgName = circuit->GetSetupManager()->GetConfigName();
+
+	ReadBraceConfig(root);
 
 	const Json::Value& econ = root["economy"];
 	terraDef = circuit->GetCircuitDef(econ.get("terra", "").asCString());
@@ -668,6 +681,20 @@ int CBuilderManager::UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 
 int CBuilderManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	// D-474: a structure under construction was destroyed; every builder on
+	// it braces toward the killer. Not when we reclaimed it ourselves. The
+	// builders are copied now and braced after the frame's task is aborted:
+	// that task's site claim covers the same ground, and a brace started
+	// before it was released had its BUILD refused (played, b06). O(builders).
+	std::vector<CCircuitUnit*> braceBuilders;
+	const bool braceKnown = (attacker != nullptr);
+	const AIFloat3 braceAt = braceKnown ? attacker->GetPos() : AIFloat3();
+	if (brace.enabled && (braceKnown || !IsReclaimUnit(unit))) {
+		auto lost = unfinishedUnits.find(unit);
+		if (lost != unfinishedUnits.end()) {
+			braceBuilders.assign(lost->second->GetAssignees().begin(), lost->second->GetAssignees().end());
+		}
+	}
 	auto iter = unfinishedUnits.find(unit);
 	if (iter != unfinishedUnits.end()) {
 		AbortTask(iter->second);
@@ -689,6 +716,12 @@ int CBuilderManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	if (search != destroyedHandler.end()) {
 		search->second(unit, attacker);
 	}
+	for (CCircuitUnit* builder : braceBuilders) {
+		// Still ours and alive: the frame's death cannot free its builders.
+		if ((builder != nullptr) && !builder->IsDead()) {
+			BraceTrigger(builder, braceKnown ? &braceAt : nullptr, "frame_lost");
+		}
+	}
 
 	return 0; //signaling: OK
 }
@@ -703,7 +736,202 @@ int CBuilderManager::UnitCaptured(CCircuitUnit* unit, int oldTeamId, int newTeam
 		AbortTask(iter->second);
 	}
 	EraseUnfinishedUnit(unit);
+	braceUnits.erase(unit->GetId());
 	return IModule::UnitCaptured(unit, oldTeamId, newTeamId);
+}
+
+/*
+ * D-474: the constructor brace. See task/builder/BraceTask.h for the task and
+ * control/kernel/ConstructorBrace.h for the rules. Cost: one trigger per
+ * damage event of a builder (while bracing, retreating or within the cooldown
+ * it returns after one map lookup), at most five reachability tests and one
+ * site search per brace started.
+ */
+namespace {
+// A retreat point counts as reachable when the builder can get this close (elmos).
+constexpr float BRACE_REACH_RANGE = 32.f;
+}
+
+// Mobile, ground: not an aircraft, a ship or a submarine. Hovercraft and
+// amphibious constructors count (they work on land). Resurrection-only bots
+// do not (they cannot build the defence).
+bool CBuilderManager::IsBraceBuilder(const CCircuitDef* cdef)
+{
+	return (cdef != nullptr) && cdef->IsMobile() && cdef->IsBuilder() && !cdef->IsAbleToFly()
+		&& !cdef->IsFloater() && !cdef->IsSubmarine();
+}
+
+void CBuilderManager::ReadBraceConfig(const Json::Value& root)
+{
+	// "brace": {"enabled", "retreat", "offset" (elmos), "cooldown", "timeout",
+	//           "commander_window" (seconds), "t2": [defs], "t1": [defs]}
+	const Json::Value& cfg = root["brace"];
+	brace.enabled = cfg.get("enabled", false).asBool();
+	brace.retreatDistance = cfg.get("retreat", brace.retreatDistance).asFloat();
+	brace.siteOffset = cfg.get("offset", brace.siteOffset).asFloat();
+	brace.cooldown = int(cfg.get("cooldown", 0.f).asFloat() * FRAMES_PER_SEC);
+	brace.timeout = int(cfg.get("timeout", 0.f).asFloat() * FRAMES_PER_SEC);
+	brace.commanderWindow = int(cfg.get("commander_window", 0.f).asFloat() * FRAMES_PER_SEC);
+	brace.holdAbove = std::clamp(cfg.get("hold_above", 0.f).asFloat(), 0.f, 1.f);
+	auto readDefs = [this](const Json::Value& names, std::vector<CCircuitDef*>& defs) {
+		defs.clear();
+		for (const Json::Value& name : names) {
+			// A faction not in this game (Legion off) has no def: skipped quietly.
+			CCircuitDef* cdef = circuit->GetCircuitDef(name.asCString());
+			if (cdef != nullptr) {
+				defs.push_back(cdef);
+			}
+		}
+	};
+	readDefs(cfg["t2"], brace.t2);
+	readDefs(cfg["t1"], brace.t1);
+	if (brace.enabled && (brace.timeout <= 0)) {
+		circuit->LOG("CONFIG brace: enabled without a timeout; disabled");
+		brace.enabled = false;
+	}
+}
+
+float CBuilderManager::BraceHold(CCircuitDef* cdef) const
+{
+	// The owner's rule (2026-11-06): the brace holds down to its own threshold
+	// (balanced 0.5); the ordinary builder retreat (0.8) stays for other work.
+	// Never above the unit's own retreat: a lower retreat is kept.
+	const float retreat = cdef->GetRetreat();
+	return (brace.holdAbove > 0.f) ? std::min(retreat, brace.holdAbove) : retreat;
+}
+
+CCircuitDef* CBuilderManager::BraceDefence(CCircuitUnit* unit) const
+{
+	// T2 first: a T2 constructor builds the T2 defence; a T1 one cannot and
+	// falls through to the T1 list. Allowed and available only.
+	const int frame = circuit->GetLastFrame();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	for (const std::vector<CCircuitDef*>* list : {&brace.t2, &brace.t1}) {
+		for (CCircuitDef* def : *list) {
+			if (cdef->CanBuild(def) && def->IsBuildAllowed() && def->IsAvailable(frame)) {
+				return def;
+			}
+		}
+	}
+	return nullptr;
+}
+
+void CBuilderManager::BraceTrigger(CCircuitUnit* unit, const AIFloat3* threat, const char* reason)
+{
+	if (!brace.enabled || (unit == nullptr) || unit->IsDead() || !IsBraceBuilder(unit->GetCircuitDef())) {
+		return;
+	}
+	IUnitTask* task = unit->GetTask();
+	// Never taken from: a player order, Lua or external control, an enemy
+	// reclaim, a unit still being built (NIL), a morph.
+	if ((task == nullptr) || (task->GetType() == IUnitTask::Type::PLAYER) || (task->GetType() == IUnitTask::Type::NIL)
+		|| task->IsExternalControlled() || task->IsEnemyReclaim() || unit->IsMorphing())
+	{
+		return;
+	}
+	const int frame = circuit->GetLastFrame();
+	SBraceUnit& state = braceUnits[unit->GetId()];
+	brace::Gate gate;
+	gate.enabled = true;
+	gate.land = true;
+	gate.retreating = (task->GetType() == IUnitTask::Type::RETREAT);
+	gate.bracing = (dynamic_cast<CBBraceTask*>(task) != nullptr);
+	gate.health = unit->GetHealthPercent();
+	gate.retreat = BraceHold(unit->GetCircuitDef());
+	gate.frame = frame;
+	gate.lastStart = state.lastStart;
+	gate.cooldown = brace.cooldown;
+	if (!brace::Starts(gate)) {
+		return;
+	}
+	CCommanderController* commander = circuit->GetCommanderController();
+	if ((commander != nullptr) && commander->Handles(unit)) {
+		// The commander's own rules come first (energy and health retreat,
+		// jamming, T3 intercept, fallback, combat); its controller starts the
+		// brace from Deploy, where none of them holds the commander.
+		state.pendingFrame = frame;
+		state.hasThreat = (threat != nullptr);
+		state.threat = (threat != nullptr) ? *threat : AIFloat3();
+		return;
+	}
+	if (dynamic_cast<CControlledTask*>(task) != nullptr) {
+		return;  // another unit controller owns it (D-388)
+	}
+	StartBrace(unit, threat != nullptr, (threat != nullptr) ? *threat : AIFloat3(), reason);
+}
+
+bool CBuilderManager::TakeCommanderBrace(CCircuitUnit* unit)
+{
+	if (!brace.enabled || (unit == nullptr)) {
+		return false;
+	}
+	IUnitTask* task = unit->GetTask();
+	if ((task != nullptr) && !task->IsDead() && (dynamic_cast<CBBraceTask*>(task) != nullptr)) {
+		return true;  // bracing: the brace holds the commander
+	}
+	auto it = braceUnits.find(unit->GetId());
+	if ((it == braceUnits.end()) || (it->second.pendingFrame < 0)) {
+		return false;
+	}
+	SBraceUnit& state = it->second;
+	const int frame = circuit->GetLastFrame();
+	const bool fresh = (frame - state.pendingFrame <= brace.commanderWindow);
+	state.pendingFrame = -1;
+	if (!fresh || (task == nullptr) || task->IsEnemyReclaim() || unit->IsMorphing()
+		|| (unit->GetHealthPercent() <= BraceHold(unit->GetCircuitDef())))
+	{
+		return false;  // stale, or the retreat threshold was crossed meanwhile
+	}
+	return StartBrace(unit, state.hasThreat, state.threat, "commander") != nullptr;
+}
+
+IBuilderTask* CBuilderManager::StartBrace(CCircuitUnit* unit, bool hasThreat, const AIFloat3& threat, const char* reason)
+{
+	const int frame = circuit->GetLastFrame();
+	const AIFloat3 pos = unit->GetPos(frame);
+	const AIFloat3& base = circuit->GetSetupManager()->GetBasePos();
+	const brace::Point toward = brace::ThreatDirection({pos.x, pos.z}, hasThreat, {threat.x, threat.z}, {base.x, base.z});
+
+	// Step back; when straight back is blocked, 45 then 90 degrees to a side.
+	// None reachable: brace where it stands.
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	AIFloat3 retreat = pos;
+	for (int i = 0; i < brace::RETREAT_CANDIDATES; ++i) {
+		const brace::Point p = brace::RetreatPoint({pos.x, pos.z}, toward, brace.retreatDistance, i);
+		AIFloat3 at(p.x, 0.f, p.z);
+		CTerrainManager::CorrectPosition(at);
+		at.y = circuit->GetMap()->GetElevationAt(at.x, at.z);
+		if (terrainMgr->CanReachAt(unit, at, BRACE_REACH_RANGE)) {
+			retreat = at;
+			break;
+		}
+	}
+
+	CCircuitDef* def = BraceDefence(unit);
+	AIFloat3 site = retreat;
+	if (def != nullptr) {
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		const float offset = brace::SiteOffset(brace.siteOffset, def->GetRadius() + cdef->GetRadius(),
+				cdef->GetBuildDistance() + def->GetRadius());
+		const brace::Point s = brace::SitePoint({retreat.x, retreat.z}, toward, offset);
+		site = AIFloat3(s.x, 0.f, s.z);
+		CTerrainManager::CorrectPosition(site);
+		site.y = circuit->GetMap()->GetElevationAt(site.x, site.z);
+	}
+
+	CBBraceTask* task = new CBBraceTask(this, def, retreat, site, BraceHold(unit->GetCircuitDef()), brace.timeout);
+	updateTasks.push_back(task);
+	TaskAdded(task);
+	AssignTask(unit, task);
+	if (unit->GetTask() != task) {
+		AbortTask(task);
+		return nullptr;
+	}
+	braceUnits[unit->GetId()].lastStart = frame;
+	circuit->LOG("[Brace] unit=%i %s reason=%s threat=%i at=%.0f,%.0f back=%.0f,%.0f site=%.0f,%.0f defence=%s",
+			unit->GetId(), unit->GetCircuitDef()->GetDef()->GetName(), reason, hasThreat ? 1 : 0,
+			pos.x, pos.z, retreat.x, retreat.z, site.x, site.z, (def != nullptr) ? def->GetDef()->GetName() : "none");
+	return task;
 }
 
 void CBuilderManager::AddBuildPower(CCircuitUnit* unit)
@@ -1051,6 +1279,25 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 				|| circuit->GetEconomyManager()->IsMetalConverter(ti.buildDef))) {
 		return nullptr;
 	}
+	// D-484: a front-line vent gets the fortified geo, whoever builds it.
+	if ((ti.type == IBuilderTask::BuildType::GEO) && (ti.buildDef != nullptr)) {
+		int facing = UNIT_NO_FACING;
+		AIFloat3 site = ti.position;
+		CCircuitDef* front = circuit->GetCommanderController()->FrontGeoDef(ti.buildDef, site, facing);
+		if (front == nullptr) {
+			return nullptr;  // D-488: a forward vent takes only its fortified geo
+		}
+		if (front != ti.buildDef) {
+			auto swapped = ti;
+			swapped.buildDef = front;
+			swapped.position = site;  // D-488: the stack position over the plant below
+			IBuilderTask* task = Enqueue(swapped);
+			if (task != nullptr) {
+				task->SetFacing(facing);  // the facing the fortified geo fits at
+			}
+			return task;
+		}
+	}
 	IBuilderTask* task;
 
 	switch (ti.type) {
@@ -1329,6 +1576,17 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 	switch (task->GetType()) {
 		case IUnitTask::Type::BUILDER: {
 			IBuilderTask* taskB = static_cast<IBuilderTask*>(task);
+			// D-108/D-477: every frame mapped to this task goes, queued or
+			// detached (D-474's brace is never in buildTasks), including an old
+			// frame of a retargeted task. Only construction tasks (before REPAIR)
+			// are ever mapped (MarkUnfinishedUnit), so service tasks skip the
+			// scan. One O(unfinished frames) pass per construction dequeue.
+			if (taskB->GetBuildType() < IBuilderTask::BuildType::REPAIR) {
+				for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
+					if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
+					else ++itu;
+				}
+			}
 			if (taskB->GetBuildType() >= IBuilderTask::BuildType::_SIZE_) {
 				break;
 			}
@@ -1349,13 +1607,9 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 				case IBuilderTask::BuildType::RESURRECT: {
 				} break;
 				default: {
+					// The target's entry, whichever task it names now; every entry
+					// naming this task went in the scan above (D-108).
 					EraseUnfinishedUnit(taskB->GetTarget());
-					// D-108 crash: and every other entry of this task (a task whose
-					// target changed left its old frame behind, a dangling key once freed)
-					for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
-						if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
-						else ++itu;
-					}
 				} break;
 			}
 			tasks.erase(it);

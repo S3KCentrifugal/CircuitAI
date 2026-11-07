@@ -1,11 +1,13 @@
 #ifndef CIRCUIT_RANGED_WORLD_H
 #define CIRCUIT_RANGED_WORLD_H
 
+#include "task/fighter/RangedObservation.h"
 #include "terrain/RangedGeometry.h"
 #include "terrain/GroundCohort.h"
 #include "terrain/LocalRush.h"
 #include "AIFloat3.h"
 #include <map>
+#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -17,10 +19,12 @@ class CCircuitDef;
 class CCircuitUnit;
 class CWeaponDef;
 
-// Per-AI callback-thread service: fresh legal data; buffers retain allocation.
-// Inventory O(N+E+F+C+I/64): world scan N, enemies E, friends F, touched cells C,
-// engine ID bound I. Same ascending order/ties; no cross-frame observation cache.
-// Member/history/shot/escort bookkeeping retains its separate map lookup costs.
+// Per-AI callback-thread service. D-462: the observed contacts and friends are
+// the ally team's shared CRangedObservation (identical data, order and ties,
+// rebuilt per frame / enemy revision / authority epoch); this class keeps only
+// what one AI is doing: formation slots, cohorts, reserved shots, the per-contact
+// history (dense, expired on read) and escorts. Every read follows Refresh in
+// the same AI turn (INV-247). No cross-frame observation cache.
 class CRangedWorld {
 public:
     struct Weapon {
@@ -42,24 +46,8 @@ public:
         float radius = 16.f, cloakCost = 0.f, cloakMoving = 0.f;
         bool cloak = false;
     };
-    struct Contact {
-        int id = -1;
-        int armor = 0;
-        CCircuitDef* def = nullptr;
-        springai::AIFloat3 pos, velocity;
-        float health = 1.f, radius = 16.f, cost = 1.f, groundRange = 0.f;
-        float explosionRadius = 0.f, hazardRadius = 0.f;
-        float tech = 1.f; // BAR customparams.techlevel, 1 when absent
-        bool los = false, armed = false, mobile = false;
-    };
-    struct Friend {
-        int id; springai::AIFloat3 pos; float radius;
-        bool screen; float radar, jammer, los;
-        CCircuitDef* def=nullptr;
-        float combatHealth=-1.f; // lazy, invalidated with the per-frame snapshot
-        float range=0.f;    // D-295: LAND weapon range of a screen definition
-        bool assist=false;  // D-295: definition itself assists (excluded as engager)
-    };
+    using Contact = CRangedObservation::Contact;
+    using Friend = CRangedObservation::Friend;
     struct Slot { springai::AIFloat3 pos; float spacing, value; float radius=0.f; bool coordinated=false; };
 
     explicit CRangedWorld(CCircuitAI* circuit);
@@ -134,42 +122,48 @@ public:
 
 private:
     CCircuitAI* circuit;
+    // D-462: shared per ally team; the references below bind to its
+    // persistent containers, which are rebuilt in place, never replaced.
+    std::shared_ptr<CRangedObservation> observation;
+    const std::vector<Contact>& contacts;
+    const std::vector<int>& objectives;
+    const ranged::SpatialIndex& enemies;
+    const ranged::SpatialIndex& staticHazards;
+    const ranged::CellStore<float>& clusterValues;
+    std::deque<Friend>& friends;
+    const CRangedObservation::Allies& allies;
     int frame = -1;
-    float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f, largestFriendRadius = 0.f;
-    float largestScreenRange = 0.f; // D-295: bounds Engaged's local ally query
+    float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f;
+    // Largest slot radius since Refresh (FreeSlot also bounds by the
+    // observation's friend radius); only widens exact broad phases.
+    float largestFriendRadius = 0.f;
     // D-295 memo: -1 unknown, 0 not engaged, k>0 engaged by friends[k-1].
     // Owned by the callback thread; invalidated lazily when frame or margin
     // differs. Assign is O(E) at most once per frame, only if an assister asks.
     mutable std::vector<int> engagedMemo;
     mutable int engagedFrame = -1;
     mutable float engagedMargin = -1.f;
+    mutable unsigned engagedGeneration = 0;
     float largestCohortHazard = 0.f;
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;
-    struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; };
-    std::unordered_map<int,Metadata> metadata;
-    const Metadata& MetadataFor(CCircuitDef* def);
+    const CRangedObservation::Metadata& MetadataFor(CCircuitDef* def) { return observation->MetadataFor(def); }
     std::unordered_map<int,Capabilities> capabilities;
-    std::vector<Contact> contacts;
-    std::vector<Friend> friends;
-    // Per-observation definition prototypes. Unit IDs/positions are never
-    // cached; mutable policy flags are reread on every Refresh publication.
-    std::vector<Friend> friendlyDefinitions;
-    std::vector<int> friendlyDefinitionFrames;
-    std::vector<int> friendlyIds;
-    ranged::OrderedIds friendlyOrder;
-    std::vector<int> objectives;
-    ranged::SpatialIndex enemies, staticHazards, formations;
-    mutable ranged::SpatialIndex allies;
-    mutable bool alliesDirty = true;
+    ranged::SpatialIndex formations;
+    // Binds this AI as the reader of the shared friend cells for its turn.
     void EnsureAllies() const;
-    ranged::CellStore<float> clusterValues;
     std::map<int,Slot> slots;
     struct Shot { int target, until; float damage; };
     std::unordered_map<int,Shot> shots;
     std::unordered_map<int,float> reserved;
-    struct History { float health=0.f; int stalled=0, frame=0, seen=0, engaged=-1; };
-    std::unordered_map<int,History> history;
+    // Per-contact repair/stall observation. D-462: an ExpiringTable keeps the
+    // old erase-after-60-s semantics without a full scan per Refresh.
+    struct History { float health=0.f; int stalled=0, frame=0, engaged=-1; };
+    ranged::ExpiringTable<History> history;
+    void ObserveHistory(int now);
+    // INV-249 oracle (CIRCUIT_VERIFY_RANGED_SHARED): the pre-D-462 map.
+    struct LegacyHistory { float health=0.f; int stalled=0, frame=0, seen=0, engaged=-1; };
+    std::unordered_map<int,LegacyHistory> legacyHistory;
     struct EscortLease { int anchor=-1; bool jammer=false; };
     std::map<int,EscortLease> escorts;
     // Callback-thread IDs only. Rebuilt on task recreation, removed on Leave.

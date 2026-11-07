@@ -122,7 +122,7 @@ namespace Military {
 
 		IUnitTask@ t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
 		if (t !is null) return t;
-		@t = TechHeavyDelivery::MilitaryTask(u);
+		@t = TechHeavyRush::MilitaryTask(u);
         if (t !is null) return t;
         @t = AmphibiousOps::MilitaryTask(u);
         if (t !is null) return t;
@@ -182,7 +182,7 @@ namespace Military {
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
         CommanderGroup::OnRemoved(unit);
-        TechHeavyDelivery::Removed(unit);
+        TechHeavyRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		TechFlank::UnitRemoved(unit);
         AmphibiousOps::UnitRemoved(unit);

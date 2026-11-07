@@ -352,7 +352,7 @@ def prepare(args):
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
     pins={'dll_sha256':hashlib.sha256(args.dll.read_bytes()).hexdigest(),
           'diagnostics':{name:os.environ[name] for name in
-              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
+              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
               if name in os.environ},
           'files':{str(p.relative_to(staged)):storage.file_hash(p) for p in staged.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
           'observer_sha256':storage.file_hash(HERE/'widgets/ranged_arena.lua'),
@@ -395,6 +395,7 @@ def main():
     parser.add_argument('--mode',choices=['fast','visual','performance'],default='fast')
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--stage-only',action='store_true')
+    parser.add_argument('--keep-going',action='store_true',help='Bounded diagnostic continuation after a recorded failure; the FAIL verdict is kept')
     args=parser.parse_args();directory,command=prepare(args)
     if args.stage_only: return 0
     launch=command+['launch','--dir',str(directory),'--engine','recoil_2026.07.04']
@@ -403,7 +404,7 @@ def main():
     case=json.loads((directory/'ranged-arena.json').read_text())
     playtest.validate_checks(case.get('checks','ranged-arena'))
     watch=command+['watch','--dir',str(directory),'--role',case.get('role','FRONT'),'--checks',case.get('checks','ranged-arena'),
-        '--play-decided','--minutes',str(args.minutes),'--wall-minutes','8']
+        '--play-decided','--minutes',str(args.minutes),'--wall-minutes','8']+(['--keep-going'] if args.keep_going else [])
     # Supplied arenas can temporarily have no enemies between waves. Their
     # completion/grace contract (or fixed performance horizon) owns the end.
     try:

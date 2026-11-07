@@ -1,0 +1,35 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "tactical cluster",
+      "pattern": "\\[TacticalLayout\\] reserved factory=",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "factory finished",
+      "pattern": "\\[Playtest\\] finished (armhp|corhp|leghp) team 0",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "connected factory corridor",
+      "pattern": "\\[FactoryCorridor\\] def=.* lane=0 segments=[1-9]",
+      "scope": "any",
+      "by_minute": 3
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

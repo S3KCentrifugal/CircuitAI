@@ -90,6 +90,7 @@ namespace CommanderCombat {
             Option("front_mex_los",0.f);
             Option("cloak_energy_retreat",0.f);
             Option("cloak_retreat_distance",600.f);
+            Option("cloak_energy_release",0.f); // D-472: 0 keeps the D-373 latch
             Option("health_retreat",.4f);
             Option("decoys",1.f);
             Option("decoy_bait",1.f);
@@ -129,6 +130,77 @@ namespace CommanderCombat {
                 CCircuitDef@ defence=ai.GetCircuitDef(defenceNames[i]);
                 if(defence !is null) aiBuilderMgr.SetCommanderCombatOption("front_defence_definition",float(defence.id));
             }
+            // D-475: the commander group's tactical queue, a reserved block of
+            // launchers built by T2 seats that expansion work has no room for.
+            // tactical_t2 0 keeps it off; the JSON enables it per profile.
+            Option("commander_group_tactical_t2",0.f);
+            Option("commander_group_tactical_metal",4000.f);
+            Option("commander_group_tactical_energy",.25f);
+            Option("commander_group_tactical_cols",3.f);
+            Option("commander_group_tactical_rows",3.f);
+            Option("commander_group_tactical_min_fill",.5f);
+            Option("commander_group_tactical_rear",300.f);
+            Option("commander_group_tactical_retry_seconds",10.f);
+            Option("commander_group_tactical_order_seconds",300.f);
+            // D-476: expansion jobs at once (one per constructor); 1 keeps the single job.
+            Option("commander_group_expansion_jobs",1.f);
+            // D-479: static artillery on the tactical queue (incomes 0: off).
+            Option("commander_group_artillery_t2_income",0.f);
+            Option("commander_group_artillery_t1_income",0.f);
+            Option("commander_group_artillery_bank",.75f);
+            Option("commander_group_artillery_spare",15.f);
+            Option("commander_group_artillery_energy",.5f);
+            Option("commander_group_artillery_energy_cover",1.f);
+            // D-480: the seat's T1 constructor collects base, then approach, mexes first (0: off).
+            Option("commander_group_seat_mex",0.f);
+            Option("commander_group_seat_base_radius",1200.f);
+            Option("commander_group_seat_approach_ahead",0.f);
+            Option("commander_group_seat_clear_radius",64.f);
+            Option("commander_group_seat_skip_seconds",30.f);
+            // D-483: construction turrets owed per finished T1 defence, T2 defence, other job.
+            Option("commander_group_nano_t1",1.f);
+            Option("commander_group_nano_t2",1.f);
+            Option("commander_group_nano_other",1.f);
+            // D-481: front-line geo fortification and the Cerberus guard (0: off).
+            Option("commander_group_geo_fortify",0.f);
+            Option("commander_group_geo_income",20.f);
+            Option("commander_group_geo_front_radius",1800.f);
+            Option("commander_group_geo_reclaim",1.f);
+            Option("commander_group_geo_guard_front",2.f);
+            Option("commander_group_geo_guard_front_offset",192.f);
+            Option("commander_group_geo_guard_spacing",128.f);
+            Option("commander_group_geo_guard_side_offset",192.f);
+            Option("commander_group_geo_guard_seconds",240.f);
+            {
+                const array<string> keys={"commander_group_geo_definition","commander_group_geo_guard_definition",
+                    "commander_group_geo_guard_front_definition","commander_group_geo_guard_side_definition"};
+                const array<string> defaults={"armgmm,corbhmth,legrampart","corbhmth","armllt,corllt,leglht","armflak,corflak,legflak"};
+                for(uint k=0;k<keys.length();++k) {
+                    aiBuilderMgr.SetCommanderCombatOption(keys[k],-1.f);
+                    array<string>@ names=aiSetupMgr.ConfigString("commander/combat/"+keys[k]+"s",defaults[k]).split(",");
+                    for(uint i=0;i<names.length();++i) {
+                        CCircuitDef@ def=ai.GetCircuitDef(names[i]);
+                        if(def !is null) aiBuilderMgr.SetCommanderCombatOption(keys[k],float(def.id));
+                    }
+                }
+            }
+            for(uint tier=0;tier<2;++tier) {
+                const string key=tier==0?"commander_group_artillery_t2_definition":"commander_group_artillery_t1_definition";
+                aiBuilderMgr.SetCommanderCombatOption(key,-1.f);
+                array<string>@ names=aiSetupMgr.ConfigString("commander/combat/"+key+"s",
+                    tier==0?"armamb,cortoast,legacluster":"armguard,corpun,legcluster").split(",");
+                for(uint i=0;i<names.length();++i) {
+                    CCircuitDef@ gun=ai.GetCircuitDef(names[i]);
+                    if(gun !is null) aiBuilderMgr.SetCommanderCombatOption(key,float(gun.id));
+                }
+            }
+            aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",-1.f);
+            array<string>@ tacticalNames=aiSetupMgr.ConfigString("commander/combat/commander_group_tactical_definitions",
+                "armemp,cortron,legperdition").split(",");
+            for(uint i=0;i<tacticalNames.length();++i) {
+                CCircuitDef@ launcher=ai.GetCircuitDef(tacticalNames[i]);
+                if(launcher !is null) aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",float(launcher.id));
+            }
             Option("front_line_depth",800.f);
             Option("front_mex_offset",160.f);
             Option("front_work_behind",400.f);
@@ -140,6 +212,7 @@ namespace CommanderCombat {
             Option("front_lane_margin",0.f);
             Option("front_mex_reach",0.f);
             Option("front_mex_behind",400.f);
+            Option("front_mex_adopt_radius",0.f); // D-478: orphan-lane spots this AI owns (0: off)
             Option("front_mex_ahead",600.f);
             Option("front_mex_capture_enemy",0.f);
             Option("front_mex_turret_every",0.f);

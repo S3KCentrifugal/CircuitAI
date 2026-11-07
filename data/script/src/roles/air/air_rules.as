@@ -158,6 +158,11 @@ namespace AirRules {
                 GenericHelpers::LogUtil("[AIR][TheatreMex] gate income=" + AirWorkforce::incomeM, 1);
             }
         }
+        // D-465: vents no allied ground start reaches are AIR's, as race-won mexes.
+        if (!commander && AirWorkforce::incomeM >= Global::RoleSettings::Air::TheatreGeoMetal) {
+            @t = AirBuild::TheatreGeo(u);
+            if (t !is null) return AirBuild::Record(t, "geo.theatre", u);
+        }
         // Affordable production support and the first wind buffer must not starve
         // behind an aspirational energy target that moves upward with mex income.
         if (AirEconomy::energy >= 250.0f) {

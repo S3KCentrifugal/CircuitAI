@@ -65,7 +65,7 @@ namespace RushBootstrap {
         }
         return true;
     }
-    bool PlanRoute(CCircuitUnit@ u,const AIFloat3& in destination) {
+    bool PlanRoute(CCircuitUnit@ u,const AIFloat3& in destination,string &out why) {
         const bool air=UnitHelpers::IsAirConstructor(u.circuitDef);
         array<AIFloat3>@ path;
         // Air constructors need no terrain solve. Refuse a threatened direct
@@ -73,14 +73,31 @@ namespace RushBootstrap {
         if(air) { @path=array<AIFloat3>();path.insertLast(destination); }
         else @path=aiBattle.GetUnitTerrainRoute(u.circuitDef,u.GetPos(ai.frame),destination,
             true,1.f,1.f,10000.f,0.f,u.circuitDef.GetBuildDistance());
-        if(path.length()==0) return false;
+        // KI-732: the terrain solver can refuse a slot native's reach test
+        // accepts (played: Koom Valley team 3, no-route for 8 min while its
+        // fusion waited). Walk straight there; the engine paths the unit and
+        // the threat test below still covers the line.
+        if(path.length()==0 && !air && aiTerrainMgr.CanReachAtSafe(u,destination,u.circuitDef.GetBuildDistance()))
+            path.insertLast(destination);
+        if(path.length()==0) {why="no-route";return false;}
         AIFloat3 previous=u.GetPos(ai.frame);
         for(uint i=0;i<path.length();++i) {
-            if(!SafeSegment(previous,path[i],air)) return false;
+            if(!SafeSegment(previous,path[i],air)) {why="threat";return false;}
             previous=path[i];
         }
-        route=path;waypoint=0;issued=-1;
+        route=path;waypoint=0;issued=-1;why="";
         return true;
+    }
+    // KI-732: take the travel lease for u to site. The caller owns the
+    // returned wait task: Work returns it to native, Recruit assigns it.
+    IUnitTask@ Lease(CCircuitUnit@ u,int site,const string& in by,string &out why) {
+        const AIFloat3 position=aiTerrainMgr.GetReservationPos(site);
+        if(!PlanRoute(u,position,why)) return null;
+        worker=u.id;slot=site;progressFrame=ai.frame;
+        bestDistance=u.GetPos(ai.frame).distance2D(position);progressWaypoint=-1;
+        @travel=aiBuilderMgr.Enqueue(TaskB::Wait(300*SECOND));
+        GenericHelpers::LogUtil("[TECH][Bootstrap] recruit worker="+worker+" slot="+slot+" distance="+int(bestDistance)+" by="+by,1);
+        return travel;
     }
     void Clear(bool stop=true) {
         CCircuitUnit@ u=ai.GetTeamUnit(worker);
@@ -109,7 +126,18 @@ namespace RushBootstrap {
             IUnitTask@ task=Layout::NanoTask(u,Task::Priority::HIGH,2,site);
             if(task !is null) {Clear(u.id!=worker);return task;}
         }
-        if(Needed()) requested=true;
+        if(!Needed()) return TravelTask(u);
+        requested=true;
+        // KI-732: a T1 worker asking for work is free now; the five-second
+        // recruit only sees idle or assisting workers, which a TECH whose
+        // workers keep building economy far from the anchor never has.
+        if(worker<0) {
+            string why;
+            IUnitTask@ lease=Lease(u,site,"ask",why);
+            if(lease !is null) return lease;
+            Diagnostic(u,why);
+            return null;
+        }
         return TravelTask(u);
     }
     void RankWorkers() {
@@ -132,18 +160,16 @@ namespace RushBootstrap {
     void Recruit() {
         nextRecruit=ai.frame+Global::RoleSettings::Tech::RushBootstrapRetrySeconds*SECOND;
         RankWorkers();
+        string why=candidates.length()==0?"no-candidate":"site";
         for(uint i=0;i<candidates.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(candidates[i]);
             const int site=FindSite(u);if(site<0) continue;
-            const AIFloat3 position=aiTerrainMgr.GetReservationPos(site);
-            if(!PlanRoute(u,position)) continue;
-            worker=u.id;slot=site;progressFrame=ai.frame;
-            bestDistance=u.GetPos(ai.frame).distance2D(position);progressWaypoint=-1;
-            @travel=aiBuilderMgr.Enqueue(TaskB::Wait(300*SECOND));
-            aiBuilderMgr.AssignTask(u,travel);
-            GenericHelpers::LogUtil("[TECH][Bootstrap] recruit worker="+worker+" slot="+slot+" distance="+int(bestDistance),1);
+            IUnitTask@ lease=Lease(u,site,"tick",why);
+            if(lease is null) continue;
+            aiBuilderMgr.AssignTask(u,lease);
             return;
         }
+        Diagnostic(null,why);   // KI-732: a failed recruit was silent
     }
     void Tick() {
         if(ai.frame<nextTick) return;

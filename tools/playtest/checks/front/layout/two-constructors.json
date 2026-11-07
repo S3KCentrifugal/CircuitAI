@@ -1,0 +1,72 @@
+{
+  "stop_minute": 8,
+  "expect": [
+    {
+      "key": "two constructors first",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] first_combat constructors=2",
+      "by_minute": 7
+    },
+    {
+      "key": "energy worker builds",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] energy_by_first",
+      "by_minute": 7
+    },
+    {
+      "key": "turret worker builds",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] turret_by_second",
+      "by_minute": 7,
+      "after_key": "commander factory assistance"
+    },
+    {
+      "key": "commander factory assistance",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] commander_factory",
+      "by_minute": 7
+    },
+    {
+      "key": "commander turret assistance",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] commander_turret",
+      "by_minute": 7,
+      "after_key": "turret worker builds"
+    },
+    {
+      "key": "turret complete",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] turret_finished",
+      "by_minute": 7,
+      "after_key": "commander turret assistance"
+    },
+    {
+      "key": "dedicated factory assistance",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] turret_factory",
+      "by_minute": 7,
+      "after_key": "turret complete"
+    },
+    {
+      "key": "front release ready",
+      "scope": "any",
+      "pattern": "\\[CommanderFront\\] ready=1",
+      "by_minute": 7,
+      "after_key": "turret complete"
+    },
+    {
+      "key": "factory duty persists",
+      "scope": "any",
+      "pattern": "\\[FrontOpeningProbe\\] turret_factory_later",
+      "by_minute": 7,
+      "after_key": "turret complete"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "scope": "any",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|\\[INVARIANT\\] FrontOpeningProbe"
+    }
+  ]
+}

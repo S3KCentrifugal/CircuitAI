@@ -146,6 +146,28 @@ namespace Lanes {
         return (known && boxed.length() > 0) ? boxed : all;
     }
 
+    // D-459/D-460: the point a district role's factories face before a lane
+    // exists: the nearest of the lobby's enemy starts, else of the map spots
+    // inside an enemy start box. Never an unfiltered spot list (an unused
+    // friendly slot would turn a lab backwards); with nothing known, the map
+    // centre. O(start spots); called once per plan.
+    AIFloat3 NearestEnemyStart(const AIFloat3 &in start)
+    {
+        array<AIFloat3> enemies = ScriptStarts(true);
+        if (enemies.length() == 0) {
+            const array<AIFloat3> spots = Spam::EnemyStartSpots();
+            for (uint i = 0; i < spots.length(); ++i)
+                if (aiSetupMgr.EnemyStartBoxAt(spots[i]) == 1) enemies.insertLast(spots[i]);
+        }
+        AIFloat3 goal(float(AiTerrainWidth()) * 0.5f, 0.f, float(AiTerrainHeight()) * 0.5f);
+        float best = -1.f;
+        for (uint i = 0; i < enemies.length(); ++i) {
+            const float d = start.SqDistance2D(enemies[i]);
+            if (best < 0.f || d < best) { best = d; goal = enemies[i]; }
+        }
+        return goal;
+    }
+
     AIFloat3 Front()
     {
         AIFloat3 z = aiBattle.CombatNear(Global::Map::StartPos, Global::RoleSettings::Tech::WeaponCombatMinHeat);

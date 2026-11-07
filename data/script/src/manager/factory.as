@@ -138,8 +138,11 @@ namespace Factory {
             if(replacement !is null) return replacement;
         }
         if(Global::AISettings::Role==AiRole::FRONT) {
+            IUnitTask@ support=FrontFactorySupport::Assist(u,true);
+            if(support !is null) return support;
             IUnitTask@ front=CommanderGroup::Recruit(u);
             if(front !is null) return front;
+            if(FrontConstructors::OpeningPending(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
         }
 		IUnitTask@ recovery = Team::Recovery::FactoryMakeTask(u);
 		if (recovery !is null) return recovery;
@@ -629,7 +632,7 @@ namespace Factory {
 	}
 
 	// Choose a factory that still needs nanos by priority: Gantry > T2 > T1
-	CCircuitUnit@ SelectFactoryNeedingNano()
+	CCircuitUnit@ SelectFactoryNeedingNano(int excludeFirst = -1, int excludeSecond = -1)
 	{
 		CCircuitUnit@ best = null;
 		int bestCount = NanoSelectionInitHigh;
@@ -641,6 +644,7 @@ namespace Factory {
 		// Pass 1: Gantries
 		for (uint i = 0; i < keys.length(); ++i) {
 			CCircuitUnit@ f = null; if (!allFactories.get(keys[i], @f) || f is null) continue;
+			if (f.id == excludeFirst || f.id == excludeSecond) continue;
 			const CCircuitDef@ d = f.circuitDef; if (d is null) continue;
 			string n = d.GetName();
 			bool isGantry = UnitHelpers::IsLandGantry(n) || UnitHelpers::IsWaterGantry(n);
@@ -654,6 +658,7 @@ namespace Factory {
 		// Pass 2: T2
 		for (uint i = 0; i < keys.length(); ++i) {
 			CCircuitUnit@ f = null; if (!allFactories.get(keys[i], @f) || f is null) continue;
+			if (f.id == excludeFirst || f.id == excludeSecond) continue;
 			const CCircuitDef@ d = f.circuitDef; if (d is null) continue;
 			string n = d.GetName();
 			bool isT2 = (UnitHelpers::IsT2BotLab(n) || UnitHelpers::IsT2VehicleLab(n) || UnitHelpers::IsT2AircraftPlant(n) || UnitHelpers::IsT2Shipyard(n) || UnitHelpers::IsSeaplanePlatform(n));
@@ -667,6 +672,7 @@ namespace Factory {
 		// Pass 3: T1 and others
 		for (uint i = 0; i < keys.length(); ++i) {
 			CCircuitUnit@ f = null; if (!allFactories.get(keys[i], @f) || f is null) continue;
+			if (f.id == excludeFirst || f.id == excludeSecond) continue;
 			const CCircuitDef@ d = f.circuitDef; if (d is null) continue;
 			int cap = _GetNanoCapacityForFactoryDef(d);
 			int cur = _GetNanoCount(f);

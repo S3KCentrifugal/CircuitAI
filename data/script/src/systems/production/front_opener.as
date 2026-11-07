@@ -17,7 +17,15 @@ namespace FrontOpener {
     AIFloat3 rally;
     bool closed = true;
 
-    bool Enabled() { return Global::RoleSettings::Front::VehicleTankOpenerChance > 0.0f; }
+    // D-471: Cortex has its own chance; Legion and any other side use the shared one.
+    float TankChance(const string &in side) {
+        return side == "cortex" ? Global::RoleSettings::Front::VehicleTankOpenerChanceCortex
+            : Global::RoleSettings::Front::VehicleTankOpenerChance;
+    }
+    bool Enabled() {
+        return Global::RoleSettings::Front::VehicleTankOpenerChance > 0.0f
+            || Global::RoleSettings::Front::VehicleTankOpenerChanceCortex > 0.0f;
+    }
     bool WasQueued(const string &in part) {
         return Enabled() && aiTerrainMgr.GetLayoutInt("front.opener." + part) != 0;
     }
@@ -26,7 +34,7 @@ namespace FrontOpener {
     }
 
     CCircuitDef@ ChooseTank(CCircuitUnit@ factory, const string &in name, const string &in side) {
-        const float chance = Global::RoleSettings::Front::VehicleTankOpenerChance;
+        const float chance = TankChance(side);
         if (chance <= 0.0f || !UnitHelpers::IsT1VehicleLab(name)) return null;
         const string tank = side == "cortex" ? "corgator" : (side == "legion" ? "leghades" : "");
         if (tank == "") return null;

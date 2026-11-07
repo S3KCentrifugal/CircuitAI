@@ -1,0 +1,161 @@
+{
+  "expect": [
+    {
+      "by_minute": 5,
+      "key": "front 0 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=0 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=0 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 3 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=3 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=0 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 4 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=4 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=0 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 5 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=5 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=0 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 6 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=6 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=0 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 7 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=7 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=0 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 8 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=8 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=2 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 11 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=11 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=2 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 12 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=12 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=2 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 13 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=13 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=2 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 14 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=14 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=2 "
+    },
+    {
+      "by_minute": 5,
+      "key": "front 15 factory completed",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=finished team=15 id=\\d+ def=(arm|cor|leg)(lab|vp) .*facing=2 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 0 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=0 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 3 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=3 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 4 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=4 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 5 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=5 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 6 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=6 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 7 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=7 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 8 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=8 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 11 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=11 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 12 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=12 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 13 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=13 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 14 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=14 "
+    },
+    {
+      "by_minute": 6,
+      "key": "front 15 commander leaves opening",
+      "scope": "any",
+      "pattern": "\\[ConstructionWatch\\].*event=commander-departed team=15 "
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "scope": "any",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation"
+    },
+    {
+      "key": "invariant",
+      "scope": "any",
+      "pattern": "\\[INVARIANT\\]"
+    }
+  ],
+  "stop_minute": 6
+}
