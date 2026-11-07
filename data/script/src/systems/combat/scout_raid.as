@@ -47,6 +47,14 @@ namespace ScoutRaid {
         int lastDirectLog = -100000; // `detour`/`blocked` lines at most once per 30 s per raider
         int nextTargetScan = 0;     // next tick a target-less raider may replan for a new contact
         bool queued = false;
+        // Pile-up breakthrough (owner 2026-11-07).
+        AIFloat3 edgeAnchor;
+        int edgeSince = -1;         // first tick at a coverage edge near edgeAnchor; -1 = not at an edge
+        bool rushing = false;
+        int rushUntil = 0;          // rush timeout frame
+        AIFloat3 rushFrom;
+        float rushLength = 0.0f;
+        int rushCooldownUntil = 0;
     }
 
     array<Raider@> raiders;
@@ -321,6 +329,7 @@ namespace ScoutRaid {
 
     void Plan(Raider@ r, CCircuitUnit@ u)
     {
+        if (r.rushing) { r.queued = false; return; }   // the rush owns the route until it ends
         const AIFloat3 pos = u.GetPos(ai.frame);
         const array<AIFloat3> starts = Lanes::EnemyStarts();
         const AIFloat3 front = aiMilitaryMgr.GetCombatFocusPos();
@@ -513,6 +522,268 @@ namespace ScoutRaid {
             if (old[i].task !is null && !old[i].task.IsDead()) old[i].task.Abort();
     }
 
+    // ---- Pile-up breakthrough (owner 2026-11-07) ----
+    // Gap searches past grunt/pawn/LLT lines eventually fail and several
+    // scouts (Rascal, Rover, Wheelie, Tick) sit just outside the coverage. A
+    // pile is PileMinGroup+ scouts, this AI's raiders and allied BARb raiders
+    // together, each pinned at a coverage edge for PileSeconds within
+    // PileRadius of one another. The AI that sees it picks the bearing toward
+    // the enemy side with the fewest overlapping firing ranges, rushes its own
+    // members 1000-1200 elmos along it and tells allies ("go") so their
+    // members rush the same bearing; afterwards every member replans normally
+    // (escape coverage, dodge, raid economy) and is exempt for
+    // RushCooldownSeconds.
+    //
+    // Cost: per raider per tick 9 GroundHazard lookups (same margin as the
+    // routes, so the lazy grid is not rebuilt). Pile search O(P^2) over
+    // P <= MaxRaiders + allied pins. Bearing choice only on a launch:
+    // O(B * S * C) with B bearings, S samples, C armed contacts within reach.
+    // Messages: one "pin" per PileShareSeconds while this AI has pinned
+    // raiders, one "go" per launch.
+    const string PilePrefix = "scoutpile|";
+    final class PinnedSet { int frame = 0; array<AIFloat3> pos; }
+    dictionary allyPinned;          // team id -> PinnedSet, expires after PileShareTtlSeconds
+    int lastShare = -100000;
+
+    bool InMap(const AIFloat3& in p)
+    {
+        return p.x >= 64.0f && p.z >= 64.0f && p.x <= AiTerrainWidth() - 64.0f && p.z <= AiTerrainHeight() - 64.0f;
+    }
+
+    // At a coverage edge: covered here, or within PileEdgeProbe on one of 8 bearings.
+    bool NearEdge(const AIFloat3& in pos, float margin)
+    {
+        if (aiBattle.GroundHazard(pos, margin) > 0.0f) return true;
+        const float probe = Global::ScoutRaid::PileEdgeProbe;
+        for (int k = 0; k < 8; ++k) {
+            const float angle = float(k) * 0.785398f;
+            const AIFloat3 p = pos + AIFloat3(cos(angle), 0.0f, sin(angle)) * probe;
+            if (InMap(p) && aiBattle.GroundHazard(p, margin) > 0.0f) return true;
+        }
+        return false;
+    }
+
+    // Pinned = at an edge and not getting anywhere (stays within
+    // PileAnchorDrift of where it first reached the edge). A raider holding in
+    // range of its live target is working, not pinned.
+    void UpdatePin(Raider@ r, CCircuitUnit@ u, const AIFloat3& in pos, float margin)
+    {
+        const bool working = r.target >= 0 && pos.distance2D(r.targetPos) <= u.circuitDef.GetMaxRange() * 1.05f;
+        if (working || ai.frame < r.rushCooldownUntil || !NearEdge(pos, margin)) { r.edgeSince = -1; return; }
+        const float drift = Global::ScoutRaid::PileAnchorDrift;
+        if (r.edgeSince < 0 || MapHelpers::SqDist(pos, r.edgeAnchor) > drift * drift) { r.edgeAnchor = pos; r.edgeSince = ai.frame; }
+    }
+
+    bool Pinned(Raider@ r)
+    {
+        return !r.rushing && r.edgeSince >= 0 && ai.frame - r.edgeSince >= Global::ScoutRaid::PileSeconds * SECOND;
+    }
+
+    // Overlap count at p: armed contacts whose land range (or a static
+    // reclaimer's build distance) plus margin covers it.
+    int Overlap(const AIFloat3& in p, const array<AIFloat3>& in cp, const array<float>& in cr)
+    {
+        int n = 0;
+        for (uint i = 0; i < cp.length(); ++i) if (MapHelpers::SqDist(p, cp[i]) <= cr[i] * cr[i]) ++n;
+        return n;
+    }
+
+    // Bearing toward the enemy side (nearest enemy start, else the map mirror)
+    // with the fewest overlapping firing ranges along a 1000-1200 elmo rush.
+    bool ChooseRush(const AIFloat3& in centre, AIFloat3& out dir, float& out length, float& out score, float& out offDeg)
+    {
+        const array<AIFloat3> starts = Lanes::EnemyStarts();
+        AIFloat3 goal(AiTerrainWidth() - centre.x, 0.0f, AiTerrainHeight() - centre.z);
+        float nearest = 1e30f;
+        for (uint i = 0; i < starts.length(); ++i) {
+            const float d = MapHelpers::SqDist(centre, starts[i]);
+            if (d < nearest) { nearest = d; goal = starts[i]; }
+        }
+        float base = atan2(goal.z - centre.z, goal.x - centre.x);
+        if (MapHelpers::SqDist(centre, goal) < 64.0f * 64.0f) base = atan2(AiTerrainHeight() * 0.5f - centre.z, AiTerrainWidth() * 0.5f - centre.x);
+        const float margin = Global::ScoutRaid::HazardMargin;
+        const float maxLen = Global::ScoutRaid::RushMaxElmos, minLen = Global::ScoutRaid::RushMinElmos;
+        array<AIFloat3> cp; array<float> cr;
+        const int n = aiBattle.GetGroundContactCount();
+        for (int i = 0; i < n; ++i) {
+            const CCircuitDef@ d = ai.GetCircuitDef(aiBattle.GetGroundContactDefId(i));
+            if (d is null) continue;
+            float range = d.HasSurfToLand() ? d.GetMaxRange(1) : 0.0f;   // CCircuitDef::RangeType::LAND
+            if (!d.IsMobile() && d.GetBuildSpeed() > 0.0f) range = AiMax(range, d.GetBuildDistance());
+            if (range <= 0.0f) continue;
+            range += margin;
+            const AIFloat3 p = aiBattle.GetGroundContactPos(i);
+            if (MapHelpers::SqDist(centre, p) > (maxLen + range) * (maxLen + range)) continue;
+            cp.insertLast(p); cr.insertLast(range);
+        }
+        const int bearings = AiMax(1, Global::ScoutRaid::RushBearings);
+        const float cone = Global::ScoutRaid::RushConeDegrees * 0.0174533f;
+        const float step = AiMax(32.0f, Global::ScoutRaid::RushSampleElmos);
+        bool found = false;
+        score = 1e30f;
+        for (int b = 0; b < bearings; ++b) {
+            const float off = bearings == 1 ? 0.0f : cone * (2.0f * float(b) / float(bearings - 1) - 1.0f);
+            const AIFloat3 d(cos(base + off), 0.0f, sin(base + off));
+            float len = -1.0f;
+            for (float l = maxLen; l >= minLen - 1.0f; l -= 100.0f) {
+                const AIFloat3 e = centre + d * l;
+                if (InMap(e) && LandPassable(e)) { len = l; break; }
+            }
+            if (len < 0.0f) continue;
+            float sum = 0.0f;
+            int samples = 0;
+            for (float s = step; s <= len + 1.0f; s += step) {
+                const AIFloat3 p = centre + d * s;
+                sum += float(Overlap(p, cp, cr));
+                if (!InMap(p) || !LandPassable(p)) sum += 2.0f;
+                ++samples;
+            }
+            const float value = sum / float(AiMax(1, samples)) + Global::ScoutRaid::RushAnglePenalty * abs(off);
+            if (value < score - 0.001f) { score = value; dir = d; length = len; offDeg = off * 57.2958f; found = true; }
+        }
+        return found;
+    }
+
+    // Rush this AI's raiders at the pile (at an edge, not cooling down) along dir.
+    int RushMembers(const AIFloat3& in centre, const AIFloat3& in dir, float length, const string& in why)
+    {
+        const float radius = Global::ScoutRaid::PileRadius * 1.25f;
+        int started = 0;
+        for (uint i = 0; i < raiders.length(); ++i) {
+            Raider@ r = raiders[i];
+            if (r.rushing || r.edgeSince < 0 || ai.frame < r.rushCooldownUntil || r.task is null) continue;
+            CCircuitUnit@ u = ai.GetTeamUnit(r.id);
+            if (u is null) continue;
+            const AIFloat3 pos = u.GetPos(ai.frame);
+            if (MapHelpers::SqDist(pos, centre) > radius * radius) continue;
+            StartRush(r, u, pos, dir, length);
+            ++started;
+        }
+        if (started > 0)
+            GenericHelpers::LogUtil("[ScoutRaid] pile rush " + why + " at (" + int(centre.x) + "," + int(centre.z) + ") units=" + started
+                + " dir=(" + int(dir.x * 100.0f) + "," + int(dir.z * 100.0f) + ") len=" + int(length), 1);
+        return started;
+    }
+
+    void StartRush(Raider@ r, CCircuitUnit@ u, const AIFloat3& in pos, const AIFloat3& in dir, float length)
+    {
+        float len = length;
+        AIFloat3 end = pos + dir * len;
+        while ((!InMap(end) || !LandPassable(end)) && len > Global::ScoutRaid::RushMinElmos - 1.0f) { len -= 100.0f; end = pos + dir * len; }
+        if (!InMap(end)) {
+            end.x = AiMax(64.0f, AiMin(AiTerrainWidth() - 64.0f, end.x));
+            end.z = AiMax(64.0f, AiMin(AiTerrainHeight() - 64.0f, end.z));
+            len = pos.distance2D(end);
+        }
+        array<AIFloat3> route = {pos};
+        const int steps = AiMax(1, int(len / Global::ScoutRaid::WaypointSpacing));
+        for (int k = 1; k <= steps; ++k) {
+            AIFloat3 p = pos + (end - pos) * (float(k) / float(steps));
+            p.y = aiBattle.Height(p);
+            route.insertLast(p);
+        }
+        const int q = replanQueue.find(r.id);
+        if (q >= 0) replanQueue.removeAt(uint(q));
+        r.queued = false;
+        r.route = route; r.cursor = 0;
+        IssueWindow(r);
+        r.task.SetLandTarget(-1);
+        r.target = -1; r.targetLostFrame = -1;
+        r.escaping = false; r.insideCoverage = false; r.hazardSince = -1; r.edgeSince = -1;
+        r.rushing = true; r.rushFrom = pos; r.rushLength = len;
+        r.rushUntil = ai.frame + int((len / AiMax(30.0f, u.circuitDef.GetSpeed()) + float(Global::ScoutRaid::RushExtraSeconds)) * float(SECOND));
+        r.lastMove = ai.frame; r.lastPos = pos;
+    }
+
+    void EndRush(Raider@ r, const AIFloat3& in pos)
+    {
+        r.rushing = false;
+        r.rushCooldownUntil = ai.frame + Global::ScoutRaid::RushCooldownSeconds * SECOND;
+        r.hazardReplans = 0; r.excluded = -1; r.routeFailures = 0; r.nextReplan = 0;
+        r.route.resize(0); r.cursor = 0; r.issuedEnd = 0;
+        r.lastMove = ai.frame; r.lastPos = pos;
+        GenericHelpers::LogUtil("[ScoutRaid] rush end unit=" + r.id + " at (" + int(pos.x) + "," + int(pos.z) + ") moved="
+            + int(pos.distance2D(r.rushFrom)) + "/" + int(r.rushLength), 1);
+        Queue(r);
+    }
+
+    // After the raider loop: share pins, find a pile, launch it.
+    void PileTick()
+    {
+        array<AIFloat3> own;
+        for (uint i = 0; i < raiders.length(); ++i) {
+            if (!Pinned(raiders[i])) continue;
+            CCircuitUnit@ u = ai.GetTeamUnit(raiders[i].id);
+            if (u !is null) own.insertLast(u.GetPos(ai.frame));
+        }
+        if (own.length() == 0) return;
+        if (ai.frame - lastShare >= Global::ScoutRaid::PileShareSeconds * SECOND) {
+            lastShare = ai.frame;
+            string body;
+            for (uint i = 0; i < own.length(); ++i) body += (i > 0 ? ";" : "") + int(own[i].x) + "," + int(own[i].z);
+            AiSendMessage(PilePrefix + "pin|" + body);
+        }
+        array<AIFloat3> all = own;
+        const int ttl = Global::ScoutRaid::PileShareTtlSeconds * SECOND;
+        array<string>@ keys = allyPinned.getKeys();
+        for (uint k = 0; k < keys.length(); ++k) {
+            PinnedSet@ s;
+            if (!allyPinned.get(keys[k], @s) || s is null) continue;
+            if (ai.frame - s.frame > ttl) { allyPinned.delete(keys[k]); continue; }
+            for (uint i = 0; i < s.pos.length(); ++i) all.insertLast(s.pos[i]);
+        }
+        if (int(all.length()) < Global::ScoutRaid::PileMinGroup) return;
+        const float radius = Global::ScoutRaid::PileRadius;
+        for (uint i = 0; i < own.length(); ++i) {
+            AIFloat3 sum(0.0f, 0.0f, 0.0f);
+            int count = 0;
+            for (uint j = 0; j < all.length(); ++j) {
+                if (MapHelpers::SqDist(own[i], all[j]) > radius * radius) continue;
+                sum = sum + all[j]; ++count;
+            }
+            if (count < Global::ScoutRaid::PileMinGroup) continue;
+            AIFloat3 centre = sum * (1.0f / float(count));
+            centre.y = aiBattle.Height(centre);
+            AIFloat3 dir; float length = 0.0f, score = 0.0f, offDeg = 0.0f;
+            if (!ChooseRush(centre, dir, length, score, offDeg)) continue;
+            GenericHelpers::LogUtil("[ScoutRaid] pile found at (" + int(centre.x) + "," + int(centre.z) + ") scouts=" + count
+                + " own=" + own.length() + " off=" + int(offDeg) + "deg overlap=" + int(score * 100.0f) / 100.0f + " len=" + int(length), 1);
+            if (RushMembers(centre, dir, length, "lead") > 0)
+                AiSendMessage(PilePrefix + "go|" + int(centre.x) + "," + int(centre.z) + "|" + int(dir.x * 1000.0f) + "," + int(dir.z * 1000.0f) + "|" + int(length));
+            return;   // one pile per tick
+        }
+    }
+
+    // Team::HandleMessage: an allied BARb's pinned raiders, or its rush call.
+    bool HandleMessage(const string &in msg, int fromTeamId)
+    {
+        if (msg.findFirst(PilePrefix) != 0) return false;
+        if (!Active()) return true;
+        array<string>@ p = msg.split("|");
+        if (p.length() < 3) return true;
+        if (p[1] == "pin") {
+            PinnedSet s;
+            s.frame = ai.frame;
+            array<string>@ pts = p[2].split(";");
+            for (uint i = 0; i < pts.length() && i < 16; ++i) {
+                array<string>@ xz = pts[i].split(",");
+                if (xz.length() != 2) continue;
+                s.pos.insertLast(AIFloat3(float(parseInt(xz[0])), 0.0f, float(parseInt(xz[1]))));
+            }
+            allyPinned.set("" + fromTeamId, @s);
+        } else if (p[1] == "go" && p.length() >= 5) {
+            array<string>@ c = p[2].split(",");
+            array<string>@ d = p[3].split(",");
+            if (c.length() != 2 || d.length() != 2) return true;
+            AIFloat3 centre(float(parseInt(c[0])), 0.0f, float(parseInt(c[1])));
+            AIFloat3 dir(float(parseInt(d[0])) / 1000.0f, 0.0f, float(parseInt(d[1])) / 1000.0f);
+            const float len = AiMax(Global::ScoutRaid::RushMinElmos, AiMin(Global::ScoutRaid::RushMaxElmos, float(parseInt(p[4]))));
+            if (dir.Length2D() < 0.5f) return true;
+            RushMembers(centre, dir, len, "join team " + fromTeamId);
+        }
+        return true;
+    }
+
     // Main::AiUpdate (every 30 frames); self-limited to once per second.
     void Tick()
     {
@@ -575,6 +846,14 @@ namespace ScoutRaid {
             if (windowEnd && ai.frame - r.lastWindow >= Global::ScoutRaid::WindowSeconds * SECOND) IssueWindow(r);
             const bool atEnd = r.task.IsAtEnd(u) && r.issuedEnd >= r.route.length();
             const bool stuck = !atEnd && ai.frame - r.lastMove > Global::ScoutRaid::StuckSeconds * SECOND;
+            // Pile-up breakthrough: a rushing raider ignores coverage (no hold,
+            // no escape) until it has covered the rush, reached its end or
+            // timed out; then it replans like any raider (escape first).
+            if (r.rushing) {
+                if (atEnd || ai.frame >= r.rushUntil || pos.distance2D(r.rushFrom) >= r.rushLength - 96.0f) EndRush(r, pos);
+                continue;
+            }
+            if (Global::ScoutRaid::PileRushEnabled) UpdatePin(r, u, pos, margin);
             // Wrap-around trigger: a contact now covers a waypoint within the
             // lookahead (at least the next 3). Sensor->enemy-cache->hazard->tick
             // latency is 2-3 s, 260-400 elmos for a Tick (round 12: a Tick ran
@@ -654,6 +933,7 @@ namespace ScoutRaid {
             Plan(r, u);
             --budget;
         }
+        if (Global::ScoutRaid::PileRushEnabled) PileTick();
         // INV-213: raider count bound and spam exclusion.
         if (int(raiders.length()) > Global::ScoutRaid::MaxRaiders)
             Invariants::Violation("INV-213", "count", "scout raiders " + raiders.length() + " exceed " + Global::ScoutRaid::MaxRaiders);

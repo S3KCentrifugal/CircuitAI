@@ -37,5 +37,29 @@ namespace ScoutRaid {
         // follow in windows near the end); <= 0 = the whole route.
         int MaxIssuedWaypoints = 6;
         int WindowSeconds = 2;              // at most one new window per raider this often
+        // Owner 2026-11-07: pile-up breakthrough. Raiders whose gap search has
+        // failed bunch up just outside grunt/pawn/LLT coverage. When
+        // PileMinGroup or more scouts (this AI's raiders plus allied BARb
+        // raiders, any scout type) have been pinned at a coverage edge within
+        // PileRadius of each other for PileSeconds, this AI's raiders in the
+        // group rush RushMinElmos..RushMaxElmos straight through the bearing
+        // (toward the enemy side) with the fewest overlapping firing ranges,
+        // then resume normal dodging and economy raids.
+        bool PileRushEnabled = true;
+        int PileMinGroup = 3;
+        float PileRadius = 450.0f;          // scouts this close count as one pile
+        float PileEdgeProbe = 420.0f;       // coverage this close (8 bearings) = "at the edge"
+        int PileSeconds = 6;                // pinned at the edge this long before it counts
+        float PileAnchorDrift = 260.0f;     // dodging inside this of the anchor stays "pinned"
+        float RushMinElmos = 1000.0f;
+        float RushMaxElmos = 1200.0f;
+        float RushConeDegrees = 75.0f;      // bearings tried either side of the enemy direction
+        int RushBearings = 11;              // odd: includes the straight bearing
+        float RushSampleElmos = 100.0f;     // overlap samples along each bearing
+        float RushAnglePenalty = 0.6f;      // overlap units per radian off the enemy direction
+        int RushExtraSeconds = 4;           // timeout = length / speed + this
+        int RushCooldownSeconds = 40;       // per raider, after a rush ends
+        int PileShareSeconds = 2;           // pinned-position broadcast to allies at most this often
+        int PileShareTtlSeconds = 5;        // an ally's pinned positions expire after this
     }
 }
