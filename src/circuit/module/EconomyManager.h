@@ -202,6 +202,9 @@ public:
 	// nearest FRONT seat's adopted lane territory.
 	bool MexLaneOrphan(int lane);
 	bool IsAdoptedLaneSpot(const springai::AIFloat3& pos);
+	// D-485: whether any spot we own lies on an orphan lane (none: the
+	// commander's adopted search is skipped).
+	bool HasAdoptedLaneSpots();
 	std::vector<springai::AIFloat3> MexLaneSpine(int lane, int step);
 	std::string DescribeMexTerritory();
 	void DumpMexTerritory(const char* why);
@@ -532,6 +535,13 @@ private:
 	// D-358: the partition over the field's corridor table of the own claim's
 	// ground class; rebuilt when the table arrives or the claims change.
 	mex_lanes::Partition mexLanes;
+	// D-485: orphan lanes (no FRONT/SUPPORT seat, some start joined) and the
+	// count of our resolved spots on them, recomputed lazily once per
+	// territory rebuild (mexRebuildCount); O(lanes x claims + spots).
+	unsigned mexRebuildCount = 0, mexOrphanRevision = ~0u;
+	std::vector<char> mexOrphanLanes;
+	int mexAdoptedSpots = 0;
+	void RefreshOrphanLanes();
 	std::shared_ptr<const field::SModel> mexField;   // the table the partition was built from (null: none yet)
 	int mexLaneClass = -1;                // field class of the own ground claim
 	int mexLaneSide = -1;                 // this team's side index in the table

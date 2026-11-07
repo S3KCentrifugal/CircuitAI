@@ -499,8 +499,9 @@ IUnitTask* CCommanderController::LaneMexWork(CCircuitUnit* unit,State& s,CCircui
     // and reopens it; the owner's geo-b25 game overflowed the stack there.
     auto& skip=s.front.laneMexSkip;
     skip.erase(std::remove_if(skip.begin(),skip.end(),[frame](const auto& e){return e.second<=frame;}),skip.end());
-    std::vector<AIFloat3> skipped;
-    skipped.reserve(skip.size()+1);
+    // D-485: one reused buffer per controller (no allocation per ask).
+    auto& skipped=mexSkipScratch;
+    skipped.clear();
     for(const auto& e:skip) skipped.push_back(e.first);
     const auto refused=[this,unit,&skip,&skipped,frame](IBuilderTask* t) {
         if(!t || !t->GetBuildDef() || t->GetTarget()
@@ -513,7 +514,8 @@ IUnitTask* CCommanderController::LaneMexWork(CCircuitUnit* unit,State& s,CCircui
     IBuilderTask* task=ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,radius,0,true,skipped,accept);
     if(refused(task)) task=ai->GetEconomyManager()->EnqueueMexWithin(unit,pos,radius,0,true,skipped,accept);
     if(refused(task)) task=nullptr;
-    if(!task && cfg->front.mexAdoptRadius>0) {
+    // D-485: the adopted search runs only while a spot we own lies on an orphan lane.
+    if(!task && cfg->front.mexAdoptRadius>0 && ai->GetEconomyManager()->HasAdoptedLaneSpots()) {
         // D-478 (the owner's rule): the lane traced from an AIR or TECH start has
         // no FRONT seat; its spots are this commander's adopted lane territory
         // (owned through MexTerritory's lane rule). Played, Clyde Cells

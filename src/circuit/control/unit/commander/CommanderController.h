@@ -448,6 +448,13 @@ private:
     std::map<int,TacticalBlock> tacticalBlocks;
     // D-480: seat mex spots blocked by a unit or structure, and the frame each skip ends.
     std::vector<std::pair<springai::AIFloat3,int>> seatMexSkip;
+    // D-485: next frame the seat sweep searches after one that found nothing;
+    // a reused spot-exclusion buffer for the seat and lane sweeps; BAR
+    // techlevel per definition id (-1 unknown), read once per definition.
+    int seatMexNext=0;
+    std::vector<springai::AIFloat3> mexSkipScratch;
+    mutable std::vector<signed char> defTier;
+    int DefTier(const CCircuitDef* def) const;
     // D-481: the one fortified-geo job, its definitions (script-owned) and the
     // guard plans of finished guard geos. Task pointers clear in TaskFinished.
     IUnitTask* geoJob=nullptr;
@@ -471,6 +478,7 @@ private:
     bool GeoJobAllowed(CCircuitUnit* unit,CCircuitUnit* anchor) const;
     IUnitTask* GroupGeoWork(CCircuitUnit* unit,CCircuitUnit* anchor);
     IUnitTask* GroupGeoGuardWork(CCircuitUnit* unit,CCircuitUnit* anchor);
+    void PlanGeoGuard(const CCircuitDef* def,const springai::AIFloat3& pos);
     bool TacticalSplit(CCircuitUnit* unit) const;
     springai::AIFloat3 groupNanoSite{-1,0,-1};
     bool groupNanoDue=false;

@@ -1566,14 +1566,16 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 	switch (task->GetType()) {
 		case IUnitTask::Type::BUILDER: {
 			IBuilderTask* taskB = static_cast<IBuilderTask*>(task);
-			// D-477: every frame mapped to this task goes, queued or detached.
-			// A detached task (D-474's brace) is never in buildTasks, so the
-			// erase below skipped it and its turret frame kept naming the freed
-			// task (played, factory-b14: UnitDestroyed of that frame read it).
-			// O(unfinished frames) per dequeue; no per-frame work.
-			for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
-				if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
-				else ++itu;
+			// D-108/D-477: every frame mapped to this task goes, queued or
+			// detached (D-474's brace is never in buildTasks), including an old
+			// frame of a retargeted task. Only construction tasks (before REPAIR)
+			// are ever mapped (MarkUnfinishedUnit), so service tasks skip the
+			// scan. One O(unfinished frames) pass per construction dequeue.
+			if (taskB->GetBuildType() < IBuilderTask::BuildType::REPAIR) {
+				for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
+					if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
+					else ++itu;
+				}
 			}
 			if (taskB->GetBuildType() >= IBuilderTask::BuildType::_SIZE_) {
 				break;
@@ -1595,13 +1597,9 @@ void CBuilderManager::DequeueTask(IUnitTask* task, bool done)
 				case IBuilderTask::BuildType::RESURRECT: {
 				} break;
 				default: {
+					// The target's entry, whichever task it names now; every entry
+					// naming this task went in the scan above (D-108).
 					EraseUnfinishedUnit(taskB->GetTarget());
-					// D-108 crash: and every other entry of this task (a task whose
-					// target changed left its old frame behind, a dangling key once freed)
-					for (auto itu = unfinishedUnits.begin(); itu != unfinishedUnits.end();) {
-						if (itu->second == taskB) { unfinishedCounts.Erase(itu->first); itu = unfinishedUnits.erase(itu); }
-						else ++itu;
-					}
 				} break;
 			}
 			tasks.erase(it);
