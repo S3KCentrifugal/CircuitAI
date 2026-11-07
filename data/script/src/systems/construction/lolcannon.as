@@ -256,6 +256,7 @@ namespace LolCannon {
     array<AIFloat3> badExtraSpots;
     AIFloat3 extraFwd(0.0f, 0.0f, 1.0f);   // the line to the enemy start the cover is laid along
     int nextExtraFix = 0;
+    int nextCoverClaim = 0;
     int extrasStarted = 0, extrasUntil = 0, nextExtrasLog = 0;
     int blockFails = 0;              // cannon order failures on a site whose turret block stands
 
@@ -1011,10 +1012,12 @@ namespace LolCannon {
     }
 
     // A live build order of the list with no frame down and nobody on it, else null.
-    // Its first hand-out starts a clock: once it has gone out 3 times with nobody
-    // staying on it, or 45 s pass with no frame down (11-07 test: crews took storage 7
-    // in turn for 300 s and never framed it), it is aborted, so its slot counts a miss
-    // and is ordered again, then moved after 3, like any failed order.
+    // Its first hand-out starts a clock: 45 s with no frame down (11-07 test: crews
+    // took storage 7 in turn for 300 s and never framed it) and it is aborted, so its
+    // slot counts a miss and is ordered again, then moved after 3, like any failed
+    // order. Hand-outs are not counted: crews drop a fresh order at once and native
+    // passes it on, and counting them aborted good cover orders within seconds (All
+    // That Glitters 2026-11-07: both shield slots given up in 18 s).
     IUnitTask@ Unworked(array<IUnitTask@>@ tasks, const string &in list, bool &out first)
     {
         first = false;
@@ -1027,7 +1030,7 @@ namespace LolCannon {
             int64 n = 0, since = 0;
             if (!orphanHand.get(key, n)) n = 0;
             if (!orphanSince.get(key, since)) since = ai.frame;
-            if (n >= 3 || ai.frame - since > 45 * SECOND) {
+            if (ai.frame - since > 45 * SECOND) {
                 orphanHand.delete(key); orphanSince.delete(key);
                 aiBuilderMgr.AbortTask(tasks[k]);
                 GenericHelpers::LogUtil("[LolCannon] " + list + " " + (k + 1) + ": its order went out " + n + " time(s) over "
@@ -1875,6 +1878,44 @@ namespace LolCannon {
         return true;
     }
 
+    // A shield with no room ahead (All That Glitters 2026-11-07: the turret block and
+    // the storages filled the ring ahead of a Ragnarok): any free spot round the cannon
+    // within ExtraShieldReach, to the sides or behind, still covers it; the nearest to
+    // the enemy start first, and away from the other shield.
+    bool ShieldRoundCannon(CCircuitDef@ d, int k, AIFloat3 &out at, int &out id)
+    {
+        id = -1;
+        const float step = ExtraStep(d);
+        const int rings = int(Global::LolCannon::ExtraShieldReach / step) + 1;
+        const float w = float(AiTerrainWidth()), h = float(AiTerrainHeight());
+        const AIFloat3 side = Layout::Side(facing), fwd = Layout::Fwd(facing);
+        float best = 1e30f;
+        AIFloat3 bestAt;
+        for (int a = -rings; a <= rings; ++a) {
+            for (int b = -rings; b <= rings; ++b) {
+                const AIFloat3 q = At(site, side, float(a) * step, fwd, float(b) * step);
+                if (q.x < 64.0f || q.z < 64.0f || q.x > w - 64.0f || q.z > h - 64.0f) continue;
+                if (q.distance2D(site) > Global::LolCannon::ExtraShieldReach) continue;
+                if (!ExtraSpotOk(0, q, q, false, step)) continue;
+                bool clash = false;   // two shields apart, not stacked
+                for (uint j = 0; j < extraPos[0].length(); ++j)
+                    if (int(j) != k && extraPos[0][j].distance2D(q) < 160.0f) clash = true;
+                if (clash) continue;
+                const float score = (siteTarget.x >= 0.0f) ? q.distance2D(siteTarget) : q.distance2D(site);
+                if (score >= best) continue;
+                if (aiTerrainMgr.IsAllyLayoutBlocked(d, q, facing) || !aiTerrainMgr.CanReserveBuilding(d, q, facing)) continue;
+                best = score; bestAt = q;
+            }
+        }
+        if (best > 1e29f) return false;
+        const int r2 = aiTerrainMgr.ReserveBuilding(d, bestAt, facing);
+        if (r2 < 0) return false;
+        if (!aiTerrainMgr.IsReservationBuildable(r2)) { aiTerrainMgr.ReleaseReservation(r2); return false; }
+        at = aiTerrainMgr.GetReservationPos(r2);
+        id = r2;
+        return true;
+    }
+
     // The cover's slot for def d centred on `base`: the nearest good spot round it
     // (3 rings), else further out (to ExtraRepickRings), else `base` itself, unpinned.
     void PlaceExtra(CCircuitDef@ d, const AIFloat3 &in base, int g, const AIFloat3 &in side, const AIFloat3 &in fwd, bool ahead)
@@ -1883,6 +1924,7 @@ namespace LolCannon {
         int id = -1;
         bool ok = FindExtraSpot(d, base, g, side, fwd, ahead, 0, 3, at, id);
         if (!ok) ok = FindExtraSpot(d, base, g, side, fwd, ahead, 4, Global::LolCannon::ExtraRepickRings, at, id);
+        if (!ok && g == 0) ok = ShieldRoundCannon(d, int(extraPos[g].length()), at, id);
         extraPos[g].insertLast(ok ? at : base);
         extraRes[g].insertLast(ok ? id : -1);
         extraBase[g].insertLast(base);
@@ -1917,8 +1959,10 @@ namespace LolCannon {
                 ++extraRepicks[g][k];
                 AIFloat3 at;
                 int id = -1;
-                if (!FindExtraSpot(d, extraBase[g][k], g, extraSide[g][k], extraAlong[g][k], extraAhead[g][k], 0,
-                        Global::LolCannon::ExtraRepickRings, at, id)) {
+                bool found = FindExtraSpot(d, extraBase[g][k], g, extraSide[g][k], extraAlong[g][k], extraAhead[g][k], 0,
+                        Global::LolCannon::ExtraRepickRings, at, id);
+                if (!found && g == 0) found = ShieldRoundCannon(d, k, at, id);
+                if (!found) {
                     extraRepicks[g][k] = Global::LolCannon::ExtraRepicks;   // nowhere left: given up
                     GenericHelpers::LogUtil("[LolCannon] cover " + ExtraWhat(g) + " " + (k + 1) + " of " + extraPos[g].length() + " at (" + int(old.x)
                         + ", " + int(old.z) + "): 3 failed orders and no other free spot; given up", 1);
@@ -2007,10 +2051,35 @@ namespace LolCannon {
             for (uint k = 0; k < extraPos[g].length(); ++k) { extraTask[g].insertLast(null); extraMiss[g].insertLast(0); }
     }
 
-    // Our cover of group g round the cannon: finished, and all (frames too).
+    // Our cover of group g: finished, and all (frames too), each within 96 of one of
+    // the group's slots (not every one of ours within ExtraCountRadius: All That
+    // Glitters 2026-11-07 read an older T2 flak as the cover's), at most one a slot.
     void ExtraCount(int g, int &out done, int &out all)
     {
-        CountNear(ExtraDef(g), site, Global::LolCannon::ExtraCountRadius, done, all);
+        done = 0; all = 0;
+        CCircuitDef@ d = ExtraDef(g);
+        if (d is null) return;
+        const int want = int(extraPos[g].length());
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef !is d) continue;
+            const AIFloat3 p = u.GetPos(ai.frame);
+            bool near = false;
+            for (int k = 0; k < want && !near; ++k) near = MapHelpers::SqDist(p, extraPos[g][k]) <= 96.0f * 96.0f;
+            if (!near) continue;
+            ++all;
+            if (u.GetBuildProgress() >= 1.0f) ++done;
+        }
+        if (all > want) all = want;
+        if (done > want) done = want;
+    }
+
+    // Slot k of group g has one of ours finished on it.
+    bool ExtraStands(int g, int k)
+    {
+        CCircuitDef@ d = ExtraDef(g);
+        return d !is null && aiBuilderMgr.FindOwnNear(extraPos[g][k], 96.0f, d) !is null;
     }
 
     int ExtraFlying(int g)
@@ -2027,9 +2096,11 @@ namespace LolCannon {
         ExtraCount(g, done, all);
         const int want = int(extraPos[g].length());
         if (done >= want) return true;
-        if (ExtraFlying(g) > 0 || (ExtraDef(g) !is null && aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g)) !is null)) return false;
-        for (uint k = 0; k < extraMiss[g].length(); ++k)
+        if (ExtraFlying(g) > 0 || all > done) return false;
+        for (uint k = 0; k < extraMiss[g].length(); ++k) {
+            if (ExtraStands(g, int(k))) continue;   // a standing slot is not short
             if (extraMiss[g][k] < 3 || extraRepicks[g][k] < Global::LolCannon::ExtraRepicks) return false;
+        }
         return true;   // every short slot came to nothing three times, on each spot it was given
     }
 
@@ -2051,6 +2122,9 @@ namespace LolCannon {
         if (slots == 0) return false;
         phase = EXTRAS;
         extrasStarted = ai.frame;
+        ReleaseUnable();
+        nextCoverClaim = 0;
+        ClaimCoverCrew();
         extrasUntil = ai.frame + Global::LolCannon::ExtrasFinishSeconds * SECOND;
         nextExtrasLog = ai.frame + 60 * SECOND;
         CCircuitDef@ d0 = ExtraDef(0);
@@ -2151,6 +2225,68 @@ namespace LolCannon {
         nextPlan = ai.frame + 30 * SECOND;
     }
 
+    // The cover begins: crew members that can build none of it (the T1 air and ground
+    // crews) go back to native work instead of idling through it.
+    void ReleaseUnable()
+    {
+        array<string>@ keys = crewOf.getKeys();
+        int let = 0;
+        for (uint i = 0; i < keys.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
+            bool able = false;
+            if (u !is null && u.circuitDef !is null)
+                for (int g = 0; g < 3 && !able; ++g) able = ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g));
+            if (able) continue;
+            int64 v = -1;
+            crewOf.get(keys[i], v);
+            const int kind = int(v);
+            crewOf.delete(keys[i]);
+            if (kind >= 0 && kind <= GROUND && crewCount[kind] > 0) --crewCount[kind];
+            ++let;
+        }
+        recruitsAir.resize(0); recruitsGround.resize(0);
+        if (let > 0) GenericHelpers::LogUtil("[LolCannon] cover: " + let + " crew released that can build none of it", 1);
+    }
+
+    // The cover needs T2 constructors (All That Glitters 2026-11-07: the crew had lost
+    // its starter and 3 of 5 storage crew by then; 11-07 test: two covers ended in 1 s
+    // with no crew member able to build any of it). Every 10 s in EXTRAS our finished
+    // constructors that can build the cover (the T2 air ones, and T2 ground ones as
+    // stand-ins) are taken off their tasks, up to 1 + Storages crew able to build it.
+    void ClaimCoverCrew()
+    {
+        if (ai.frame < nextCoverClaim) return;
+        nextCoverClaim = ai.frame + 10 * SECOND;
+        const int want = 1 + Wanted(STORE);
+        int able = 0;
+        array<string>@ keys = crewOf.getKeys();
+        for (uint i = 0; i < keys.length(); ++i)
+            if (CanCover(ai.GetTeamUnit(parseInt(keys[i])))) ++able;
+        if (able >= want) return;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        int taken = 0;
+        for (uint i = 0; i < ids.length() && able < want; ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f || crewOf.exists(Key(u.id))) continue;
+            const string name = u.circuitDef.GetName();
+            if (!IsT2Air(name) && T2_GROUND.find(name) < 0) continue;   // constructors only, never labs or turrets
+            if (u.task !is null && u.task.GetType() == int(Task::Type::PLAYER)) continue;   // a player's own unit
+            if (LrpcBlock::IsCrew(u.id)) continue;
+            if (!CanCover(u) || !Claim(u, STORE, "taken off its task for the cover")) continue;
+            IUnitTask@ t = BuilderTask(u);
+            if (t !is null) aiBuilderMgr.AssignTask(u, t);
+            ++able; ++taken;
+        }
+        if (taken > 0) GenericHelpers::LogUtil("[LolCannon] cover: " + taken + " T2 constructor(s) taken for it, " + able + " of " + want + " able", 1);
+    }
+
+    bool CanCover(CCircuitUnit@ u)
+    {
+        if (u is null || u.circuitDef is null) return false;
+        for (int g = 0; g < 3; ++g) if (ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g))) return true;
+        return false;
+    }
+
     // Release every crew member but the two kinds given (and the turret crews, air
     // and T1 ground, with `turretCrews`).
     void KeepOnly(int a, int b, bool turretCrews, const string &in why)
@@ -2211,6 +2347,7 @@ namespace LolCannon {
             return;
         }
         if (phase == EXTRAS) {
+            ClaimCoverCrew();
             ReplaceExtras();
             FinishExtras();
             return;
