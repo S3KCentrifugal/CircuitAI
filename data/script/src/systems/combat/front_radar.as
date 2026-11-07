@@ -544,7 +544,7 @@ namespace FrontRadar {
         if (u is null) { GhostDrop("commander lost"); return true; }
         const float walk = sqrt(MapHelpers::SqDist(u.GetPos(ai.frame), ghostSite));
         if (aiBuilderMgr.CommanderFrontAdopt(u, ghostOrder, walk + GHOST_ADOPT_SLACK)) return false;
-        GhostDrop("commander falling back");
+        GhostDrop(aiBuilderMgr.CommanderKeepOutWalk(u, ghostSite) ? "site or walk in commander keep-out" : "commander falling back");
         return true;
     }
 
@@ -572,6 +572,10 @@ namespace FrontRadar {
         const float walk = sqrt(MapHelpers::SqDist(u.GetPos(ai.frame), ghostSite));
         const float cap = Global::FrontRadar::GhostRadarRange * Global::FrontRadar::GhostCoverage + Global::FrontRadar::GhostTravel;
         if (walk <= cap && aiBuilderMgr.CommanderFrontAdopt(u, ghostOrder, walk + GHOST_ADOPT_SLACK)) return ghostOrder;
+        // Owner 2026-11-07 (Baryon Tar Lake, AI 15): a standing frame inside porc
+        // reach is not worth the commander; the order ends even with a frame
+        const bool keptOut = aiBuilderMgr.CommanderKeepOutWalk(u, ghostSite);
+        if (keptOut) { GhostDrop("site or walk in commander keep-out"); return null; }
         // Declined (the commander's fallback is on: an enemy group near it) or
         // pushed out of reach: the order ends now and its spot is skipped, rather
         // than hanging to the GhostOrderSeconds abort (2026-10-28: 24 of 30 failures)
@@ -739,7 +743,8 @@ namespace FrontRadar {
         if (o is null) { fwdOwner = -1; return; }   // another builder may take it
         if (UnitHelpers::IsCommander(o.circuitDef)) {
             const float walk = sqrt(MapHelpers::SqDist(o.GetPos(ai.frame), fwdSite));
-            if (!aiBuilderMgr.CommanderFrontAdopt(o, fwdOrder, walk + GHOST_ADOPT_SLACK)) ForwardDrop("commander falling back");
+            if (!aiBuilderMgr.CommanderFrontAdopt(o, fwdOrder, walk + GHOST_ADOPT_SLACK))
+                ForwardDrop(aiBuilderMgr.CommanderKeepOutWalk(o, fwdSite) ? "site or walk in commander keep-out" : "commander falling back");
         }
     }
 
@@ -786,6 +791,9 @@ namespace FrontRadar {
         const float walk = sqrt(MapHelpers::SqDist(pos, target));
         if (walk > (comm ? Global::FrontRadar::ForwardCommanderTravel : Global::FrontRadar::ForwardTravel)) { fwdWhy |= FWD_FAR; return null; }
         if (!GhostPathSafe(pos, target, Global::FrontRadar::ForwardMaxThreat)) { fwdWhy |= FWD_PATH; return null; }
+        // Owner 2026-11-07: the threat map scores most porc 0 (behaviour threat), so a
+        // commander also checks its keep-out discs
+        if (comm && aiBuilderMgr.CommanderKeepOutWalk(u, target)) { fwdWhy |= FWD_PATH; return null; }
         if (!aiTerrainMgr.CanReachAt(u, target, u.circuitDef.GetBuildDistance())) { fwdWhy |= FWD_REACH; return null; }
         @fwdOrder = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, rd, target,
             Global::FrontRadar::GhostShake, true, Global::FrontRadar::ForwardOrderSeconds * SECOND));
@@ -855,6 +863,9 @@ namespace FrontRadar {
             if (crowd != 0) { if (crowd == 1) ++dCrowdOurs; else ++dCrowdAlly; continue; }
             if (aiBattle.SurfThreat(site) > Global::FrontRadar::GhostMaxThreat) { ++dThreat; continue; }
             if (!GhostPathSafe(pos, site)) { ++dPath; continue; }
+            // Owner 2026-11-07 (Baryon Tar Lake, AI 15 vs seen Amputators): threat map
+            // scores most porc 0, so the commander's keep-out discs are checked too
+            if (aiBuilderMgr.CommanderKeepOutWalk(u, site)) { ++dPath; continue; }
             if (!aiTerrainMgr.CanReachAt(u, site, u.circuitDef.GetBuildDistance())) { ++dReach; continue; }
             bestCount = count; bestWalk = walk; best = site;
         }

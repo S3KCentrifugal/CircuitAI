@@ -1314,6 +1314,9 @@ IUnitTask* CBuilderManager::CommanderFrontWork(CCircuitUnit* unit,int kind,CCirc
 bool CBuilderManager::CommanderFrontAdopt(CCircuitUnit* unit,IUnitTask* task,float reach) {
     return circuit->GetCommanderController()->AdoptFrontWork(unit,task,reach);
 }
+bool CBuilderManager::CommanderKeepOutWalk(CCircuitUnit* unit,const AIFloat3& site) const {
+    return circuit->GetCommanderController()->KeepOutWalkBlocks(unit,site);
+}
 
 IUnitTask* CBuilderManager::Enqueue(const TaskB::SServBTask& ti)
 {

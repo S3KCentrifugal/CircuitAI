@@ -133,6 +133,7 @@ CBuilderScript::CBuilderScript(CScriptManager* scr, CBuilderManager* mgr)
     r=engine->RegisterObjectMethod("CBuilderManager","int FrontCommanderId() const",asMETHOD(CBuilderManager,FrontCommanderId),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBuilderManager","IUnitTask@+ CommanderFrontWork(CCircuitUnit@, int, CCircuitDef@, float)",asMETHOD(CBuilderManager,CommanderFrontWork),asCALL_THISCALL); ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBuilderManager","bool CommanderFrontAdopt(CCircuitUnit@, IUnitTask@, float)",asMETHOD(CBuilderManager,CommanderFrontAdopt),asCALL_THISCALL); ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBuilderManager","bool CommanderKeepOutWalk(CCircuitUnit@, const AIFloat3& in) const",asMETHOD(CBuilderManager,CommanderKeepOutWalk),asCALL_THISCALL); ASSERT(r>=0);
 	r = engine->RegisterObjectMethod("CBuilderManager", "IUnitTask@+ FindQueuedTask(CCircuitUnit@, int type)", asFUNCTION(CBuilderManager_FindQueuedTask), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 
 }

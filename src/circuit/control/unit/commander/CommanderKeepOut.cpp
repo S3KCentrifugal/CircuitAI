@@ -143,7 +143,13 @@ void CCommanderController::RefreshKeepOut(CCircuitUnit* unit,int frame) {
             // An image whose spot was seen empty (HIDDEN) is gone.
             if(g.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
             ghost=!enemy->IsInRadarOrLOS();
-            if(!ghost && PorcTech(def)<cfg->safety.porcHeavyTech) continue;
+            if(!ghost && PorcTech(def)<cfg->safety.porcHeavyTech) {
+                // Owner 2026-11-07 (Baryon Tar Lake): seen T1 porc that outranges
+                // our laser (Amputator, Ambusher, Toaster) is a disc too.
+                if(cfg->safety.porcOutrange<=0 || enemy->IsBeingBuilt()) continue;
+                const float reach=MatchupFor(def,unit->GetCircuitDef()).range;
+                if(!(reach>LaserRange(unit->GetCircuitDef())+cfg->doctrine.rangedMargin)) continue;
+            }
         }
         const auto& m=MatchupFor(def,unit->GetCircuitDef());
         if(m.range<=0.f) continue;
@@ -203,6 +209,35 @@ bool CCommanderController::KeepOutBlocks(CCircuitUnit* unit,const AIFloat3& site
     // Heavy-unit discs refuse work away from home only, like their withdrawal.
     const bool home=site.SqDistance2D(ai->GetSetupManager()->GetBasePos())<SQUARE(BASE_RADIUS);
     return KeepOutAt(P(site),0,!home)!=nullptr;
+}
+
+// Owner 2026-11-07 (Baryon Tar Lake, AI 15): a ghost radar order adopted as
+// front work walked the commander back into Amputator range after every keep-out
+// release. Adopted work is refused when its site or the straight walk there
+// crosses a disc the commander is not already inside.
+const CCommanderController::KeepOutZone* CCommanderController::KeepOutOnWalk(CCircuitUnit* unit,const AIFloat3& site) const {
+    if(keepOut.empty() || !unit || !geom::is_valid(site)) return nullptr;
+    if(!Handles(unit) && !IsGroupMember(unit->GetId())) return nullptr;
+    const int frame=ai->GetLastFrame();
+    const bool home=site.SqDistance2D(ai->GetSetupManager()->GetBasePos())<SQUARE(BASE_RADIUS);
+    const Point from=P(unit->GetPos(frame)), to=P(site);
+    if(const auto* z=KeepOutAt(to,0,!home)) return z;
+    const float len=commander::Length(to-from);
+    const int steps=int(len/100.f)+1;
+    for(int i=1;i<steps;++i) {
+        const Point p=from+(to-from)*(float(i)/float(steps));
+        for(const auto& z:keepOut) {
+            if(!z.tower && z.until<frame) continue;
+            if(z.heavy && home) continue;
+            if(commander::Length(from-z.center)<z.radius) continue;
+            if(commander::Length(p-z.center)<z.radius) return &z;
+        }
+    }
+    return nullptr;
+}
+
+bool CCommanderController::KeepOutWalkBlocks(CCircuitUnit* unit,const AIFloat3& site) const {
+    return KeepOutOnWalk(unit,site)!=nullptr;
 }
 
 AIFloat3 CCommanderController::KeepOutGoal(CCircuitUnit* unit,const AIFloat3& goal) const {

@@ -332,6 +332,7 @@ public:
     int FrontCommanderId() const;
     IUnitTask* CommanderFrontWork(CCircuitUnit* unit,int kind,CCircuitDef* def,float radius);
     bool CommanderFrontAdopt(CCircuitUnit* unit,IUnitTask* task,float reach);
+    bool CommanderKeepOutWalk(CCircuitUnit* unit,const springai::AIFloat3& site) const;
 	void AddBuildPower(CCircuitUnit* unit);
 	void DelBuildPower(CCircuitUnit* unit);
 	float GetBuildPower() const { return buildPower; }

@@ -238,6 +238,11 @@ struct CommanderSafetyConfig {
     // (land reach > porcMaxRange: LRPC, nukes) are left out. Only a D-gun on a
     // nearby T3 (T3Exempt) may enter. 0 = off.
     float porcKeepOut=1,porcMaxRange=2000,porcHeavyTech=2;
+    // Owner 2026-11-07 (Baryon Tar Lake: AI 15's commander stood 875 inside a
+    // seen row of Amputators for a ghost radar): seen or radar porc below
+    // porcHeavyTech is a disc too when its reach beats the commander's laser by
+    // doctrine rangedMargin. 0 = off.
+    float porcOutrange=1;
     // Shelling: health lost per second over shellWindow, mostly unexplained by
     // visible enemies in reach, with no radar dot closer than shellDotRange.
     // The commander steps shellStep back, keeps out of a shellZone disc there
@@ -460,6 +465,7 @@ public:
     // A commander or commander group member never takes work at a site inside a
     // keep-out zone (scouted laser tower range, recent shelling).
     bool KeepOutBlocks(CCircuitUnit* unit,const springai::AIFloat3& site) const;
+    bool KeepOutWalkBlocks(CCircuitUnit* unit,const springai::AIFloat3& site) const;
     bool CanResumeFrontTask(CCircuitUnit* unit, IUnitTask* task) const;
     std::vector<commander::DefenceExclusion> DefenceExclusions(CCircuitUnit* unit,CCircuitDef* def,
         const springai::AIFloat3& center,float searchRadius,const IUnitTask* ignore=nullptr) const;
@@ -633,6 +639,9 @@ private:
     // ---- keep-out and shelling withdrawal (CommanderKeepOut.cpp) ----
     struct KeepOutZone { commander::Point center; float radius=0; int id=-1,until=-1; bool tower=false,porc=false,ghost=false,heavy=false; };
     std::vector<KeepOutZone> keepOut; // towers rebuilt once a second; shell zones until expiry
+    // A keep-out disc on the site or the straight walk to it, ignoring discs the
+    // commander already stands in (its withdrawal handles those). Adopted front work.
+    const KeepOutZone* KeepOutOnWalk(CCircuitUnit* unit,const springai::AIFloat3& site) const;
     int keepOutFrame=-10000,nextDiveFrame=0;
     std::set<int> towerDefs; bool towerDefsResolved=false;
     std::map<int,float> porcTech; // static armed def id -> customparams techlevel (cache)

@@ -209,6 +209,13 @@ bool CCommanderController::AdoptFrontWork(CCircuitUnit* unit,IUnitTask* task,flo
     State* found=states.Find(unit->GetId()); if(!found) return false;
     auto& s=*found; const int frame=ai->GetLastFrame();
     if(FallbackActive(s,frame)) return false;
+    if(task->GetType()==IUnitTask::Type::BUILDER) {
+        if(const auto* z=KeepOutOnWalk(unit,static_cast<IBuilderTask*>(task)->GetPosition())) {
+            ai->LOG("[CommanderWork] unit=%i adopt refused: keep-out %s %i on the site or walk",unit->GetId(),
+                z->heavy?"heavy_unit":z->porc?(z->ghost?"porc_ghost":"porc"):z->tower?"tower":"shell_zone",z->id);
+            return false;
+        }
+    }
     s.work.task=task; s.work.kind=WORK_ADOPTED; s.work.reach=std::max(0.f,reach); s.work.held=false; s.work.boundary=s.fallback.boundary;
     ai->LOG("[CommanderWork] unit=%i adopt task=%i reach=%.0f",unit->GetId(),
         task->GetType()==IUnitTask::Type::BUILDER?int(static_cast<IBuilderTask*>(task)->GetBuildType()):-1,s.work.reach);
