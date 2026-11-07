@@ -363,6 +363,7 @@ IUnitTask* CCommanderController::RadarWork(CCircuitUnit* unit,State& s,CCircuitD
 
 IUnitTask* CCommanderController::AssistWork(CCircuitUnit* unit,const State& s,const AIFloat3& center,float radius,bool factories,int frame) {
     if(factories && !unit->GetCircuitDef()->IsAbleToAssist()) return nullptr;
+    if(AssistClosed(unit)) return nullptr;   // D-490: low energy, no assist
     const AIFloat3 pos=unit->GetPos(frame);
     const float reach=unit->GetCircuitDef()->GetBuildDistance();
     IUnitTask* best=nullptr; CCircuitUnit* plant=nullptr;

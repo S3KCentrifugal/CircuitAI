@@ -1424,6 +1424,17 @@ float CEconomyManager::GetMetalPull()
 	return metal.pull;
 }
 
+economy::EnergyState CEconomyManager::GetEnergyState()
+{
+	economy::EnergyState state;
+	state.stalling = isEnergyStalling;
+	state.current = GetEnergyCur();
+	state.storage = GetEnergyStore();
+	state.income = GetAvgEnergyIncome();
+	state.pull = GetEnergyPull();
+	return state;
+}
+
 float CEconomyManager::GetEnergyCur()
 {
 	return energy.current = economy->GetCurrent(energyRes);

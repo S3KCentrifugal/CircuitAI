@@ -1560,6 +1560,22 @@ CRetreatTask* CBuilderManager::EnqueueRetreat()
 
 void CBuilderManager::AssignTask(CCircuitUnit* unit, IUnitTask* task)
 {
+	// INV-262 (D-490): a FRONT commander's own construction is never replaced by
+	// another construction, assist or guard (a brace is a safety reaction).
+	// Cost: commanders only; two casts and the controller's O(1) test.
+	if ((unit != nullptr) && (task != nullptr) && unit->GetCircuitDef()->IsRoleComm()) {
+		IUnitTask* old = unit->GetTask();
+		auto* next = dynamic_cast<IBuilderTask*>(task);
+		auto* controller = circuit->GetCommanderController();
+		if ((old != nullptr) && (old != task) && (next != nullptr) && (dynamic_cast<CBBraceTask*>(task) == nullptr)
+			&& ((next->GetBuildType() <= IBuilderTask::BuildType::REPAIR) || (next->GetBuildType() == IBuilderTask::BuildType::GUARD))
+			&& (controller != nullptr) && controller->KeepsOwnConstruction(unit, old))
+		{
+			auto* oldBuild = static_cast<IBuilderTask*>(old);
+			circuit->LOG("[INVARIANT] INV-262 commander %i own construction %s swapped for build type %i",
+				unit->GetId(), oldBuild->GetBuildDef() ? oldBuild->GetBuildDef()->GetDef()->GetName() : "?", int(next->GetBuildType()));
+		}
+	}
 	ITaskModule::AssignTask(unit, task);
 	static_cast<CBuilderScript*>(script)->TaskAssigned(unit);
 }

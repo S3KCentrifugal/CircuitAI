@@ -8,6 +8,7 @@
 #ifndef SRC_CIRCUIT_MODULE_ECONOMYMANAGER_H_
 #define SRC_CIRCUIT_MODULE_ECONOMYMANAGER_H_
 
+#include "resource/EnergyState.h"
 #include "module/Module.h"
 #include "util/AvailList.h"
 #include "resource/MetalField.h"
@@ -256,6 +257,9 @@ public:
 	bool IsMetalEmpty() const { return isMetalEmpty; }
 	bool IsMetalFull() const { return isMetalFull; }
 	bool IsEnergyStalling() const { return isEnergyStalling; }
+	// D-493: the one energy state every "energy is low" caller reads (EnergyState.h).
+	economy::EnergyState GetEnergyState();
+	bool IsEnergyLow(float share) { return economy::EnergyLow(GetEnergyState(), share); }
 	bool IsEnergyEmpty() const { return isEnergyEmpty; }
 	bool IsEnergyFull() const { return isEnergyFull; }
 //	bool IsEnergyRequired() const { return isEnergyRequired; }

@@ -665,6 +665,7 @@ namespace RoleTech
 
 		Opening::Tick();
 		TechBuild::Tick();
+		TechPinpointers::Tick();   // D-492: Pinpointers while the team has artillery and none
 		TechChain::Tick();
         TechHeavyRush::Tick();
         TechGantry::SampleIncome();
@@ -835,9 +836,15 @@ namespace RoleTech
 				/*metalIncomePerPlant*/ Global::RoleSettings::Tech::RequiredMetalIncomeForT2AircraftPlant,
 				/*energyIncomePerPlant*/ Global::RoleSettings::Tech::RequiredEnergyIncomeForT2AircraftPlant);
 
-			if (allowedT2Air > 0)
+			// D-489 (owner, 2026-11-07): the T1 aircraft lab follows the first
+			// advanced fusion, or an aircraft-lab step the chain has reached
+			// (the nuke plan's, after its silo). This block runs after
+			// TechChain::Tick, so before D-489 it put the chain's lifted cap
+			// back to 0 until the T2 aircraft-lab income held. One lab is enough.
+			if (allowedT2Air > 0 || aiTerrainMgr.GetLayoutInt("tech.heavy.afus-completed", 0) > 0
+				|| TechChain::WantsStep("ap"))
 			{
-				allowedT1Air = 1; // We don't really need more than 1 t1 lab
+				allowedT1Air = 1;
 			}
 
 			GenericHelpers::LogUtil(
@@ -1994,6 +2001,9 @@ namespace RoleTech
             if (done && bt == Task::BuildType::ENERGY && builderTask.buildDef !is null
                 && builderTask.buildDef.GetName() == TechChain::DefFor("afus"))
                 aiTerrainMgr.SetLayoutInt("tech.heavy.afus-completed", 1);
+            // D-491: INV-264, the first fusion and aircraft lab stand in the core
+            if (done && (bt == Task::BuildType::ENERGY || bt == Task::BuildType::FACTORY) && builderTask.target !is null)
+                Layout::CheckCore(builderTask.target);
 
 			// MexTracker bookkeeping is done role-independently in Builder::AiTaskRemoved.
 			if (bt == Task::BuildType::MEXUP)

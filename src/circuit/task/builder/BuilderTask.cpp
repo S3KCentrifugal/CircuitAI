@@ -960,6 +960,13 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 	if (unit->IsAttrNoDisrupt()) {
 		return true;
 	}
+	// D-490 (owner): a FRONT commander walking to its own construction (a mex,
+	// a turret) is not offered other work on the way; played, the policy's
+	// assist rung swapped it off a mex to help a constructor.
+	if (cdef->IsRoleComm() && (circuit->GetCommanderController() != nullptr)
+		&& circuit->GetCommanderController()->KeepsOwnConstruction(unit, this)) {
+		return true;
+	}
 	HideAssignee(unit);
 	IUnitTask* task = manager->MakeTask(unit);
 	// D-114 crash (owner's game, build94, F43291): MakeTask runs the script's
