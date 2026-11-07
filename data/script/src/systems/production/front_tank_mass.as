@@ -11,13 +11,18 @@
 // T2 factory stands, a T1 bot lab rolls every BotWaveIntervalSeconds on BotWaveChance for a random
 // BotWaveMin..Max Pawns or Grunts (BotWaveGoblinMin..Max Goblins), held the same way, then sent at
 // the enemy as one attack wave.
+// Raiders (owner, 2026-11-07): the bot wave's rules for a T1 vehicle plant too, on its own timer: every
+// VehicleRaiderWaveIntervalSeconds, VehicleRaiderWaveChance for VehicleRaiderWaveMin..Max Blitz/Incisor/Alaris,
+// held the same way, then one attack wave, until our first T2 factory stands. Legion bot waves are Phobos
+// (legcen), no longer Goblins (owner, 2026-11-07).
 // All tiers reuse FrontOpener's cohort, so one opener-or-mass batch exists at a time and Spam keeps
 // off the plant. Only the factory MakeTask calls this; no periodic job. Log [FRONT][TankMass].
 namespace FrontTankMass {
-    // Frame of each tier's next roll (0 T1 tanks, 1 T2 tanks, 2 bots); -1 until that tier's factory first asks
-    array<int> nextRoll = {-1, -1, -1};
+    // Frame of each tier's next roll (0 T1 tanks, 1 T2 tanks, 2 bots, 3 vehicle raiders); -1 until that tier's factory first asks
+    array<int> nextRoll = {-1, -1, -1, -1};
     bool finished = false;    // T1 tanks: a T2 factory stood, no more T1 rolls this game
     bool botFinished = false; // bots: the same
+    bool raiderFinished = false; // vehicle raiders: the same
     // Owner (2026-10-19): FRONT keeps to one factory type. The first T1 land factory (the scout
     // rush lock) sets it: 0 bot lab, 1 vehicle plant; -1 not seen yet. Masses come only from that
     // type; spam and edge lane labs never roll (they build their single spam unit).
@@ -32,7 +37,14 @@ namespace FrontTankMass {
     string WaveBot(const string &in side) {
         if (side == "armada") return "armpw";   // Pawn
         if (side == "cortex") return "corak";   // Grunt
-        if (side == "legion") return "leggob";  // Goblin
+        if (side == "legion") return "legcen";  // Phobos (owner, 2026-11-07: Goblins left the wave)
+        return "";
+    }
+
+    string WaveRaider(const string &in side) {
+        if (side == "armada") return "armflash";  // Blitz
+        if (side == "cortex") return "corgator";  // Incisor
+        if (side == "legion") return "leghades";  // Alaris
         return "";
     }
 
@@ -67,7 +79,10 @@ namespace FrontTankMass {
         const bool vehicle = UnitHelpers::IsT1VehicleLab(factoryName) || UnitHelpers::IsT2VehicleLab(factoryName);
         if (mainType >= 0 && (vehicle ? 1 : 0) != mainType) return null;
         if (UnitHelpers::IsT1VehicleLab(factoryName)) {
-            if (finished || !openerDone || Global::RoleSettings::Front::VehicleTankMassChance <= 0.0f) return null;
+            if (!openerDone) return null;
+            IUnitTask@ raiders = TryRaiderWave(u, side);
+            if (raiders !is null) return raiders;
+            if (finished || Global::RoleSettings::Front::VehicleTankMassChance <= 0.0f) return null;
             if (nextRoll[0] >= 0 && ai.frame >= nextRoll[0] && T2FactoryStands()) {
                 finished = true;
                 GenericHelpers::LogUtil("[FRONT][TankMass] T2 factory stands: no more T1 rolls", 1);
@@ -85,11 +100,9 @@ namespace FrontTankMass {
                 GenericHelpers::LogUtil("[FRONT][TankMass] T2 factory stands: no more bot wave rolls", 1);
                 return null;
             }
-            const bool goblin = side == "legion";
             return Roll(u, side, 2, Global::RoleSettings::Front::BotWaveIntervalSeconds,
                 Global::RoleSettings::Front::BotWaveChance, WaveBot(side),
-                goblin ? Global::RoleSettings::Front::BotWaveGoblinMin : Global::RoleSettings::Front::BotWaveMin,
-                goblin ? Global::RoleSettings::Front::BotWaveGoblinMax : Global::RoleSettings::Front::BotWaveMax,
+                Global::RoleSettings::Front::BotWaveMin, Global::RoleSettings::Front::BotWaveMax,
                 Global::RoleSettings::Front::BotWaveGatherSeconds, Task::FightType::ATTACK);
         }
         if (UnitHelpers::IsT2VehicleLab(factoryName)) {
@@ -102,10 +115,24 @@ namespace FrontTankMass {
         return null;
     }
 
+    // Owner (2026-11-07): Blitz/Incisor/Alaris waves, the bot wave's rules on a T1 vehicle plant
+    IUnitTask@ TryRaiderWave(CCircuitUnit@ u, const string &in side) {
+        if (raiderFinished || Global::RoleSettings::Front::VehicleRaiderWaveChance <= 0.0f) return null;
+        if (nextRoll[3] >= 0 && ai.frame >= nextRoll[3] && T2FactoryStands()) {
+            raiderFinished = true;
+            GenericHelpers::LogUtil("[FRONT][TankMass] T2 factory stands: no more raider wave rolls", 1);
+            return null;
+        }
+        return Roll(u, side, 3, Global::RoleSettings::Front::VehicleRaiderWaveIntervalSeconds,
+            Global::RoleSettings::Front::VehicleRaiderWaveChance, WaveRaider(side),
+            Global::RoleSettings::Front::VehicleRaiderWaveMin, Global::RoleSettings::Front::VehicleRaiderWaveMax,
+            Global::RoleSettings::Front::VehicleRaiderWaveGatherSeconds, Task::FightType::ATTACK);
+    }
+
     IUnitTask@ Roll(CCircuitUnit@ u, const string &in side, uint t, int intervalSeconds,
                     float chance, const string &in tankName, int minCount, int maxCount, int gatherSeconds,
                     Task::FightType promote) {
-        const string tier = t == 0 ? "T1" : (t == 1 ? "T2" : "Bots");
+        const string tier = t == 0 ? "T1" : (t == 1 ? "T2" : (t == 2 ? "Bots" : "Raiders"));
         const int interval = AiMax(1, intervalSeconds) * SECOND;
         if (nextRoll[t] < 0) {
             nextRoll[t] = ai.frame + interval;

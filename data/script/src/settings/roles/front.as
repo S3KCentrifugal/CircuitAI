@@ -360,6 +360,15 @@ namespace Front {
             int BotWaveGoblinMin = 15;
             int BotWaveGoblinMax = 20;
             int BotWaveGatherSeconds = 360;
+            // Owner (2026-11-07): the bot wave's rules for a T1 vehicle plant, on its own timer: every
+            // VehicleRaiderWaveIntervalSeconds, VehicleRaiderWaveChance for VehicleRaiderWaveMin..Max Blitz/Incisor/Alaris,
+            // held at the plant until the last is out, then one attack wave. Legion bot waves are Phobos now (BotWaveGoblin* unused).
+            // Off here, on in experimental_balanced.
+            float VehicleRaiderWaveChance = 0.0f;
+            int VehicleRaiderWaveIntervalSeconds = 180;
+            int VehicleRaiderWaveMin = 10;
+            int VehicleRaiderWaveMax = 15;
+            int VehicleRaiderWaveGatherSeconds = 360;
             float SwitchFactoryCostMultiplier = 1.2f;
             int ScoutAssignmentLimit = 5;
             float BuilderCostThresholdForBase = 200.0f;

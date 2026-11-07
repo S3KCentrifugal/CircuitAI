@@ -315,6 +315,9 @@ namespace Main {
         // FRONT bot labs (owner, 2026-10-19): every 3 min from the opener wave to the first T2 factory, 50% for 10-15
         // Pawns/Grunts or 15-20 Goblins held at the lab until the last is out, then one attack wave (BotWave*, off in src)
         Global::RoleSettings::Front::BotWaveChance = 0.5f;
+        // ... and T1 vehicle plants the same: every 3 min, 50% for 10-15 Blitz/Incisor/Alaris as one attack wave; Legion bot
+        // waves are 10-15 Phobos, no Goblins (owner, 2026-11-07; VehicleRaiderWave*, off in src)
+        Global::RoleSettings::Front::VehicleRaiderWaveChance = 0.5f;
         // D-471 (owner, 2026-11-04): Cortex vehicles open Rascal scout, then ten Incisors.
         Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = 1.0f;
 		// FRONT (owner, 2026-10-17): two FRONTs each build a spam lab for an edge lane, left and right
