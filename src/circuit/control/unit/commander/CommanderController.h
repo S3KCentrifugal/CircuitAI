@@ -102,6 +102,9 @@ struct CommanderFrontState {
     int laneMexCount=0; bool laneMexTurret=false;
     int expansionMexNext=0;
     springai::AIFloat3 laneMexLast{-1,0,-1};
+    // D-482: lane mex spots the engine refused (a structure stands there), and
+    // the frame each skip ends; cleared as they expire, at most a few entries.
+    std::vector<std::pair<springai::AIFloat3,int>> laneMexSkip;
     // Completion-owned IDs, never borrowed unit pointers. Released with the
     // commander; destroyed/transferred mexes are removed on a work offer.
     std::vector<int> unfortifiedMexes;
@@ -215,6 +218,46 @@ struct CommanderGroupConfig {
     float sensorDefenseBand=3; // weapons at/above this band precede sensor work
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
+    // D-475 tactical queue: launchers in a reserved block, once the group has
+    // tacticalT2 T2 members (0: off), more than tacticalMetal stored metal and
+    // energy above tacticalEnergy of storage without a stall.
+    float tacticalT2=0,tacticalMetal=4000,tacticalEnergy=.25f;
+    float tacticalCols=3,tacticalRows=3,tacticalMinFill=.5f,tacticalRear=300;
+    float tacticalRetrySeconds=10,tacticalOrderSeconds=300;
+    // D-479: static artillery in the tactical queue. T2 (Rattlesnake class)
+    // from artilleryT2Income metal/s; the T1 fallback (Gauntlet class) from
+    // artilleryT1Income, below the T2 income or with no T2 seat. Both need the
+    // metal floating (bank >= artilleryBank of storage, or spare income >=
+    // artillerySpare), the energy bank >= artilleryEnergy of storage without a
+    // stall and, with artilleryEnergyCover, spare energy income covering the
+    // turret's build draw. Incomes 0: off.
+    float artilleryT2Income=0,artilleryT1Income=0,artilleryBank=.75f,artillerySpare=15;
+    float artilleryEnergy=.5f,artilleryEnergyCover=1;
+    // D-480: the FRONT seat's T1 constructor in the group takes every open mex
+    // it owns in its base (seatBaseRadius of the start), then every one along
+    // its lane up to the commander (seatApproachAhead past it), before any
+    // other group work. seatMex 0: off.
+    float seatMex=0,seatBaseRadius=1200,seatApproachAhead=0;
+    // A blocked spot: features within seatClearRadius are reclaimed first; any
+    // other blocker skips the spot for seatSkipSeconds.
+    float seatClearRadius=64,seatSkipSeconds=30;
+    // D-483: construction turrets a finished group job owes: a T1 defence
+    // nanoT1, a T2 defence (BAR techlevel 2+) nanoT2, any other job nanoOther.
+    float nanoT1=1,nanoT2=1,nanoOther=1;
+    // D-481: a T2 group constructor upgrades our own front-line T1 geo to the
+    // fortified one (Prude, Cerberus, Rampart). Front line: in the group lane band
+    // and within group radius plus build reach of the commander (where it places
+    // porc) to start; kept while within geoFrontRadius. geoFortify 0: off.
+    float geoFortify=0,geoIncome=20,geoFrontRadius=1800;
+    // D-488: 1 reclaims our plant on a forward vent when the fortified geo does not stack on it.
+    float geoReclaim=1;
+    // After a guard geo (Cerberus) finishes: geoGuardFront light lasers
+    // geoGuardFrontOffset ahead along the lane, geoGuardSpacing apart, and
+    // one flak geoGuardSideOffset to each side; plan dropped after geoGuardSeconds.
+    float geoGuardFront=2,geoGuardFrontOffset=192,geoGuardSpacing=128,geoGuardSideOffset=192,geoGuardSeconds=240;
+    // D-476: expansion jobs the group runs at once (one per constructor); 1
+    // keeps the single shared job of D-470 and earlier.
+    float expansionJobs=1;
 };
 struct CommanderFrontConfig {
     float workers=2;
@@ -243,6 +286,10 @@ struct CommanderFrontConfig {
     // ahead of it; enemy extractors on those spots are captured when
     // mexCaptureEnemy; one line turret per mexTurretEvery corridor mexes.
     float mexReach=0,mexBehind=400,mexAhead=600,mexCaptureEnemy=0,mexTurretEvery=0;
+    // D-478: radius (elmos) within which the FRONT commander also takes the
+    // spots of an orphan lane (no FRONT/SUPPORT seat on it) that it owns, when
+    // its own lane sweep finds nothing. 0 keeps the sweep to its own lane.
+    float mexAdoptRadius=0;
     float mexEnemyHome=0; // spots this close to an enemy start are never swept (0 = off)
 };
 struct CommanderT3Config {
@@ -322,7 +369,12 @@ public:
     bool HealthRetreat(CCircuitUnit* unit) const;
     int FrontCommanderId() const;
     void TaskFinished(IUnitTask* task,bool done);
-    bool OwnsGroupProject(const IUnitTask* task) const { return task && task==groupJob; }
+    // D-484: the geo definition to build at pos: a T2 geo outside the fortified
+    // list on a front-line vent becomes its faction's fortified geo.
+    // facing: set to the engine facing the fortified geo fits at (unchanged when def is kept).
+    // D-488: only on a forward vent; pos moves to the stack site; nullptr: order nothing there.
+    CCircuitDef* FrontGeoDef(CCircuitDef* def,springai::AIFloat3& pos,int& facing) const;
+    bool OwnsGroupProject(const IUnitTask* task) const { return IsExpansionJob(task); }
     bool IsGroupMember(int id) const;
     bool SetDefenseRule(int slot,const std::string& key,float value);
     IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
@@ -371,11 +423,85 @@ private:
     std::array<int,6> groupMembers{{-1,-1,-1,-1,-1,-1}};
     int groupDef2=-1,groupRadar2=-1,groupJammer2=-1,groupAA2=-1;
     State groupState;
-    IUnitTask* groupJob=nullptr; // borrowed until BuilderManager::DequeueTask callback
+    // D-476: the expansion queue, up to commander_group_expansion_jobs jobs at
+    // once (formerly the single groupJob). Each slot borrows its task until
+    // TaskFinished and carries that job's nano debt and hold lease. Fixed
+    // array: every lookup is at most MAX_EXPANSION_JOBS pointer compares.
+    static constexpr int MAX_EXPANSION_JOBS=6;
+    struct ExpansionJob { IUnitTask* task=nullptr; bool earnsNano=true,nano=false; int until=-1; };
+    std::array<ExpansionJob,MAX_EXPANSION_JOBS> expansionJobs{};
+    int ExpansionCap() const;
+    int ExpansionJobCount() const;
+    int NanoJobCount() const;
+    // Owed nanos no expansion job is building yet (the nano debt that blocks).
+    bool NanoUnassigned() const { return groupNanoOwed>unsigned(NanoJobCount()); }
+    bool IsExpansionJob(const IUnitTask* task) const;
+    IUnitTask* FirstExpansionJob() const;
+    IUnitTask* JoinExpansionJob(CCircuitUnit* unit,bool nearby);
+    // D-475/D-476: the second group queue. expansionJobs is the expansion
+    // queue (every job the group had before); tacticalJob is the tactical
+    // queue: one constructor above tactical_metal, any constructor with no
+    // expansion work below it. Borrowed like an expansion job, cleared in
+    // TaskFinished. The block is the layout group its slots come from; not
+    // serialized (after a load a new block is reserved).
+    IUnitTask* tacticalJob=nullptr;
+    std::vector<int> tacticalDefs;          // launchers, script-owned, first buildable wins
+    std::vector<int> artilleryT2Defs,artilleryT1Defs;  // D-479: static artillery, script-owned
+    // D-479: one reserved block per definition (T1 and T2 footprints differ).
+    struct TacticalBlock { int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0; };
+    std::map<int,TacticalBlock> tacticalBlocks;
+    // D-480: seat mex spots blocked by a unit or structure, and the frame each skip ends.
+    std::vector<std::pair<springai::AIFloat3,int>> seatMexSkip;
+    // D-485: next frame the seat sweep searches after one that found nothing;
+    // a reused spot-exclusion buffer for the seat and lane sweeps; BAR
+    // techlevel per definition id (-1 unknown), read once per definition.
+    int seatMexNext=0;
+    std::vector<springai::AIFloat3> mexSkipScratch;
+    mutable std::vector<signed char> defTier;
+    int DefTier(const CCircuitDef* def) const;
+    // D-481: the one fortified-geo job, its definitions (script-owned) and the
+    // guard plans of finished guard geos. Task pointers clear in TaskFinished.
+    IUnitTask* geoJob=nullptr;
+    springai::AIFloat3 geoJobPos;  // D-488: the vent of geoJob (a build or a reclaim)
+    int geoNext=0;
+    // D-481: per vent, the frame until which a vent the engine or an ally plan refused is not ordered again.
+    std::vector<int> geoVentSkip;
+    // D-484: vents FrontGeoDef swapped to a fortified geo (front line when ordered);
+    // a guard geo finished on one is guarded. Mutable: recorded from a const query.
+    // fails: swapped orders there that ended unbuilt; at FRONT_GEO_FAILS the vent keeps its geo.
+    static constexpr int FRONT_GEO_FAILS=2;
+    struct FrontGeoSite { springai::AIFloat3 pos; int fails=0; };
+    mutable std::vector<FrontGeoSite> frontGeoSites;
+    std::vector<int> geoDefs,geoGuardDefs,geoGuardFrontDefs,geoGuardSideDefs;
+    // D-481: one plan per guarded geo; each item (front light lasers, then the
+    // two side flak) has its own task, so builders work items in parallel.
+    // state: 0 to order, 1 ordered, 2 done or given up; retries per item.
+    static constexpr int MAX_GEO_GUARD_ITEMS=6;
+    struct GeoGuard { springai::AIFloat3 pos; float fx=0,fz=1; int until=0;
+        std::array<IUnitTask*,MAX_GEO_GUARD_ITEMS> tasks{}; std::array<char,MAX_GEO_GUARD_ITEMS> state{},retries{}; };
+    std::vector<GeoGuard> geoGuards;
+    int tacticalNext=0;                     // next block search (frame)
+    bool IsTacticalDef(const CCircuitDef* def) const;
+    float TacticalBlockRadius(const CCircuitDef* def) const;
+    bool OnTacticalBlock(const CCircuitDef* def,const springai::AIFloat3& site) const;
+    int GroupT2Count() const;
+    bool TacticalEconomy() const;           // the launcher gate (D-475)
+    bool ArtilleryEconomy(CCircuitUnit* unit,CCircuitDef* def) const;
+    CCircuitDef* TacticalChoice(CCircuitUnit* unit) const;
+    bool TacticalJobAllowed(CCircuitUnit* unit,IUnitTask* task,CCircuitUnit* anchor) const;
+    bool ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,int frame);
+    IUnitTask* GroupTacticalWork(CCircuitUnit* unit,CCircuitUnit* anchor,bool nearby);
+    IUnitTask* GroupSeatMexWork(CCircuitUnit* unit,CCircuitUnit* anchor);
+    bool GeoFrontLine(CCircuitUnit* anchor,const springai::AIFloat3& pos,float radius) const;
+    bool GeoJobAllowed(CCircuitUnit* unit,CCircuitUnit* anchor) const;
+    IUnitTask* GroupGeoWork(CCircuitUnit* unit,CCircuitUnit* anchor);
+    IUnitTask* GroupGeoGuardWork(CCircuitUnit* unit,CCircuitUnit* anchor);
+    void PlanGeoGuard(const CCircuitDef* def,const springai::AIFloat3& pos);
+    bool TacticalSplit(CCircuitUnit* unit) const;
     springai::AIFloat3 groupNanoSite{-1,0,-1};
-    bool groupNanoDue=false,groupJobNano=false,groupJobEarnsNano=true;
+    bool groupNanoDue=false;
     unsigned groupNanoOwed=0;
-    int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0,groupProjectUntil=-1;
+    int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0;
     bool GroupCanBuild(CCircuitDef* def,CCircuitUnit* anchor) const;
     bool GroupCanFund(CCircuitDef* def) const;
     std::array<defense::Rule,defense::MAX_RULES> defenseRules;
@@ -423,7 +549,9 @@ private:
     using DefenseBuilders=std::array<DefenseBuilder,6>;
     DefenseBuilders GatherDefenseBuilders(CCircuitUnit* anchor);
     defense::Project DefenseProject(CCircuitDef* def,const DefenseFacts& facts,const DefenseBuilders& builders);
-    IUnitTask* GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand=0);
+    // allowSurplus false: a surplus pick is not offered (D-476: the group asks
+    // for it only after mex upgrades and maintenance).
+    IUnitTask* GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand=0,bool allowSurplus=true);
     bool IsGroupStructure(int defId) const;
     bool GroupLaneWorkAllowed(CCircuitUnit* unit,CCircuitDef* def,const springai::AIFloat3& at) const;
     IUnitTask* GroupUpgradeMex(CCircuitUnit* unit,CCircuitUnit* anchor);

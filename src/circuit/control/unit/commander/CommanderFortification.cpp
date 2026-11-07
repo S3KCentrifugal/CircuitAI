@@ -172,7 +172,7 @@ IUnitTask* CCommanderController::ExpansionMexWork(CCircuitUnit* unit,State& s,CC
     if(cfg->front.mexMinIncome<=0 || cfg->front.mexDefence<=0 || !Handles(unit)
         || !role.frontReady || !def || !unit->GetCircuitDef()->CanBuild(def)
         || HealthRetreat(unit) || EnergyRetreat(unit) || FallbackActive(s,frame)
-        || groupJob || groupNanoDue || frame<s.front.expansionMexNext) return nullptr;
+        || ExpansionJobCount()>=ExpansionCap() || NanoUnassigned() || frame<s.front.expansionMexNext) return nullptr;
     const float income=ai->GetEconomyManager()->GetAvgMetalIncome();
     if(income<=cfg->front.mexMinIncome) return nullptr;
     // Preserve the existing three-second fortification retry interval. Do not

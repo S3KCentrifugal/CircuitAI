@@ -1035,6 +1035,9 @@ int CFactoryManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 int CFactoryManager::UnitFinished(CCircuitUnit* unit)
 {
 	auto iter = unfinishedUnits.find(unit);
+	if ((iter != unfinishedUnits.end()) && DropDeadMapping(unfinishedUnits, iter, "recruit")) {
+		iter = unfinishedUnits.end();
+	}
 	if (iter != unfinishedUnits.end()) {
 		CRecruitTask* task = static_cast<CRecruitTask*>(iter->second);
 		if (task->IsRepeat()) {
@@ -1072,7 +1075,7 @@ int CFactoryManager::UnitFinished(CCircuitUnit* unit)
 		}
 	}
 	auto itre = repairUnits.find(unit->GetId());
-	if (itre != repairUnits.end()) {
+	if ((itre != repairUnits.end()) && !DropDeadMapping(repairUnits, itre, "repair")) {
 		DoneTask(itre->second);
 	}
 
@@ -1121,11 +1124,11 @@ int CFactoryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
 	lagStrays.erase(unit->GetId());
 	auto iter = unfinishedUnits.find(unit);
-	if (iter != unfinishedUnits.end()) {
+	if ((iter != unfinishedUnits.end()) && !DropDeadMapping(unfinishedUnits, iter, "recruit")) {
 		AbortTask(iter->second);
 	}
 	auto itre = repairUnits.find(unit->GetId());
-	if (itre != repairUnits.end()) {
+	if ((itre != repairUnits.end()) && !DropDeadMapping(repairUnits, itre, "repair")) {
 		AbortTask(itre->second);
 	}
 
@@ -1226,9 +1229,11 @@ void CFactoryManager::DequeueTask(IUnitTask* task, bool done)
 						factoryTasks.erase(it);
 					}
 					unfinishedUnits.erase(static_cast<CRecruitTask*>(task)->GetTarget());
+					EraseTaskMappings(task);  // D-477: and every other entry naming it
 				} break;
 				case IBuilderTask::BuildType::REPAIR: {
 					repairUnits.erase(static_cast<CSRepairTask*>(task)->GetTargetId());
+					EraseTaskMappings(task);  // D-477
 				} break;
 				default: break;  // RECLAIM
 			}
@@ -1236,6 +1241,47 @@ void CFactoryManager::DequeueTask(IUnitTask* task, bool done)
 		default: break;
 	}  // WAIT
 	ITaskModule::DequeueTask(task, done);
+}
+
+/*
+ * D-477 (KI-762, the owner's game on queues-b11): UnitFinished dequeued a
+ * factory task that had already been freed. unfinishedUnits and repairUnits
+ * were erased by the task's current target only, so a task retargeted while
+ * mapped left its old entry naming it after it was freed. Every entry that
+ * names a dequeued task is erased here, as D-108 does for CBuilderManager.
+ * O(entries) at dequeue only (tens of entries); no per-frame work.
+ */
+void CFactoryManager::EraseTaskMappings(const IUnitTask* task)
+{
+	for (auto it = unfinishedUnits.begin(); it != unfinishedUnits.end();) {
+		if (it->second == task) {
+			// The key is not dereferenced: a stale entry's unit may be gone too.
+			circuit->LOG("[INVARIANT] INV-258 factory task still mapped to a unit other than its target (recruit)");
+			it = unfinishedUnits.erase(it);
+		} else {
+			++it;
+		}
+	}
+	for (auto it = repairUnits.begin(); it != repairUnits.end();) {
+		if (it->second == task) {
+			circuit->LOG("[INVARIANT] INV-258 factory task still mapped to a unit other than its target (repair) unit=%i",
+					it->first);
+			it = repairUnits.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+template<class Map, class Iter>
+bool CFactoryManager::DropDeadMapping(Map& map, Iter it, const char* which)
+{
+	if (!it->second->IsDead()) {
+		return false;
+	}
+	circuit->LOG("[INVARIANT] INV-258 factory %s mapping names a dequeued task; dropped", which);
+	map.erase(it);
+	return true;
 }
 
 void CFactoryManager::ApplySwitchFrame()

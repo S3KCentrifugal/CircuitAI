@@ -102,6 +102,47 @@ static IUnitTask* EnqueueAirGeo(CEconomyManager* economy, CCircuitUnit* builder,
 
 static bool IsGeoAirOnly(CEconomyManager* economy, const AIFloat3& pos) { return economy->IsGeoAirOnly(pos); }
 
+// D-488: an order already queued within this distance of a vent owns it
+// (matches GeoFortify.cpp).
+static constexpr float FORTIFIED_GEO_TASK_RADIUS = 64.f;
+
+// D-488: the CEconomyManager::GeoFortify code for builder and def at a forward vent.
+static int GeoFortifyState(CEconomyManager* economy, CCircuitUnit* builder, CCircuitDef* definition,
+        int spot, float maxThreat)
+{
+    AIFloat3 site;
+    int facing = UNIT_NO_FACING;
+    return static_cast<int>(economy->CheckGeoFortify(builder, definition, spot, maxThreat, site, facing));
+}
+
+// D-488: orders the fortified geo where it fits (over the standing plant when
+// it stacks there); an order already at the vent is returned when builder can
+// join it. Null otherwise; the script reads GeoFortifyState for the reason.
+static IUnitTask* EnqueueFortifiedGeo(CEconomyManager* economy, CCircuitUnit* builder, CCircuitDef* definition,
+        int spot, float maxThreat)
+{
+    AIFloat3 site;
+    int facing = UNIT_NO_FACING;
+    const auto state = economy->CheckGeoFortify(builder, definition, spot, maxThreat, site, facing);
+    auto* circuit = economy->GetCircuit();
+    auto* manager = circuit->GetBuilderManager();
+    if (state == CEconomyManager::GeoFortify::BUSY) {
+        const AIFloat3& vent = circuit->GetEnergyManager()->GetSpots()[spot];
+        for (auto* task : manager->GetTasks(IBuilderTask::BuildType::GEO)) {
+            if (task->GetPosition().SqDistance2D(vent) < SQUARE(FORTIFIED_GEO_TASK_RADIUS)
+                && !task->IsDead() && task->CanAssignTo(builder)) return task;
+        }
+        return nullptr;
+    }
+    if (state != CEconomyManager::GeoFortify::READY) return nullptr;
+    IBuilderTask* task = manager->Enqueue(TaskB::Spot(IBuilderTask::BuildType::GEO,
+        IBuilderTask::Priority::HIGH, definition, site, spot));
+    if (task != nullptr) task->SetFacing(facing);  // the facing the site test accepted
+    return task;
+}
+
+static CCircuitUnit* OwnGeoAt(CEconomyManager* economy, int spot) { return economy->OwnGeoAt(spot); }
+
 static void CEconomyManager_SetEnergyCondition(CEconomyManager* mgr, const CCircuitDef* cdef, int limit, float mi, float ei)
 {
 	mgr->SetEnergyCondition(const_cast<CCircuitDef*>(cdef), limit, mi, ei);
@@ -251,6 +292,12 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueLocalGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueLocalGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueAirGeo(CCircuitUnit@, CCircuitDef@, const AIFloat3& in, float)", asFUNCTION(EnqueueAirGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsGeoAirOnly(const AIFloat3& in)", asFUNCTION(IsGeoAirOnly), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "void SetGeoForward(int, bool)", asMETHOD(CEconomyManager, SetGeoForward), asCALL_THISCALL); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsGeoForward(int) const", asMETHOD(CEconomyManager, IsGeoForward), asCALL_THISCALL); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "int GeoFortifyState(CCircuitUnit@, CCircuitDef@, int, float)", asFUNCTION(GeoFortifyState), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueFortifiedGeo(CCircuitUnit@, CCircuitDef@, int, float)", asFUNCTION(EnqueueFortifiedGeo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "CCircuitUnit@ OwnGeoAt(int)", asFUNCTION(OwnGeoAt), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-488
+	r = engine->RegisterObjectMethod("CEconomyManager", "bool CanSpareGeo(CCircuitUnit@)", asMETHOD(CEconomyManager, CanSpareGeo), asCALL_THISCALL); ASSERT(r >= 0);  // D-488
 	r = engine->RegisterObjectMethod("CEconomyManager", "bool IsMetalMap() const", asMETHOD(CEconomyManager, IsMetalMap), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetEffectiveUnitLimit() const", asMETHOD(CEconomyManager, GetEffectiveUnitLimit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "int GetFieldMexCount(const AIFloat3& in, float) const", asMETHOD(CEconomyManager, GetFieldMexCount), asCALL_THISCALL); ASSERT(r >= 0);

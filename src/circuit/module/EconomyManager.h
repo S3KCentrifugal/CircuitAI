@@ -165,6 +165,24 @@ public:
 	bool CanReachMex(CCircuitUnit* builder, const springai::AIFloat3& pos);
 	// D-465: a geothermal vent no claimant ground start reaches (build stance, 3D).
 	bool IsGeoAirOnly(const springai::AIFloat3& pos);
+	// D-488: forward vents (a fortified geo there reaches mid map or beyond),
+	// chosen by script (ForwardGeo) once per match; empty when no role sets them.
+	void SetGeoForward(int spot, bool value);
+	bool IsGeoForward(int spot) const;
+	int GeoSpotAt(const springai::AIFloat3& pos) const;  // vent within GEO_PLANT_RADIUS, or -1
+	// D-488: our finished geo plant standing on a vent, or nullptr.
+	CCircuitUnit* OwnGeoAt(int spot) const;
+	// D-488: the plant's energy can go: not stalling, and income without it still covers the pull.
+	bool CanSpareGeo(CCircuitUnit* plant);
+	// D-488: where def can go at a vent. A geo stacks on the plant below only
+	// with the yardmaps aligned, so a standing plant's own position is tried
+	// first, then the vent; the first facing the engine accepts. false: refused.
+	bool FindGeoSite(CCircuitDef* def, int spot, springai::AIFloat3& site, int& facing) const;
+	// D-488: whether def can be ordered at a forward vent for builder, as a
+	// GeoFortify code; site and facing are set for READY.
+	enum class GeoFortify : int { READY = 0, BUILT, ALLY, UNREACHABLE, BUSY, REFUSED_PLANT, REFUSED, UNAVAILABLE, ENEMY };
+	GeoFortify CheckGeoFortify(CCircuitUnit* builder, CCircuitDef* def, int spot, float maxThreat,
+			springai::AIFloat3& site, int& facing);
 	bool IsMexExpansionAllowed(const springai::AIFloat3& pos, bool allyAware);
 	bool IsMexNavigationEnabled() const { return mexNavigationEnabled; }
 	bool IsMexOwnershipActive() const;
@@ -197,6 +215,14 @@ public:
 	springai::AIFloat3 MexLaneMidpoint(int lane);
 	float MexLaneWidth(int lane);
 	bool MexLaneMember(int lane, int team);
+	// D-478: a lane no FRONT or SUPPORT seat stands on (the lane traced from an
+	// AIR or TECH start), and a spot of such a lane that this AI owns: the
+	// nearest FRONT seat's adopted lane territory.
+	bool MexLaneOrphan(int lane);
+	bool IsAdoptedLaneSpot(const springai::AIFloat3& pos);
+	// D-485: whether any spot we own lies on an orphan lane (none: the
+	// commander's adopted search is skipped).
+	bool HasAdoptedLaneSpots();
 	std::vector<springai::AIFloat3> MexLaneSpine(int lane, int step);
 	std::string DescribeMexTerritory();
 	void DumpMexTerritory(const char* why);
@@ -338,6 +364,7 @@ private:
 	std::vector<SResSpot> mexSpots;  // AI-local metal info
 	int mexCount;
 	std::vector<SResSpot> geoSpots;
+	std::vector<char> geoForward;  // D-488: per vent, set by script; sized on first set
 
 	struct SMetalExt {
 		float speed;
@@ -527,6 +554,13 @@ private:
 	// D-358: the partition over the field's corridor table of the own claim's
 	// ground class; rebuilt when the table arrives or the claims change.
 	mex_lanes::Partition mexLanes;
+	// D-485: orphan lanes (no FRONT/SUPPORT seat, some start joined) and the
+	// count of our resolved spots on them, recomputed lazily once per
+	// territory rebuild (mexRebuildCount); O(lanes x claims + spots).
+	unsigned mexRebuildCount = 0, mexOrphanRevision = ~0u;
+	std::vector<char> mexOrphanLanes;
+	int mexAdoptedSpots = 0;
+	void RefreshOrphanLanes();
 	std::shared_ptr<const field::SModel> mexField;   // the table the partition was built from (null: none yet)
 	int mexLaneClass = -1;                // field class of the own ground claim
 	int mexLaneSide = -1;                 // this team's side index in the table

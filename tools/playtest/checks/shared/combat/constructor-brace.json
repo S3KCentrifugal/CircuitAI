@@ -1,0 +1,59 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "enemy",
+      "pattern": "spawn id=\\d+ team=1 unit=armpw",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "brace",
+      "pattern": "\\[Brace\\] unit=\\d+ armck reason=(damaged|frame_lost) .*defence=armbeamer",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "enemy"
+    },
+    {
+      "key": "beamer",
+      "pattern": "defense_ready def=armbeamer count=[1-9]",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "brace"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\] INV-(?!254 )",
+      "scope": "any",
+      "note": "INV-254 (the commander waiting on a seat-only defence) fires on the pre-branch build too: KI-757."
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "rule rejected",
+      "pattern": "\\[DefenseFixture\\] ERROR",
+      "scope": "any"
+    }
+  ]
+}
