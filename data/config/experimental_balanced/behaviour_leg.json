@@ -824,6 +824,7 @@
 				"power": 1.0
 			},
 			"leghrk": {
+				"priority_min_tech": 2,   // owner 2026-11-07: structures, commanders and T2/T3 units before any T1 unit
 				"fire_state": 2,
 				"role": ["artillery"],
 				"attribute": ["siege"],
@@ -887,6 +888,7 @@
 				"power": 1.0
 			},
 			"legeallterrainmech": {
+				"priority_min_tech": 2,   // owner 2026-11-07: structures, commanders and T2/T3 units before any T1 unit
 				// owner 2026-10-28: Myrmidon on the ranged controller (bombardment). Its cannons arc high
 				// (smart trajectory), so no terrain check: from near max range it shells radar dots and
 				// scouted non-spam, never walks in on an unidentified dot, and firing sites stay outside

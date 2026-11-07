@@ -1797,6 +1797,7 @@
 				"power": 1.0
 			},
 			"armvang": { //vanguard
+				"priority_min_tech": 2,   // owner 2026-11-07: structures, commanders and T2/T3 units before any T1 unit
 				"role": ["artillery", "heavy"],
 				"attribute": ["siege"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
@@ -2368,6 +2369,7 @@
 				"power": 1.0
 			},
 			"corcat": {
+				"priority_min_tech": 2,   // owner 2026-11-07: structures, commanders and T2/T3 units before any T1 unit
 				"role": ["artillery", "heavy"],
 				// Shared controller uses loaded rocket range/burst and bounded firing slots.
 			// Bombardment retains splash/static value; no precision-only heavy preference.

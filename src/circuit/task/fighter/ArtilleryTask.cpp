@@ -2392,7 +2392,11 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 					continue;
 				}
 			}
-			if ((edef == nullptr) || edef->IsMobile() || edef->IsAttrSiege()
+			// Owner 2026-11-07 (priority_min_tech, Thanatos/Vanguard): an identified
+			// T2/T3 mobile in radar or LOS joins the structures in the same pick
+			// (siege hulls included); T1 mobiles stay engine auto-fire only.
+			const bool prioMobile = (edef != nullptr) && edef->IsMobile() && !ghost && cdef->IsPriorityTarget(edef);
+			if ((edef == nullptr) || (edef->IsMobile() && !prioMobile) || (edef->IsAttrSiege() && !prioMobile)
 				|| circuit->GetCircuitDef(edef->GetId())->IsIgnore())
 			{
 				continue;

@@ -720,6 +720,12 @@ void CFactoryManager::ReadConfig()
                 cdef->SetTargetMinCost(targetCost.asFloat());
             else circuit->LOG("CONFIG %s: %s invalid target_min_cost", cfgName.c_str(), defName.c_str());
         }
+        const auto& prioTech = behaviour["priority_min_tech"];
+        if (!prioTech.isNull()) {
+            if (prioTech.isNumeric() && std::isfinite(prioTech.asFloat()) && prioTech.asFloat() >= 0.f && prioTech.asFloat() <= 3.f)
+                cdef->SetPriorityMinTech(prioTech.asFloat());
+            else circuit->LOG("CONFIG %s: %s invalid priority_min_tech", cfgName.c_str(), defName.c_str());
+        }
 
 		const Json::Value& reload = behaviour["reload"];
 		if (!reload.isNull()) {
