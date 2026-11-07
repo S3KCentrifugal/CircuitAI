@@ -23,14 +23,28 @@
 // claim for SurplusSeatRetrySeconds). Cost: O(1) per ask; the placement is the
 // existing layout query the other turret and converter rows already make. Seats
 // are not saved: after a load the next ask reclaims them from live state.
+//
+// D-493: the rules are pure in helpers/math/surplus_seat_math.as (tested); the
+// energy test is the shared one (aiEconomyMgr.IsEnergyLow). This file only reads
+// the live facts and makes the engine calls.
+#include "../../helpers/math/surplus_seat_math.as"
 namespace TechSurplusSeats {
     class Seat {
         string name;
-        int id;            // the holder, -1 when vacant
-        int lastSurplus;   // last frame the seat's surplus held
-        int retry;         // no claim before this frame
-        int idleSince;     // INV-260: frame the holder was first seen idle, -1 when busy
-        Seat(const string &in n) { name = n; id = -1; lastSurplus = -1; retry = 0; idleSince = -1; }
+        int id;               // the holder, -1 when vacant
+        int lastSurplus;      // last frame the seat's surplus held
+        int retry;            // no claim before this frame
+        int idleSince;        // frame the holder was first seen idle, -1 when busy
+        int handedFrame;      // last frame the seat handed its holder an order (diagnosis, KI-771)
+        int handedType;       // that order's task type, -1 none
+        string handedDef;     // its build definition, if any
+        int fallbackHolder;   // INV-260: the holder of the last idle fallback ...
+        int fallbackFrame;    // ... and its frame
+        Seat(const string &in n)
+        {
+            name = n; id = -1; lastSurplus = -1; retry = 0; idleSince = -1;
+            handedFrame = -1; handedType = -1; handedDef = ""; fallbackHolder = -1; fallbackFrame = -1;
+        }
     }
     Seat@ turret = Seat("turret");
     Seat@ converter = Seat("converter");
@@ -40,27 +54,19 @@ namespace TechSurplusSeats {
         return Global::RoleSettings::Tech::SurplusSeatsEnabled && Global::AISettings::Role == AiRole::TECH;
     }
 
-    bool EnergyLow()
-    {
-        const float storage = aiEconomyMgr.energy.storage;
-        return aiEconomyMgr.isEnergyStalling
-            || (storage > 0.0f && aiEconomyMgr.energy.current < storage * Global::RoleSettings::Tech::SurplusSeatLowEnergyShare);
-    }
-
-    // A turret drains energy too: none while energy is low.
+    // A turret drains energy too: none while energy is low (the shared rule).
     bool MetalSurplus()
     {
-        return !EnergyLow() && aiEconomyMgr.metal.current >= Global::RoleSettings::Tech::SurplusSeatMetalBank;
+        return SurplusSeatMath::MetalSurplus(aiEconomyMgr.metal.current, Global::RoleSettings::Tech::SurplusSeatMetalBank,
+            aiEconomyMgr.IsEnergyLow(Global::RoleSettings::Tech::SurplusSeatLowEnergyShare));
     }
 
     // Excess energy: the bank floating (TechChain::EnergyBankFloats) or at
     // SurplusSeatEnergyShare of storage (played, b52: the seat was released with the bank at 95 %).
     bool EnergySurplus()
     {
-        if (aiEconomyMgr.isEnergyStalling) return false;
-        const float storage = aiEconomyMgr.energy.storage;
-        return TechChain::EnergyBankFloats()
-            || (storage > 0.0f && aiEconomyMgr.energy.current >= storage * Global::RoleSettings::Tech::SurplusSeatEnergyShare);
+        return SurplusSeatMath::EnergyExcess(aiEconomyMgr.isEnergyStalling, TechChain::EnergyBankFloats(),
+            aiEconomyMgr.energy.current, aiEconomyMgr.energy.storage, Global::RoleSettings::Tech::SurplusSeatEnergyShare);
     }
 
     bool AtBase(CCircuitUnit@ u)
@@ -90,26 +96,34 @@ namespace TechSurplusSeats {
         if (retry) s.retry = ai.frame + Global::RoleSettings::Tech::SurplusSeatRetrySeconds * SECOND;
     }
 
-    // True when u holds (or now claims) the seat.
+    // True when u holds (or now claims) the seat (SurplusSeatMath::Decide).
     bool Admit(Seat@ s, CCircuitUnit@ u, bool surplus)
     {
         if (surplus) s.lastSurplus = ai.frame;
         if (s.id >= 0 && s.id != u.id && !Eligible(s, ai.GetTeamUnit(s.id))) Release(s, "holder gone or away", false);
-        if (s.id == u.id) {
-            if (!Eligible(s, u)) { Release(s, "left base or taken", false); return false; }
-            if (ai.frame - s.lastSurplus > Global::RoleSettings::Tech::SurplusSeatReleaseSeconds * SECOND) {
-                Release(s, "surplus over", false);
-                return false;
-            }
-            return true;
-        }
-        if (s.id >= 0 || !surplus || ai.frame < s.retry || !Eligible(s, u)) return false;
+        const int decision = SurplusSeatMath::Decide(s.id == u.id, s.id >= 0 && s.id != u.id, Eligible(s, u), surplus,
+            ai.frame, s.lastSurplus, s.retry, Global::RoleSettings::Tech::SurplusSeatReleaseSeconds * SECOND);
+        if (decision == SurplusSeatMath::RELEASE_INELIGIBLE) { Release(s, "left base or taken", false); return false; }
+        if (decision == SurplusSeatMath::RELEASE_SURPLUS) { Release(s, "surplus over", false); return false; }
+        if (decision == SurplusSeatMath::HOLD) return true;
+        if (decision != SurplusSeatMath::CLAIM) return false;
         s.id = u.id;
         s.idleSince = -1;
         GenericHelpers::LogUtil("[TECH][Seat] " + u.circuitDef.GetName() + " " + u.id + " holds the " + s.name
             + " seat: metal " + int(aiEconomyMgr.metal.current) + "/" + int(aiEconomyMgr.metal.storage)
             + " energy " + int(aiEconomyMgr.energy.current) + "/" + int(aiEconomyMgr.energy.storage) + " (D-489)", 1);
         return true;
+    }
+
+    // Records what the seat handed its holder (KI-771 diagnosis) and returns it.
+    IUnitTask@ Hand(Seat@ s, IUnitTask@ t)
+    {
+        if (t is null) return null;
+        s.handedFrame = ai.frame;
+        s.handedType = t.GetType();
+        IBuilderTask@ b = cast<IBuilderTask>(t);
+        s.handedDef = (b is null || b.buildDef is null) ? "" : b.buildDef.GetName();
+        return t;
     }
 
     IUnitTask@ TurretWork(CCircuitUnit@ u)
@@ -124,10 +138,10 @@ namespace TechSurplusSeats {
         IUnitTask@ t = Layout::NanoTask(u, Task::Priority::HIGH, budget);
         if (t is null) @t = TechBuild::AssistNearestOf(u, name);
         if (t is null) Release(turret, "no free turret slot", true);
-        return t;
+        return Hand(turret, t);
     }
 
-    // D-107's converter aircraft is the converter seat while it stands.
+    // The D-107 converter aircraft is the converter seat while it stands.
     bool AirConverterServes() { return ai.GetTeamUnit(TechBuild::airConvId) !is null; }
 
     IUnitTask@ ConverterWork(CCircuitUnit@ u)
@@ -145,39 +159,39 @@ namespace TechSurplusSeats {
             if (reason == EcoPlanner::PENDING) @t = TechBuild::AssistNearestOf(u, name);
             if (t is null) Release(converter, "nothing to build: " + EcoPlanner::ConversionReasonName(reason), true);
         }
-        return t;
+        return Hand(converter, t);
     }
 
     // EcoPlanner::TechConversionAdmission: the metal-full, capacity, parallel and income
-    // tests are waived for the converter seat and D-107's converter aircraft while energy is in excess.
+    // tests are waived for the converter seat and the D-107 converter aircraft while energy is in excess.
     bool ConverterSeatWaived(CCircuitUnit@ worker)
     {
-        if (!Enabled() || worker is null || !EnergySurplus()) return false;
-        return worker.id == converter.id || worker.id == TechBuild::airConvId;
+        if (!Enabled() || worker is null) return false;
+        return SurplusSeatMath::ConverterWaived(worker.id == converter.id || worker.id == TechBuild::airConvId, EnergySurplus());
     }
 
-    // From Invariants::Tick. INV-260: a held seat's holder is never idle for
-    // SurplusSeatIdleSeconds (a seat with nothing to do is released at once).
+    // From Invariants::Tick. A holder lost, retreating or sent away is vacated
+    // here (played, b52). A holder idle SurplusSeatIdleReleaseSeconds never took
+    // the order it was handed: the seat is freed and the order logged (KI-771).
+    // INV-260 (D-493): that fallback never fires twice in a row for the same
+    // holder within the retry window, which would mean the cause is still there.
     void Check(Seat@ s)
     {
         if (s.id < 0) { s.idleSince = -1; return; }
         CCircuitUnit@ u = ai.GetTeamUnit(s.id);
-        // A holder lost, retreating or sent away is vacated here, not on the next
-        // ask of another constructor (played, b52: a retreating holder kept the seat).
         if (!Eligible(s, u)) { Release(s, "holder gone, retreating or away", false); return; }
         const bool idle = u.task is null || u.task.GetType() == int(Task::Type::IDLE);
         if (!idle) { s.idleSince = -1; return; }
-        if (s.idleSince < 0) s.idleSince = ai.frame;
-        // An order the holder never takes up (played, b52: a turret seat holder idle
-        // after a failed move while asks kept returning an order it could not join)
-        // frees the seat, which waits SurplusSeatRetrySeconds before the next claim.
-        else if (ai.frame - s.idleSince >= Global::RoleSettings::Tech::SurplusSeatIdleReleaseSeconds * SECOND) {
-            Release(s, "holder idle " + int((ai.frame - s.idleSince) / SECOND) + " s: its order was not taken", true);
-            return;
-        }
-        if (s.idleSince >= 0 && ai.frame - s.idleSince >= Global::RoleSettings::Tech::SurplusSeatIdleSeconds * SECOND)
-            Invariants::Violation("INV-260", s.name, "the " + s.name + " seat holder " + s.id + " has been idle "
-                + int((ai.frame - s.idleSince) / SECOND) + " s (D-489)");
+        if (s.idleSince < 0) { s.idleSince = ai.frame; return; }
+        if (!SurplusSeatMath::IdleRelease(s.idleSince, ai.frame, Global::RoleSettings::Tech::SurplusSeatIdleReleaseSeconds * SECOND)) return;
+        const int window = Global::RoleSettings::Tech::SurplusSeatRetrySeconds * SECOND;
+        if (SurplusSeatMath::FallbackRepeated(s.fallbackHolder, s.fallbackFrame, s.id, ai.frame, window))
+            Invariants::Violation("INV-260", s.name, "the " + s.name + " seat idle fallback fired twice for holder " + s.id
+                + " within " + Global::RoleSettings::Tech::SurplusSeatRetrySeconds + " s (D-493)");
+        s.fallbackHolder = s.id; s.fallbackFrame = ai.frame;
+        const string handed = s.handedFrame < 0 ? "nothing handed" : ("handed type " + s.handedType + " " + s.handedDef
+            + " " + int((ai.frame - s.handedFrame) / SECOND) + " s ago");
+        Release(s, "holder idle " + int((ai.frame - s.idleSince) / SECOND) + " s: its order was not taken (" + handed + ")", true);
     }
     void Tick()
     {

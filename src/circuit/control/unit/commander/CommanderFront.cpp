@@ -201,7 +201,7 @@ AIFloat3 CCommanderController::FrontPosition(CCircuitUnit* unit,State& s,int fra
 
 IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitDef* buildDef,float radius) {
     Bind bound(this,PresetOfUnit(unit?unit->GetId():-1)); // D-388: this unit's preset
-    if(kind==19) return GroupWork(unit);
+    if(kind==19) return HandedGroup(unit,GroupWork(unit));
     if(HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
     if(kind==WORK_SOLAR) {
         if(!Handles(unit) || !role.frontDuty || cfg->front.solarIncome<=0 || !unit->IsFinished()) return nullptr;
@@ -216,11 +216,11 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         // D-490: the commander's own construction (a mex, a turret) is finished first.
         if(cfg->front.keepOwnBuild>0 && IsOwnConstruction(unit,current)) return nullptr;
         auto* eco=ai->GetEconomyManager();
-        // D-490: front_solar_stall also offers it while energy stalls above front_solar_income.
-        const bool incomeLow=eco->GetAvgEnergyIncome()<cfg->front.solarIncome
-            || (cfg->front.solarStall>0 && eco->IsEnergyStalling());
-        if(!incomeLow || eco->GetEnergyStore()<=0
-            || eco->GetEnergyCur()>=eco->GetEnergyStore()*cfg->front.solarStorage) return nullptr;
+        // D-493: the shared energy state; D-490: front_solar_stall also offers it
+        // while energy stalls above front_solar_income.
+        const economy::EnergyState energy=eco->GetEnergyState();
+        const bool incomeLow=energy.income<cfg->front.solarIncome || (cfg->front.solarStall>0 && energy.stalling);
+        if(!incomeLow || energy.storage<=0 || !economy::EnergyLow(energy,cfg->front.solarStorage)) return nullptr;
         // Priority-two repairs retain precedence over emergency economy. Only
         // ask the existing bounded repair selector when a solar is eligible;
         // ordinary deployment does not gain another friendly-unit query.
@@ -256,16 +256,17 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         }
         if(!task) { state.front.solarNext=frame+3*FRAMES_PER_SEC;return nullptr; }
         state.work.task=task;state.work.kind=WORK_SOLAR;
+        state.work.NoteOrigin(task,commander::TaskOrigin::Solar);  // D-493
         ai->LOG("[CommanderWork] unit=%i work=22 solar=%s income=%.1f storage=%.3f",unit->GetId(),def->GetDef()->GetName(),
             eco->GetAvgEnergyIncome(),eco->GetEnergyCur()/eco->GetEnergyStore());
         return task;
     }
-    if(kind==20) return GroupAssist(unit);
+    if(kind==20) return Handed(unit,GroupAssist(unit),commander::TaskOrigin::Assist);
     // Every normal defensive offer shares tier selection and the following
     // nano obligation, even while the assigned T2 worker is still en route.
     if(role.frontDuty && ((kind==WORK_MEX_DEFENCE && cfg->front.mexMinIncome<=0) || kind==WORK_TERRITORY_LINE
         || kind==WORK_LINE || kind==WORK_TIMED || kind==WORK_RADAR || kind==2 || kind==3))
-        return GroupWork(unit);
+        return HandedGroup(unit,GroupWork(unit));
     if(GroupActive(unit) && kind==WORK_MEX_LANE) buildDef=nullptr;
     if(!Handles(unit) || !role.frontDuty || !role.frontReady || !unit->IsFinished()
         || (kind!=WORK_HOLD && cfg->safety.healthRetreat<=0
@@ -305,6 +306,9 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
             && task->GetType()==IUnitTask::Type::BUILDER && cfg->front.fortifyAdvance>0)
             s.front.fortifyNextProgress=ai->GetBattle()->GetFrontLaneProgress(unit->GetPos(frame))+cfg->front.fortifyAdvance;
         s.work.task=task; s.work.kind=kind; s.work.held=FallbackActive(s,frame); s.work.boundary=s.fallback.boundary;
+        // D-493: the assist rungs (assist, factory, base) hand out assists; every other rung, own work.
+        s.work.NoteOrigin(task,(kind==WORK_ASSIST || kind==WORK_FACTORY || kind==WORK_BASE)
+            ?commander::TaskOrigin::Assist:commander::TaskOrigin::Ladder);
         if(task) ai->LOG("[CommanderWork] unit=%i work=%i task=%i",unit->GetId(),kind,
             task->GetType()==IUnitTask::Type::BUILDER?int(static_cast<IBuilderTask*>(task)->GetBuildType()):-1);
         return task;

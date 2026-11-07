@@ -3159,29 +3159,50 @@ int CTerrainManager::PackFactoryFlush(CCircuitDef* cdef, const AIFloat3& anchor)
 	return id;
 }
 
+void CTerrainManager::AddCoreFootprint(CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	int2 r1, r2;
+	if ((cdef == nullptr) || !ReservationCells(cdef, pos, facing, r1, r2)) return;
+	const layout_rank::CellRect rect{r1.x, r1.y, r2.x, r2.y};
+	for (const auto& r : coreRects) {
+		if ((r.x1 == rect.x1) && (r.z1 == rect.z1) && (r.x2 == rect.x2) && (r.z2 == rect.z2)) return;
+	}
+	coreRects.push_back(rect);
+}
+
+int CTerrainManager::CoreEdgeGap(CCircuitDef* cdef, const AIFloat3& pos, int facing) const
+{
+	if ((cdef == nullptr) || coreRects.empty()) return -1;
+	int best = -1;
+	for (int f : {facing < 0 ? 0 : facing, facing < 0 ? 1 : facing}) {
+		int2 c1, c2;
+		if (!ReservationCells(cdef, pos, f, c1, c2)) continue;
+		// The member itself (a core footprint it overlaps) is skipped: the gap is to the others.
+		const layout_rank::CellRect own{c1.x, c1.y, c2.x, c2.y};
+		for (const auto& r : coreRects) {
+			if (layout_rank::Overlaps(own, r)) continue;
+			const int gap = layout_rank::EdgeGap(own, r);
+			if ((best < 0) || (gap < best)) best = gap;
+		}
+	}
+	return best;
+}
+
 int CTerrainManager::PackBesideCore(int zone, CCircuitDef* cdef, int nanoGroup, int facing, bool anyFacing,
-		int coreA, int coreB, int maxGapCells, float minNanoDist)
+		int maxGapCells, float minNanoDist)
 {
 	performance::Scope measured(circuit, performance::PACK_GROUP);
 	SSlowCall slow("PackBesideCore", circuit);
-	if (!layoutEnabled || (cdef == nullptr) || (maxGapCells < 0)) {
+	if (!layoutEnabled || (cdef == nullptr) || (maxGapCells < 0) || coreRects.empty()) {
 		return -1;
 	}
-	// The core: at most two reserved footprints. Cost: candidates (zone plus
-	// its reach ring) x facings x 2 rectangle gaps, a few times a game.
-	std::vector<layout_rank::CellRect> core;
+	// Cost: candidates (zone plus its reach ring) x facings x core members, a
+	// few times a game.
+	const std::vector<layout_rank::CellRect>& core = coreRects;
 	AIFloat3 centre(0.f, 0.f, 0.f);
-	for (int id : {coreA, coreB}) {
-		auto it = reservations.find(id);
-		int2 r1, r2;
-		if ((it != reservations.end()) && (it->second.def != nullptr)
-			&& ReservationCells(it->second.def, it->second.pos, it->second.facing, r1, r2)) {
-			core.push_back(layout_rank::CellRect{r1.x, r1.y, r2.x, r2.y});
-			centre += it->second.pos;
-		}
-	}
-	if (core.empty()) {
-		return -1;
+	for (const auto& r : core) {
+		centre.x += (r.x1 + r.x2) * base_layout::HALF_CELL_ELMOS;
+		centre.z += (r.z1 + r.z2) * base_layout::HALF_CELL_ELMOS;
 	}
 	centre /= float(core.size());
 	if ((facing < 0) || (facing > 3)) {

@@ -34,7 +34,6 @@ namespace Tech {
             int SurplusSeatReleaseSeconds = 20;          // a seat outlives its surplus by this, so a dip does not churn it
             int SurplusSeatRetrySeconds = 15;            // after a seat finds no slot, no claim for this long
             int SurplusSeatIdleReleaseSeconds = 5;       // a seat holder idle this long gives the seat up
-            int SurplusSeatIdleSeconds = 10;             // INV-260: a held seat idle this long is broken
             bool ClusterEconomyEnabled = true;
             int ClusterTurretParallel = 10;
             float ClusterWorkerRadius = 640.f;

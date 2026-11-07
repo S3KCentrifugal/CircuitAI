@@ -181,6 +181,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::solarRadius>("front_solar_radius",32,600),Front<&FC::solarDef>("front_solar_def",-1,100000),
         Front<&FC::solarStall>("front_solar_stall",0,1),Front<&FC::keepOwnBuild>("front_keep_own_build",0,1),
         Front<&FC::assistBreakEnergy>("front_assist_break_energy",0,1),
+        Front<&FC::assistCloseSeconds>("front_assist_close_seconds",0,120),
         Front<&FC::mexSeconds>("front_mex_seconds",0,30),Front<&FC::stallSeconds>("front_stall_seconds",3,60),
         Front<&FC::detourSeconds>("front_detour_seconds",0,3),
         T3<&TC::declineGate>("t3_decline_gate",0,1),
@@ -350,10 +351,8 @@ float CCommanderController::GetDeficit() const {
 }
 bool CCommanderController::SetOption(const std::string& name,float value) {
     if(!std::isfinite(value)) return false;
-    {  // D-492: artillery fire control and crowding levers
-        float* lever=name=="artillery_fire_control"?&artilleryFireControl
-            :name=="artillery_heavy_cost"?&artilleryHeavyCost
-            :name=="artillery_local_max"?&artilleryLocalMax
+    {  // D-492: the tactical queue's artillery crowding levers
+        float* lever=name=="artillery_local_max"?&artilleryLocalMax
             :name=="artillery_local_radius"?&artilleryLocalRadius:nullptr;
         if(lever) {
             if(value<0 || value>100000) return false;
@@ -728,7 +727,6 @@ void CCommanderController::Update() {
     // D-389: keep the side's combat snapshot alive while commanders read it.
     if(role.enabled && !states.Empty()) ai->GetAllyTeam()->GetCombatSnapshot().Want(frame);
     UpdateCommanderGroup();
-    UpdateArtillery();   // D-492
     for(auto& entry:states) {
         const int id=entry.id; auto& s=*entry.value;
         auto* unit=ai->GetTeamUnit(id); if(!unit || unit->IsDead()) continue;
@@ -1263,7 +1261,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
         // its frame before moving the anchor away; safety/fallback ran first.
         // GroupAssist bounds pre-frame holding by the project's original lease.
         if(ExpansionJobCount()>0) {
-            if(auto* assist=GroupAssist(unit)) {
+            if(auto* assist=Handed(unit,GroupAssist(unit),commander::TaskOrigin::Assist)) {
                 if(unit->GetTask()!=assist) ai->GetBuilderManager()->AssignTask(unit,assist);
                 return true;
             }

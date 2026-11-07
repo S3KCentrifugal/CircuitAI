@@ -34,13 +34,6 @@
       "after_key": "artillery job"
     },
     {
-      "key": "adopt",
-      "pattern": "\\[Artillery\\] adopt unit=\\d+",
-      "scope": "any",
-      "by_minute": 9,
-      "after_key": "artillery finished"
-    },
-    {
       "key": "crowded",
       "pattern": "artillery_crowded def=armamb",
       "scope": "any",
@@ -51,7 +44,7 @@
       "pattern": "\\[Artillery\\] aim unit=\\d+ target=\\d+ def=cornanotc kind=support",
       "scope": "any",
       "by_minute": 10,
-      "after_key": "adopt"
+      "after_key": "artillery finished"
     },
     {
       "key": "aim static",

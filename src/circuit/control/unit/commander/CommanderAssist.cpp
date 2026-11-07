@@ -35,48 +35,66 @@ constexpr int ASSIST_LOW_LOG_SECONDS=60;
 }
 
 /*
- * Own construction: a construction task (a build definition, not repair,
- * reclaim, guard) that this commander works alone, or that its own work
- * ladder chose for it (state.work.task, not a group assist, kind 20). A job
- * another builder started and the commander joined is assisting.
- * Cost: a cast, a set size, one state lookup.
+ * D-493: own construction against assisting by the task's recorded origin
+ * (CommanderTaskOrigin.h, tested): ladder, group and solar tasks are the
+ * commander's own; an assist rung, a group assist or a joined job is an
+ * assist. An unrecorded task falls back to "works it alone". Cost: a cast, a
+ * set size and an eight-entry scan.
  */
 bool CCommanderController::IsOwnConstruction(CCircuitUnit* unit,IUnitTask* task) const {
     auto* build=dynamic_cast<IBuilderTask*>(task);
-    if(!unit || !build || task->IsDead() || task->IsExternalControlled() || task->IsEnemyReclaim()
-        || !build->GetBuildDef() || build->GetBuildType()>=BT::REPAIR) return false;
-    if(task->GetAssignees().size()<=1) return true;
+    if(!unit || !build || task->IsDead() || task->IsExternalControlled() || task->IsEnemyReclaim()) return false;
     const State* s=states.Find(unit->GetId());
-    return s && s->work.task==task && s->work.kind!=WORK_GROUP_ASSIST && s->work.kind!=WORK_ASSIST;
+    const auto origin=s?s->work.OriginOf(task):commander::TaskOrigin::None;
+    const bool construction=build->GetBuildDef()!=nullptr && build->GetBuildType()<BT::REPAIR;
+    return commander::OwnConstruction(origin,construction,task->GetAssignees().size()<=1);
 }
 
-// Assisting: helping another builder's frame (a repair of an unfinished
-// structure, a guard, or a joined construction task that is not our own).
 bool CCommanderController::IsAssisting(CCircuitUnit* unit,IUnitTask* task) const {
     auto* build=dynamic_cast<IBuilderTask*>(task);
     if(!unit || !build || task->IsDead() || task->IsExternalControlled() || task->IsEnemyReclaim()) return false;
-    if(IsOwnConstruction(unit,task)) return false;
-    if(build->GetBuildType()==BT::GUARD) return true;
+    const State* s=states.Find(unit->GetId());
+    const auto origin=s?s->work.OriginOf(task):commander::TaskOrigin::None;
+    const bool construction=build->GetBuildDef()!=nullptr && build->GetBuildType()<BT::REPAIR;
+    bool repairOfFrame=false;
     if(build->GetBuildType()==BT::REPAIR) {
         CAllyUnit* target=build->GetTarget();
         if(!target) if(auto* repair=dynamic_cast<IRepairTask*>(task)) target=ai->GetFriendlyUnit(repair->GetTargetId());
-        return target && target->GetCircuitDef() && !target->GetCircuitDef()->IsMobile() && target->GetUnit()->IsBeingBuilt();
+        repairOfFrame=target && target->GetCircuitDef() && !target->GetCircuitDef()->IsMobile() && target->GetUnit()->IsBeingBuilt();
     }
-    return build->GetBuildDef()!=nullptr && build->GetBuildType()<BT::REPAIR;
+    return commander::Assisting(origin,construction,task->GetAssignees().size()<=1,repairOfFrame,build->GetBuildType()==BT::GUARD);
+}
+
+IUnitTask* CCommanderController::Handed(CCircuitUnit* unit,IUnitTask* task,commander::TaskOrigin origin) {
+    if(!task || !unit) return task;
+    if(State* s=states.Find(unit->GetId())) s->work.NoteOrigin(task,origin);
+    return task;
+}
+IUnitTask* CCommanderController::HandedGroup(CCircuitUnit* unit,IUnitTask* task) {
+    if(!task || !unit || !Handles(unit)) return task;
+    State* s=states.Find(unit->GetId());
+    if(!s || s->work.OriginOf(task)!=commander::TaskOrigin::None) return task;  // keep the first record
+    // Nobody else on it: the commander starts it. Someone else on it: a join.
+    bool others=false;
+    for(auto* worker:task->GetAssignees()) if(worker!=unit) { others=true; break; }
+    return Handed(unit,task,others?commander::TaskOrigin::Assist:commander::TaskOrigin::Group);
 }
 
 // Energy is low: the bank under front_assist_break_energy of storage, or stalling.
 bool CCommanderController::AssistEnergyLow() const {
-    if(cfg->front.assistBreakEnergy<=0) return false;
-    auto* eco=ai->GetEconomyManager();
-    return eco->IsEnergyStalling()
-        || (eco->GetEnergyStore()>0 && eco->GetEnergyCur()<eco->GetEnergyStore()*cfg->front.assistBreakEnergy);
+    // D-493: the shared definition (resource/EnergyState.h); this caller's threshold.
+    return cfg->front.assistBreakEnergy>0 && ai->GetEconomyManager()->IsEnergyLow(cfg->front.assistBreakEnergy);
 }
 
 // The commander's assist offers (group assist, joining a job, adopting a
 // worker's project, the assist/factory/base rungs) are closed while energy is low.
 bool CCommanderController::AssistClosed(CCircuitUnit* unit) const {
-    return unit && Handles(unit) && role.frontDuty && AssistEnergyLow();
+    if(!unit || !Handles(unit) || !role.frontDuty) return false;
+    if(AssistEnergyLow()) return true;
+    // D-493: closed for front_assist_close_seconds after a break, so a brief
+    // recovery of the bank does not hand the commander the same assist again.
+    const State* s=states.Find(unit->GetId());
+    return s && ai->GetLastFrame()<s->work.assistClosedUntil;
 }
 
 // Reevaluate (out of build range) asks the policy again; for a FRONT
@@ -109,6 +127,10 @@ bool CCommanderController::AssistEnergyBreak(CCircuitUnit* unit,State& s,int fra
     }
     if(frame<s.work.assistBreakNext) return false;
     s.work.assistBreakNext=frame+ASSIST_BREAK_PERIOD_SECONDS*FRAMES_PER_SEC;
+    s.work.assistClosedUntil=frame+int(cfg->front.assistCloseSeconds*FRAMES_PER_SEC);
+    // D-493: a break is a reason to look for a solar site now, whatever the
+    // three-second retry of the last failed search (one bounded search).
+    s.front.solarNext=0;
     const char* why="solar";
     IUnitTask* next=FrontWork(unit,WORK_SOLAR,nullptr,0);
     if(!next || next==current) {

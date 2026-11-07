@@ -322,10 +322,7 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // Every completed/cancelled builder task, not just groupJob, can be the
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
-    for(auto& entry:states) entry.value->work.Retire(task);
-    // D-492: a finished artillery structure joins fire control.
-    if(done) if(auto* built=dynamic_cast<IBuilderTask*>(task);
-        built && built->GetTarget() && IsArtilleryDef(built->GetBuildDef())) AdoptArtillery(built->GetTarget()->GetId());
+    for(auto& entry:states) { entry.value->work.Retire(task); entry.value->work.RetireOrigin(task); }  // D-493
     // D-481: a guard item ends; a cancelled one is ordered again (GEO_GUARD_RETRIES).
     for(auto& g:geoGuards) for(std::size_t k=0;k<g.tasks.size();++k) if(g.tasks[k]==task) {
         g.tasks[k]=nullptr; g.state[k]=done?2:0;

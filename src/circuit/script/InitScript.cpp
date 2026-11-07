@@ -481,10 +481,18 @@ static int CTerrainManager_PackFactoryFlush(CTerrainManager* terrainMgr, const C
 }
 
 static int CTerrainManager_PackBesideCore(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup,
-		int facing, bool anyFacing, int coreA, int coreB, int maxGapCells, float minNanoDist)
+		int facing, bool anyFacing, int maxGapCells, float minNanoDist)
 {
 	return terrainMgr->PackBesideCore(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anyFacing,
-			coreA, coreB, maxGapCells, minNanoDist);
+			maxGapCells, minNanoDist);
+}
+static void CTerrainManager_AddCoreFootprint(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	terrainMgr->AddCoreFootprint(const_cast<CCircuitDef*>(cdef), pos, facing);
+}
+static int CTerrainManager_CoreEdgeGap(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	return terrainMgr->CoreEdgeGap(const_cast<CCircuitDef*>(cdef), pos, facing);
 }
 
 static bool IBuilderTask_PreferFactoryFacing(IUnitTask* task, int facing)
@@ -725,30 +733,11 @@ static bool CTerrainManager_CanTraverse(CTerrainManager* mgr, CCircuitDef* def,
 
 // Confirm transfers against engine ownership, not the donor's local registry:
 // GiveUnits removes local task ownership before the engine processes the gift.
-// D-492: finished units of the allied team (ours included) whose definition is in
-// a comma list of unit names (unknown names are skipped). O(names + F) over the
-// ally index; script calls it every few seconds, never per unit.
-static int CCircuitAI_CountAlliedFinished(CCircuitAI* circuit, const std::string& names)
+// D-493: finished allied units (ours included) of one definition, O(1) after
+// one O(F) count per friendly-unit refresh (CAllyTeam::FinishedCount).
+static int CCircuitAI_AlliedFinishedCount(CCircuitAI* circuit, const CCircuitDef* def)
 {
-    std::vector<int> ids;
-    std::size_t start = 0;
-    while (start <= names.size()) {
-        const std::size_t end = std::min(names.find(',', start), names.size());
-        const std::string name = names.substr(start, end - start);
-        if (!name.empty()) {
-            if (CCircuitDef* def = circuit->GetCircuitDef(name.c_str())) ids.push_back(def->GetId());
-        }
-        start = end + 1;
-    }
-    if (ids.empty()) return 0;
-    int count = 0;
-    for (const auto& kv : circuit->GetAllyTeam()->GetFriendlyUnits()) {
-        const CAllyUnit* unit = kv.second;
-        if (unit == nullptr || unit->GetCircuitDef() == nullptr) continue;
-        if (std::find(ids.begin(), ids.end(), unit->GetCircuitDef()->GetId()) == ids.end()) continue;
-        if (!unit->GetUnit()->IsBeingBuilt()) ++count;
-    }
-    return count;
+    return (def == nullptr) ? 0 : circuit->GetAllyTeam()->FinishedCount(def->GetId());
 }
 
 static int CCircuitAI_GetFriendlyUnitTeam(CCircuitAI* circuit, int unitId)
@@ -1329,7 +1318,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitAI", "array<Id>@ GetTeamIds() const", asFUNCTION(CCircuitAI_GetTeamIds), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "void GiveUnits(const array<CCircuitUnit@>@+, int)", asFUNCTION(CCircuitAI_GiveUnits), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CCircuitAI", "int GetFriendlyUnitTeam(int) const", asFUNCTION(CCircuitAI_GetFriendlyUnitTeam), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
-    r = engine->RegisterObjectMethod("CCircuitAI", "int CountAlliedFinished(const string& in) const", asFUNCTION(CCircuitAI_CountAlliedFinished), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-492
+    r = engine->RegisterObjectMethod("CCircuitAI", "int AlliedFinishedCount(const CCircuitDef@) const", asFUNCTION(CCircuitAI_AlliedFinishedCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
     r = engine->RegisterObjectMethod("CCircuitAI", "AIFloat3 GetFriendlyUnitPosition(int, int) const", asFUNCTION(CCircuitAI_GetFriendlyUnitPosition), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool UnitControl(CCircuitUnit@, bool)", asMETHODPR(CCircuitAI, UnitControl, (CCircuitUnit*, bool), bool), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool UnitControl(Id, bool)", asMETHODPR(CCircuitAI, UnitControl, (ICoreUnit::Id, bool), bool), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1588,7 +1577,10 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "void AddFactoryZone(int, int)", asMETHOD(CTerrainManager, AddFactoryZone), asCALL_THISCALL); ASSERT(r >= 0);  // D-104
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryFront(int)", asMETHOD(CTerrainManager, SetFactoryFront), asCALL_THISCALL); ASSERT(r >= 0);  // D-104
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackFactoryFlush(const CCircuitDef@, const AIFloat3& in)", asFUNCTION(CTerrainManager_PackFactoryFlush), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-104
-	r = engine->RegisterObjectMethod("CTerrainManager", "int PackBesideCore(int zone, const CCircuitDef@, int nanoGroup, int facing, bool anyFacing, int coreA, int coreB, int maxGapCells, float minNanoDist)", asFUNCTION(CTerrainManager_PackBesideCore), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-491
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PackBesideCore(int zone, const CCircuitDef@, int nanoGroup, int facing, bool anyFacing, int maxGapCells, float minNanoDist)", asFUNCTION(CTerrainManager_PackBesideCore), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-491, D-493
+	r = engine->RegisterObjectMethod("CTerrainManager", "void AddCoreFootprint(const CCircuitDef@, const AIFloat3& in, int facing)", asFUNCTION(CTerrainManager_AddCoreFootprint), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
+	r = engine->RegisterObjectMethod("CTerrainManager", "int CoreCount() const", asMETHOD(CTerrainManager, CoreCount), asCALL_THISCALL); ASSERT(r >= 0);  // D-493
+	r = engine->RegisterObjectMethod("CTerrainManager", "int CoreEdgeGap(const CCircuitDef@, const AIFloat3& in, int facing) const", asFUNCTION(CTerrainManager_CoreEdgeGap), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReleaseSetSlots(const CCircuitDef@)", asFUNCTION(CTerrainManager_ReleaseSetSlots), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
 	r = engine->RegisterObjectMethod("CTerrainManager", "int EdgeGapToGroup(const CCircuitDef@, const AIFloat3& in, int facing, int group) const", asFUNCTION(CTerrainManager_EdgeGapToGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
 	r = engine->RegisterObjectMethod("CTerrainManager", "int CountStructuresInExit(CCircuitUnit@) const", asMETHOD(CTerrainManager, CountStructuresInExit), asCALL_THISCALL); ASSERT(r >= 0);  // D-096

@@ -3,7 +3,7 @@
   "unit": "armcom",
   "side": "armada",
   "role": "FRONT",
-  "description": "D-492: the D-479 artillery arena with enemy structures ahead of the group: a light laser (corllt) from 20 s, and at 450 s, once the Rattlesnakes stand, a construction turret (cornanotc) and a Punisher (corpun) within the Rattlesnake's 1380 range of its block. Fire control aims at the construction turret first (kind=support), then the Punisher (kind=static); artillery_local_max holds the block to two Rattlesnakes while no more enemy statics are in reach.",
+  "description": "D-492: the D-479 artillery arena with enemy structures ahead of the group: a light laser (corllt) from 20 s, and at 450 s, once the Rattlesnakes stand, a construction turret (cornanotc) and a Punisher (corpun) within the Rattlesnake's 1380 range of its block. The artillery controller (D-493) aims at the construction turret first (kind=support), then the Punisher (kind=static); artillery_local_max holds the block to two Rattlesnakes while no more enemy statics are in reach.",
   "commander_overrides": {
     "front_push_screen": 0,
     "commander_group_jammer_income": 0,

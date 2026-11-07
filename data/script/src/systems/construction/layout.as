@@ -100,59 +100,81 @@ namespace Layout {
         return def !is null && def.count == 0 && aiBuilderMgr.GetUnfinishedCount(def) == 0
             && aiBuilderMgr.GetQueuedBuildCount(int(type), def) == 0;
     }
-    int PackCore(CCircuitDef@ def, int facing, bool anyFacing, int coreA, int coreB)
+    // D-493: the core is a native list of footprints (AddCoreFootprint). It is
+    // seeded from the advanced lab's slot on first use, grows with each member
+    // placed, and is persisted here as named layout ints, re-added after a load.
+    bool coreLoaded = false;
+    void AddCore(CCircuitDef@ def, const AIFloat3 &in pos, int facing)
     {
-        if (!Global::RoleSettings::Tech::CoreLayoutEnabled || def is null || boxZone == 0 || nanoGroup <= 0 || coreA < 0) return -1;
-        const int id = aiTerrainMgr.PackBesideCore(boxZone, def, nanoGroup, facing, anyFacing, coreA, coreB,
+        if (def is null) return;
+        aiTerrainMgr.AddCoreFootprint(def, pos, facing);
+        const int n = aiTerrainMgr.GetLayoutInt(CORE + ".n", 0);
+        aiTerrainMgr.SetLayoutInt(CORE + "." + n + ".def", def.id);
+        aiTerrainMgr.SetLayoutInt(CORE + "." + n + ".x", int(pos.x));
+        aiTerrainMgr.SetLayoutInt(CORE + "." + n + ".z", int(pos.z));
+        aiTerrainMgr.SetLayoutInt(CORE + "." + n + ".f", facing);
+        aiTerrainMgr.SetLayoutInt(CORE + ".n", n + 1);
+    }
+    // After a load the native list is empty: re-add the persisted footprints once.
+    // Before any member, seed it from the advanced lab's slot.
+    void EnsureCore()
+    {
+        if (!coreLoaded) {
+            coreLoaded = true;
+            const int n = aiTerrainMgr.GetLayoutInt(CORE + ".n", 0);
+            if (aiTerrainMgr.CoreCount() == 0) {
+                for (int i = 0; i < n; ++i) {
+                    const int defId = aiTerrainMgr.GetLayoutInt(CORE + "." + i + ".def", -1);
+                    CCircuitDef@ def = defId < 0 ? null : ai.GetCircuitDef(defId);
+                    if (def is null) continue;
+                    aiTerrainMgr.AddCoreFootprint(def, AIFloat3(float(aiTerrainMgr.GetLayoutInt(CORE + "." + i + ".x", 0)), 0.0f,
+                        float(aiTerrainMgr.GetLayoutInt(CORE + "." + i + ".z", 0))), aiTerrainMgr.GetLayoutInt(CORE + "." + i + ".f", 0));
+                }
+            }
+        }
+        if (aiTerrainMgr.CoreCount() > 0 || labSlot < 0) return;
+        const AIFloat3 at = aiTerrainMgr.GetReservationPos(labSlot);
+        if (at.x < 0.0f) return;
+        AddCore(ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(Global::AISettings::Side)), at, aiTerrainMgr.GetReservationFacing(labSlot));
+    }
+
+    int PackCore(CCircuitDef@ def, int facing, bool anyFacing)
+    {
+        if (!Global::RoleSettings::Tech::CoreLayoutEnabled || def is null || boxZone == 0 || nanoGroup <= 0) return -1;
+        EnsureCore();
+        if (aiTerrainMgr.CoreCount() == 0) return -1;
+        const int id = aiTerrainMgr.PackBesideCore(boxZone, def, nanoGroup, facing, anyFacing,
             Global::RoleSettings::Tech::CoreMaxGapCells, MinNanoDist(def));
         if (id >= 0) {
             coreFound.set(def.GetName(), true);
             const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
-            GenericHelpers::LogUtil("[Layout] core: " + def.GetName() + " beside the advanced lab at (" + int(p.x) + ", " + int(p.z) + ") (D-491)", 1);
+            AddCore(def, p, aiTerrainMgr.GetReservationFacing(id));
+            GenericHelpers::LogUtil("[Layout] core: " + def.GetName() + " beside the core at (" + int(p.x) + ", " + int(p.z) + ") (D-491)", 1);
         } else {
             GenericHelpers::LogUtil("[Layout] core: no site for " + def.GetName() + " within " + Global::RoleSettings::Tech::CoreMaxGapCells
-                + " cells of the advanced lab; the ordinary packer places it (D-491)", 1);
+                + " cells of the core; the ordinary packer places it (D-491)", 1);
         }
         return id;
     }
 
     dictionary coreFound;   // def name -> a core site was reserved for its first (INV-264)
 
-    // INV-264 (D-491): the first fusion and first T1 aircraft lab, given a core
-    // site, finish within CoreMaxGapCells of a core slot that still exists (the
-    // advanced lab retires once the advanced fusion is under way, D-078, so the
-    // aircraft lab is measured against the fusion's slot then). From
-    // Tech_BuilderAiTaskRemoved; constant work. The unit's facing is unknown,
-    // so the larger footprint side is used (the gap is never overstated).
-    float CoreGap(CCircuitUnit@ u, int slot, CCircuitDef@ slotDef)
-    {
-        if (slot < 0 || slotDef is null) return -1.0f;
-        const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
-        if (at.x < 0.0f) return -1.0f;   // the slot is gone
-        const bool turned = (aiTerrainMgr.GetReservationFacing(slot) & 1) == 1;
-        const float halfX = float(turned ? slotDef.GetFootprintZ() : slotDef.GetFootprintX()) * SQUARE_SIZE * 0.5f;
-        const float halfZ = float(turned ? slotDef.GetFootprintX() : slotDef.GetFootprintZ()) * SQUARE_SIZE * 0.5f;
-        const float half = float(AiMax(u.circuitDef.GetFootprintX(), u.circuitDef.GetFootprintZ())) * SQUARE_SIZE * 0.5f;
-        const AIFloat3 p = u.GetPos(ai.frame);
-        return AiMax(0.0f, AiMax(abs(p.x - at.x) - halfX - half, abs(p.z - at.z) - halfZ - half));
-    }
+    // INV-264 (D-491, D-493): the first fusion and first T1 aircraft lab, given a
+    // core site, finish within CoreMaxGapCells of the core (native footprints,
+    // the unit's real facing). From Tech_BuilderAiTaskRemoved; one native gap test.
     void CheckCore(CCircuitUnit@ u)
     {
         if (!Global::RoleSettings::Tech::CoreLayoutEnabled || u is null || u.circuitDef.count != 1) return;
         const string side = Global::AISettings::Side, name = u.circuitDef.GetName();
         if (name != UnitHelpers::GetFusionNameForSide(side) && name != UnitHelpers::GetT1AirPlantForSide(side)) return;
         if (!coreFound.exists(name)) return;
-        float gap = -1.0f;
-        const array<int> slots = {labSlot, name == UnitHelpers::GetFusionNameForSide(side) ? -1 : CoreFusionSlot()};
-        const array<string> defs = {UnitHelpers::GetT2BotLabForSide(side), UnitHelpers::GetFusionNameForSide(side)};
-        for (uint i = 0; i < slots.length(); ++i) {
-            const float g = CoreGap(u, slots[i], ai.GetCircuitDef(defs[i]));
-            if (g >= 0.0f && (gap < 0.0f || g < gap)) gap = g;
-        }
-        const float cell = SQUARE_SIZE * 2;
-        if (gap > float(Global::RoleSettings::Tech::CoreMaxGapCells + 1) * cell)
-            Invariants::Violation("INV-264", name, "the first " + name + " stands " + int(gap / cell)
-                + " cells from the core's slots, beyond " + Global::RoleSettings::Tech::CoreMaxGapCells + " (D-491)");
+        EnsureCore();
+        // Native skips the member's own footprint (any core footprint it overlaps):
+        // the gap is to the other members.
+        const int gap = aiTerrainMgr.CoreEdgeGap(u.circuitDef, u.GetPos(ai.frame), aiTerrainMgr.GetBuildingFacing(u));
+        if (gap > Global::RoleSettings::Tech::CoreMaxGapCells)
+            Invariants::Violation("INV-264", name, "the first " + name + " stands " + gap
+                + " cells from the core, beyond " + Global::RoleSettings::Tech::CoreMaxGapCells + " (D-491)");
     }
 
     int ReserveSpineFusion(CCircuitDef@ fusion) {
@@ -165,7 +187,7 @@ namespace Layout {
         const int bay = aiTerrainMgr.NextSlotAny(spineReactorGroup, seed);
         if (bay >= 0) aiTerrainMgr.ReleaseReservation(bay);
         // D-491: beside the advanced lab first
-        int id = PackCore(fusion, facing, false, labSlot, -1);
+        int id = PackCore(fusion, facing, false);
         if (id >= 0) { aiTerrainMgr.SetLayoutInt(CORE + ".fusion_slot", id); return id; }
         return aiTerrainMgr.PackNearGroup(boxZone, fusion, nanoGroup,
             facing, seed, 0.0f, MinNanoDist(fusion), 0);
@@ -1257,7 +1279,7 @@ namespace Layout {
         // D-491: the first T1 aircraft lab beside the advanced lab and the first fusion
         if (labSlot >= 0 && def.GetName() == UnitHelpers::GetT1AirPlantForSide(Global::AISettings::Side)
             && FirstOf(def, Task::BuildType::FACTORY)) {
-            const int core = PackCore(def, LabFacing(), true, labSlot, CoreFusionSlot());
+            const int core = PackCore(def, LabFacing(), true);
             if (core >= 0) return core;
         }
         // D-104: flush against the turrets (air: any facing, no exit test)
@@ -1534,6 +1556,15 @@ namespace Layout {
         return task;
     }
 
+    // D-493: a utility building (the Pinpointer) on the layout. Ordinary STORE
+    // packing near the turrets: exit lanes, corridors and pockets are refused.
+    // The one named entry point for the borrowed build type.
+    const int UtilityOrderSeconds = 300;
+    IUnitTask@ PlaceUtility(CCircuitDef@ def, CCircuitUnit@ builder)
+    {
+        return Place(Task::BuildType::STORE, Task::Priority::HIGH, def, UtilityOrderSeconds * SECOND, builder);
+    }
+
     IUnitTask@ Place(Task::BuildType type, Task::Priority priority, CCircuitDef@ def, int timeout, CCircuitUnit@ builder = null)
     {
         if (AiPerfEnabled) AiPerfBegin(4);
@@ -1613,7 +1644,7 @@ namespace Layout {
             const int core = CoreFusionSlot();
             if (core >= 0 && aiTerrainMgr.GetReservationState(core) == 0 && aiTerrainMgr.IsReservationBuildable(core)) id = core;
             if (id < 0) {
-                id = PackCore(def, facing, false, labSlot, -1);
+                id = PackCore(def, facing, false);
                 if (id >= 0) aiTerrainMgr.SetLayoutInt(CORE + ".fusion_slot", id);
             }
         }
