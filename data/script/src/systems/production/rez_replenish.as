@@ -28,10 +28,15 @@ the target when it is lower.
 
 SHARING. A BARb with a T1 bot lab announces itself ("barbrez|lab|1"). A BARb
 with a vehicle plant and no T1 bot lab asks the nearest announced one
-("barbrez|req|have|n|army") when it has fewer than RequestBelow rez bots and
-an army above RequestMinArmy. The bot-lab AI adds n to what its labs keep in
-stock and gives each finished rez bot above max(own target, ShareKeepMin) to
-the oldest requester with ai.GiveUnits ("barbrez|sent|id|def").
+("barbrez|req|have|n|army|level") by its own army: above RequestMinArmy with
+fewer than RequestBelow (3) it asks to reach RequestUpTo (6); from RequestHighArmy
+(23400, 9 rez bots = 5% of it) with fewer than RequestHighBelow (6) it asks to
+reach 9; it renews the ask until it holds that level. The bot-lab AI remembers
+each request and adds to its stock only what its OWN army allows (owner,
+2026-11-07): a requester up to 3 above the donor's 3 tier (1200), up to 6 above
+its 6 tier (3500), up to 9 above its 9 tier (5000), nothing below 1200. Each
+finished rez bot above max(own target, ShareKeepMin) goes to the oldest request
+it may fill with ai.GiveUnits ("barbrez|sent|id|def").
 
 SECOND LAB (SecondLab, owner 2026-10-28). Spam comes first: once Spam pumps
 the first T1 bot lab of an AI that started on one (the lead), no pump is
@@ -93,6 +98,7 @@ namespace RezReplenish {
     array<int> giftQueue;          // requester team ids, oldest first
     dictionary giftPending;        // team -> int64 left to give
     dictionary giftExpiry;         // team -> int64 frame
+    dictionary giftLevel;          // team -> int64 rez bot count the requester asked to reach
     int giftsGiven = 0;
     int lastGiftFrame = -100000;
     int lastAnnounceFrame = -100000;
@@ -101,10 +107,16 @@ namespace RezReplenish {
     // sharing, requester side
     dictionary donors;             // team -> int64 last announce frame
     int lastRequestFrame = -100000;
+    int askLevel = 0;              // the level of our open request (0: none)
     int requestsSent = 0;
     int received = 0;
 
     int lastUpdateFrame = -100000;
+
+    // Target() cache: one table lookup per scan
+    int targetFrame = -1;
+    bool targetCut = false;
+    int targetCache = 0;
     int lastLogFrame = -100000;
 
     // A role that keeps its T1 bot lab (TECH and SUPPORT retire theirs at T2).
@@ -183,14 +195,55 @@ namespace RezReplenish {
     // The own target for the current army; 0 = no replenishment (below the threshold or off).
     int Target()
     {
-        if (!Global::RezReplenish::Enabled || !RoleEligible() || cut || army <= Global::RezReplenish::ArmyMinMetal) return 0;
+        if (targetFrame == scanFrame && targetCut == cut) return targetCache;
+        targetFrame = scanFrame;
+        targetCut = cut;
+        targetCache = _TargetFor(army);
+        return targetCache;
+    }
+
+    int _TargetFor(float a)
+    {
+        if (!Global::RezReplenish::Enabled || !RoleEligible() || cut || a <= Global::RezReplenish::ArmyMinMetal) return 0;
         if (!Global::RezReplenish::Scale) return Global::RezReplenish::Target;
         int t = 0;
         const int n = AiMin(int(Global::RezReplenish::ScaleArmy.length()), int(Global::RezReplenish::ScaleTargets.length()));
         for (int i = 0; i < n; ++i) {
-            if (army > Global::RezReplenish::ScaleArmy[i]) t = Global::RezReplenish::ScaleTargets[i];
+            if (a <= Global::RezReplenish::ScaleArmy[i]) break;   // ascending
+            t = Global::RezReplenish::ScaleTargets[i];
         }
         return t;
+    }
+
+    // Owner (2026-11-07): the highest gift level our own army allows (0: give nothing).
+    int GiftAllowedLevel()
+    {
+        int l = 0;
+        const int n = AiMin(int(Global::RezReplenish::GiftTierLevels.length()), int(Global::RezReplenish::GiftTierDonorArmy.length()));
+        for (int i = 0; i < n; ++i) {
+            if (army <= Global::RezReplenish::GiftTierDonorArmy[i]) break;   // ascending
+            l = Global::RezReplenish::GiftTierLevels[i];
+        }
+        return l;
+    }
+
+    // Rez bots we may give this requester now: up to the level our army allows, of what is left.
+    int GiftReadyFor(int team, int allowed)
+    {
+        const int64 left = _Get(giftPending, team, 0);
+        if (left <= 0 || allowed <= 0) return 0;
+        const int64 level = _Get(giftLevel, team, left);
+        const int64 has = level - left;   // what they had plus what we gave since
+        return int(AiMax(0, AiMin(int(left), allowed - int(has))));
+    }
+
+    int GiftReady()
+    {
+        const int allowed = GiftAllowedLevel();
+        if (allowed <= 0) return 0;
+        int sum = 0;
+        for (uint i = 0; i < giftQueue.length(); ++i) sum += GiftReadyFor(giftQueue[i], allowed);
+        return sum;
     }
 
     int GiftOutstanding()
@@ -203,6 +256,7 @@ namespace RezReplenish {
                 if (left > 0) GenericHelpers::LogUtil("[RezRep] request-expired team=" + team + " left=" + left, 1);
                 giftPending.delete("" + team);
                 giftExpiry.delete("" + team);
+                giftLevel.delete("" + team);
                 giftQueue.removeAt(i);
                 continue;
             }
@@ -218,7 +272,8 @@ namespace RezReplenish {
     int Want()
     {
         if (cut) return 0;
-        const int gifts = (Global::RezReplenish::ShareEnabled && _IsDonor()) ? GiftOutstanding() : 0;
+        // only the gifts our own army allows now (owner, 2026-11-07); the rest wait, remembered
+        const int gifts = (Global::RezReplenish::ShareEnabled && _IsDonor() && GiftOutstanding() > 0) ? GiftReady() : 0;
         if (gifts > 0) return Keep() + gifts;
         return Target();
     }
@@ -630,7 +685,12 @@ namespace RezReplenish {
         if (GiftOutstanding() <= 0) return;
         if (ai.frame - lastGiftFrame < Global::RezReplenish::GiftSpacingSeconds * SECOND) return;
         if (rezFinished <= Keep() || rezIds.length() == 0) return;
-        const int recipient = giftQueue[0];
+        // the oldest request our own army allows a rez bot for now (owner, 2026-11-07)
+        const int allowed = GiftAllowedLevel();
+        int recipient = -1;
+        for (uint i = 0; i < giftQueue.length() && recipient < 0; ++i)
+            if (GiftReadyFor(giftQueue[i], allowed) > 0) recipient = giftQueue[i];
+        if (recipient < 0) return;
         CCircuitUnit@ u = ai.GetTeamUnit(rezIds[rezIds.length() - 1]);   // the newest
         if (u is null || u.circuitDef is null) return;
         const int unitId = u.id;
@@ -646,7 +706,8 @@ namespace RezReplenish {
         --rezFinished; --rezAll; lastRezAll = rezAll;
         AiSendMessage(MSG + "|sent|" + unitId + "|" + name, recipient);
         GenericHelpers::LogUtil("[RezRep] give unit=" + unitId + " def=" + name + " to=" + recipient + " left=" + left
-            + " rez=" + rezFinished + " keep=" + Keep() + " army=" + int(army) + " given=" + giftsGiven, 1);
+            + " rez=" + rezFinished + " keep=" + Keep() + " army=" + int(army) + " allowed=" + allowed
+            + " given=" + giftsGiven, 1);
         GiftOutstanding();   // drops a filled request
     }
 
@@ -668,18 +729,29 @@ namespace RezReplenish {
 
     void _Request()
     {
-        if (cut) return;
-        if (rezAll >= Global::RezReplenish::RequestBelow) return;
-        if (army <= Global::RezReplenish::RequestMinArmy) return;
+        if (cut) { askLevel = 0; return; }
+        // our own army picks the tier (owner, 2026-11-07): above 1200 ask below 3 for 6, from 23400
+        // (9 rez bots = 5% of it) ask below 6 for 9
+        int level = 0, below = 0;
+        if (army >= Global::RezReplenish::RequestHighArmy) {
+            level = Global::RezReplenish::RequestHighUpTo; below = Global::RezReplenish::RequestHighBelow;
+        } else if (army > Global::RezReplenish::RequestMinArmy) {
+            level = Global::RezReplenish::RequestUpTo; below = Global::RezReplenish::RequestBelow;
+        }
+        if (askLevel > level) askLevel = level;
+        if (askLevel > 0 && rezAll >= askLevel) askLevel = 0;   // filled
+        if (level <= 0) return;
+        if (rezAll >= below && askLevel <= 0) return;   // keep asking until an open request is filled
         if (ai.frame - lastRequestFrame < Global::RezReplenish::RequestCooldownSeconds * SECOND) return;
         const int donor = _PickDonor();
         if (donor < 0) return;
-        const int n = AiMax(1, Global::RezReplenish::RequestUpTo - rezAll);
+        const int n = AiMax(1, level - rezAll);
         lastRequestFrame = ai.frame;
+        askLevel = level;
         ++requestsSent;
-        AiSendMessage(MSG + "|req|" + rezAll + "|" + n + "|" + int(army), donor);
-        GenericHelpers::LogUtil("[RezRep] request to=" + donor + " have=" + rezAll + " n=" + n + " army=" + int(army)
-            + " requests=" + requestsSent, 1);
+        AiSendMessage(MSG + "|req|" + rezAll + "|" + n + "|" + int(army) + "|" + level, donor);
+        GenericHelpers::LogUtil("[RezRep] request to=" + donor + " have=" + rezAll + " n=" + n + " level=" + level
+            + " army=" + int(army) + " requests=" + requestsSent, 1);
     }
 
     // Team::HandleMessage. Both sides.
@@ -701,16 +773,25 @@ namespace RezReplenish {
             }
             const int64 had = _Get(giftPending, fromTeamId, 0);
             const int room = Global::RezReplenish::ShareMaxOutstanding - (GiftOutstanding() - int(had));
-            const int64 n = AiMin(AiMin(int(parseInt(p[3])), Global::RezReplenish::RequestUpTo), room);
+            const int askHave = AiMax(0, int(parseInt(p[2])));
+            const int askN = AiMax(0, int(parseInt(p[3])));
+            // a requester without the level field asked the old way: up to have + n, at most RequestUpTo
+            const int reqLevel = (p.length() >= 6) ? AiMax(0, int(parseInt(p[5])))
+                : AiMin(askHave + askN, Global::RezReplenish::RequestUpTo);
+            const int maxLevel = AiMax(Global::RezReplenish::RequestUpTo, Global::RezReplenish::RequestHighUpTo);
+            const int64 n = AiMin(AiMin(askN, AiMin(reqLevel, maxLevel)), room);
             if (n <= 0) {
                 GenericHelpers::LogUtil("[RezRep] request-full team=" + fromTeamId + " outstanding=" + GiftOutstanding(), 1);
                 return true;
             }
-            _Set(giftPending, fromTeamId, (n > had) ? n : had);
+            // the requester's fresh count is the truth; remembered until it stops renewing
+            _Set(giftPending, fromTeamId, n);
+            _Set(giftLevel, fromTeamId, AiMin(reqLevel, maxLevel));
             _Set(giftExpiry, fromTeamId, ai.frame + Global::RezReplenish::RequestExpirySeconds * SECOND);
             if (giftQueue.find(fromTeamId) < 0) giftQueue.insertLast(fromTeamId);
             GenericHelpers::LogUtil("[RezRep] request-from team=" + fromTeamId + " have=" + p[2] + " n=" + n
-                + " theirArmy=" + (p.length() >= 5 ? p[4] : "?") + " outstanding=" + GiftOutstanding()
+                + " level=" + reqLevel + " theirArmy=" + (p.length() >= 5 ? p[4] : "?") + " outstanding=" + GiftOutstanding()
+                + " ourArmy=" + int(army) + " allowed=" + GiftAllowedLevel() + " ready=" + GiftReadyFor(fromTeamId, GiftAllowedLevel())
                 + " rez=" + rezFinished + " keep=" + Keep(), 1);
             return true;
         }
