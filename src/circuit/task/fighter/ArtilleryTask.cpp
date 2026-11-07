@@ -1431,7 +1431,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
         }
         CEnemyInfo* best = nullptr;
         float bestSq = SQUARE(range);
-        int bestTier = 3;  // 2026-11-06 Task C: 0 LOS, 1 identified radar, 2 unidentified dot
+        // 2026-11-07 (@Barscrewl): 0 known (LOS or identified radar contact, one
+        // tier: nearest first), 1 unidentified radar dot. Was LOS > radar > dot.
+        int bestTier = 2;
         for (const auto& kv : circuit->GetEnemyInfos()) {
             CEnemyInfo* e = kv.second;
             if (e->IsHidden() || !e->IsInRadarOrLOS() || e->GetData()->IsDead() || e->GetData()->IsDying()
@@ -1443,12 +1445,12 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
             if (!edef && ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;
             const float sq = pos.SqDistance2D(ep);
             if (sq >= SQUARE(range)) continue;
-            const int tier = e->IsInLOS() ? 0 : ((edef != nullptr) ? 1 : 2);
+            const int tier = (e->IsInLOS() || (edef != nullptr)) ? 0 : 1;
             if ((tier < bestTier) || ((tier == bestTier) && (sq < bestSq))) { best = e; bestSq = sq; bestTier = tier; }
         }
         if (best && (st.missileTarget != best->GetId())) {
-            static const char* tierName[3] = {"live", "radar", "dot"};
-            circuit->LOG("ARTYPICK: %s %i tier %s target %i", cdef->GetDef()->GetName(), unit->GetId(), tierName[bestTier], best->GetId());
+            circuit->LOG("ARTYPICK: %s %i tier %s target %i (%s)", cdef->GetDef()->GetName(), unit->GetId(),
+                    (bestTier == 0) ? "known" : "dot", best->GetId(), best->IsInLOS() ? "LOS" : "radar");
         }
         if (best) {
             if (st.missileTarget != best->GetId() || frame >= st.missileOrderUntil) {
