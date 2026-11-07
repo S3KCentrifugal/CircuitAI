@@ -70,7 +70,13 @@ static void T1ExemptDrop(CCircuitAI* circuit, CCircuitUnit* unit, const CEnemyIn
 bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy)
 {
     if (ArtyT1Exempt(launcher, enemy)) return false;
-    if (!IsSlowMissileLauncher(launcher->GetDef()->GetName())) return true;
+    if (!IsSlowTargetLauncher(launcher->GetDef()->GetName())) {  // 2026-11-07: + Arbiter
+        // Thanatos: an unidentified radar dot only while stationary (same dot rule).
+        if ((enemy != nullptr) && (enemy->GetCircuitDef() == nullptr) && IsSpamRetreatLauncher(launcher->GetDef()->GetName())) {
+            return SlowMissileSpeedAllowed(enemy->GetVel().SqLength2D(), 0.f, false, FRAMES_PER_SEC);
+        }
+        return true;
+    }
     if (enemy == nullptr) return false;
     const CCircuitDef* def = enemy->GetCircuitDef();
     return SlowMissileSpeedAllowed(enemy->GetVel().SqLength2D(), def ? def->GetSpeed() : 0.f, def != nullptr, FRAMES_PER_SEC);
@@ -290,6 +296,14 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		}
 	}
 
+	// 2026-11-07: Arbiter/Thanatos take the radar-dot pick like the slow launchers:
+	// known targets, then unidentified (stationary) dots, then ghosts.
+	if ((bestTarget != nullptr) && !bestTarget->IsInRadarOrLOS()
+		&& IsSpamRetreatLauncher(unit->GetCircuitDef()->GetDef()->GetName())
+		&& ArtyRadarDotStep(circuit, unit, frame, pos))
+	{
+		return;
+	}
 	if (bestTarget != nullptr) {
 		if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();  // audit 11-04: never null here, guarded anyway
 
@@ -907,7 +921,7 @@ void ArtySpamRetreatDamaged(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo*
 	CMilitaryManager* military = circuit->GetMilitaryManager();
 	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
 	const CCircuitDef* cdef = unit->GetCircuitDef();
-	if (!info.spamRetreat || (cdef == nullptr) || !IsSlowMissileLauncher(cdef->GetDef()->GetName())) return;
+	if (!info.spamRetreat || (cdef == nullptr) || !IsSpamRetreatLauncher(cdef->GetDef()->GetName())) return;  // 2026-11-07: + Arbiter, Thanatos
 	const CCircuitDef* adef = (attacker != nullptr) ? attacker->GetCircuitDef() : nullptr;
 	if (adef != nullptr) {
 		if (!adef->IsMobile()) return;  // porc: snipe rules
@@ -2350,8 +2364,9 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		// a fresh LOS sighting. Same O(enemies) loop.
 		CMilitaryManager* military = circuit->GetMilitaryManager();
 		const CMilitaryManager::SArtySnipeInfo& snipeInfo = military->GetArtySnipeInfo();
+		// 2026-11-07: Arbiter too (IsGhostPickLauncher), same 3/1 volley rule.
 		CMilitaryManager::SArtySnipeState* ghostSt = (snipeInfo.isEnabled && (snipeInfo.defs.count(cdef->GetId()) > 0)
-				&& (cdef->GetMaxRange(CCircuitDef::RangeType::LAND) >= snipeInfo.closeMinRange))
+				&& ((cdef->GetMaxRange(CCircuitDef::RangeType::LAND) >= snipeInfo.closeMinRange) || IsGhostPickLauncher(cdef->GetDef()->GetName())))
 				? &military->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame()) : nullptr;
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
