@@ -249,6 +249,7 @@ namespace Invariants {
     void Tick()
     {
         TechGantryScale::Check();   // D-288: INV-199, a due gantry makes progress within the grace
+        TechSurplusSeats::Tick();   // D-489: INV-260, a held surplus seat is never idle
         // D-229: a completed silo hands builders back to ordinary economy.
         // Lost earlier recipe structures must not restart the rush.
         if (TechChain::NukeRush()) {

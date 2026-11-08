@@ -3161,6 +3161,111 @@ int CTerrainManager::PackFactoryFlush(CCircuitDef* cdef, const AIFloat3& anchor)
 	return id;
 }
 
+void CTerrainManager::AddCoreFootprint(CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	int2 r1, r2;
+	if ((cdef == nullptr) || !ReservationCells(cdef, pos, facing, r1, r2)) return;
+	const layout_rank::CellRect rect{r1.x, r1.y, r2.x, r2.y};
+	for (const auto& r : coreRects) {
+		if ((r.x1 == rect.x1) && (r.z1 == rect.z1) && (r.x2 == rect.x2) && (r.z2 == rect.z2)) return;
+	}
+	coreRects.push_back(rect);
+}
+
+int CTerrainManager::CoreEdgeGap(CCircuitDef* cdef, const AIFloat3& pos, int facing) const
+{
+	if ((cdef == nullptr) || coreRects.empty()) return -1;
+	int best = -1;
+	for (int f : {facing < 0 ? 0 : facing, facing < 0 ? 1 : facing}) {
+		int2 c1, c2;
+		if (!ReservationCells(cdef, pos, f, c1, c2)) continue;
+		// The member itself (a core footprint it overlaps) is skipped: the gap is to the others.
+		const layout_rank::CellRect own{c1.x, c1.y, c2.x, c2.y};
+		for (const auto& r : coreRects) {
+			if (layout_rank::Overlaps(own, r)) continue;
+			const int gap = layout_rank::EdgeGap(own, r);
+			if ((best < 0) || (gap < best)) best = gap;
+		}
+	}
+	return best;
+}
+
+int CTerrainManager::PackBesideCore(int zone, CCircuitDef* cdef, int nanoGroup, int facing, bool anyFacing,
+		int maxGapCells, float minNanoDist)
+{
+	performance::Scope measured(circuit, performance::PACK_GROUP);
+	SSlowCall slow("PackBesideCore", circuit);
+	if (!layoutEnabled || (cdef == nullptr) || (maxGapCells < 0) || coreRects.empty()) {
+		return -1;
+	}
+	// Cost: candidates (zone plus its reach ring) x facings x core members, a
+	// few times a game.
+	const std::vector<layout_rank::CellRect>& core = coreRects;
+	AIFloat3 centre(0.f, 0.f, 0.f);
+	for (const auto& r : core) {
+		centre.x += (r.x1 + r.x2) * base_layout::HALF_CELL_ELMOS;
+		centre.z += (r.z1 + r.z2) * base_layout::HALF_CELL_ELMOS;
+	}
+	centre /= float(core.size());
+	if ((facing < 0) || (facing > 3)) {
+		facing = UNIT_FACING_SOUTH;
+	}
+	std::vector<int> facings = {facing};
+	if (anyFacing) {
+		facings = {facing, (facing + 1) % 4, (facing + 3) % 4, (facing + 2) % 4};
+	}
+	struct SCorePick {
+		AIFloat3 pos;
+		int facing;
+		layout_rank::CoreKey key;
+	};
+	std::vector<SCorePick> picks;
+	for (int f : facings) {
+		for (const SPackCandidate& c : PackCandidates(zone, cdef, nanoGroup, f, centre, 0.f, minNanoDist, true)) {
+			int2 c1, c2;
+			if (!ReservationCells(cdef, c.pos, f, c1, c2)) {
+				continue;
+			}
+			const int gap = layout_rank::NearestEdgeGap(layout_rank::CellRect{c1.x, c1.y, c2.x, c2.y}, core);
+			if (gap <= maxGapCells) {
+				picks.push_back(SCorePick{c.pos, f, layout_rank::CoreKey{gap, c.nanoSq, c.anchorSq}});
+			}
+		}
+	}
+	std::sort(picks.begin(), picks.end(), [](const SCorePick& a, const SCorePick& b) {
+		return layout_rank::CoreBefore(a.key, b.key);
+	});
+	constexpr int CORE_TRIES_MAX = 400;   // the zone is full of refused ground beyond this
+	constexpr int CORE_POCKET_TESTS_MAX = 40;  // D-090: flood fills a call
+	const bool air = MakesAircraft(circuit, cdef);
+	int tried = 0, pocketTests = 0;
+	for (const SCorePick& p : picks) {
+		if (++tried > CORE_TRIES_MAX) {
+			break;
+		}
+		AIFloat3 pos = p.pos;
+		pos.y = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
+		if (!circuit->GetMap()->IsPossibleToBuildAt(cdef->GetDef(), pos, p.facing)) {
+			continue;
+		}
+		if (!air && !cdef->IsMobile() && cdef->IsBuilder() && !IsExitClear(cdef, p.pos, p.facing, EXIT_CLEAR_LENGTH, EXIT_CLEAR_MARGIN)) {
+			continue;
+		}
+		if ((++pocketTests <= CORE_POCKET_TESTS_MAX) && LeavesPocket(zone, cdef, pos, p.facing)) {
+			continue;
+		}
+		const int id = ReserveBuildingEx(cdef, pos, p.facing, 0, 0, true, true, false, zone, true);
+		if (id >= 0) {
+			circuit->LOG("RESERVE: core %s at (%.0f, %.0f) facing %i, %i cell(s) from the core (id %i, %i candidates)",
+					cdef->GetDef()->GetName(), pos.x, pos.z, p.facing, p.key.gap, id, int(picks.size()));
+			return id;
+		}
+	}
+	circuit->LOG("RESERVE: no core site for %s within %i cell(s) (%i candidates, %i tried)",
+			cdef->GetDef()->GetName(), maxGapCells, int(picks.size()), tried);
+	return -1;
+}
+
 void CTerrainManager::IndexReservation(int id)
 {
     ++packingRevision; // invalidate exact empty-geometry reuse on mutation

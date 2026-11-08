@@ -73,6 +73,18 @@ namespace TechChain
     array<int> staleHave;      // ... at this count
 
     bool Active() { return active && !done; }
+    // D-489: the active chain holds a step with this key that is not yet met
+    // or skipped. O(steps), a dozen; called once per economy update.
+    bool WantsStep(const string &in key)
+    {
+        if (!Active()) return false;
+        for (uint i = 0; i < steps.length(); ++i) {
+            if (steps[i].key != key || (i < skipped.length() && skipped[i])) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(steps[i].defName);
+            if (d !is null && d.count - aiBuilderMgr.GetUnfinishedCount(d) < steps[i].target) return true;
+        }
+        return false;
+    }
     // D-289: the def of the chain's current dear step (the step Next last
     // worked on, stallStep), for the turret ladder; null when the chain is
     // inactive or the step is not dear. O(1): no scan, one def lookup.

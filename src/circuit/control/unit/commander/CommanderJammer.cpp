@@ -89,7 +89,7 @@ commander::JammerPlan CCommanderController::GroupJammerCoverage(CCircuitUnit* un
         plan.probes[index++]={P(at)+side*(width*sign),1,false};
     // A committed local structure (or the latest defense awaiting its nano)
     // supplies an actual construction point in addition to the lane samples.
-    const auto* project=dynamic_cast<const IBuilderTask*>(groupJob);
+    const auto* project=dynamic_cast<const IBuilderTask*>(FirstExpansionJob());
     const auto work=project?project->GetPosition():groupNanoSite;
     if(OnMap(work) && work.SqDistance2D(anchorPos)<=SQUARE(cfg->group.radius))
         plan.probes[8]={P(work),2,true};

@@ -225,7 +225,7 @@ namespace Main {
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
 		ArtilleryPolicy::VetoLifted = Global::RoleSettings::Front::Agitator;
-		ArtilleryPolicy::Check();
+		ArtilleryPolicy::Check(Global::AISettings::Role == AiRole::FRONT);  // D-495; returns at once while VetoLifted
         Lanes::Poll(); // complete async surveys for every role before consumers run
         AmphibiousOps::Tick();
         ScoutRaid::Tick(); // D-296: no-op unless the profile JSON enables scout raids

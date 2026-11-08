@@ -244,6 +244,7 @@ namespace RoleFront {
         FrontAgitator::Sample(); // owner, 2026-11-01: bank at 50% in the last 2 min gates forward agitators
         FrontTactical::Update(); // owner, 2026-11-02: T1 constructors pulled to help an open tactical launcher order (front_tactical.as)
         FrontOverflow::Update(); // owner, 2026-10-31: energy overflow into T2 converter blocks; per-minute overflow log
+        FrontLayout::CheckFirstFactory();   // D-494: INV-267
 
         // One-time switch for T1 combat units to 'raider' role when metal income > 250
         if (!g_frontT1CombatRoleSwitchDone && metalIncome > 250.0f) {
@@ -739,6 +740,13 @@ namespace RoleFront {
         IBuilderTask@ defaultBuilderTask = cast<IBuilderTask>(defaultTask);
         if (defaultBuilderTask !is null) {
             Task::BuildType dbt = Task::BuildType(defaultBuilderTask.GetBuildType());
+            // D-494: before its first factory the commander does not walk to a mex
+            // farther than StartFactoryMexRadius from the start: it builds the
+            // factory (queued, else the planned one) instead.
+            if (UnitHelpers::IsCommander(udef) && (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP)) {
+                IUnitTask@ factory = Front_StartFactoryBeforeFarMex(builder, defaultBuilderTask);
+                if (factory !is null) { aiBuilderMgr.AbortTask(defaultTask); return factory; }
+            }
             if (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP ||
                 dbt == Task::BuildType::GEO || dbt == Task::BuildType::GEOUP ||
                 dbt == Task::BuildType::ENERGY) {
@@ -815,12 +823,30 @@ namespace RoleFront {
     // queued energy that gates it. FindQueuedTask keeps native's safe-reach
     // test. O(factory + energy tasks), only until the first factory stands.
     string g_frontStartFactoryTakeoverLogged = "";
+
+    // D-494: the commander's next mex lies beyond StartFactoryMexRadius of the
+    // start and no factory stands: the start factory comes first. O(1) plus one
+    // queued-task lookup, only until the first factory stands.
+    IUnitTask@ Front_StartFactoryBeforeFarMex(CCircuitUnit@ comm, IBuilderTask@ mex)
+    {
+        const float radius = Global::RoleSettings::Front::StartFactoryMexRadius;
+        if (radius <= 0.f || comm is null || mex is null || aiFactoryMgr.GetFactoryCount() > 0) return null;
+        if (MapHelpers::SqDist(mex.GetBuildPos(), Global::Map::StartPos) <= radius * radius) return null;
+        IUnitTask@ task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::FACTORY));
+        if (task is null) @task = FrontLayout::OrderFirstFactory();
+        if (task !is null)
+            GenericHelpers::LogUtil("[FRONT] commander " + comm.id + " builds the start factory before a mex "
+                + int(sqrt(MapHelpers::SqDist(mex.GetBuildPos(), Global::Map::StartPos))) + " from the start (D-494)", 1);
+        return task;
+    }
     IUnitTask@ Front_StartFactoryTakeover(CCircuitUnit@ comm)
     {
         const float after = Global::RoleSettings::Front::StartFactoryTakeoverSeconds;
         if (after <= 0.f || ai.frame < int(after * SECOND) || aiFactoryMgr.GetFactoryCount() > 0) return null;
         string what = "start factory";
         IUnitTask@ task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::FACTORY));
+        // D-494: native has not queued it (its metal gate holds): order the planned one.
+        if (task is null) { what = "planned start factory"; @task = FrontLayout::OrderFirstFactory(); }
         if (task is null) {
             what = "energy holding the start factory";
             @task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::ENERGY));
@@ -1192,6 +1218,10 @@ namespace RoleFront {
             nanoCap = Global::RoleSettings::Front::NanoMaxCount;
         }
         nanoCap = FrontFactoryNanos::Cap(nanoCap);   // the T2 labs' turrets still to be framed
+        // D-486: while metal floats, fill mode may add FillWorkers turrets past
+        // the energy cap (played: the cap, energy income / 150, held a FRONT AI
+        // at +58 metal/s to its turrets, and every fill ask was refused).
+        nanoCap = AiMax(nanoCap, FrontFactorySupport::FillCapFloor());
         array<string> nanos = UnitHelpers::GetT1NanoUnitNames();
         UnitHelpers::BatchApplyUnitCaps(nanos, nanoCap);
     }

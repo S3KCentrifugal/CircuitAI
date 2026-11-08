@@ -636,6 +636,7 @@ void CEconomyManager::RebuildMexTerritory() {
         && mexResolvedClusters == clusters.size() && mexResolvedLandWindow == landWindow && mexResolvedTheatreWindow == theatreWindow
         && mexField == fieldModel) return;
     mexTerritoryDirty = false;
+    ++mexRebuildCount;  // D-485: orphan lane cache
     mexResolvedRevision = data->heightRevision;
     mexResolvedClusters = clusters.size();
     mexResolvedLandWindow = landWindow;
@@ -850,6 +851,41 @@ float CEconomyManager::MexLaneWidth(int lane) {
     if (!mexTheatresEnabled) return 0.f;
     RebuildMexTerritory();
     return lane >= 0 && std::size_t(lane) < mexLanes.lanes.size() && std::isfinite(mexLanes.lanes[lane].width) ? mexLanes.lanes[lane].width : 0.f;
+}
+// D-485: the orphan lanes and our adopted spot count, once per territory
+// rebuild. A lane is orphan when some start joined it and none of those is a
+// FRONT/SUPPORT seat; a lane no start joined keeps the walking rule.
+void CEconomyManager::RefreshOrphanLanes() {
+    RebuildMexTerritory();
+    if (mexOrphanRevision == mexRebuildCount) return;
+    mexOrphanRevision = mexRebuildCount;
+    std::vector<char> seated(mexLanes.lanes.size(), 0);
+    mexOrphanLanes.assign(mexLanes.lanes.size(), 0);
+    for (const auto& [team, claim] : mexClaims) {
+        if (claim.lane < 0 || std::size_t(claim.lane) >= seated.size()) continue;
+        if (claim.laneSpots) seated[claim.lane] = 2;
+        else if (seated[claim.lane] == 0) seated[claim.lane] = 1;
+    }
+    for (std::size_t l = 0; l < seated.size(); ++l) mexOrphanLanes[l] = (seated[l] == 1);
+    mexAdoptedSpots = 0;
+    const int own = circuit->GetTeamId();
+    for (const auto& r : mexResolved)
+        if (r.owner == own && r.lane >= 0 && std::size_t(r.lane) < mexOrphanLanes.size() && mexOrphanLanes[r.lane]) ++mexAdoptedSpots;
+}
+bool CEconomyManager::MexLaneOrphan(int lane) {
+    if (!mexTheatresEnabled || lane < 0) return false;
+    RefreshOrphanLanes();
+    return std::size_t(lane) < mexOrphanLanes.size() && mexOrphanLanes[lane];
+}
+// O(1) after the per-rebuild refresh; the resolved table is shared.
+bool CEconomyManager::IsAdoptedLaneSpot(const AIFloat3& pos) {
+    const auto* r = MexResolvedAt(pos);
+    return (r != nullptr) && (r->owner == circuit->GetTeamId()) && (r->lane >= 0) && MexLaneOrphan(r->lane);
+}
+bool CEconomyManager::HasAdoptedLaneSpots() {
+    if (!mexTheatresEnabled) return false;
+    RefreshOrphanLanes();
+    return mexAdoptedSpots > 0;
 }
 bool CEconomyManager::MexLaneMember(int lane, int team) {
     if (!mexTheatresEnabled) return false;

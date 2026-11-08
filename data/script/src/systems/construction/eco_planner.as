@@ -132,17 +132,23 @@ namespace EcoPlanner {
         return af !is null && af.count - aiBuilderMgr.GetUnfinishedCount(af) >= from;
     }
     ConversionReason TechConversionAdmission(CCircuitDef@ def, CCircuitUnit@ worker) {
-        if ((TechBuild::MetalFullLong() || aiEconomyMgr.isMetalFull) && !ConvertPastMetalFull()) return METAL_FULL;
         if (def is null) return UNAVAILABLE;
+        const bool advanced = def.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side);
+        // D-489 (owner, 2026-11-07): metal is worth more than energy and spare metal goes
+        // to the team, so the converter seat fills every free advanced-converter slot
+        // while energy is in excess: no metal-full refusal, no capacity, parallel or
+        // income test for it. Availability, buildability and placement still apply.
+        const bool seat = advanced && TechSurplusSeats::ConverterSeatWaived(worker);
+        if ((TechBuild::MetalFullLong() || aiEconomyMgr.isMetalFull) && !seat && !ConvertPastMetalFull()) return METAL_FULL;
         const int pending = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), def)
             + aiBuilderMgr.GetUnfinishedCount(def);
-        const int parallel = TechChain::EnergyBankFloats() ? Global::RoleSettings::Tech::ConverterParallel : 1;
+        int parallel = TechChain::EnergyBankFloats() ? Global::RoleSettings::Tech::ConverterParallel : 1;
+        if (seat) parallel = AiMax(parallel, pending + 1);
         const float income = Economy::GetMinMetalIncomeLast10s();
-        const bool advanced = def.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side);
         const ConversionReason reason = DecideConversion(false, true, pending, parallel,
-            ConversionSupply() >= aiEconomyMgr.GetEnergyUse(def), def.IsAvailable(ai.frame),
+            seat || ConversionSupply() >= aiEconomyMgr.GetEnergyUse(def), def.IsAvailable(ai.frame),
             worker is null || (worker.circuitDef !is null && worker.circuitDef.CanBuild(def)),
-            advanced ? (income >= Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter || FundedConverterRecovery(def, pending))
+            advanced ? (seat || income >= Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter || FundedConverterRecovery(def, pending))
                 : income < Global::RoleSettings::Tech::BuildT1ConvertersUntilMetalIncome,
             conversionDecision !is null && conversionDecision.placementRejected
                 && conversionDecision.placementRejectedDef == def.id);
@@ -168,6 +174,9 @@ namespace EcoPlanner {
     dictionary conversionReasons;
     void TraceConversion(CCircuitUnit@ worker, ConversionReason reason) {
         if (worker is null) return;
+        // INV-261 (D-489): the converter seat is never refused for a full metal bank or capacity while energy is in excess
+        if ((reason == METAL_FULL || reason == CAPACITY) && TechSurplusSeats::ConverterSeatWaived(worker))
+            Invariants::Violation("INV-261", "" + worker.id, "converter seat " + worker.id + " refused as " + ConversionReasonName(reason) + " while energy is in excess (D-489)");
         const string key = "" + worker.id;
         const string signature = "" + int(reason) + ":" + TechPlan::phase;
         string previous;

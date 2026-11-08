@@ -6,6 +6,18 @@ namespace RoleSettings {
 namespace Front {
             bool FactoryLayoutsEnabled = true;
             int FactorySupportRows = 4; // reserved growth, not an instruction to build all turrets
+            // D-486: fill mode. While metal floats (10 s minimum income at least
+            // FillIncome, and the bank at least FillBank of storage or spare
+            // income at least FillSpare, energy not stalling) base constructors
+            // build construction turrets into every reserved factory turret slot,
+            // the T1 cluster first, then the T2 cluster even before its plant;
+            // at most FillWorkers at once; off FillHoldSeconds after it stops.
+            bool FillEnabled = true;
+            float FillIncome = 30.0f;
+            float FillBank = 0.75f;
+            float FillSpare = 10.0f;
+            int FillWorkers = 2;
+            float FillHoldSeconds = 20.0f;
             float FactoryUtilityBlastMargin = 32.f;
             // D-459: the opening builder's walking budget when FRONT plans
             // its first district; later factories keep their district slot.
@@ -13,6 +25,13 @@ namespace Front {
             // D-461: with no factory standing after this many seconds, the
             // commander takes the queued start factory itself. 0 disables.
             float StartFactoryTakeoverSeconds = 60.0f;
+            // D-494: before the first factory the commander takes no mex farther than
+            // this from the start; it builds the factory first (0 disables).
+            float StartFactoryMexRadius = 900.0f;
+            int StartFactoryOrderSeconds = 300;          // D-494: the planned start factory order's timeout
+            float StartFactoryGraceSeconds = 60.0f;      // D-494: INV-267 allows this long past the takeover
+            float StartFactoryRetrySeconds = 5.0f;       // D-494: after an order died without a frame
+            float StartFactoryShake = 256.0f;            // D-494: the ordinary site's search radius round the start
             float FactoryProductionBudgetShare = 0.65f;
             // D-468, INV-252: a construction turret holding a repair order on a
             // target outside its reach this long is logged as a violation

@@ -507,6 +507,7 @@ private:
 	mutable uint64_t localOracleMismatches = 0;
 	void IndexLocalSlot(int id);
 	std::map<std::string, int> layoutGroups;
+	std::vector<layout_rank::CellRect> coreRects;  // D-493: the TECH core's footprints
 	struct ExitMovementFacts { int mobile; float halfWidth, slope, depth; bool hover; };
 	// Immutable definition facts only. Ownership is this terrain manager;
 	// terrain connectivity/height/slope are always read from current buffers.
@@ -614,6 +615,24 @@ public:
 	// factory facing the front (else a side, never away), exit clear; an air
 	// factory any facing, no exit test. -1 when no turret stands or no site
 	int PackFactoryFlush(CCircuitDef* cdef, const springai::AIFloat3& anchor);
+	// D-491 / D-493: the TECH core, a list of footprints (definition, position,
+	// facing) captured when each member is placed. It does not depend on the
+	// reservations: the advanced lab's footprint stays after the lab is
+	// reclaimed (D-078). Script persists it as named layout ints and re-adds it
+	// after a load. Any number of members; a few in practice.
+	void AddCoreFootprint(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	int CoreCount() const { return int(coreRects.size()); }
+	// The smallest edge gap (cells) from cdef at pos/facing to the other core
+	// members (footprints it overlaps, itself, are skipped); facing -1 takes the
+	// smaller of the two orientations. -1 when no other member exists.
+	int CoreEdgeGap(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
+	// cdef inside a turret's reach of nanoGroup (zone and its ring), touching
+	// the core when the ground allows, else the smallest edge gap up to
+	// maxGapCells (layout_rank::CoreBefore). A ground factory keeps its exit
+	// clear; an air factory takes any facing (anyFacing). Exit lanes and pockets
+	// are refused as by PackNearGroup. -1 when the core is empty or nothing fits.
+	int PackBesideCore(int zone, CCircuitDef* cdef, int nanoGroup, int facing, bool anyFacing,
+			int maxGapCells, float minNanoDist);
 	static bool MakesAircraft(CCircuitAI* circuit, CCircuitDef* cdef);
 	// D-101: the next unserved slot of cdef in a set, nearest its turret first; -1
 	int NextSetSlot(CCircuitDef* cdef) const;

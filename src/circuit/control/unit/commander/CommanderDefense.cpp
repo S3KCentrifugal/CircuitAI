@@ -42,7 +42,8 @@ bool CCommanderController::SetDefenseRule(int slot,const std::string& key,float 
             return true;
         }
         float* field=key=="enabled"?&defenseSettings.enabled:key=="radius"?&defenseSettings.radius:
-            key=="surplus_metal"?&defenseSettings.surplusMetal:key=="surplus_energy_margin"?&defenseSettings.surplusEnergyMargin:
+            key=="surplus_metal"?&defenseSettings.surplusMetal:key=="surplus_income"?&defenseSettings.surplusIncome:
+            key=="surplus_energy_margin"?&defenseSettings.surplusEnergyMargin:
             key=="surplus_fire_seconds"?&defenseSettings.surplusFireSeconds:key=="surplus_limit"?&defenseSettings.surplusLimit:
             key=="memory"?&defenseSettings.memory:key=="strategic_memory"?&defenseSettings.strategicMemory:
             key=="heavy_metal"?&defenseSettings.heavyMetal:key=="heavy_health"?&defenseSettings.heavyHealth:
@@ -388,7 +389,7 @@ dp::Project CCommanderController::DefenseProject(CCircuitDef* def,const DefenseF
     return p;
 }
 
-IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand) {
+IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand,bool allowSurplus) {
     if(defenseSettings.enabled<=0) return nullptr;
     AssessGroupDefense(anchor,frame);
     auto* eco=ai->GetEconomyManager();
@@ -478,13 +479,15 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     };
     if(selected<0) return nullptr;
     if(best.band<minimumBand) return skip("band");
+    if(best.surplus && !allowSurplus) return skip("surplus_later");
     if(frame<defenseOfferNext) return skip("offer_cadence");
     const auto seats=GatherDefenseBuilders(anchor);
     // Strategic urgency may defer, never erase, the nano obligation. D-469:
     // only while a present, free seat can build the nano; a commander alone
     // (no nano in its build list) otherwise refused every later defence for
     // the rest of the game (played: ~125 skips per 16-AI game).
-    if(groupNanoDue && best.band<3) {
+    // D-476: only owed nanos that no expansion job is building yet block.
+    if(NanoUnassigned() && best.band<3) {
         auto* nano=ai->GetCircuitDefSafe(groupNano);
         if(nano && std::any_of(seats.begin(),seats.end(),[&](const DefenseBuilder& seat) {
             return seat.def && seat.def->CanBuild(nano); })) return skip("nano_due");
@@ -525,7 +528,7 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
         TrackGroupJob(task,supportAnchor<0); defenseNext=defenseDecisionNext=0;
         // Owner 2026-11-02: gates passed with enemies seen in the planner radius
         // (this second's assessment) commits the job; see GroupProjectAllowed.
-        groupJobCommitted=!best.surplus && defenseLocalDanger;
+        CommitExpansionJob(task,!best.surplus && defenseLocalDanger);
         return task;
     }
     defenseReason+=" placement_blocked";
@@ -561,7 +564,7 @@ void CCommanderController::CheckOwnGroundDefense(CCircuitUnit* anchor,int frame)
 // anchor never stays idle or on a Wait past seat_grace plus slack while it
 // holds such a rule. Constant work per decision; log limited like INV-253.
 void CCommanderController::CheckSeatWait(CCircuitUnit* anchor,int frame) {
-    if(defenseSeatWaitSince<0 || defenseOwnChoice<0 || groupJob || frame<defenseSeatLogNext) return;
+    if(defenseSeatWaitSince<0 || defenseOwnChoice<0 || ExpansionJobCount()>0 || frame<defenseSeatLogNext) return;
     if(float(frame-defenseSeatWaitSince)/FRAMES_PER_SEC<defenseSettings.seatGrace+SEAT_WAIT_INVARIANT_SLACK_SECONDS) return;
     auto* task=anchor->GetTask();
     if(task && task->GetType()!=IUnitTask::Type::IDLE && task->GetType()!=IUnitTask::Type::WAIT) return;
@@ -619,10 +622,12 @@ IUnitTask* CCommanderController::SupportDefenseWork(CCircuitUnit* unit,int ancho
     if(unit->GetPos(frame).SqDistance2D(anchor->GetPos(frame))>SQUARE(cfg->group.radius)) return nullptr;
     // CanAssignTo admits additional build power; it may reject an already
     // assigned repairer once the remaining repair is small. Retain that worker.
-    if(groupJob && !groupJob->IsDead() && GroupProjectAllowed(unit,groupJob)
-        && (current==groupJob || groupJob->CanAssignTo(unit))) return groupJob;
-    if(groupJob && !groupJob->IsDead() && !groupJob->GetAssignees().empty()) return nullptr;
-    if(groupJob) groupJob->GetManager()->AbortTask(groupJob);
+    // Engineering keeps one shared job: its first expansion slot.
+    auto* job=FirstExpansionJob();
+    if(job && !job->IsDead() && GroupProjectAllowed(unit,job)
+        && (current==job || job->CanAssignTo(unit))) return job;
+    if(job && !job->IsDead() && !job->GetAssignees().empty()) return nullptr;
+    if(job) job->GetManager()->AbortTask(job);
     if(auto* defense=GroupPlannedDefense(unit,anchor,frame)) return defense;
     return GroupLocalMaintenance(unit,anchor);
 }

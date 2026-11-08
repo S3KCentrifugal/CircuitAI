@@ -62,6 +62,7 @@ class CTerrainManager;
 class CBattleAnalysis;
 class CBuilderManager;
 class CCommanderController;
+class IArtilleryCensus;
 class CControllerRegistry;
 class CWidgetState;
 class CFactoryManager;
@@ -355,6 +356,8 @@ public:
     // D-388: unit controllers; the commander controller is the first of them.
     CControllerRegistry* GetControllers() const { return controllers.get(); }
     CCommanderController* GetCommanderController() const { return commanderController; }
+    // D-493: what the commander group may ask about our artillery (crowding).
+    IArtilleryCensus* GetArtilleryCensus() const { return artilleryCensus; }
     CWidgetState* GetWidgetState() const { return widgetState.get(); }  // D-300
 	CFactoryManager*  GetFactoryManager()  const { return factoryManager.get(); }
 	CEconomyManager*  GetEconomyManager()  const { return economyManager.get(); }
@@ -417,6 +420,7 @@ private:
 	std::shared_ptr<CBuilderManager> builderManager;
     std::unique_ptr<CControllerRegistry> controllers;  // owns every unit controller
     CCommanderController* commanderController=nullptr;  // owned by controllers
+    IArtilleryCensus* artilleryCensus=nullptr;          // D-493: owned by controllers
     std::unique_ptr<CWidgetState> widgetState;  // D-300: AI -> widget state file
 	std::shared_ptr<CFactoryManager> factoryManager;
 	std::shared_ptr<CEconomyManager> economyManager;

@@ -287,6 +287,7 @@
 			},
 			"legcluster": {
 				// owner 2026-11-01: FRONT builds forward Amputators (front_agitator.as); veto lifted, nothing native orders it
+				"controller": "artillery_battery",
 				"role": ["static"],
 				"on": false,
 				"limit": 3,
@@ -354,6 +355,7 @@
 				"power": 1.0
 			},
 			"legacluster": {
+				"controller": "artillery_popup",
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0

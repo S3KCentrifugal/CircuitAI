@@ -66,7 +66,14 @@ static void TestLanes() {
     const auto r = Resolve(in);
     Require(r.rule == Rule::LANE && r.owner == 1, "a lane cluster goes to the lane's FRONT/SUPPORT member, not the nearer TECH or the other lane");
     in.entrants = { Ground(0, 300.f, 2500.f, false, 0), Ground(2, 200.f, 2500.f, true, 1) };
-    Require(Resolve(in).owner == 0, "a lane without a FRONT or SUPPORT member falls back to its members");
+    Require(Resolve(in).owner == 2, "D-478: a lane without a FRONT or SUPPORT member goes to the nearest FRONT/SUPPORT seat of another lane, not its AIR/TECH member");
+    in.entrants = { Ground(0, 300.f, 2500.f, false, 0), Ground(2, 900.f, 2500.f, true, 1), Ground(3, 400.f, 2500.f, true, 2) };
+    Require(Resolve(in).owner == 3, "D-478: the nearest such seat by walk");
+    in.entrants = { Ground(0, 300.f, 2500.f, false, 0), Ground(2, 200.f, 2500.f, false, 1) };
+    Require(Resolve(in).owner == 0, "with no FRONT or SUPPORT seat at all the lane falls back to its members");
+    in.entrants = { Ground(0, 300.f, 2500.f, false, 5), Ground(2, 200.f, 2500.f, true, 1) };
+    const auto open = Resolve(in);
+    Require(open.rule == Rule::LAND_WALK && open.owner == 2, "D-478: a lane no start joined keeps the walking rule (not adopted)");
     in.forward = true;
     const auto f = Resolve(in);
     Require(f.rule == Rule::FORWARD && f.owner == -1, "a cluster past the midpoint is nobody's during the window");

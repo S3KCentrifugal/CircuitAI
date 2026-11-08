@@ -8,6 +8,7 @@
 #ifndef SRC_CIRCUIT_SETUP_ALLYTEAM_H_
 #define SRC_CIRCUIT_SETUP_ALLYTEAM_H_
 
+#include <unordered_map>
 #include "unit/enemy/EnemyManager.h"
 #include "util/math/QuadField.h"
 #include "util/math/Region.h"
@@ -81,6 +82,10 @@ public:
 	void UpdateFriendlyUnits();
 	CAllyUnit* GetFriendlyUnit(ICoreUnit::Id unitId) const;
 	const AllyUnits& GetFriendlyUnits() const { return friendlyUnits; }
+	// D-493: finished allied units of one definition (ours included). The
+	// per-definition counts are rebuilt once per friendly-unit refresh, on the
+	// first ask: O(F) then, O(1) per ask until the next refresh.
+	int FinishedCount(int defId);
 	using AllyStructures=std::vector<std::pair<int,CAllyUnit*>>;
 	const AllyStructures& GetFriendlyStructures();
 
@@ -196,6 +201,8 @@ private:
 	int resignSize;
 	int lastUpdate;
 	AllyUnits friendlyUnits;  // owner
+	std::unordered_map<int, int> finishedCounts;  // D-493: def id -> finished allied units
+	int finishedCountsFrame = -1;                 // the refresh they were counted at
 	AllyStructures friendlyStructures; // borrowed ordered subset, storage reused
 	bool friendlyStructuresReady=false;
 	CQuadField quadField;

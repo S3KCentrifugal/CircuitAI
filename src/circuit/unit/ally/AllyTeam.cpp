@@ -158,6 +158,21 @@ void CAllyTeam::ForceUpdateFriendlyUnits()
 	UpdateFriendlyUnits();
 }
 
+int CAllyTeam::FinishedCount(int defId)
+{
+	if (finishedCountsFrame != lastUpdate) {
+		finishedCounts.clear();
+		for (const auto& kv : friendlyUnits) {
+			const CAllyUnit* unit = kv.second;
+			if ((unit == nullptr) || (unit->GetCircuitDef() == nullptr) || unit->GetUnit()->IsBeingBuilt()) continue;
+			++finishedCounts[unit->GetCircuitDef()->GetId()];
+		}
+		finishedCountsFrame = lastUpdate;
+	}
+	const auto it = finishedCounts.find(defId);
+	return (it == finishedCounts.end()) ? 0 : it->second;
+}
+
 void CAllyTeam::UpdateFriendlyUnits()
 {
 	// FIXME: Works bad because of circuit->GetCircuitDef(unitDefId) inside allyTeam:

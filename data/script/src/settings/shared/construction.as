@@ -57,6 +57,29 @@ namespace RoleSettings {
         // Shared AIR/TECH wall exclusion, measured from every allied start.
         float WallBaseExclusionRadius = 1200.0f;
 
+        // D-488 (owner, 2026-11-07): FRONT and AIR put the fortified geo (a
+        // Cortex T2 constructor builds the Cerberus) on every forward vent: one
+        // whose fortified geo, firing toward the nearest enemy start, reaches
+        // mid map or beyond. A standing geo there is built over where the new
+        // one stacks, else reclaimed first (systems/construction/forward_geothermal.as).
+        namespace ForwardGeo {
+            bool Enabled = true;
+            string Definitions = "corbhmth,armgmm,legrampart"; // first one the worker can build
+            string RangeDefinition = "corbhmth";  // whose main range sets the reach
+            float RangeFallback = 1650.0f;        // elmos, when that definition has no range
+            float MidRatio = 1.0f;                // reach point forward: ally-start distance >= MidRatio x enemy-start distance
+            float EnemyBaseRadius = 2000.0f;      // a vent this near an enemy start is in its base, never forward (elmos)
+            float MinMetalIncome = 20.0f;         // metal/s before the first order (the commander group's geo gate)
+            float MaxThreat = 3.0f;               // threat at the vent (commander front_threat scale)
+            float JoinDistance = 1500.0f;         // another worker joins the open job within this (elmos)
+            float RetrySeconds = 2.0f;            // between searches for a new job
+            float RefusedSeconds = 30.0f;         // a refused vent is skipped this long
+            int UnbuiltLimit = 2;                 // build jobs ending without the fortified geo before a vent waits
+            float UnbuiltSeconds = 300.0f;        // that wait
+            bool Reclaim = true;                  // reclaim our plant when the fortified geo does not stack on it
+            int ReclaimSeconds = 120;             // reclaim task timeout
+        }
+
         
 }
 }

@@ -1,5 +1,28 @@
 // Mono-space font required
 {
+	// D-474: constructor brace. A land constructor (not air, not a ship) that is
+	// damaged, or whose structure under construction is destroyed, steps back
+	// "retreat" elmos from the threat and builds the first defence it can from
+	// "t2", else from "t1", "offset" elmos ahead of where it stopped (between it
+	// and the threat). Below "hold_above" (health fraction) the builder leaves the
+	// brace for its ordinary retreat; above it the brace holds even under the
+	// builder's 80 % retreat (the owner's rule, 2026-11-06). A commander
+	// braces only when none of its own rules holds it (it waits up to
+	// "commander_window" seconds for that). Seconds: cooldown, timeout, commander_window.
+	"brace": {
+		"enabled": true,
+		"retreat": 100,
+		"offset": 80,
+		"cooldown": 5,
+		"timeout": 120,
+		"commander_window": 3,
+		"hold_above": 0.5,
+		// Scorpion and its equivalents (Pit Bull, Chimera)
+		"t2": ["corvipe", "armpb", "legapopupdef"],
+		// Beamer and its equivalents (Twin Guard, Hive: the porcupine column 3),
+		// then the light laser for a builder that has none of them (the commander)
+		"t1": ["armbeamer", "corhllt", "leghive", "armllt", "corllt", "leglht"]
+	},
 	"porcupine": {
 		"unit": {
 		//             	   0          1         2          3            4         5          6          7            8         9        10
