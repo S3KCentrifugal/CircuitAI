@@ -1260,6 +1260,13 @@ void CBuilderManager::ActivateTask(IBuilderTask* task)
 	task->Activate();
 }
 
+IBuilderTask* CBuilderManager::EnqueueVetoed(const TaskB::SBuildTask& ti)
+{
+	// Scoped: the flag is cleared on every exit, so no other caller inherits it.
+	struct Guard { bool& flag; explicit Guard(bool& f) : flag(f) { flag = true; } ~Guard() { flag = false; } } guard(vetoOverride);
+	return Enqueue(ti);
+}
+
 IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 {
 	// Positional requests from older role helpers still enter the field claim
@@ -1273,9 +1280,10 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 	}
 	// Only construction types (the contiguous range before REPAIR) initialize
 	// buildDef. Service tasks such as Repair/Reclaim leave that field unset.
-	// A profile's construction veto survives scripts lifting temporary caps.
+	// A profile's construction veto survives scripts lifting temporary caps;
+	// only EnqueueVetoed passes it (D-495).
 	if ((ti.type < IBuilderTask::BuildType::REPAIR)
-			&& (ti.buildDef != nullptr) && (!ti.buildDef->IsBuildAllowed()
+			&& (ti.buildDef != nullptr) && ((!ti.buildDef->IsBuildAllowed() && !vetoOverride)
 				|| circuit->GetEconomyManager()->IsMetalConverter(ti.buildDef))) {
 		return nullptr;
 	}

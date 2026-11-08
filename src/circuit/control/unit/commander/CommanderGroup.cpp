@@ -362,6 +362,7 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     }
     if(task==tacticalJob) {  // D-475: the tactical queue's slot is free again
         tacticalJob=nullptr;
+        if(task==t1Job) t1Job=nullptr;  // D-495
         const auto* build=dynamic_cast<IBuilderTask*>(task);
         const auto* def=build?build->GetBuildDef():nullptr;
         ai->LOG("[CommanderGroup] job_end queue=tactical done=%i team=%i def=%s",int(done),ai->GetTeamId(),

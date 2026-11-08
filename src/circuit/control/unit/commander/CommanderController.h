@@ -11,6 +11,7 @@
 // fallback, T3, front, work); CommanderRole holds the per-AI script policy.
 #include "control/core/CommandWriter.h"
 #include "control/core/UnitController.h"
+#include "control/kernel/ArtilleryT1Gate.h"
 #include "control/kernel/CommanderCombat.h"
 #include "control/kernel/CommanderFortification.h"
 #include "control/kernel/CommanderGroupWork.h"
@@ -23,6 +24,7 @@
 #include "spring/RouteCommand.h"
 #include "AIFloat3.h"
 #include <cmath>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -254,6 +256,17 @@ struct CommanderGroupConfig {
     // turret's build draw. Incomes 0: off.
     float artilleryT2Income=0,artilleryT1Income=0,artilleryBank=.75f,artillerySpare=15;
     float artilleryEnergy=.5f,artilleryEnergyCover=1;
+    // D-495: the T1 gun's gate (control/kernel/ArtilleryT1Gate.h). A target:
+    // an enemy T1 gun within t1Counter of one of our structures, or armed enemy
+    // structures worth t1Value x the gun's metal within t1Cluster round a
+    // defence whose height-adjusted range reaches t1MobileRange. The site
+    // reaches it (range +/- t1HeightGain per elmo of height, less t1Margin)
+    // outside every known enemy weapon (+ t1Margin). Targets seen within
+    // t1VisionSeconds; at most t1Max T1 guns per AI; replanned at most once
+    // per t1EvalSeconds.
+    float artilleryT1Counter=1400,artilleryT1Value=1,artilleryT1Cluster=400,artilleryT1MobileRange=820;
+    float artilleryT1HeightGain=.6f,artilleryT1Margin=64,artilleryT1VisionSeconds=30,artilleryT1Max=2;
+    float artilleryT1EvalSeconds=10;
     // D-480: the FRONT seat's T1 constructor in the group takes every open mex
     // it owns in its base (seatBaseRadius of the start), then every one along
     // its lane up to the commander (seatApproachAhead past it), before any
@@ -487,6 +500,32 @@ private:
     // D-479: one reserved block per definition (T1 and T2 footprints differ).
     struct TacticalBlock { int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0; };
     std::map<int,TacticalBlock> tacticalBlocks;
+    // D-495 (CommanderArtilleryT1.cpp): the T1 gun's plan, a justified target
+    // and a site in its reach outside every known enemy weapon. Built from the
+    // side's combat snapshot at most once per artilleryT1EvalSeconds; mutable
+    // because TacticalChoice (const) asks for it. Not serialized.
+    struct T1Plan {
+        int defId=-1;
+        artillery_t1::Case why=artillery_t1::Case::None;
+        artillery_t1::Contact target;
+        springai::AIFloat3 site{-1,0,-1};
+        int facing=0;
+    };
+    std::vector<int> artilleryT1CounterDefs;  // may take counter-battery work, script-owned
+    mutable T1Plan t1Plan;
+    mutable int t1PlanFrame=std::numeric_limits<int>::min()/2;
+    mutable std::vector<artillery_t1::Contact> t1Enemies;  // reused per plan
+    // The live T1 job: its target, checked once against the frame (INV-268).
+    IUnitTask* t1Job=nullptr;
+    artillery_t1::Contact t1JobTarget;
+    float t1JobRange=0;
+    bool t1JobChecked=false;
+    bool IsArtilleryT1Def(const CCircuitDef* def) const;
+    bool T2LabStarted() const;
+    const T1Plan* ArtilleryT1Plan(CCircuitUnit* unit) const;
+    bool ArtilleryT1Site(CCircuitUnit* anchor,CCircuitDef* def,const artillery_t1::Contact& target,T1Plan& plan) const;
+    bool ReserveArtilleryT1Site(CCircuitDef* def,TacticalBlock& block);
+    void CheckArtilleryT1Job(int frame);
     // D-480: seat mex spots blocked by a unit or structure, and the frame each skip ends.
     std::vector<std::pair<springai::AIFloat3,int>> seatMexSkip;
     // D-485: next frame the seat sweep searches after one that found nothing;

@@ -121,7 +121,7 @@ namespace Main {
 
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
-		ArtilleryPolicy::Check();
+		ArtilleryPolicy::Check(Global::AISettings::Role == AiRole::FRONT);  // D-495
         Lanes::Poll(); // complete async surveys for every role before consumers run
         AmphibiousOps::Tick();
         ScoutRaid::Tick(); // D-296: no-op unless the profile JSON enables scout raids
