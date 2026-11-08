@@ -139,9 +139,13 @@ public:
 
 	void SetDamagedFrame(int frame) { damagedFrame = frame; }
 	int GetDamagedFrame() const { return damagedFrame; }
+	// Owner 2026-11-02: last EVENT_WEAPON_FIRED frame of any weapon, -1 none.
+	void SetFireFrame(int frame) { fireFrame = frame; }
+	int GetFireFrame() const { return fireFrame; }
 
 	bool HasDGun() const { return dgun != nullptr; }
 	bool HasWeapon() const { return weapon != nullptr; }
+	springai::Weapon* GetMainWeapon() const { return weapon; }
 	bool HasShield() const { return shield != nullptr; }
 	void ManualFire(CEnemyInfo* target, int timeout);
 	bool IsDGunHigh() const;
@@ -170,6 +174,7 @@ public:
 	void CmdFightTo(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
 	void CmdPatrolTo(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
 	void CmdAttackGround(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
+    void CmdStationaryGroundTarget(const springai::AIFloat3& pos);
 	void CmdWantedSpeed(float speed = NO_SPEED_LIMIT);
 	void CmdStop(short options = 0, int timeout = INT_MAX);
 	void CmdSetTarget(CEnemyInfo* enemy);
@@ -272,6 +277,7 @@ private:
 	int moveFails;
 	int failFrame;
 	int damagedFrame;
+	int fireFrame;
 	int execFrame;  // TODO: Replace by CExecuteAction?
 	int disarmFrame;
 	int ammoFrame;

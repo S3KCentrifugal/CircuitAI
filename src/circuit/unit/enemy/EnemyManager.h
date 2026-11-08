@@ -8,6 +8,8 @@
 #ifndef SRC_CIRCUIT_UNIT_ENEMY_ENEMYMANAGER_H_
 #define SRC_CIRCUIT_UNIT_ENEMY_ENEMYMANAGER_H_
 
+#include <unordered_map>
+#include <string>
 #include "unit/CoreUnit.h"
 #include "unit/CircuitDef.h"
 #include "unit/enemy/EnemyUnit.h"
@@ -76,6 +78,12 @@ public:
 private:
 	void DyingEnemy(CEnemyUnit* enemy);
 	void DeleteEnemyUnit(CEnemyUnit* data);
+	// Owner 2026-11-04 18:32Z: a ghost structure whose own wreck now lies at its
+	// spot, or whose spot was seen empty, died: nullptr, or why it is gone.
+	const char* GhostStructureGone(CEnemyUnit* enemy, int frame);
+	std::unordered_map<int, int> ghostCheckFrame;          // enemy id -> next check frame
+	std::unordered_map<int, std::string> wreckNames;        // def id -> corpse feature name
+	std::unordered_map<int, bool> cloakDefs;                // def id -> can cloak (an empty spot proves nothing)
 
 public:
 	/*
