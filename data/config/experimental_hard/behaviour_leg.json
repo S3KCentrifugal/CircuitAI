@@ -945,7 +945,9 @@
 			},
 			"legbar": {
 				"role": ["artillery", "anti_spam", "assault"],
-				"attribute": ["siege", "rare"],
+				"attribute": ["siege", "rare", "ranged"],
+				// Owner 2026-11-03: Sharpshooter (armsnipe) micro at max range - firing sites at 98% of this unit's own weapon range (from its def), kites back to it; always fires at will.
+				"ranged": {"always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.98, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1007,7 +1009,9 @@
 			},
 			"leginf": {
 				"role": ["artillery"],
-				"attribute": ["siege"],
+				"attribute": ["siege", "ranged"],
+				// Owner 2026-11-03: Sharpshooter (armsnipe) micro at max range - firing sites at 98% of this unit's own weapon range (from its def), kites back to it; always fires at will.
+				"ranged": {"always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.98, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
