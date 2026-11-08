@@ -200,7 +200,7 @@ namespace Front {
 
             // Economy Scaling Limits
             float MetalIncomePerLab = 35.0f;
-            float MetalIncomeForGantry = 225.0f;   // owner, 2026-10-25 (175 before)
+            float MetalIncomeForGantry = 250.0f;   // smrt-test value (owner 2026-11-08: FRONT eco is smrt-test's); was 225 from 2026-10-25
             // Owner (2026-10-25): without the eco ladder, the T2 constructors order the gantry themselves at
             // MetalIncomeForGantry (roles/front/front.as Front_TryLadderGantry), not the native factory switch
             bool DirectGantry = true;
