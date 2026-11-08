@@ -475,6 +475,27 @@ namespace FrontConstructors {
         const float radius = Global::RoleSettings::Front::BaseSupportRadius;
         return p.x >= 0.f && p.z >= 0.f && MapHelpers::SqDist(p, Global::Map::StartPos) <= radius * radius;
     }
+    // D-486: which FRONT constructor may fill reserved factory turret slots:
+    // the base seat, the converter seat once released, the energy seat with no
+    // energy job, and an unseated constructor within BaseSupportRadius. Never
+    // the commander or expansion seat, and never off a started frame.
+    IUnitTask@ FillWork(CCircuitUnit@ unit) {
+        if (!Global::RoleSettings::Front::FillEnabled || !FrontFactorySupport::Active()) return null;
+        const int seat = Seat(unit.id);
+        if (seat == COMMANDER || seat == EXPANSION) return null;
+        if (seat == CONVERTER && !ConverterReleased()) return null;
+        IBuilderTask@ current = cast<IBuilderTask>(unit.task);
+        if (FrontFactorySupport::IsFillJob(unit.task)) return unit.task;
+        if (current !is null && !current.IsDead() && current.target !is null
+            && current.GetBuildType() < int(Task::BuildType::REPAIR)) return null;
+        if (seat == ENERGY && current !is null && !current.IsDead()
+            && (current.GetBuildType() == int(Task::BuildType::ENERGY) || current.GetBuildType() == int(Task::BuildType::GEO))) return null;
+        if (seat < 0) {
+            const float radius = Global::RoleSettings::Front::BaseSupportRadius;
+            if (MapHelpers::SqDist(unit.GetPos(ai.frame), Global::Map::StartPos) > radius * radius) return null;
+        }
+        return FrontFactorySupport::FillWork(unit);
+    }
     IUnitTask@ BaseWork(CCircuitUnit@ unit) {
         // Keep an in-progress local structure; never abort shared work merely
         // to select another economic rung. Native retreat/combat owns safety.

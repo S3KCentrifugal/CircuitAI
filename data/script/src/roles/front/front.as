@@ -850,6 +850,10 @@ namespace RoleFront {
         if (energyIncome > Global::RoleSettings::Front::NanoEnergyIncomeThresholdForMax) {
             nanoCap = Global::RoleSettings::Front::NanoMaxCount;
         }
+        // D-486: while metal floats, fill mode may add FillWorkers turrets past
+        // the energy cap (played: the cap, energy income / 150, held a FRONT AI
+        // at +58 metal/s to its turrets, and every fill ask was refused).
+        nanoCap = AiMax(nanoCap, FrontFactorySupport::FillCapFloor());
         array<string> nanos = UnitHelpers::GetT1NanoUnitNames();
         UnitHelpers::BatchApplyUnitCaps(nanos, nanoCap);
     }

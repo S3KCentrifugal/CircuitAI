@@ -6,6 +6,18 @@ namespace RoleSettings {
 namespace Front {
             bool FactoryLayoutsEnabled = true;
             int FactorySupportRows = 4; // reserved growth, not an instruction to build all turrets
+            // D-486: fill mode. While metal floats (10 s minimum income at least
+            // FillIncome, and the bank at least FillBank of storage or spare
+            // income at least FillSpare, energy not stalling) base constructors
+            // build construction turrets into every reserved factory turret slot,
+            // the T1 cluster first, then the T2 cluster even before its plant;
+            // at most FillWorkers at once; off FillHoldSeconds after it stops.
+            bool FillEnabled = true;
+            float FillIncome = 30.0f;
+            float FillBank = 0.75f;
+            float FillSpare = 10.0f;
+            int FillWorkers = 2;
+            float FillHoldSeconds = 20.0f;
             float FactoryUtilityBlastMargin = 32.f;
             // D-459: the opening builder's walking budget when FRONT plans
             // its first district; later factories keep their district slot.

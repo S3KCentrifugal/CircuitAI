@@ -9,6 +9,7 @@ namespace FrontFactorySupport {
     bool loaded=false;
     void Reset() {
         loaded=false;frame=-SECOND;turrets.resize(0);assigned.resize(0);
+        fillJobs.resize(0);fillUntil=-1;fillChecked=-SECOND;  // D-486
     }
     void Added(CCircuitUnit@ unit) {
         if(unit is null || unit.circuitDef.IsMobile() || unit.circuitDef.GetBuildDistance()<=0.f
@@ -225,5 +226,93 @@ namespace FrontFactorySupport {
             && current.GetBuildType()==int(Task::BuildType::REPAIR)) return turret.task;
         return factorySide?aiFactoryMgr.Enqueue(TaskS::Repair(Task::Priority::NORMAL,target))
             :aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::NORMAL,target,10*SECOND));
+    }
+    /*
+     * D-486 (the owner's rule): fill mode. The deficit rule above adds a turret
+     * only for the measured shortfall of a finished factory's current product,
+     * one queued at a time, so a FRONT AI at +58 metal/s with a full bank kept
+     * its reserved turret slots empty (owner's screenshot, deficit=0). While
+     * metal floats, base constructors (FrontConstructors::FillWork) fill every
+     * reserved slot of the factory clusters: T1 first, then T2, the T2 cluster
+     * even before its plant. Turrets without a factory assist nearby work
+     * until the plant starts. Cost: one floating check per second; per job,
+     * one bounded slot search (NextSupportSlot, budget FillSlotBudget).
+     */
+    const int FillSlotBudget=8;
+    array<IUnitTask@> fillJobs;
+    int fillUntil=-1,fillChecked=-SECOND;
+    bool Floating() {
+        const float income=Economy::GetMinMetalIncomeLast10s();
+        if(income<Global::RoleSettings::Front::FillIncome || aiEconomyMgr.isEnergyStalling) return false;
+        const float storage=AiMax(1.f,aiEconomyMgr.metal.storage);
+        return aiEconomyMgr.metal.current>=Global::RoleSettings::Front::FillBank*storage
+            || aiEconomyMgr.metal.income-aiEconomyMgr.metal.pull>=Global::RoleSettings::Front::FillSpare;
+    }
+    bool FillOn() {
+        if(!Global::RoleSettings::Front::FillEnabled || !Active()) return false;
+        if(ai.frame>=fillChecked+SECOND) {
+            fillChecked=ai.frame;
+            const bool was=ai.frame<fillUntil;
+            if(Floating()) fillUntil=ai.frame+int(Global::RoleSettings::Front::FillHoldSeconds*SECOND);
+            const bool now=ai.frame<fillUntil;
+            if(now!=was) GenericHelpers::LogUtil("[FrontLayout] fill "+(now?"on":"off")+" income="
+                +Economy::GetMinMetalIncomeLast10s()+" bank="+aiEconomyMgr.metal.current+"/"+aiEconomyMgr.metal.storage,1);
+        }
+        return ai.frame<fillUntil;
+    }
+    // D-486: the turret cap fill mode needs (Front_IncomeNanoLimits): the
+    // turrets standing or queued plus FillWorkers; 0 while fill is off.
+    int FillCapFloor() {
+        if(!FillOn()) return 0;
+        CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        return nano is null?0:nano.count+Global::RoleSettings::Front::FillWorkers;
+    }
+    int FillGroup(uint tier) {
+        int group=aiTerrainMgr.GetLayoutInt(FrontLayout::TierKey(tier)+".adopted_nano",-1);
+        if(group<0) group=aiTerrainMgr.GetNamedLayoutGroup(FrontLayout::PlanKey(tier)+".nano");
+        return group;
+    }
+    bool IsFillJob(IUnitTask@ task) {
+        return task !is null && fillJobs.findByRef(task)>=0;
+    }
+    IUnitTask@ FillWork(CCircuitUnit@ unit) {
+        for(int i=int(fillJobs.length())-1;i>=0;--i)
+            if(fillJobs[i] is null || fillJobs[i].IsDead()) fillJobs.removeAt(uint(i));
+        if(IsFillJob(unit.task)) return unit.task;
+        if(!FillOn()) return null;
+        if(int(fillJobs.length())>=Global::RoleSettings::Front::FillWorkers) return FillNone(unit,"workers");
+        CCircuitDef@ nano=ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        if(nano is null || !unit.circuitDef.CanBuild(nano) || !nano.IsAvailable(ai.frame)) return FillNone(unit,"nano");
+        string why="";
+        for(uint tier=0;tier<2;++tier) {
+            const int group=FillGroup(tier);
+            if(group<0) {why+=" t"+(tier+1)+"=nogroup";continue;}
+            if(aiTerrainMgr.GetGroupCount(group,true)<=0) {why+=" t"+(tier+1)+"=full";continue;}
+            CCircuitUnit@ factory=FrontLayout::Factory(tier);
+            const AIFloat3 seed=factory !is null?factory.GetPos(ai.frame)
+                :aiTerrainMgr.GetLayoutGroupCenter(FrontLayout::PlanKey(tier)+".nano");
+            const int slot=aiTerrainMgr.NextSupportSlot(unit,nano,group,seed,FillSlotBudget);
+            if(slot<0) {why+=" t"+(tier+1)+"=noslot("+aiTerrainMgr.GetGroupCount(group,true)+")";continue;}
+            IUnitTask@ task=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,Task::Priority::HIGH,
+                nano,aiTerrainMgr.GetReservationPos(slot),0.f,true,300*SECOND));
+            if(task is null) continue;
+            if(!AiPinReservation(task,slot)) {aiBuilderMgr.AbortTask(task);continue;}
+            fillJobs.insertLast(task);
+            const AIFloat3 at=aiTerrainMgr.GetReservationPos(slot);
+            GenericHelpers::LogUtil("[FrontLayout] fill builder="+unit.id+" tier="+(tier+1)+" slot="+slot
+                +" factory="+(factory is null?0:1)+" at="+int(at.x)+","+int(at.z)+" jobs="+fillJobs.length(),1);
+            return task;
+        }
+        return FillNone(unit,why);
+    }
+    // Why fill made nothing, once per FillReasonSeconds per AI (diagnostic).
+    const int FillReasonSeconds=10;
+    int fillReasonFrame=-1;
+    IUnitTask@ FillNone(CCircuitUnit@ unit,const string &in why) {
+        if(ai.frame>=fillReasonFrame) {
+            fillReasonFrame=ai.frame+FillReasonSeconds*SECOND;
+            GenericHelpers::LogUtil("[FrontLayout] fill none builder="+unit.id+" "+why+" jobs="+fillJobs.length(),1);
+        }
+        return null;
     }
 }

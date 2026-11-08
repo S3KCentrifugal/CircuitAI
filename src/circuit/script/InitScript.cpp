@@ -30,6 +30,8 @@
 #include "task/fighter/FerryTask.h"
 #include "task/fighter/AirWaveTask.h"
 #include "unit/CircuitUnit.h"
+#include "unit/ally/AllyTeam.h"
+#include "unit/ally/AllyUnit.h"
 #include "unit/TransportUtils.h"
 #include "CircuitAI.h"
 #include "AISCommands.h"
@@ -38,6 +40,7 @@
 #include "util/ExtAS.h"
 #include "util/Utils.h"
 #include "util/Performance.h"
+#include <algorithm>
 #include "util/WidgetState.h"
 
 #include "angelscript/include/angelscript.h"
@@ -477,6 +480,21 @@ static int CTerrainManager_PackFactoryFlush(CTerrainManager* terrainMgr, const C
 	return terrainMgr->PackFactoryFlush(const_cast<CCircuitDef*>(cdef), anchor);
 }
 
+static int CTerrainManager_PackBesideCore(CTerrainManager* terrainMgr, int zone, const CCircuitDef* cdef, int nanoGroup,
+		int facing, bool anyFacing, int maxGapCells, float minNanoDist)
+{
+	return terrainMgr->PackBesideCore(zone, const_cast<CCircuitDef*>(cdef), nanoGroup, facing, anyFacing,
+			maxGapCells, minNanoDist);
+}
+static void CTerrainManager_AddCoreFootprint(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	terrainMgr->AddCoreFootprint(const_cast<CCircuitDef*>(cdef), pos, facing);
+}
+static int CTerrainManager_CoreEdgeGap(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& pos, int facing)
+{
+	return terrainMgr->CoreEdgeGap(const_cast<CCircuitDef*>(cdef), pos, facing);
+}
+
 static bool IBuilderTask_PreferFactoryFacing(IUnitTask* task, int facing)
 {
     auto* factory = dynamic_cast<CBFactoryTask*>(task);
@@ -715,6 +733,13 @@ static bool CTerrainManager_CanTraverse(CTerrainManager* mgr, CCircuitDef* def,
 
 // Confirm transfers against engine ownership, not the donor's local registry:
 // GiveUnits removes local task ownership before the engine processes the gift.
+// D-493: finished allied units (ours included) of one definition, O(1) after
+// one O(F) count per friendly-unit refresh (CAllyTeam::FinishedCount).
+static int CCircuitAI_AlliedFinishedCount(CCircuitAI* circuit, const CCircuitDef* def)
+{
+    return (def == nullptr) ? 0 : circuit->GetAllyTeam()->FinishedCount(def->GetId());
+}
+
 static int CCircuitAI_GetFriendlyUnitTeam(CCircuitAI* circuit, int unitId)
 {
     auto* unit = circuit->GetFriendlyUnit(unitId);
@@ -1293,6 +1318,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitAI", "array<Id>@ GetTeamIds() const", asFUNCTION(CCircuitAI_GetTeamIds), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "void GiveUnits(const array<CCircuitUnit@>@+, int)", asFUNCTION(CCircuitAI_GiveUnits), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CCircuitAI", "int GetFriendlyUnitTeam(int) const", asFUNCTION(CCircuitAI_GetFriendlyUnitTeam), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CCircuitAI", "int AlliedFinishedCount(const CCircuitDef@) const", asFUNCTION(CCircuitAI_AlliedFinishedCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
     r = engine->RegisterObjectMethod("CCircuitAI", "AIFloat3 GetFriendlyUnitPosition(int, int) const", asFUNCTION(CCircuitAI_GetFriendlyUnitPosition), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool UnitControl(CCircuitUnit@, bool)", asMETHODPR(CCircuitAI, UnitControl, (CCircuitUnit*, bool), bool), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool UnitControl(Id, bool)", asMETHODPR(CCircuitAI, UnitControl, (ICoreUnit::Id, bool), bool), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1551,6 +1577,10 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "void AddFactoryZone(int, int)", asMETHOD(CTerrainManager, AddFactoryZone), asCALL_THISCALL); ASSERT(r >= 0);  // D-104
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryFront(int)", asMETHOD(CTerrainManager, SetFactoryFront), asCALL_THISCALL); ASSERT(r >= 0);  // D-104
 	r = engine->RegisterObjectMethod("CTerrainManager", "int PackFactoryFlush(const CCircuitDef@, const AIFloat3& in)", asFUNCTION(CTerrainManager_PackFactoryFlush), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-104
+	r = engine->RegisterObjectMethod("CTerrainManager", "int PackBesideCore(int zone, const CCircuitDef@, int nanoGroup, int facing, bool anyFacing, int maxGapCells, float minNanoDist)", asFUNCTION(CTerrainManager_PackBesideCore), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-491, D-493
+	r = engine->RegisterObjectMethod("CTerrainManager", "void AddCoreFootprint(const CCircuitDef@, const AIFloat3& in, int facing)", asFUNCTION(CTerrainManager_AddCoreFootprint), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
+	r = engine->RegisterObjectMethod("CTerrainManager", "int CoreCount() const", asMETHOD(CTerrainManager, CoreCount), asCALL_THISCALL); ASSERT(r >= 0);  // D-493
+	r = engine->RegisterObjectMethod("CTerrainManager", "int CoreEdgeGap(const CCircuitDef@, const AIFloat3& in, int facing) const", asFUNCTION(CTerrainManager_CoreEdgeGap), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReleaseSetSlots(const CCircuitDef@)", asFUNCTION(CTerrainManager_ReleaseSetSlots), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
 	r = engine->RegisterObjectMethod("CTerrainManager", "int EdgeGapToGroup(const CCircuitDef@, const AIFloat3& in, int facing, int group) const", asFUNCTION(CTerrainManager_EdgeGapToGroup), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-101
 	r = engine->RegisterObjectMethod("CTerrainManager", "int CountStructuresInExit(CCircuitUnit@) const", asMETHOD(CTerrainManager, CountStructuresInExit), asCALL_THISCALL); ASSERT(r >= 0);  // D-096
@@ -1886,6 +1916,7 @@ void CInitScript::RegisterIBuilderTask(asIScriptEngine* engine, const char* cls)
 	r = engine->RegisterObjectProperty(cls, "CCircuitDef@ const buildDef", asOFFSET(T, buildDef)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty(cls, "CCircuitUnit@ const target", asOFFSET(T, target)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty(cls, "bool canAutoAbort", asOFFSET(T, canAutoAbort)); ASSERT(r >= 0);
+	r = engine->RegisterObjectProperty(cls, "float siteRadius", asOFFSET(T, siteRadius)); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod(cls, "int GetGuardTargetId() const", asFUNCTION(IBuilderTask_GuardTargetId), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 }
 
@@ -1902,6 +1933,19 @@ void CInitScript::RegisterCSuperTask(asIScriptEngine* engine)
 	RegisterIFighterTask<CSuperTask>(engine, "CSuperTask");
 	RegisterCast<IFighterTask, CSuperTask>(engine, "IFighterTask", "CSuperTask");
 	int r = engine->RegisterObjectMethod("CSuperTask", "void SetTargetPos(const AIFloat3& in)", asMETHOD(CSuperTask, SetTargetPos), asCALL_THISCALL); ASSERT(r >= 0);
+	// Tiered fire (lolcannons, owner 2026-10-26): script/src/systems/construction/lolcannon.as
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTargetTier(const CCircuitDef@, int)", asMETHOD(CSuperTask, SetTargetTier), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierRetarget(int)", asMETHOD(CSuperTask, SetTierRetarget), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierTargetId() const", asMETHOD(CSuperTask, GetTierTargetId), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierCount() const", asMETHOD(CSuperTask, GetTierCount), asCALL_THISCALL); ASSERT(r >= 0);
+	// Area rotation (owner 2026-10-27): the ranked target areas, readable by any role
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierRotation(int, int, int, float)", asMETHOD(CSuperTask, SetTierRotation), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaCount() const", asMETHOD(CSuperTask, GetTierAreaCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaIndex() const", asMETHOD(CSuperTask, GetTierAreaIndex), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "AIFloat3 GetTierAreaPos(int) const", asMETHOD(CSuperTask, GetTierAreaPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaTier(int) const", asMETHOD(CSuperTask, GetTierAreaTier), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "float GetTierAreaMetal(int) const", asMETHOD(CSuperTask, GetTierAreaMetal), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaTargetId(int) const", asMETHOD(CSuperTask, GetTierAreaTargetId), asCALL_THISCALL); ASSERT(r >= 0);
 }
 
 static void CRouteTask_SetRoute(CRouteTask* task, const CScriptArray* array)

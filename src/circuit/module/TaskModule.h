@@ -45,7 +45,10 @@ public:
 	virtual void DiscardUnusedTask(IUnitTask* task) {}
 	void AbortTask(IUnitTask* task);
     IUnitTask* EnqueueGroupFollow(int target,float radius,bool guard,const springai::AIFloat3& goal);
-	void DoneTask(IUnitTask* task) { DequeueTask(task, true); }
+	// D-477: both route to the task's own manager, whose DequeueTask keeps its
+	// bookkeeping (a factory task finished through the builder manager left
+	// the factory's maps naming it after it was freed: KI-762).
+	void DoneTask(IUnitTask* task);
 
 public:
 	// script hooks

@@ -18,6 +18,10 @@ struct Settings {
     float urgentBand=4;
     float shieldInPlasmaZone=1, shieldSafeSeconds=10;
     float surplusMetal=0, surplusEnergyMargin=100, surplusFireSeconds=10, surplusLimit=32;
+    // D-476: spare metal income (income minus current spending, metal/s) that
+    // also admits surplus defences, so a front that spends its income keeps
+    // porcing without banking surplusMetal first. 0 disables the income path.
+    float surplusIncome=0;
     // D-469: elmos beyond a turret's range at which a mobile ground enemy
     // (LIGHT/HEAVY) still counts as covered: turrets go down on the side
     // facing an army before it closes. 0 keeps the exact weapon range.
@@ -149,7 +153,9 @@ inline bool Better(const Evaluation& a, const Evaluation& b) {
 inline Evaluation EvaluateSurplus(const Settings& s, const Rule& r, Project p,
     const Economy& e, int count) {
     Evaluation v;
-    if (s.enabled <= 0 || s.surplusMetal <= 0 || e.metal <= s.surplusMetal || r.surplusPriority <= 0) return v;
+    const bool banked = s.surplusMetal > 0 && e.metal > s.surplusMetal;
+    const bool earning = s.surplusIncome > 0 && e.metalIncome - e.metalPull >= s.surplusIncome;
+    if (s.enabled <= 0 || !(banked || earning) || r.surplusPriority <= 0) return v;
     const float firingReserve = std::max(p.shotEnergy, p.operatingEnergy * s.surplusFireSeconds);
     if (e.energyIncome - e.energyPull < p.operatingEnergy + s.surplusEnergyMargin
         || e.energy * (1 - r.reserve) < firingReserve) { v.reason = Reason::ENERGY; return v; }

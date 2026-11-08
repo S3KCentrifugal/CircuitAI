@@ -21,7 +21,20 @@
 			"threat_memory_seconds": 60, "threat_memory_cap": 600,
 			"front_cloak_income": 2000, "cloak_budget": 0.15, "cloak_still_seconds": 10, "posture_period": 30, "cloak_log": 1,
 			"blip_dps": 60, "blip_range": 450
-		}
+		},
+		// D-493: static artillery fire control (control/unit/artillery/). Every gun aims,
+		// once per aim_period, at an enemy construction turret or resurrection bot in range,
+		// then a heavy unit (heavy role or heavy_cost metal) within heavy_share of its range,
+		// then the known enemy structure with the longest range until it is dead; else the
+		// engine targets. Pop-up guns are armoured only while closed: under fire they cannot
+		// answer they drop a structure aim and close for close_seconds.
+		"artillery_battery": {
+			"type": "artillery",
+			"aim_period": 1, "reissue_seconds": 15, "order_seconds": 60,
+			"heavy_cost": 600, "heavy_share": 0.5, "close_under_fire": 0, "log": 1
+		},
+		"artillery_popup": {"extends": "artillery_battery", "close_under_fire": 1, "close_seconds": 6, "hit_seconds": 2},
+		"artillery_fortified": {"extends": "artillery_battery"}
 	},
 	"roles": {"commander": "commander"}
 },
@@ -777,6 +790,7 @@
 				"power": 1.0
 			},
 			"armguard": {
+				"controller": "artillery_battery",
 				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
@@ -837,6 +851,7 @@
 				"power": 1.0
 			},
 			"armamb": {
+				"controller": "artillery_popup",
 				"role": ["static", "anti_nuke"],
 				"on": false,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -983,6 +998,7 @@
 				"power": 1.0
 			},
 			"corpun": {
+				"controller": "artillery_battery",
 				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
@@ -1039,6 +1055,7 @@
 				"power": 1.0
 			},
 			"cortoast": {
+				"controller": "artillery_popup",
 				"role": ["static"],
 				"on": false,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -1050,6 +1067,7 @@
 				"power": 1.0
 			},
 			"corbhmth" : {
+				"controller": "artillery_fortified",
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1676,7 +1694,7 @@
 			"armsnipe": {
 				"role": ["anti_heavy"],
 				"attribute": ["ranged", "ret_hold"],
-				"ranged": {"target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true},
+				"ranged": {"commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true},
 				"retreat": 0.95,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1807,7 +1825,7 @@
 			"armmanni": {
 				"role": ["anti_heavy", "assault"],
 				"attribute": ["artillery", "siege", "ranged"],
-				"ranged": {"hold_fireline": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "assist_radius": 3500, "assist_margin": 150, "assist_screen": true},
+				"ranged": {"commander_priority": 100, "hold_fireline": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "assist_radius": 3500, "assist_margin": 150, "assist_screen": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}
 				},

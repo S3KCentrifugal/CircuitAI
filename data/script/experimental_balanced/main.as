@@ -67,6 +67,7 @@ namespace Main {
         Global::Commander::FrontRecovery = true;
         Global::Commander::FrontMexSeconds = 1.f;
         Global::RoleSettings::Tech::EcoFlakEnabled = true;
+        Global::LolCannon::Enabled = true; // Ragnarok/Calamity/Starfall only via the gated FRONT/TECH program (owner 2026-10-21)
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 
         // The opening Tick must search for gaps and raid just like later scouts.
@@ -111,6 +112,7 @@ namespace Main {
     void AiSuperWeaponFired(CCircuitUnit@ unit, const AIFloat3& in aim)
     {
         ArtilleryPolicy::Fired(unit, aim);
+        LolCannon::Fired(unit, aim);   // owner 2026-10-27: the first strike's area is scouted
     }
     void AiUnitDestroyed(CCircuitUnit@ unit)
     {

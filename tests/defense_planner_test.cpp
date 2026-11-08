@@ -91,6 +91,16 @@ int main() {
     p.buildPower=0;assert(Evaluate(r,p,e,1,0).reason==Reason::NO_BUILDER);
     r.priority=0;assert(Evaluate(r,p,e,1,0).reason==Reason::DISABLED);
     assert(std::string(Name(Reason::TOO_LATE))=="ready_too_late" && !Better(Evaluation{},good));
+    {   // D-476: spare metal income admits surplus with a small bank
+        Settings s; s.enabled=1; s.surplusMetal=2000; s.surplusIncome=10;
+        Rule r; r.def=1; r.minMetal=50; r.minEnergy=500; r.surplusPriority=4;
+        Project p{500,1000,1000,100,0,50,100,0};
+        Economy e{600,10000,40,1000,25,100};   // 15 metal/s spare, 600 banked
+        assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::READY);
+        e.metalPull=31; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED); // 9 spare, small bank
+        e.metal=2001; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::READY);      // the bank alone
+        s.surplusIncome=0; s.surplusMetal=0; assert(EvaluateSurplus(s,r,p,e,0).reason==Reason::DISABLED);
+    }
     {
         Settings s; s.enabled=1; s.surplusMetal=2000;
         Rule r; r.def=1; r.minMetal=50; r.minEnergy=500; r.surplusPriority=4;
