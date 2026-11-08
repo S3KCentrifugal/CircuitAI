@@ -28,9 +28,10 @@ namespace ThugFireAtWill {
     {
         if (unit is null || unit.circuitDef is null) return false;
         const string name = unit.circuitDef.GetName();
-        return name == "corthud" || name == "armham" || name == "legbar" || name == "legmed"
-            || name == "leghrk" || name == "leginf" || name == "leglob"
-            || name == "corstorm" || name == "armrock" || name == "legbal"
+        // Owner 2026-11-08: Thug, Mace, Satyr, Aggravator, Rocketeer and Ballista
+        // left this list; the DLL's assault micro keeps them at fire at will.
+        return name == "legbar" || name == "legmed"
+            || name == "leghrk" || name == "leginf"
             || name == "armmanni";   // owner 2026-11-02: Starlight fires at will always (Tremor: hold fire, Ambassador rules since 2026-11-07)
     }
 

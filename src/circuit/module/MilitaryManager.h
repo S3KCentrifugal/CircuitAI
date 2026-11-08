@@ -32,6 +32,7 @@ class IMainJob;
 class CBDefenceTask;
 class CFGuardTask;
 class CRangedWorld;
+class CAssaultMicro;
 
 namespace TaskF {
 	struct SFightTask {
@@ -749,6 +750,7 @@ public:
 	// outside its ranged controller (retreat, script routes) holds fire while
 	// spam is in reach, else keeps its default fire state.
 	void UpdateSpamFireHold();
+	void UpdateAssaultMicro();
 	// Debug goal: takes the military non-spam units in reach into one
 	// CDebugGoalTask while it is on, ends the task when it is off
 	void UpdateDebugGoal();
@@ -801,6 +803,7 @@ public:
 
 private:
 	std::shared_ptr<CRangedWorld> rangedWorld;
+	std::shared_ptr<CAssaultMicro> assaultMicro;  // owner 2026-11-08
     float aggressionDelta=0.f, automaticAggression=0.f;
     IUnitTask* MakeTask(CCircuitUnit* unit) override;
     void UpdateExternalControl();

@@ -521,6 +521,37 @@ void CFactoryManager::ReadConfig()
 		if (cdef->IsAttrNoDGun()) {
 			cdef->RemDGun();
 		}
+		// Owner 2026-11-08: shared assault micro (AssaultMicro.cpp). An object
+		// opts in; every key is optional and validated, a bad value disables it.
+		if (behaviour["assault_micro"].isObject()) {
+			const Json::Value& a = behaviour["assault_micro"];
+			AssaultPolicy policy;
+			policy.enabled = !cdef->IsAttrRanged();  // one owner: the ranged controller wins
+			auto number = [&](const char* key, float& value, float low, float high) {
+				const auto& setting = a[key];
+				if (setting.isNull()) return;
+				const float v = setting.isNumeric() ? setting.asFloat() : NAN;
+				if (!std::isfinite(v) || v < low || v > high) { policy.enabled = false; return; }
+				value = v;
+			};
+			number("radius", policy.radius, 100.f, 3000.f);
+			number("superior", policy.superior, .1f, 10.f);
+			number("equal", policy.equal, .05f, 10.f);
+			number("superior_in", policy.supIn, .3f, 1.5f);
+			number("superior_out", policy.supOut, .3f, 1.5f);
+			number("equal_in", policy.eqIn, .3f, 1.5f);
+			number("equal_out", policy.eqOut, .3f, 1.5f);
+			number("equal_period", policy.eqPeriod, 0.f, 30.f);
+			number("deficient_in", policy.defIn, .3f, 1.5f);
+			number("deficient_out", policy.defOut, .3f, 1.5f);
+			number("deficient_period", policy.defPeriod, 0.f, 30.f);
+			number("porc_margin", policy.porcMargin, 0.f, 512.f);
+			if (policy.equal > policy.superior) policy.enabled = false;
+			if (!policy.enabled) {
+				circuit->LOG("CONFIG %s: %s has invalid assault_micro (or is ranged); assault micro off", cfgName.c_str(), defName.c_str());
+			}
+			cdef->SetAssaultPolicy(policy);
+		}
 		if (cdef->IsAttrRanged()) {
 			// Invalid containers/types must disable this opt-in controller, not
 			// throw while parsing an otherwise usable profile.

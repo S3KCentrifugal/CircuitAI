@@ -130,6 +130,13 @@ public:
 	bool IsStuck() const { return isStuck; }
 
 	void ForceUpdate(int frame);
+	// Owner 2026-11-08: assault micro (AssaultMicro.cpp) owns this hull's
+	// movement until microUntil; task and script movement orders are dropped
+	// meanwhile (the micro forces a task update when it lets go).
+	void SetMicroUntil(int frame) { microUntil = frame; }
+	int GetMicroUntil() const { return microUntil; }
+	void SetMicroIssuing(bool value) { microIssuing = value; }
+	bool IsMicroBlocked() const;
 	bool IsForceUpdate(int frame);
 
 	void SetIsDead() { isDead = true; }
@@ -286,6 +293,7 @@ private:
     int sentFireFrame=-100000, sentMoveFrame=-100000, sentCloakFrame=-100000;
     bool RepeatState(int& sent, int& sentFrame, int value);
     int commMoveFrame=-100000; // owner 2026-10-24: last new commander MOVE
+    int microUntil=-1; bool microIssuing=false; // owner 2026-11-08: assault micro gate
     int lagMoveFrame=-100000, lagTargetFrame=-100000, lagTurretFrame=-100000; // owner 2026-10-25
 	ITravelAction* travelAct;
 

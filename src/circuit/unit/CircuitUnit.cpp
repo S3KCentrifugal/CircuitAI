@@ -123,6 +123,9 @@ void CCircuitUnit::SetTask(IUnitTask* task)
 	}
 	SetTaskFrame(manager->GetCircuit()->GetLastFrame());
 	taskState = ETaskState::NONE;
+	// Retreat, player control, idle or a script task: the assault micro lets go
+	// so the new owner's first orders go through (it re-takes fighters only).
+	if (task == nullptr || task->GetType() != IUnitTask::Type::FIGHTER) microUntil = -1;
 }
 
 void CCircuitUnit::ClearAct()
@@ -160,6 +163,12 @@ void CCircuitUnit::ForceUpdate(int frame)
 	if (execFrame < 0) {
 		execFrame = frame;
 	}
+}
+
+bool CCircuitUnit::IsMicroBlocked() const
+{
+	if (microUntil < 0 || microIssuing || manager == nullptr) return false;
+	return manager->GetCircuit()->GetLastFrame() < microUntil;
 }
 
 bool CCircuitUnit::IsForceUpdate(int frame)
@@ -303,6 +312,7 @@ void CCircuitUnit::CmdRemove(std::vector<float>&& params, short options)
 
 void CCircuitUnit::CmdMoveTo(const AIFloat3& pos, short options, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	assert(geom::is_in_map(pos));
     // Optional provenance for command storms outside RouteTask too. IDs only,
     // bounded by AI/unit IDs for this process; no allocation/query in normal
@@ -346,6 +356,7 @@ void CCircuitUnit::CmdJumpTo(const AIFloat3& pos, short options, int timeout)
 
 void CCircuitUnit::CmdFightTo(const AIFloat3& pos, short options, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	assert(geom::is_in_map(pos));
 	if (!LagAllowMove() || !LagAllowTurret()) return;
 	unit->Fight(pos, options, timeout);
@@ -353,6 +364,7 @@ void CCircuitUnit::CmdFightTo(const AIFloat3& pos, short options, int timeout)
 
 void CCircuitUnit::CmdPatrolTo(const AIFloat3& pos, short options, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	assert(geom::is_in_map(pos));
 	if (!LagAllowMove() || !LagAllowTurret()) return;
 	unit->PatrolTo(pos, options, timeout);
@@ -368,6 +380,7 @@ void CCircuitUnit::CmdStationaryGroundTarget(const AIFloat3& pos)
 
 void CCircuitUnit::CmdAttackGround(const AIFloat3& pos, short options, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	assert(geom::is_in_map(pos));
 	float params[] = {pos.x, pos.y, pos.z};
 	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_ATTACK_GROUND, params, options, timeout);
@@ -382,6 +395,7 @@ void CCircuitUnit::CmdWantedSpeed(float speed)
 
 void CCircuitUnit::CmdStop(short options, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	++lagload::Get().other;
 	unit->Stop(options, timeout);
 	priorityTarget = -1; // BAR STOP cancels the priority list; allow a new intent.
@@ -756,6 +770,7 @@ void CCircuitUnit::TrySetMoveState(CCircuitDef::MoveT state)
 
 bool CCircuitUnit::KeepWeaponRange(CEnemyInfo* enemy, int timeout)
 {
+	if (IsMicroBlocked()) return true;
 	if (circuitDef->GetStandoff() <= 0.f || enemy == nullptr || enemy->IsHidden()
 			|| !enemy->IsInRadarOrLOS()) return false;
 	CCircuitAI* circuit = manager->GetCircuit();
@@ -800,6 +815,7 @@ void CCircuitUnit::TrySetIdleMode(int mode)
 
 void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout, bool queueFight)
 {
+	if (IsMicroBlocked()) return;
 	if (!LagAllowTarget() || !LagAllowMove()) return;
 	if (KeepWeaponRange(enemy, timeout)) return;
 	target = enemy;
@@ -842,6 +858,7 @@ void CCircuitUnit::Attack(CEnemyInfo* enemy, bool isGround, int timeout, bool qu
 
 void CCircuitUnit::Attack(const AIFloat3& pos, CEnemyInfo* enemy, bool isGround, bool isStatic, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	if (!LagAllowTarget() || !LagAllowMove()) return;
 	if (KeepWeaponRange(enemy, timeout)) return;
 	TRY_UNIT(manager->GetCircuit(), this,
@@ -873,6 +890,7 @@ void CCircuitUnit::Attack(const AIFloat3& pos, CEnemyInfo* enemy, bool isGround,
 
 void CCircuitUnit::Attack(const AIFloat3& position, CEnemyInfo* enemy, int tile, bool isGround, bool isStatic, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	target = enemy;
 	targetTile = tile;
 	Attack(position, enemy, isGround, isStatic, timeout);
@@ -880,6 +898,7 @@ void CCircuitUnit::Attack(const AIFloat3& position, CEnemyInfo* enemy, int tile,
 
 void CCircuitUnit::Guard(CCircuitUnit* target, int timeout)
 {
+	if (IsMicroBlocked()) return;
 	if (!LagAllowMove() || !LagAllowTurret()) return;
 	TRY_UNIT(manager->GetCircuit(), this,
 //		unit->ExecuteCustomCommand(CMD_ORBIT, {(float)target->GetId(), 300.0f}, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
@@ -890,6 +909,7 @@ void CCircuitUnit::Guard(CCircuitUnit* target, int timeout)
 
 void CCircuitUnit::Gather(const AIFloat3& groupPos, int timeout)
 {
+	if (IsMicroBlocked()) return;
 //	const AIFloat3& pos = geom::get_radial_pos(groupPos, SQUARE_SIZE * 8);
 	TRY_UNIT(manager->GetCircuit(), this,
 		CmdMoveTo(groupPos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);

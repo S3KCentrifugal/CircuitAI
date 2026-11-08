@@ -179,6 +179,7 @@ void CRaidTask::Update()
 					}
 					unit->GetTravelAct()->StateWait();
 
+					if (unit->IsMicroBlocked()) continue;  // assault micro owns it (owner 2026-11-08)
 					TRY_UNIT(circuit, unit,
 						unit->GetUnit()->Attack(GetTarget()->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 60);
 						unit->CmdSetTarget(GetTarget());

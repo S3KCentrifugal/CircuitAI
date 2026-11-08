@@ -39,6 +39,7 @@
 #include "task/fighter/ArtilleryTask.h"
 #include "task/fighter/RangedWorld.h"
 #include "task/fighter/RangedEngagement.h"
+#include "task/fighter/AssaultMicro.h"
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
@@ -1041,6 +1042,9 @@ void CMilitaryManager::InitMilitary()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDroneAA, this), FRAMES_PER_SEC, offset + 3);  // owner 2026-11-08: T1.5 re-order, retreat
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSpamFireHold, this),
 				FRAMES_PER_SEC / 2, offset + 4);
+		// Owner 2026-11-08: shared Mace/Thug/Satyr/Aggravator/Rocketeer/Ballista micro.
+		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateAssaultMicro, this),
+				FRAMES_PER_SEC / 2, offset + 5);
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -2399,6 +2403,12 @@ void CMilitaryManager::UpdateSpamFireHold()
 		}
 		unit->TrySetFireState(want);  // repeats are dropped by CmdSetFireState
 	}
+}
+
+void CMilitaryManager::UpdateAssaultMicro()
+{
+	if (!assaultMicro) assaultMicro = std::make_shared<CAssaultMicro>(circuit);
+	assaultMicro->Update();
 }
 
 void CMilitaryManager::UpdateSensorGuards()

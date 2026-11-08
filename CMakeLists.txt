@@ -15,6 +15,7 @@ set(additionalSources      ${additionalSources} ${CMAKE_CURRENT_SOURCE_DIR}/src/
 set(additionalSources      ${additionalSources} ${CMAKE_CURRENT_SOURCE_DIR}/src/circuit/task/fighter/GroundFormations.cpp)
 set(additionalSources      ${additionalSources} ${CMAKE_CURRENT_SOURCE_DIR}/src/circuit/task/fighter/EscortStrikeTask.cpp)
 set(additionalSources      ${additionalSources} ${CMAKE_CURRENT_SOURCE_DIR}/src/circuit/task/fighter/DebugGoalTask.cpp)
+set(additionalSources      ${additionalSources} ${CMAKE_CURRENT_SOURCE_DIR}/src/circuit/task/fighter/AssaultMicro.cpp)
 set(additionalSources      ${additionalSources} ${CMAKE_SOURCE_DIR}/rts/System/Misc/SpringTime.cpp)
 if (WIN32)  # spring::condition_variable_any requirement
 	set(additionalSources  ${additionalSources} ${CMAKE_SOURCE_DIR}/rts/System/Platform/Win/CriticalSection.cpp)

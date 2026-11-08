@@ -11,6 +11,7 @@
 #include "terrain/TerrainData.h"
 #include "util/MaskHandler.h"
 #include "unit/RangedPolicy.h"
+#include "unit/AssaultPolicy.h"
 
 #include "UnitDef.h"
 
@@ -193,6 +194,8 @@ public:
 	bool IsAttrRanged() const { return attr & AttrMask::RANGED; }
 	const RangedPolicy& GetRangedPolicy() const { return rangedPolicy; }
 	void SetRangedPolicy(const RangedPolicy& value) { rangedPolicy = value; }
+	const AssaultPolicy& GetAssaultPolicy() const { return assaultPolicy; }
+	void SetAssaultPolicy(const AssaultPolicy& value) { assaultPolicy = value; }
 
 	bool IsHoldFire()   const { return fireState == FireType::HOLD; }
 	bool IsReturnFire() const { return fireState == FireType::RETURN; }
@@ -405,6 +408,7 @@ public:
 
 private:
 	RangedPolicy rangedPolicy;
+	AssaultPolicy assaultPolicy;
 	static RoleName* roleNames;
 	static AttrName* attrNames;
 
