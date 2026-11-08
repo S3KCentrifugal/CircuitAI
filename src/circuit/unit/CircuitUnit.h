@@ -174,6 +174,7 @@ public:
 	void CmdFightTo(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
 	void CmdPatrolTo(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
 	void CmdAttackGround(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
+    void CmdStationaryGroundTarget(const springai::AIFloat3& pos);
 	void CmdWantedSpeed(float speed = NO_SPEED_LIMIT);
 	void CmdStop(short options = 0, int timeout = INT_MAX);
 	void CmdSetTarget(CEnemyInfo* enemy);

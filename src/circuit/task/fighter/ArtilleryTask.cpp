@@ -714,7 +714,7 @@ bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit)
 }
 
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame,
-		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport)
+		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport, int volleyLimit, bool allowFire)
 {
 	// Owner 2026-11-02: listed rocket artillery (Arbiter, Negotiator, Thanatos,
 	// Ambassador, Boreas) with nothing seen to shoot fires on a ghost image of
@@ -724,7 +724,7 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	// and shields, besides armed structures.
 	const CMilitaryManager::SArtyCommInfo& info = circuit->GetMilitaryManager()->GetArtyCommInfo();
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	if (!info.isEnabled || info.ghostDefs.count(cdef->GetId()) == 0) {
+	if (volleyLimit <= 0 && (!info.isEnabled || info.ghostDefs.count(cdef->GetId()) == 0)) {
 		return false;
 	}
 	springai::Weapon* weapon = unit->GetMainWeapon();
@@ -752,6 +752,8 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	// ghost is done after 3, any other after 1, until it is seen again.
 	CMilitaryManager* gfm = circuit->GetMilitaryManager();
 	CMilitaryManager::SArtySnipeState& gfs = gfm->GetArtySnipeState(unit->GetId(), frame);
+    // Ranged ghost users do not enter ArtySnipeStep, so keep their volley ledger alive.
+    if (volleyLimit > 0) gfs.lastCall = frame;
 	if ((track.shot != prevShot) && (track.shot >= 0) && (track.target >= 0) && !track.counted
 		&& (track.orderFrame >= 0) && (track.shot >= track.orderFrame) && (track.shot - track.orderFrame <= FRAMES_PER_SEC * 6))
 	{
@@ -760,16 +762,20 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 		if ((ge != nullptr) && ge->NotInRadarAndLOS()) {
 			int& n = GhostCountRef(gfs, ge);
 			++n;
-			const int need = GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef());
+            // End this ground-fire order after one detected volley, so a fast
+            // reload cannot silently repeat it beyond the configured budget.
+            if (volleyLimit > 0) { TRY_UNIT(circuit, unit, unit->CmdStop();) }
+			const int need = volleyLimit > 0 ? volleyLimit : GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef());
 			circuit->LOG("ARTY: %s %i ghost volley %i/%i at %i", cdef->GetDef()->GetName(), unit->GetId(), n, need, track.target);
 			if (n >= need) {
 				GhostDoneSet(gfs, ge);
+
 				circuit->LOG("ARTY: %s %i fired %i ghost volleys at %i, leaves it until seen", cdef->GetDef()->GetName(),
 						unit->GetId(), n, track.target);
 			}
 		}
 	}
-	const char* goneWhy = ((frame < track.orderUntil) && (track.target >= 0)) ? GhostGoneWhy(circuit, track.target) : nullptr;
+	const char* goneWhy = (((volleyLimit > 0) || (frame < track.orderUntil)) && (track.target >= 0)) ? GhostGoneWhy(circuit, track.target) : nullptr;
 	if (goneWhy != nullptr) {
 		circuit->LOG("ARTY: %s %i target %i %s, stops", cdef->GetDef()->GetName(), unit->GetId(), track.target, goneWhy);
 		track.orderUntil = -1;
@@ -779,10 +785,15 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 		)
 		return false;
 	}
+    if (!allowFire) {
+        if (track.target >= 0) { TRY_UNIT(circuit, unit, unit->CmdStop();) }
+        track.target = -1; track.orderUntil = -1;
+        return false;
+    }
 	if (frame < track.orderUntil) {
 		return true;  // the volley is on its way; do not replace the order
 	}
-	if ((frame - track.shot < info.ghostIdleFrames) || (reload > frame)) {
+	if ((frame - track.shot < (volleyLimit > 0 ? 0 : info.ghostIdleFrames)) || (reload > frame)) {
 		return false;
 	}
 	CThreatMap* threatMap = circuit->GetThreatMap();
@@ -835,7 +846,8 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 	track.orderFrame = frame;
 	track.counted = false;
 	TRY_UNIT(circuit, unit,
-		unit->CmdAttackGround(best->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+		if (volleyLimit > 0) unit->CmdStationaryGroundTarget(best->GetPos());
+        else unit->CmdAttackGround(best->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
 	)
 	circuit->LOG("ARTY: %s %i fires on ghost %s at (%.0f, %.0f), last shot %s %.0f s ago",
 			cdef->GetDef()->GetName(), unit->GetId(), best->GetCircuitDef()->GetDef()->GetName(),
