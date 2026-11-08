@@ -292,6 +292,10 @@ namespace Front {
             // D-471: Cortex vehicle labs keep the Rascal scout, then open with
             // the RaiderOpenerCount batch as Incisors (corgator), not Rascals.
             float VehicleTankOpenerChanceCortex = 1.0f;
+            // Owner (2026-11-08): an Armada T1 vehicle plant holds its RaiderOpenerCount Blitzes at the plant
+            // (FrontOpener gather) and sends them out together as one raid, instead of the native raid squads
+            // that trickle out after the first group leaves. Off here, on in experimental_balanced.
+            bool VehicleOpenerHoldArmada = false;
             int VehicleTankGatherSeconds = 300; // release a disrupted/incomplete batch
             // Owner (2026-10-19): after the opener and until a T2 factory stands, a T1 vehicle plant rolls
             // every VehicleTankMassIntervalSeconds; on VehicleTankMassChance it builds VehicleTankMassMin..Max

@@ -317,6 +317,9 @@ namespace Main {
         Global::RoleSettings::Front::VehicleRaiderWaveChance = 0.5f;
         // D-471 (owner, 2026-11-04): Cortex vehicles open Rascal scout, then ten Incisors.
         Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = 1.0f;
+        // Owner (2026-11-08): Armada vehicle plants hold the ten opener Blitzes at the plant and send them as one
+        // raid (11-01 lobby games did this by chance; native raid squads now trickle out). src/settings/roles/front.as
+        Global::RoleSettings::Front::VehicleOpenerHoldArmada = true;
 		// FRONT (owner, 2026-10-17): two FRONTs each build a spam lab for an edge lane, left and right
 		// (src/settings/shared/spam.as EdgeLanesEnabled, off there; systems/combat/edge_lanes.as)
 		Global::Spam::EdgeLanesEnabled = true;

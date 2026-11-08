@@ -25,7 +25,8 @@ namespace FrontOpener {
     }
     bool Enabled() {
         return Global::RoleSettings::Front::VehicleTankOpenerChance > 0.0f
-            || Global::RoleSettings::Front::VehicleTankOpenerChanceCortex > 0.0f;
+            || Global::RoleSettings::Front::VehicleTankOpenerChanceCortex > 0.0f
+            || Global::RoleSettings::Front::VehicleOpenerHoldArmada;
     }
     bool WasQueued(const string &in part) {
         return Enabled() && aiTerrainMgr.GetLayoutInt("front.opener." + part) != 0;
@@ -35,6 +36,14 @@ namespace FrontOpener {
     }
 
     CCircuitDef@ ChooseTank(CCircuitUnit@ factory, const string &in name, const string &in side) {
+        // Owner (2026-11-08): Armada's opener is already the Blitz; hold the batch and launch it as one raid.
+        if (side == "armada") {
+            if (!Global::RoleSettings::Front::VehicleOpenerHoldArmada || !UnitHelpers::IsT1VehicleLab(name)) return null;
+            CCircuitDef@ blitz = ai.GetCircuitDef("armflash");
+            if (blitz is null || !factory.circuitDef.CanBuild(blitz) || !blitz.IsAvailable(ai.frame)
+                || blitz.power <= 0.0f) return null;
+            return blitz;
+        }
         const float chance = TankChance(side);
         if (chance <= 0.0f || !UnitHelpers::IsT1VehicleLab(name)) return null;
         const string tank = side == "cortex" ? "corgator" : (side == "legion" ? "leghades" : "");
