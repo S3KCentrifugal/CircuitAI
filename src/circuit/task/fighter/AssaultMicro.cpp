@@ -11,6 +11,11 @@
 #include "CircuitAI.h"
 
 #include "Log.h"
+#include "UnitDef.h"
+#include "WeaponDef.h"
+#include "Damage.h"
+
+#include <memory>
 
 #include <algorithm>
 #include <cmath>
@@ -56,6 +61,23 @@ bool CAssaultMicro::InPorc(const AIFloat3& p, float margin) const
     return false;
 }
 
+float CAssaultMicro::BlastOf(CCircuitDef* def)
+{
+    auto [it, fresh] = blastByDef.try_emplace(def->GetId(), 0.f);
+    if (fresh) {
+        // Same measure as the old ranged controller: the death explosion's
+        // area of effect when it does any damage.
+        const std::unique_ptr<WeaponDef> explosion(def->GetDef()->GetDeathExplosion());
+        if (explosion) {
+            const std::unique_ptr<Damage> damage(explosion->GetDamage());
+            const auto types = damage ? damage->GetTypes() : std::vector<float>{};
+            if (std::any_of(types.begin(), types.end(), [](float v) { return v > 0.f; }))
+                it->second = explosion->GetAreaOfEffect();
+        }
+    }
+    return it->second;
+}
+
 void CAssaultMicro::Snapshot(int frame)
 {
     if (!heavyResolved) {
@@ -80,6 +102,8 @@ void CAssaultMicro::Snapshot(int frame)
         Enemy en;
         en.pos = at; en.cost = def->GetCostM(); en.reach = reach; en.radius = e->GetRadius();
         en.heavy = !mobile && heavyDefs.count(def->GetId()) > 0;
+        en.comm = mobile && def->IsRoleComm();
+        if (en.comm) en.blast = BlastOf(def);
         // Heavy porc nanoframes are avoided too (assisted frames finish in
         // seconds); only finished units count as metal or anchor the cadence.
         en.counts = !e->IsBeingBuilt();
@@ -249,7 +273,23 @@ void CAssaultMicro::Update()
         AIFloat3 goal;
         for (const auto& [d2, i] : local) {
             const Enemy& e = enemies[i];
-            const AIFloat3 g = e.pos + Away(e.pos, pos) * (frac * range);
+            float dist = frac * range;
+            if (e.comm) {
+                // Owner 2026-11-08: Mace/Thug/Satyr stand and shoot a commander
+                // (no back-out) but never inside its death blast.
+                if (p.commanderNoRetreat) dist = inF * range;
+                if (p.commanderBlast) dist = std::max(dist, e.blast + p.commanderMargin);
+            }
+            AIFloat3 g = e.pos + Away(e.pos, pos) * dist;
+            if (p.commanderBlast) {
+                // Any other local commander's blast pushes the goal out radially.
+                for (const auto& [d2c, ci] : local) {
+                    const Enemy& c = enemies[ci];
+                    if (!c.comm || c.blast <= 0.f) continue;
+                    const float keep = c.blast + p.commanderMargin;
+                    if (Dist2(g, c.pos) < SQUARE(keep)) g = c.pos + Away(c.pos, g) * keep;
+                }
+            }
             if (InPorc(g, p.porcMargin)) continue;
             anchor = &e; goal = g;
             break;

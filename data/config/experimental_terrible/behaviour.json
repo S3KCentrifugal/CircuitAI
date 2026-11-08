@@ -1505,7 +1505,7 @@
 				// Owner 2026-11-08: shared assault micro (Mace, Thug, Satyr, Aggravator,
 				// Rocketeer, Ballista): local metal odds within 800, three cadences,
 				// heavy porc retreat, fire at will. Replaces the ranged controller.
-				"assault_micro": {},
+				"assault_micro": {"commander_no_retreat": true, "commander_blast": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2062,7 +2062,7 @@
 				// Owner 2026-11-08: shared assault micro (Mace, Thug, Satyr, Aggravator,
 				// Rocketeer, Ballista): local metal odds within 800, three cadences,
 				// heavy porc retreat, fire at will. Replaces the ranged controller.
-				"assault_micro": {},
+				"assault_micro": {"commander_no_retreat": true, "commander_blast": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

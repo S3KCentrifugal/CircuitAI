@@ -25,6 +25,12 @@ struct AssaultPolicy {
     float eqIn = .90f, eqOut = 1.01f, eqPeriod = 2.f;
     float defIn = .99f, defOut = 1.10f, defPeriod = 5.f;
     float porcMargin = 64.f;
+    // Owner 2026-11-08 (Mace, Thug, Satyr): commander_no_retreat - against an
+    // enemy commander the hull holds the step-in distance and never backs
+    // out; commander_blast - it never stands inside an enemy commander's
+    // death explosion (area of effect + commanderMargin), whatever the mode.
+    bool commanderNoRetreat = false, commanderBlast = false;
+    float commanderMargin = 4.f;
 };
 
 } // namespace circuit

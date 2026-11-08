@@ -34,6 +34,8 @@ private:
         springai::AIFloat3 pos;
         float cost = 0.f, reach = 0.f, radius = 0.f;
         bool heavy = false;   // heavy porc: never engaged, reach + margin avoided
+        bool comm = false;    // enemy commander
+        float blast = 0.f;    // its death explosion area of effect (commanders only)
         bool counts = false;  // in the metal census (finished army / static defence)
         bool target = false;  // may be the nearest-enemy anchor
     };
@@ -53,6 +55,8 @@ private:
 
     CCircuitAI* circuit;
     std::unordered_set<int> heavyDefs;
+    std::unordered_map<int, float> blastByDef;  // commander def id -> death explosion AoE
+    float BlastOf(CCircuitDef* def);
     bool heavyResolved = false;
     std::vector<Enemy> enemies;
     std::vector<int> heavy;   // indices into enemies

@@ -546,6 +546,15 @@ void CFactoryManager::ReadConfig()
 			number("deficient_out", policy.defOut, .3f, 1.5f);
 			number("deficient_period", policy.defPeriod, 0.f, 30.f);
 			number("porc_margin", policy.porcMargin, 0.f, 512.f);
+			auto flag = [&](const char* key, bool& value) {
+				const auto& setting = a[key];
+				if (setting.isNull()) return;
+				if (!setting.isBool()) { policy.enabled = false; return; }
+				value = setting.asBool();
+			};
+			flag("commander_no_retreat", policy.commanderNoRetreat);
+			flag("commander_blast", policy.commanderBlast);
+			number("commander_margin", policy.commanderMargin, 0.f, 512.f);
 			if (policy.equal > policy.superior) policy.enabled = false;
 			if (!policy.enabled) {
 				circuit->LOG("CONFIG %s: %s has invalid assault_micro (or is ranged); assault micro off", cfgName.c_str(), defName.c_str());
