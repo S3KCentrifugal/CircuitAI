@@ -203,5 +203,118 @@ int main()
         std::vector<float> small(3,0.f);
         assert(PaintDisc(small,gw,gh,cs,96.f,96.f,100.f,1.f)==0);                   // undersized grid
     }
-    std::cout << "ranged geometry: ordered legacy/brute-force spatial oracle, early exits, generations, overflow, weapon envelopes and ID sort PASS\n";
+    {
+        // D-462 / INV-248: a LazySpatialIndex filled cell by cell (local loads
+        // in any order, then optionally a full pass) visits exactly what a
+        // SpatialIndex built from the full ascending-ID read visits, query by
+        // query, including Any's first match and nested queries during visit.
+        std::mt19937 rng(462);
+        const float width=4096.f, height=3072.f;
+        std::uniform_real_distribution<float> px(1.f,width-2.f), pz(1.f,height-2.f), qx(-600.f,width+600.f), qz(-600.f,height+600.f), qr(0.f,1500.f);
+        for (int trial=0; trial<60; ++trial) {
+            struct Unit { int id; Point p; };
+            std::vector<Unit> units;
+            std::set<int> used;
+            const int count=int(rng()%400);
+            while (int(units.size())<count) { const int id=int(rng()%32000); if (used.insert(id).second) units.push_back({id,{px(rng),pz(rng)}}); }
+            std::vector<Unit> sorted=units;
+            std::sort(sorted.begin(),sorted.end(),[](const Unit& a,const Unit& b){ return a.id<b.id; });
+            SpatialIndex full; full.Configure(width,height);
+            for (size_t i=0;i<sorted.size();++i) full.Add(sorted[i].p,sorted[i].id);
+            LazySpatialIndex lazy; lazy.Configure(width,height);
+            for (int generation=0; generation<2; ++generation) {
+                lazy.Reset();
+                std::vector<int> values; // lazy values are positions in this vector
+                int loads=0;
+                const auto fillAll=[&](int adoptX,int adoptZ) {
+                    const int pass=lazy.BeginPass();
+                    if (adoptX>=0) lazy.Adopt(adoptX,adoptZ,pass);
+                    for (const auto& u:sorted) {
+                        const int x=lazy.Coord(u.p.x), z=lazy.Coord(u.p.z);
+                        if (lazy.Admit(x,z,pass)) { lazy.Append(x,z,int(values.size())); values.push_back(u.id); }
+                    }
+                    lazy.MarkComplete();
+                };
+                const auto load=[&](int x,int z) {
+                    ++loads;
+                    // D-462 busy frame: the load itself switches to a full read.
+                    if (trial%3==2 && lazy.Touched()>=6) { fillAll(x,z); return; }
+                    // Engine area query order is arbitrary: shuffle, then sort.
+                    std::vector<Unit> inCell;
+                    for (const auto& u:units) if (lazy.Coord(u.p.x)==x && lazy.Coord(u.p.z)==z) inCell.push_back(u);
+                    std::shuffle(inCell.begin(),inCell.end(),rng);
+                    std::sort(inCell.begin(),inCell.end(),[](const Unit& a,const Unit& b){ return a.id<b.id; });
+                    for (const auto& u:inCell) { lazy.Append(x,z,int(values.size())); values.push_back(u.id); }
+                };
+                for (int q=0; q<40; ++q) {
+                    if (q==25 && (trial%2)) fillAll(-1,-1); // full read completes the remaining cells only
+                    const Point p{qx(rng),qz(rng)}; const float r=qr(rng);
+                    std::vector<int> expected, actual;
+                    full.Query(p,r,[&](int id){ expected.push_back(id); });
+                    lazy.Query(p,r,load,[&](int index){
+                        actual.push_back(values[size_t(index)]);
+                        // A nested query may load other cells while visiting.
+                        if (actual.size()==1) lazy.Query({qx(rng),qz(rng)},200.f,load,[](int){});
+                    });
+                    assert(actual==expected);
+                    const int threshold=int(rng()%32000);
+                    int fullFirst=-1, lazyFirst=-1;
+                    const bool a=full.Any(p,r,[&](int id){ if (id>threshold) { fullFirst=id; return true; } return false; });
+                    const bool b=lazy.Any(p,r,load,[&](int index){ if (values[size_t(index)]>threshold) { lazyFirst=values[size_t(index)]; return true; } return false; });
+                    assert(a==b && fullFirst==lazyFirst);
+                }
+                // Each cell loads at most once per generation.
+                assert(loads<=lazy.Columns()*lazy.Rows());
+            }
+        }
+        // A widened broad phase with an exact predicate returns the same Any
+        // result and first match (the D-462 radius bound argument).
+        SpatialIndex index; index.Configure(4096.f,4096.f);
+        std::vector<Point> at; std::vector<float> radius;
+        for (int i=0;i<300;++i) { at.push_back({px(rng),px(rng)}); radius.push_back(float(rng()%80)); index.Add(at.back(),i); }
+        for (int q=0;q<500;++q) {
+            const Point p{px(rng),px(rng)}; const float r=float(rng()%200);
+            float largest=0.f; for (float value:radius) largest=std::max(largest,value);
+            int first=-1, widened=-1;
+            const auto exact=[&](int& out){ return [&](int i){ if (DistanceSq(p,at[size_t(i)])<(r+radius[size_t(i)])*(r+radius[size_t(i)])) { out=i; return true; } return false; }; };
+            const bool a=index.Any(p,r+largest,exact(first));
+            const bool b=index.Any(p,r+largest+400.f,exact(widened));
+            assert(a==b && first==widened);
+            if (a) assert(DistanceSq(p,at[size_t(first)])<(r+radius[size_t(first)])*(r+radius[size_t(first)]));
+        }
+    }
+    {
+        // D-462 / INV-249: ExpiringTable behaves as an unordered_map that
+        // erases entries unseen for more than the horizon at every Prune.
+        std::mt19937 rng(249);
+        for (int trial=0; trial<40; ++trial) {
+            const int horizon=int(rng()%400)+1;
+            ExpiringTable<int> table(1000,horizon,unsigned(rng()%7)+1);
+            struct Legacy { int value=0; int seen=0; };
+            std::unordered_map<int,Legacy> legacy;
+            int frame=0;
+            for (int step=0; step<4000; ++step) {
+                const int op=int(rng()%10);
+                const int id=int(rng()%1100)-50; // dense, negative and over-bound ids
+                if (op<4) {          // touch, optionally refresh seen, write a value
+                    auto& e=table.Touch(id); auto& l=legacy[id];
+                    assert(e.value==l.value && e.seen==l.seen);
+                    if (rng()%2) { e.seen=frame; l.seen=frame; }
+                    const int v=int(rng()%100); e.value=v; l.value=v;
+                } else if (op<7) {   // read
+                    const auto* e=table.Find(id); const auto it=legacy.find(id);
+                    assert((e==nullptr)==(it==legacy.end()));
+                    if (e) assert(e->value==it->second.value && e->seen==it->second.seen);
+                } else if (op<9) {   // advance and prune
+                    frame+=int(rng()%120);
+                    table.Prune(frame);
+                    for (auto it=legacy.begin();it!=legacy.end();) it=(frame-it->second.seen>horizon) ? legacy.erase(it) : std::next(it);
+                } else {
+                    frame+=int(rng()%30);
+                }
+            }
+            assert(table.OverflowSize()<=legacy.size()+200);
+        }
+    }
+    std::cout << "ranged geometry: ordered legacy/brute-force spatial oracle, early exits, generations, overflow, weapon envelopes, ID sort, lazy cells and expiring history PASS\n";
 }

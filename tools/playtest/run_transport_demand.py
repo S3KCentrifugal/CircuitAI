@@ -52,7 +52,7 @@ def main():
     widget=directory/'LuaUI/Widgets/transport_demand_watch.lua'
     widget.write_text(widget.read_text().replace('__SIDE__',args.side).replace('__LOCAL__','true' if args.local else 'false'))
     labels=['strategy matrix','uncarryable T2 override','restricted cargo','finished rush','stale target cleared',
-            'cancel keeps light','cancel closes heavy slot','delivery ledger','light only before rush','rush target','physical heavy after rush','rush target released','no extras']
+            'cancel keeps light','cancel closes heavy slot','light only before rush','rush target','physical heavy after rush','rush target released','no extras']
     checks=directory/'transport-demand-checks.json'
     checks.write_text(json.dumps({'stop_minute':4,
         'complete_on':{'key':'done','pattern':r'\[TransportDemandTest\] PASS no extras','scope':'any'},
@@ -60,7 +60,7 @@ def main():
         'expect':[{'key':label,'pattern':r'\[TransportDemandTest\] PASS '+label+r'\s*$','scope':'any','by_minute':4} for label in labels],
         'forbid':[{'key':'failure','scope':'any','pattern':r'\[TransportDemandTest\] FAIL|: ERR\s+:|\.as \(\d+,\s*\d+\)\s*:\s*WARN\s*:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:|Error in.*transport_demand'}]},indent=2))
     storage.write_json(directory/'transport-demand-inputs.json',dict(side=args.side,profile=args.profile,local_build=args.local,
-        overrides=['supplied air factory, one heavy cargo for ledger checks and resource banks; transport income gate zero, additional threshold 100000',
+        overrides=['supplied air factory, one idle heavy cargo and resource banks; transport income gate zero, additional threshold 100000',
                    'ordinary role economy/building, commander deployment and periodic base invariants suspended',
                    'actual VM policy matrix, directed request, native production and donation; no supplied transports'],
         scripts={str(p.relative_to(source.parent)):storage.file_hash(p) for p in source.parent.rglob('*.as')},

@@ -29,6 +29,9 @@ namespace circuit {
 namespace {
 constexpr float POKE_DIRECTION_MIN_LENGTH_SQ = .5f;
 constexpr float PRESSED_STATIC_TARGET_MULTIPLIER = 2.f;
+// Owner 2026-11-07 (priority_min_tech): far above any value/HP score (those are
+// ~0.01-1000 even with commander_priority 100), so the tier always wins.
+constexpr float PRIORITY_TIER_OFFSET = 1.e6f;
 }
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
@@ -495,6 +498,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if(rear) s*=backline::TargetWeight(c.mobile,
                 std::sqrt(ranged::DistanceSq(P(c.pos),rear->screenCentre)),rear->screenReach,
                 c.def->GetSpeed(),distance,rear->weights);
+            if(def->IsPriorityTarget(c.def)) s+=PRIORITY_TIER_OFFSET;  // owner 2026-11-07, see Update
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
             // Commander focus is a tier, not a multiplier defeated by low HP
             // repairers or existing shot reservations. Geometry still vetoes.
@@ -967,6 +971,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // Owner 2026-10-19: the tower shooting at a pressing hull comes first.
             if(CRangedWorld::Pressed(c,policy.pressStatic)) value*=PRESSED_STATIC_TARGET_MULTIPLIER;
             if(c.def && c.def->IsEnemyRoleAny(CCircuitDef::COMM)) value*=policy.commanderPriority;
+            // Owner 2026-11-07: priority_min_tech. A tier, not a weight: the offset
+            // puts every structure / commander / T2+ contact above any T1 mobile
+            // or dot, and lets SelectTarget's switch ratio leave a held T1 at once.
+            if(def->IsPriorityTarget(c.def)) value+=PRIORITY_TIER_OFFSET;
             if(c.id==target && (heldScoreFrame!=frame || value>heldScore)) { heldScore=value; heldScoreFrame=frame; }
             if(value>bestScore || (value==bestScore && (best<0 || c.id<contacts[best].id))) {
                 best=i; bestWeapon=int(wi); bestScore=value; bestDamage=damage;

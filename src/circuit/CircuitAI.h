@@ -64,6 +64,7 @@ class CCommanderController;
 class CSkirmisherController;
 class CBacklineController;
 class CLineController;
+class IArtilleryCensus;
 class CControllerRegistry;
 class CWidgetState;
 class CFactoryManager;
@@ -349,6 +350,8 @@ public:
     CSkirmisherController* GetSkirmisherController() const { return skirmisherController; }  // D-430, D-432
     CBacklineController* GetBacklineController() const { return backlineController; }        // D-432
     CLineController* GetLineController() const { return lineController; }        // D-430
+    // D-493: what the commander group may ask about our artillery (crowding).
+    IArtilleryCensus* GetArtilleryCensus() const { return artilleryCensus; }
     CWidgetState* GetWidgetState() const { return widgetState.get(); }  // D-300
 	CFactoryManager*  GetFactoryManager()  const { return factoryManager.get(); }
 	CEconomyManager*  GetEconomyManager()  const { return economyManager.get(); }
@@ -411,6 +414,7 @@ private:
     CSkirmisherController* skirmisherController=nullptr; // owned by controllers (D-430, D-432)
     CBacklineController* backlineController=nullptr;     // owned by controllers (D-432)
     CLineController* lineController=nullptr;            // owned by controllers (D-430)
+    IArtilleryCensus* artilleryCensus=nullptr;          // D-493: owned by controllers
     std::unique_ptr<CWidgetState> widgetState;  // D-300: AI -> widget state file
 	std::shared_ptr<CFactoryManager> factoryManager;
 	std::shared_ptr<CEconomyManager> economyManager;

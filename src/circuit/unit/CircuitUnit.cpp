@@ -6,6 +6,7 @@
  */
 
 #include "unit/CircuitUnit.h"
+#include "task/fighter/MissileTargetPolicy.h"
 #include "unit/action/DGunAction.h"
 #include "unit/action/TravelAction.h"
 #include "unit/enemy/EnemyUnit.h"
@@ -43,6 +44,7 @@ CCircuitUnit::CCircuitUnit(CCircuitAI* circuit, Id unitId, Unit* unit, CCircuitD
 		, moveFails(0)
 		, failFrame(-1)
 		, damagedFrame(-1)
+		, fireFrame(-1)
 		, execFrame(-1)
 		, disarmFrame(-1)
 		, ammoFrame(-1)
@@ -338,6 +340,14 @@ void CCircuitUnit::CmdPatrolTo(const AIFloat3& pos, short options, int timeout)
 	unit->PatrolTo(pos, options, timeout);
 }
 
+void CCircuitUnit::CmdStationaryGroundTarget(const AIFloat3& pos)
+{
+    assert(geom::is_in_map(pos));
+    float params[] = {pos.x, pos.y, pos.z};
+    // BAR's coordinate priority target aims the weapon without an ATTACK move.
+    SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
+}
+
 void CCircuitUnit::CmdAttackGround(const AIFloat3& pos, short options, int timeout)
 {
 	assert(geom::is_in_map(pos));
@@ -616,6 +626,7 @@ void CCircuitUnit::CmdResurrectInArea(const AIFloat3& pos, float radius, short o
 
 void CCircuitUnit::CmdSetFireState(CCircuitDef::FireT state)
 {
+    if (IsSlowMissileLauncher(circuitDef->GetDef()->GetName())) state = CCircuitDef::FireType::HOLD;
 	unit->SetFireState(state);
     requestedFire=state;
 }

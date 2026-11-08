@@ -28,6 +28,7 @@
 #include "tech_chain.as"
 #include "tech_plan.as"
 #include "tech_heavy_rush.as"
+#include "../../systems/production/tech_air_foundry.as"
 #include "tech_transport.as"
 
 namespace RoleTech
@@ -207,6 +208,7 @@ namespace RoleTech
 	{
         aiBuilderMgr.recoverConstruction = true;
         TechFortifications::Reset();
+        TechAirFoundry::Configure();
         TechReclaim::ProtectEnergyStorage();   // D-290 (owner): TECH never reclaims an energy storage, on any path
 
 		// Apply TECH role settings
@@ -663,6 +665,7 @@ namespace RoleTech
 
 		Opening::Tick();
 		TechBuild::Tick();
+		TechPinpointers::Tick();   // D-492: Pinpointers while the team has artillery and none
 		TechChain::Tick();
         TechHeavyRush::Tick();
         TechGantry::SampleIncome();
@@ -833,9 +836,15 @@ namespace RoleTech
 				/*metalIncomePerPlant*/ Global::RoleSettings::Tech::RequiredMetalIncomeForT2AircraftPlant,
 				/*energyIncomePerPlant*/ Global::RoleSettings::Tech::RequiredEnergyIncomeForT2AircraftPlant);
 
-			if (allowedT2Air > 0)
+			// D-489 (owner, 2026-11-07): the T1 aircraft lab follows the first
+			// advanced fusion, or an aircraft-lab step the chain has reached
+			// (the nuke plan's, after its silo). This block runs after
+			// TechChain::Tick, so before D-489 it put the chain's lifted cap
+			// back to 0 until the T2 aircraft-lab income held. One lab is enough.
+			if (allowedT2Air > 0 || aiTerrainMgr.GetLayoutInt("tech.heavy.afus-completed", 0) > 0
+				|| TechChain::WantsStep("ap"))
 			{
-				allowedT1Air = 1; // We don't really need more than 1 t1 lab
+				allowedT1Air = 1;
 			}
 
 			GenericHelpers::LogUtil(
@@ -1497,13 +1506,17 @@ namespace RoleTech
 				// D-101 (owner's rule): while a construction turret stands the new one is
 				// placed by the layout (played: the rebuilt T1 lab went back into its old footprint)
 				if (isReset && fac != "") aiTerrainMgr.SetResetFactorySlot(Layout::ReserveFactorySite(ai.GetCircuitDef(fac)));
+				// D-451/C1: the disposable opening lab needs no protected road.
+				if (!isReset) LayoutHelpers::ExemptStartFactory(fac);
 				return fac;
 			}
 			else
 			{
 				GenericHelpers::LogUtil("[Tech_SelectFactoryHandler] nearestMapPosition is null", 2);
 				// Even if nearest start is unavailable, attempt a safe fallback
-				return FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				const string fallback = FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				if (!isReset) LayoutHelpers::ExemptStartFactory(fallback);
+				return fallback;
 			}
 		}
 
@@ -1745,6 +1758,7 @@ namespace RoleTech
 		}
 
 		Team::Donation::OnConstructorBuilt(unit);   // a requested constructor goes to its requester; the rest are ours
+        TechAirFoundry::Added(unit);
         FrontlineEngineering::Added(unit);
 		if (Team::IsT2Constructor(d))
 		{
@@ -1754,6 +1768,7 @@ namespace RoleTech
 
 	void Tech_BuilderAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{ /* other bookkeeping moved to Builder::AiUnitRemoved */
+        TechAirFoundry::Removed(unit);
         FrontlineEngineering::Removed(unit);
         if (unit !is null) {
             EcoPlanner::conversionReasons.delete("" + unit.id);
@@ -1986,6 +2001,9 @@ namespace RoleTech
             if (done && bt == Task::BuildType::ENERGY && builderTask.buildDef !is null
                 && builderTask.buildDef.GetName() == TechChain::DefFor("afus"))
                 aiTerrainMgr.SetLayoutInt("tech.heavy.afus-completed", 1);
+            // D-491: INV-264, the first fusion and aircraft lab stand in the core
+            if (done && (bt == Task::BuildType::ENERGY || bt == Task::BuildType::FACTORY) && builderTask.target !is null)
+                Layout::CheckCore(builderTask.target);
 
 			// MexTracker bookkeeping is done role-independently in Builder::AiTaskRemoved.
 			if (bt == Task::BuildType::MEXUP)

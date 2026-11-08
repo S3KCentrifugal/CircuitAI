@@ -19,6 +19,7 @@
 #include "control/unit/skirmisher/SkirmisherController.h"
 #include "control/unit/backline/BacklineController.h"
 #include "control/group/LineController.h"
+#include "control/unit/artillery/ArtilleryController.h"
 #include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
 #include "module/EconomyManager.h"
@@ -415,6 +416,7 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			const struct SWeaponFiredEvent* evt = (const struct SWeaponFiredEvent*)data;
 			CCircuitUnit* unit = GetTeamUnit(evt->unitId);
 			if (unit != nullptr) {
+				unit->SetFireFrame(lastFrame);  // ghost porc fire: shots seen directly
                 if (controllers) controllers->WeaponFired(evt->unitId,evt->weaponDefId);
 				CAirWaveTask* wave = dynamic_cast<CAirWaveTask*>(unit->GetTask());
                 if (wave != nullptr) wave->OnWeaponFired(unit, evt->weaponDefId);
@@ -696,6 +698,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     skirmisherController=controllers->Add(std::make_unique<CSkirmisherController>(this));
     backlineController=controllers->Add(std::make_unique<CBacklineController>(this));
     lineController=controllers->AddGroup(std::make_unique<CLineController>(this));
+    artilleryCensus=controllers->Add(std::make_unique<CArtilleryController>(this));  // D-493
     controllers->ReadConfig(setupManager->GetConfig());
     // D-300: before script init, so AiMain can already publish widget state.
     widgetState=std::make_unique<CWidgetState>(this);

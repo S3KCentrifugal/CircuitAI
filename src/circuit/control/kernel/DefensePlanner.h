@@ -18,10 +18,28 @@ struct Settings {
     float urgentBand=4;
     float shieldInPlasmaZone=1, shieldSafeSeconds=10;
     float surplusMetal=0, surplusEnergyMargin=100, surplusFireSeconds=10, surplusLimit=32;
+    // D-476: spare metal income (income minus current spending, metal/s) that
+    // also admits surplus defences, so a front that spends its income keeps
+    // porcing without banking surplusMetal first. 0 disables the income path.
+    float surplusIncome=0;
+    // D-469: elmos beyond a turret's range at which a mobile ground enemy
+    // (LIGHT/HEAVY) still counts as covered: turrets go down on the side
+    // facing an army before it closes. 0 keeps the exact weapon range.
+    float approach=0;
+    // D-470: seconds a commander waits for a group seat to start a choice it
+    // cannot build itself before it builds its own best defence instead.
+    float seatGrace=5;
 };
+inline float CoverRange(int channel, float range, const Settings& s) {
+    return (channel == LIGHT || channel == HEAVY) ? range + std::max(0.f, s.approach) : range;
+}
 enum class Reason { READY, DISABLED, NO_BUILDER, INCOME, ENERGY, TOO_LATE, COVERED, LOW_VALUE, LIMIT };
 struct Rule {
     int def = -1, band = 2, limit = 4;
+    // D-469: an earlier slot this rule stands in for. The rule is considered
+    // only when that slot has no seat able to start it (a lone commander's
+    // light laser for the constructor-only Beamer/Twin Guard). -1: always.
+    int fallbackFor = -1;
     float minMetal = 0, minEnergy = 0, seconds = 90, window = 30;
     float efficiency = .65f, valueRatio = 0, priority = 1, reserve = .2f;
     float surplusPriority = 0;
@@ -91,6 +109,24 @@ inline float Marginal(const Demands& demand, const std::array<float, COUNT>& act
     }
     return benefit;
 }
+// D-469: firing energy spare income cannot pay, over the policy window, which
+// the bank must then hold beyond the build's own energy. Comparing operating
+// energy with spare income alone refused every laser turret whenever the AI
+// spent its income, even with full storage (played: idle commanders under
+// attack with energy storage nearly full, `energy_committed`).
+inline float BankedFiring(const Project& p, const Economy& e, const Rule& r) {
+    return std::max(0.f, p.operatingEnergy - std::max(0.f, e.energyIncome - e.energyPull)) * r.window;
+}
+inline bool FallbackOpen(const Rule& r, Reason preferred) {
+    return r.fallbackFor < 0 || preferred == Reason::NO_BUILDER;
+}
+// D-470: the asking unit cannot build the shared choice and no seat started
+// it within the grace: its own best READY rule replaces it when not less urgent.
+inline bool OwnChoiceOpen(bool canBuildChoice, float waitedSeconds, float graceSeconds,
+    const Evaluation& own, const Evaluation& choice) {
+    return !canBuildChoice && waitedSeconds >= std::max(0.f, graceSeconds)
+        && own.reason == Reason::READY && own.band >= choice.band;
+}
 inline Evaluation Evaluate(const Rule& r, const Project& p, const Economy& e,
     float benefit, int count) {
     Evaluation v; v.band = r.band;
@@ -99,7 +135,7 @@ inline Evaluation Evaluate(const Rule& r, const Project& p, const Economy& e,
     if (count >= r.limit) { v.reason = Reason::LIMIT; return v; }
     if (e.metalIncome < r.minMetal || e.energyIncome < r.minEnergy) { v.reason = Reason::INCOME; return v; }
     if (p.shotEnergy > e.energy * (1 - r.reserve)
-        || p.operatingEnergy > std::max(0.f, e.energyIncome - e.energyPull)) { v.reason = Reason::ENERGY; return v; }
+        || BankedFiring(p, e, r) > std::max(0.f, e.energy * (1 - r.reserve) - p.energy)) { v.reason = Reason::ENERGY; return v; }
     v.ready = ReadyTime(p, e, r.reserve);
     if (!std::isfinite(v.ready) || v.ready > r.seconds) { v.reason = Reason::TOO_LATE; return v; }
     if (benefit <= 0) { v.reason = Reason::COVERED; return v; }
@@ -117,7 +153,9 @@ inline bool Better(const Evaluation& a, const Evaluation& b) {
 inline Evaluation EvaluateSurplus(const Settings& s, const Rule& r, Project p,
     const Economy& e, int count) {
     Evaluation v;
-    if (s.enabled <= 0 || s.surplusMetal <= 0 || e.metal <= s.surplusMetal || r.surplusPriority <= 0) return v;
+    const bool banked = s.surplusMetal > 0 && e.metal > s.surplusMetal;
+    const bool earning = s.surplusIncome > 0 && e.metalIncome - e.metalPull >= s.surplusIncome;
+    if (s.enabled <= 0 || !(banked || earning) || r.surplusPriority <= 0) return v;
     const float firingReserve = std::max(p.shotEnergy, p.operatingEnergy * s.surplusFireSeconds);
     if (e.energyIncome - e.energyPull < p.operatingEnergy + s.surplusEnergyMargin
         || e.energy * (1 - r.reserve) < firingReserve) { v.reason = Reason::ENERGY; return v; }

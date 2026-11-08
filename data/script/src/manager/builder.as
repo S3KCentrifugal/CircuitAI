@@ -17,7 +17,9 @@
 #include "../systems/team/ferry.as"
 #include "../systems/construction/layout.as"
 #include "../systems/construction/front_energy.as"
+#include "../systems/construction/forward_geothermal.as"
 #include "../systems/team/sea_assist.as"
+#include "../systems/construction/lolcannon.as"
 
 namespace Builder {
 	// CCircuitUnit is registered as asOBJ_NOCOUNT (see InitScript.cpp).
@@ -1997,17 +1999,32 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+        IUnitTask@ foundry = TechAirFoundry::Work(u);
+        if (foundry !is null) return foundry;
+        ForwardGeo::Update(); // D-488: judges the vents once; withdraws them on a role change
         // FRONT ownership precedes generic edge/spam/economy providers and
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
+            IUnitTask@ support=FrontFactorySupport::Assist(u,false);
+            if(support !is null) return support;
             FrontEnergy::Update(); // before any group/base/default provider can enqueue energy
             if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
             if (FrontConstructors::Eligible(u)) {
                 if (u.task !is null && (u.task.IsExternalControlled() || u.task.IsEnemyReclaim()
                     || u.task.GetType() == int(Task::Type::PLAYER) || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
+                // D-486: floating metal fills the reserved factory turret slots first.
+                IUnitTask@ fill = FrontConstructors::FillWork(u);
+                if (fill !is null) return fill;
+                // D-488: a T2 constructor puts the fortified geo on forward vents.
+                IUnitTask@ geo = ForwardGeo::Work(u);
+                if (geo !is null) return geo;
+                if (FrontConstructors::Seat(u.id) == FrontConstructors::ENERGY) return FrontConstructors::EnergyWork(u);
+                if (FrontConstructors::Seat(u.id) == FrontConstructors::CONVERTER) return FrontConstructors::ConverterWork(u);   // D-463
                 if (FrontConstructors::IsBase(u.id)) return FrontConstructors::BaseWork(u);
-                if (FrontConstructors::Seat(u.id) != 2) return aiBuilderMgr.DefaultMakeTask(u);
+                if (FrontConstructors::Seat(u.id) != FrontConstructors::COMMANDER) return aiBuilderMgr.DefaultMakeTask(u);
             }
+            IUnitTask@ opening=FrontConstructors::CommanderOpening(u);
+            if(opening !is null) return opening;
             IUnitTask@ front=UnitHelpers::IsCommander(u.circuitDef)?CommanderFront::Work(u):CommanderGroup::Work(u);
             if(front !is null) return front;
         }
@@ -2026,6 +2043,8 @@ namespace Builder {
 				return null;
 			}
 		}
+		// owner, 2026-10-21: the lolcannon crew builds only the lolcannon program
+		{ IUnitTask@ lc = LolCannon::BuilderTask(u); if (lc !is null) return lc; }
 		// New gating via BuilderTaskTrack: grace window, then gate if added, else allow; hard timeout clears
 		BuilderTaskTrack@ tr = GetTrackForBuilder(u);
 		if (tr !is null) {
@@ -2046,7 +2065,8 @@ namespace Builder {
 		}
 
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
-		@t = SeaCoast::Build(u); // SEA-only lost-water recovery precedes discretionary spam.
+		@t = ForwardGeo::Work(u); // D-488: FRONT and AIR fortify forward vents first
+		if (t is null) @t = SeaCoast::Build(u); // SEA-only lost-water recovery precedes discretionary spam.
 		if (t is null) @t = EdgeLanes::BuilderTask(u); // owner, 2026-10-17: two FRONTs build the edge lane labs
 		if (t is null) @t = Spam::BuilderMakeTask(u);
 		if (t is null && MetalEconomy::Active() && !SeaLayout::Active() && Global::AISettings::Role != AiRole::AIR && Global::AISettings::Role != AiRole::TECH
@@ -2075,6 +2095,8 @@ namespace Builder {
 
 	void AiTaskAdded(IUnitTask@ task)
 	{
+		LolCannon::TaskAdded(task);   // owner, 2026-10-21: a lolcannon outside its program is aborted
+		if (Global::AISettings::Role == AiRole::FRONT) FrontLayout::Prepare(task);
 		if (Global::AISettings::Role == AiRole::TECH && Global::RoleSettings::Tech::ExperimentalBuild)
 			Invariants::ConstructionAdmitted(task);
 		if (Global::AISettings::Role == AiRole::TECH) TechReclaim::Audit(task);   // D-290: every reclaim of ours, named by path
@@ -2409,6 +2431,7 @@ namespace Builder {
 		if (unit is null) return;
 
 		if (Team::Recovery::OnUnitAdded(unit)) return;
+		LolCannon::UnitAdded(unit);   // owner, 2026-10-21: the lolcannon crew is claimed as it comes out
 
 		// Role-independent, like the mex bookkeeping in AiTaskAdded: SEA counts
 		// its construction ships here, TACTICAL unlocks its shipyard caps the
@@ -2798,6 +2821,7 @@ namespace Builder {
 		if (unit is null) return;
 
 		Team::SeaAssist::OnUnitRemoved(unit);
+		LolCannon::UnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
         CommanderGroup::OnRemoved(unit);
 

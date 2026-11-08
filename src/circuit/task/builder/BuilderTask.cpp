@@ -45,6 +45,18 @@
 
 namespace circuit {
 
+namespace {
+// D-482 (INV-259): synchronous re-evaluation swaps in progress on this thread.
+// A swapped-in task starts at once and re-evaluates; two kinds of work that
+// each prefer the other recursed until the stack overflowed (owner's 8v8 on
+// All That Glitters, geo-b25, F27634; nano-b27 locally, F18543: the FRONT
+// commander's lane mex against adopting an ally's turret frame, 3,030 swaps in
+// one frame). Normal play nests one swap.
+thread_local int reevaluateSwapDepth = 0;
+constexpr int MAX_REEVALUATE_SWAP_DEPTH = 4;
+thread_local int reevaluateRefusedFrame = -1;
+}
+
 using namespace springai;
 
 IBuilderTask::BuildName IBuilderTask::buildNames = {
@@ -83,6 +95,7 @@ IBuilderTask::IBuilderTask(ITaskModule* mgr, Priority priority,
 		, pinRequired(false)
 		, pinFailed(false)
 		, layoutOwned(false)
+		, siteRadius(-1.f)
 		, nextTask(nullptr)
 		, initiator(nullptr)
 		, buildFails(0)
@@ -110,6 +123,7 @@ IBuilderTask::IBuilderTask(ITaskModule* mgr, Type type, BuildType buildType)
 		, pinRequired(false)
 		, pinFailed(false)
 		, layoutOwned(false)
+		, siteRadius(-1.f)
 		, nextTask(nullptr)
 		, initiator(nullptr)
 		, savedIncome({0.f, 0.f})
@@ -359,7 +373,7 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 	AIFloat3 pos = (shake > .0f) ? geom::get_near_pos(position, shake) : position;
 	CTerrainManager::CorrectPosition(pos);
 
-	const float searchRadius = 200 * SQUARE_SIZE;
+	const float searchRadius = (siteRadius > 0.f) ? siteRadius : 200 * SQUARE_SIZE;
 	FindBuildSite(unit, pos, searchRadius);
 
 	if (geom::is_valid(buildPos)) {
@@ -367,6 +381,13 @@ bool IBuilderTask::Execute(CCircuitUnit* unit)
 		TRY_UNIT(circuit, unit,
 			if (!BuildAtSite(unit, 0, CmdTimeout(frame))) return false;
 		)
+	} else if (siteRadius > 0.f) {
+		// A placed site (the FRONT lolcannon): no room near it is a failed
+		// order, not a structure somewhere up to 1,600 elmos away.
+		circuit->LOG("SITE: aborting %s task, no site within %.0f of (%.0f, %.0f)",
+				buildDef->GetDef()->GetName(), siteRadius, position.x, position.z);
+		manager->AbortTask(this);
+		return false;
 	} else if (pinFailed) {
 		circuit->LOG("RESERVE: aborting %s task after required slot %i failed",
 				buildDef->GetDef()->GetName(), pinnedReservation);
@@ -739,6 +760,11 @@ bool IBuilderTask::IsExperimental() const
 
 float IBuilderTask::EngageRange(CCircuitUnit* unit)
 {
+	return EngineBuildRange(unit) * 0.9f;
+}
+
+float IBuilderTask::EngineBuildRange(CCircuitUnit* unit)
+{
 	// The engine's rule (Recoil BuilderCAI::GetBuildRange / MoveInBuildRange):
 	// in range when |builder - site| <= buildDistance + modelRadius(buildee);
 	// its own move goal is 0.9 of that. The same numbers, so the AI never
@@ -749,7 +775,7 @@ float IBuilderTask::EngageRange(CCircuitUnit* unit)
 	} else if (buildDef != nullptr) {
 		radius = buildDef->GetRadius();
 	}
-	return (unit->GetCircuitDef()->GetBuildDistance() + radius) * 0.9f;
+	return unit->GetCircuitDef()->GetBuildDistance() + radius;
 }
 
 int IBuilderTask::CmdTimeout(int frame) const
@@ -908,8 +934,18 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 				// the builder off its order (played: the first lab and the opening
 				// solars took minutes whenever energy was empty). The sequence
 				// manages energy itself; a slow build beats an abandoned one.
+				// D-467: wait only where the engine builds. "In range" above is 2D
+				// within build distance + DEFAULT_SLACK (64); the engine's is 3D
+				// within build distance + the buildee's radius (BuilderCAI.cpp:257).
+				// A builder walking its last steps through that band was put on
+				// CMD_WAIT while energy was empty and froze just out of range
+				// (owner's game: FRONT's first constructor at a base mex, D-466).
+				// Outside the engine's range any wait is lifted so it walks in.
+				// Cost: one 3D distance per re-evaluation; a command only on a flip.
 				if (!IsExperimental() && ((unit->GetTravelAct() == nullptr) || unit->GetTravelAct()->IsFinished())) {
-					unit->CmdWait(ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
+					const float engineRange = EngineBuildRange(unit);
+					const bool inEngineRange = pos.SqDistance(GetPosition()) <= SQUARE(engineRange);
+					unit->CmdWait(inEngineRange && ecoMgr->IsEnergyEmpty() && (buildType != BuildType::ENERGY) && (buildType != BuildType::GEO)
 							&& (buildType != BuildType::STORE) && (buildType != BuildType::RECLAIM));
 				}
 			)
@@ -922,6 +958,13 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 		)
 	}
 	if (unit->IsAttrNoDisrupt()) {
+		return true;
+	}
+	// D-490 (owner): a FRONT commander walking to its own construction (a mex,
+	// a turret) is not offered other work on the way; played, the policy's
+	// assist rung swapped it off a mex to help a constructor.
+	if (cdef->IsRoleComm() && (circuit->GetCommanderController() != nullptr)
+		&& circuit->GetCommanderController()->KeepsOwnConstruction(unit, this)) {
 		return true;
 	}
 	HideAssignee(unit);
@@ -943,6 +986,23 @@ bool IBuilderTask::Reevaluate(CCircuitUnit* unit)
 		&& ((task->GetType() != IUnitTask::Type::BUILDER)
 			|| (static_cast<IBuilderTask*>(task)->GetBuildType() != buildType)))
 	{
+		if (reevaluateSwapDepth >= MAX_REEVALUATE_SWAP_DEPTH) {
+			// Keep this task; the made one is dropped if nobody else holds it.
+			// The next ordinary update re-evaluates from depth zero.
+			if (circuit->GetLastFrame() != reevaluateRefusedFrame) {
+				reevaluateRefusedFrame = circuit->GetLastFrame();
+				const IBuilderTask* other = (task->GetType() == IUnitTask::Type::BUILDER) ? static_cast<IBuilderTask*>(task) : nullptr;
+				circuit->LOG("[INVARIANT] INV-259 task swap re-entered %i deep team=%i unit=%i def=%s keep=%i made=%i/%i",
+						reevaluateSwapDepth, circuit->GetTeamId(), unit->GetId(), unit->GetCircuitDef()->GetDef()->GetName(),
+						int(buildType), int(task->GetType()), (other != nullptr) ? int(other->GetBuildType()) : -1);
+			}
+			manager->DiscardUnusedTask(task);
+			return true;
+		}
+		struct SSwap {
+			SSwap() { ++reevaluateSwapDepth; }
+			~SSwap() { --reevaluateSwapDepth; }
+		} swap;
 		manager->AssignTask(unit, task);
 		return false;
 	}

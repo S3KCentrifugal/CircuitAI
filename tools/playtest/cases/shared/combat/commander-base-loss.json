@@ -1,0 +1,90 @@
+{
+  "name": "commander-base-loss",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "D-472 / KI-755: the only factory is destroyed while the commander is in energy retreat from two raiders, with a reserve the team cannot store; the raiders are then removed, the retreat ends and the commander rebuilds a factory.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4300,
+      4000
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "commander_observation": true,
+  "commander_front_work": true,
+  "commander_initial": true,
+  "enemy_commander_home": true,
+  "commander_overrides": {
+    "escape_seconds": 10
+  },
+  "start_energy": 0,
+  "start_metal": 1000,
+  "enemy_waypoints": [
+    [
+      4450,
+      4000
+    ]
+  ],
+  "groups": [
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4300,
+        3600
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 2,
+      "position": [
+        4300,
+        4900
+      ],
+      "after_seconds": 20
+    }
+  ],
+  "camera": [
+    4300,
+    4000,
+    1800
+  ],
+  "photos": [
+    25,
+    60,
+    120
+  ],
+  "min_spawn_spacing": 60,
+  "command_breakdown": true,
+  "observation_frames": 3,
+  "assertions": {
+    "min_shooters": 0,
+    "min_kills": 0,
+    "min_damage": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-base-loss",
+  "storage_scenario": "commander-base-loss",
+  "remove_units_after_seconds": 30,
+  "remove_unit_team": 0,
+  "remove_unit_name": "armlab",
+  "group_loss_steps": [
+    {
+      "seconds": 55,
+      "team": 1,
+      "units": [
+        "corak"
+      ]
+    }
+  ],
+  "start_energy_storage": 500
+}

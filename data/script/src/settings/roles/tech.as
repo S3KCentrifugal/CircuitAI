@@ -4,12 +4,36 @@
 namespace Global {
 namespace RoleSettings {
 namespace Tech {
+            int AirFactoryAssistCount = 6; // Air Foundry; JSON tech_production/air_foundry_count overrides at init.
             bool RushBootstrapEnabled = true;
             float RushBootstrapLocalRadius = 800.f;
             float RushBootstrapMaxThreat = 0.f;
             int RushBootstrapRetrySeconds = 5;
             int RushBootstrapStallSeconds = 30;
             bool GrowthEnabled = true;
+            // D-489 (owner, 2026-11-07): surplus seats. While metal floats, one T1
+            // constructor at base only builds construction turrets on free economy
+            // slots; while energy floats, one T2 constructor at base only builds
+            // advanced energy converters (metal-full admission waived for it).
+            // D-491 (owner, 2026-11-07): the first advanced lab, fusion and T1 aircraft lab
+            // stand together, touching on open flat ground, at most CoreMaxGapCells apart
+            bool CoreLayoutEnabled = true;
+            int CoreMaxGapCells = 4;                     // layout cells (16 elmos); beyond this the ordinary packer places it
+            // D-492 (owner, 2026-11-07): the team's artillery needs Pinpointers
+            bool PinpointerEnabled = true;
+            int PinpointerTarget = 3;                    // TECH's own, ordered or standing
+            string PinpointerDefinitions = "armtarg,cortarg,legtarg";
+            string PinpointerTriggerDefinitions = "armamb,cortoast,legacluster,armbrtha,corint,leglrpc,armvulc,corbuzz,legstarfall";   // T2 artillery or better
+            int PinpointerCheckSeconds = 5;
+            int PinpointerGraceSeconds = 180;            // INV-266
+            bool SurplusSeatsEnabled = true;
+            float SurplusSeatBaseRadius = 1400.f;        // a constructor within this of the base centre is at base
+            float SurplusSeatMetalBank = 1000.f;         // owner, 2026-11-07: a metal bank at or over this is a surplus (turret seat)
+            float SurplusSeatEnergyShare = .9f;          // owner, 2026-11-07: an energy bank at or over this share of storage is excess (converter seat)
+            float SurplusSeatLowEnergyShare = .2f;       // energy is low under this share of storage, or stalling: no turret seat
+            int SurplusSeatReleaseSeconds = 20;          // a seat outlives its surplus by this, so a dip does not churn it
+            int SurplusSeatRetrySeconds = 15;            // after a seat finds no slot, no claim for this long
+            int SurplusSeatIdleReleaseSeconds = 5;       // a seat holder idle this long gives the seat up
             bool ClusterEconomyEnabled = true;
             int ClusterTurretParallel = 10;
             float ClusterWorkerRadius = 640.f;
@@ -41,14 +65,6 @@ namespace Tech {
             bool HeavyTransportPoolEnabled = true;
             float HeavyTransportAdditionalIncomeStart = 40.0f;
             float HeavyTransportMetalPerAdditional = 100.0f;
-            float HeavyDeliveryArrivalRadius = 240.0f;
-            float HeavyDeliveryDestinationMove = 192.0f;
-            float HeavyDeliveryRouteRetrySeconds = 10.0f;
-            bool HeavyDeliveryFrontEnabled = false;
-            float HeavyDeliveryAirPadding = 192.0f;
-            float HeavyDeliveryAirThreat = 0.5f;
-            float HeavyDeliveryBlockedSeconds = 90.0f;
-            float HeavyDeliveryFrontRadius = 128.0f;
             bool LocalGeothermalEnabled = true;
             float LocalGeothermalRadius = 1200.0f;
             float LocalGeothermalBudgetSeconds = 90.0f;
@@ -417,6 +433,7 @@ namespace Tech {
             float ChainWindBootstrap = 5.0f;
             float ChainAssistRadius = 4000.0f;
             float ChainParallelCostM = 400.0f;
+            float ChainStaleQueuedSeconds = 60.0f;          // D-461: a queued chain order no builder can take stops counting as in flight after this; 0 disables
             float ChainStepStallSeconds = 120.0f;           // D-070: a chain step with no progress for this long is skipped (an unreachable frame must not end the rush)              // D-070: structures cheaper than this (metal) are built one per builder in parallel; dearer ones get every builder on one frame              // D-070: every builder inside this joins the current step's frame
             float ChainNearFrameRadius = 600.0f;            // D-075: a chain frame of a cheap step within this of the builder is finished before anything else
             float PowerTurretBankFactor = 1.5f;             // D-075: ... and the bank holds this many turret costs
@@ -727,7 +744,7 @@ namespace Tech {
 
             // T2 Aircraft Plant thresholds (TECH role)
             // Mirrors AIR role defaults; scoped to TECH so roles don't cross-reference
-            float RequiredMetalIncomeForT2AircraftPlant = 200.0f;
+            float RequiredMetalIncomeForT2AircraftPlant = 100.0f;   // owner, 2026-11-07 (D-489): was 200
             float RequiredEnergyIncomeForT2AircraftPlant = 2000.0f;
 
             /******************** LANDLOCKED WATER EXPANSION ********************/

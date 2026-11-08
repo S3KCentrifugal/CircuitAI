@@ -47,10 +47,33 @@ namespace CommanderGroup {
         Definition("commander_group_radar",UnitHelpers::GetStaticRadarNameForSide(side));
         Definition("commander_group_jammer",UnitHelpers::GetStaticJammerNameForSide(side));
         Definition("commander_group_aa",UnitHelpers::GetStaticAALightNameForSide(side));
-        Definition("commander_group_def2",side=="cortex"?"corvipe":side=="legion"?"legacluster":"armpb");
+        // D-496: the T2 front defence is the 730-range pop-up (Scorpion, Pit Bull,
+        // Chimera). It was the Eviscerator for Legion: as a front defence its 1380
+        // range set the spacing rule to 690 elmos, so 99% of the tactical queue's
+        // Eviscerator slots were refused (Clyde, 3 of 480 built).
+        Definition("commander_group_def2",side=="cortex"?"corvipe":side=="legion"?"legapopupdef":"armpb");
+        CheckDefenceNotArtillery();
         Definition("commander_group_radar2",side=="cortex"?"corarad":side=="legion"?"legarad":"armarad");
         Definition("commander_group_jammer2",side=="cortex"?"corshroud":side=="legion"?"legajam":"armveil");
         Definition("commander_group_aa2",side=="cortex"?"corflak":side=="legion"?"legflak":"armflak");
+    }
+    // INV-269 (D-496): the group's front defences are never one of its static
+    // artillery definitions, which the front-defence spacing rule would then
+    // keep apart by half their range. Once per load.
+    void CheckDefenceNotArtillery() {
+        array<string>@ artillery=aiSetupMgr.ConfigString("commander/combat/commander_group_artillery_t2_definitions",
+            "armamb,cortoast,legacluster").split(",");
+        array<string>@ t1=aiSetupMgr.ConfigString("commander/combat/commander_group_artillery_t1_definitions",
+            "armguard,corpun,legcluster").split(",");
+        for(uint i=0;i<t1.length();++i) artillery.insertLast(t1[i]);
+        const array<string> keys={"commander_group_def","commander_group_def2"};
+        const string side=Global::AISettings::Side.length()>0?Global::AISettings::Side:ai.GetSideName();
+        for(uint k=0;k<keys.length();++k) {
+            const string name=aiSetupMgr.ConfigString("commander/combat/"+keys[k],
+                k==0?(side=="cortex"?"corhllt":side=="legion"?"legmg":"armbeamer"):(side=="cortex"?"corvipe":side=="legion"?"legapopupdef":"armpb"));
+            if(artillery.find(name)>=0)
+                Invariants::Violation("INV-269","group-defence-artillery",keys[k]+"="+name+" is a static artillery definition (D-496)");
+        }
     }
     void Save(int seat) {aiTerrainMgr.SetLayoutInt("front.group.member."+seat,members[seat]);}
     void Update() {
@@ -73,11 +96,11 @@ namespace CommanderGroup {
             if(!Eligible(ai.GetTeamUnit(members[i]))) {members[i]=-1;Save(int(i));}
             aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,float(members[i]));
         }
-        aiBuilderMgr.SetCommanderCombatOption("commander_group_unit",Eligible(ai.GetTeamUnit(FrontConstructors::seats[2]))?float(FrontConstructors::seats[2]):-1.f);
+        aiBuilderMgr.SetCommanderCombatOption("commander_group_unit",Eligible(ai.GetTeamUnit(FrontConstructors::seats[FrontConstructors::COMMANDER]))?float(FrontConstructors::seats[FrontConstructors::COMMANDER]):-1.f);
     }
     bool Owns(int id) {
         if(Global::AISettings::Role!=AiRole::FRONT) return false;
-        Load();return id>=0 && (members.find(id)>=0 || (enabled && FrontConstructors::seats[2]==id));
+        Load();return id>=0 && (members.find(id)>=0 || (enabled && FrontConstructors::seats[FrontConstructors::COMMANDER]==id));
     }
     bool OnAdded(CCircuitUnit@ unit) {
         if(Global::AISettings::Role!=AiRole::FRONT || !Eligible(unit)) return false;

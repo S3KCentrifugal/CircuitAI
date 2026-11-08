@@ -352,5 +352,166 @@ private:
     float cell;
     CellStore<std::vector<int>> cells;
 };
+
+// D-462: a SpatialIndex whose cells are filled on first touch within one
+// generation (one observation frame). The caller's loader appends a cell's
+// values in the order a full build would have inserted them; queries then
+// visit exactly the z/x/insertion sequence of a SpatialIndex holding the same
+// data. Coordinates are clipped to the configured grid, so every value must
+// lie inside it (the ranged reader corrects positions onto the map first).
+// FillPass lets a full read complete every unloaded cell without disturbing
+// cells already loaded in this generation. Reset is O(previously loaded
+// cells); a query costs its intersecting cells, each loaded at most once per
+// generation, plus results. Engine-free: tests/ranged_geometry_test.cpp
+// compares it with SpatialIndex on random data and query orders.
+class LazySpatialIndex {
+public:
+    explicit LazySpatialIndex(float cell=512.f): cell(cell) {}
+    void Configure(float width,float height) {
+        columns=std::max(1,Coord(width)+1); rows=std::max(1,Coord(height)+1);
+        cells.assign(size_t(columns)*size_t(rows),Cell{});
+        touched.clear(); complete=false; generation=1;
+    }
+    void Reset() {
+        for(const int index:touched) cells[size_t(index)].values.clear();
+        touched.clear(); complete=false; distinct=0;
+        ++generation; // generation 0 is never current: fresh cells start unloaded
+    }
+    // Distinct cells queries visited in this generation, loaded or not; the
+    // caller's load policy (cell by cell or one full read) may use it.
+    int Touched() const { return distinct; }
+    int Columns() const { return columns; }
+    int Rows() const { return rows; }
+    float CellSize() const { return cell; }
+    int Coord(float v) const { return int(std::floor(v/cell)); }
+    bool Inside(int x,int z) const { return x>=0 && z>=0 && x<columns && z<rows; }
+    bool Complete() const { return complete; }
+    bool Loaded(int x,int z) const { return complete || (Inside(x,z) && At(x,z).generation==generation); }
+    // Marks an unloaded cell loaded and calls load(x,z), which appends its
+    // values in full-build order. Loading the same cell again is a no-op.
+    template<class Load> void Ensure(int x,int z,Load&& load) {
+        if(complete || !Inside(x,z)) return;
+        Cell& c=At(x,z);
+        if(c.generation==generation) return;
+        c.generation=generation; c.pass=0; touched.push_back(Index(x,z));
+        load(x,z);
+    }
+    void Append(int x,int z,int value) { if(Inside(x,z)) At(x,z).values.push_back(value); }
+    // A full read: BeginPass, then for every value in global full-build order
+    // Admit(cell) and Append when admitted, then MarkComplete. Cells already
+    // loaded earlier in this generation are refused; unloaded cells are
+    // claimed by the pass, so later values of the same cell are admitted too.
+    int BeginPass() { return ++pass; }
+    bool Admit(int x,int z,int fillPass) {
+        if(complete || !Inside(x,z)) return false;
+        Cell& c=At(x,z);
+        if(c.generation==generation) return c.pass==fillPass;
+        c.generation=generation; c.pass=fillPass; touched.push_back(Index(x,z));
+        return true;
+    }
+    void MarkComplete() { complete=true; }
+    // Lets a full pass started from inside load(x,z) fill that same cell,
+    // which Ensure already marked loaded (and is still empty).
+    void Adopt(int x,int z,int fillPass) {
+        if(!Inside(x,z)) return;
+        Cell& c=At(x,z);
+        if(c.generation==generation && c.values.empty()) c.pass=fillPass;
+    }
+    template<class Load,class F> void Query(Point p,float radius,Load&& load,F&& visit) {
+        int x0=Coord(p.x-radius),x1=Coord(p.x+radius),z0=Coord(p.z-radius),z1=Coord(p.z+radius);
+        if(!Clip(x0,z0,x1,z1)) return;
+        for(int z=z0;z<=z1;++z) for(int x=x0;x<=x1;++x) {
+            Visit(x,z); Ensure(x,z,load);
+            // A nested query may load other cells while visit runs; the cell
+            // storage never moves and a loaded cell never changes this generation.
+            const auto& values=At(x,z).values;
+            for(size_t i=0;i<values.size();++i) visit(values[i]);
+        }
+    }
+    template<class Load,class F> bool Any(Point p,float radius,Load&& load,F&& predicate) {
+        int x0=Coord(p.x-radius),x1=Coord(p.x+radius),z0=Coord(p.z-radius),z1=Coord(p.z+radius);
+        if(!Clip(x0,z0,x1,z1)) return false;
+        for(int z=z0;z<=z1;++z) for(int x=x0;x<=x1;++x) {
+            Visit(x,z); Ensure(x,z,load);
+            const auto& values=At(x,z).values;
+            for(size_t i=0;i<values.size();++i) if(predicate(values[i])) return true;
+        }
+        return false;
+    }
+    const std::vector<int>* Values(int x,int z) const { return Loaded(x,z) && Inside(x,z) ? &At(x,z).values : nullptr; }
+private:
+    struct Cell { std::vector<int> values; unsigned generation=0, visited=0; int pass=0; };
+    int Index(int x,int z) const { return z*columns+x; }
+    void Visit(int x,int z) { Cell& c=At(x,z); if(c.visited!=generation) { c.visited=generation; ++distinct; } }
+    Cell& At(int x,int z) { return cells[size_t(Index(x,z))]; }
+    const Cell& At(int x,int z) const { return cells[size_t(Index(x,z))]; }
+    bool Clip(int& x0,int& z0,int& x1,int& z1) const {
+        x0=std::max(x0,0); z0=std::max(z0,0); x1=std::min(x1,columns-1); z1=std::min(z1,rows-1);
+        return x0<=x1 && z0<=z1;
+    }
+    float cell;
+    int columns=0, rows=0, pass=0, distinct=0;
+    unsigned generation=1;
+    bool complete=false;
+    std::vector<Cell> cells;
+    std::vector<int> touched;
+};
+
+// D-462: an id-keyed table with the visible behaviour of a map that erases,
+// at every Prune(frame), each entry whose `seen` is more than `horizon`
+// frames before that prune. The erase is decided when an entry is next read
+// or written instead: an entry not written since an earlier prune is absent
+// iff (last prune frame - seen) > horizon, because seen only changes on a
+// write and prune frames only increase. Prune is O(1); Find and Touch are
+// O(1) for ids in [0, bound) (dense, allocated on first write) and expected
+// O(1) otherwise (sparse overflow, swept every sweepPrunes prunes). Values
+// of an absent entry are reset on the next Touch, as a fresh insert would be.
+// Engine-free: tests/ranged_geometry_test.cpp runs it against an erasing
+// unordered_map under random operation sequences.
+template<class T> class ExpiringTable {
+public:
+    struct Entry { T value{}; int seen=0; };
+    ExpiringTable(int bound,int horizon,unsigned sweepPrunes=1800):
+        bound(std::max(0,bound)), horizon(horizon), sweepPrunes(std::max(1u,sweepPrunes)) {}
+    const Entry* Find(int id) const {
+        const Slot* s=Lookup(id);
+        return s && !Absent(*s) ? &s->entry : nullptr;
+    }
+    Entry& Touch(int id) {
+        Slot& s=Get(id);
+        if(Absent(s)) { s.entry=Entry{}; s.used=true; }
+        s.epoch=epoch;
+        return s.entry;
+    }
+    void Prune(int frame) {
+        lastPrune=frame; ++epoch;
+        if(++sincePrune<sweepPrunes) return;
+        sincePrune=0;
+        for(auto it=overflow.begin();it!=overflow.end();) it=Absent(it->second) ? overflow.erase(it) : std::next(it);
+    }
+    size_t OverflowSize() const { return overflow.size(); }
+private:
+    struct Slot { Entry entry; unsigned epoch=0; bool used=false; };
+    bool Absent(const Slot& s) const {
+        return !s.used || (s.epoch<epoch && double(lastPrune)-double(s.entry.seen)>double(horizon));
+    }
+    const Slot* Lookup(int id) const {
+        if(id>=0 && id<bound) return size_t(id)<dense.size() ? &dense[size_t(id)] : nullptr;
+        const auto it=overflow.find(id);
+        return it==overflow.end() ? nullptr : &it->second;
+    }
+    Slot& Get(int id) {
+        if(id>=0 && id<bound) {
+            if(dense.empty()) dense.resize(size_t(bound));
+            return dense[size_t(id)];
+        }
+        return overflow[id];
+    }
+    int bound, horizon;
+    unsigned sweepPrunes, sincePrune=0, epoch=0;
+    int lastPrune=0;
+    std::vector<Slot> dense;
+    std::unordered_map<int,Slot> overflow;
+};
 }
 #endif

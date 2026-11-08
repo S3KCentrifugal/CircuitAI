@@ -23,6 +23,9 @@
 namespace springai {
 	class AIFloat3;
 }
+namespace Json {
+	class Value;
+}
 
 namespace circuit {
 
@@ -304,6 +307,17 @@ public:
 
 	CCircuitDef* GetTerraDef() const { return terraDef; }
 
+	// D-474: the constructor brace (task/builder/BraceTask.h). A land
+	// constructor that is damaged, or whose structure under construction is
+	// destroyed, steps back from the threat and builds one defence toward it.
+	// threat: the attacker's (or killer's) position, null when unknown. The
+	// health retreat supersedes it. A commander that the commander controller
+	// owns only records the trigger; the controller starts it with
+	// TakeCommanderBrace once none of its own rules holds the commander.
+	void BraceTrigger(CCircuitUnit* unit, const springai::AIFloat3* threat, const char* reason);
+	bool TakeCommanderBrace(CCircuitUnit* unit);
+	bool IsBraceEnabled() const { return brace.enabled; }
+
 	float GetGoalExecTime() const { return goalExecTime; }
 	unsigned int GetWorkerCount() const { return workers.size(); }
     IUnitTask* EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius);
@@ -395,6 +409,9 @@ public:
 	void ActivateTask(IBuilderTask* task);
 
 	IBuilderTask* Enqueue(const TaskB::SBuildTask& ti);
+	// D-495: Enqueue past the profile's construction veto. Only the FRONT
+	// commander group's gated T1 artillery (CommanderArtilleryT1.cpp) calls it.
+	IBuilderTask* EnqueueVetoed(const TaskB::SBuildTask& ti);
 	IBuilderTask* EnqueueLayout(const TaskB::SBuildTask& ti, const std::string& groupName, CCircuitUnit* builder);
 	IBuilderTask* EnqueueFactoryNano(const TaskB::SBuildTask& ti, CCircuitUnit* builder);
 	IUnitTask* Enqueue(const TaskB::SServBTask& ti);
@@ -509,6 +526,36 @@ private:
 	std::map<CCircuitUnit*, std::shared_ptr<IPathQuery>> costQueries;  // IPathQuery owner
 	std::map<CCircuitUnit*, int> dangerTime;  // unit: frame
 	int dangerHysteresis;  // frames
+
+	// D-474: brace settings, from the profile's "brace" block (ReadConfig).
+	// Off unless the profile enables it, so the legacy profiles are unchanged.
+	struct SBraceConfig {
+		bool enabled = false;
+		float retreatDistance = 100.f;   // elmos stepped back from the threat
+		float siteOffset = 80.f;         // elmos from the retreat point toward the threat
+		int cooldown = 0;                // frames between two braces of one builder
+		int timeout = 0;                 // frames; the task's whole lifetime
+		int commanderWindow = 0;         // frames a commander's trigger waits for the controller
+		float holdAbove = 0.f;           // brace threshold (fraction); 0: the unit's retreat fraction
+		std::vector<CCircuitDef*> t2;    // first one the builder can build wins; T2 first
+		std::vector<CCircuitDef*> t1;
+	} brace;
+	// Per builder, by id (a stable key; erased when the builder dies or leaves).
+	struct SBraceUnit {
+		int lastStart = -1;
+		int pendingFrame = -1;           // commander only: trigger not yet taken
+		bool hasThreat = false;
+		springai::AIFloat3 threat;
+	};
+	std::map<ICoreUnit::Id, SBraceUnit> braceUnits;
+	void ReadBraceConfig(const Json::Value& root);
+	IBuilderTask* StartBrace(CCircuitUnit* unit, bool hasThreat, const springai::AIFloat3& threat, const char* reason);
+	// The health fraction at or below which a brace gives way to the retreat:
+	// brace.holdAbove when set (and lower than the unit's retreat), else the
+	// unit's retreat fraction.
+	float BraceHold(CCircuitDef* cdef) const;
+	CCircuitDef* BraceDefence(CCircuitUnit* unit) const;
+	static bool IsBraceBuilder(const CCircuitDef* cdef);
 	bool experimentalBuild = false;          // script property (D-064, D-066: the whole experimental build system)
 	bool recoverConstruction = false;        // opt-in TECH/SEA; independent of placement mode
 	int constructionRetrySeconds = 10;
@@ -534,6 +581,7 @@ private:
 public:
 	void UpdateAreaUsers();
 private:
+	bool vetoOverride = false;  // D-495: true only inside EnqueueVetoed
 	std::unordered_set<terrain::SMobileType::Id> workerMobileTypes;
 	std::map<terrain::SArea*, std::map<CCircuitDef*, int>> buildAreas;  // area <=> worker types
 

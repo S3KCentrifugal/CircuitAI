@@ -26,8 +26,15 @@ namespace circuit {
 using springai::AIFloat3;
 namespace dp=defense;
 
+// D-469: at most one INV-253 line per group every 30 s.
+static constexpr int DEFENSE_INVARIANT_LOG_FRAMES=30*FRAMES_PER_SEC;
+// D-470: INV-254 allows this long past seat_grace for the offer cadence, a
+// ladder hold (front_hold_seconds) and one placement retry before it reports.
+static constexpr float SEAT_WAIT_INVARIANT_SLACK_SECONDS=15.f;
+
 bool CCommanderController::SetDefenseRule(int slot,const std::string& key,float value) {
-    if(!std::isfinite(value) || value<0 || value>1000000) return false;
+    // fallback_for alone takes -1 (none).
+    if(!std::isfinite(value) || (value<0 && key!="fallback_for") || value>1000000) return false;
     if(slot==-1) {
         if(key=="nuclear_warning") {
             ai->GetAllyTeam()->NuclearWarning(ai->GetLastFrame());
@@ -35,21 +42,25 @@ bool CCommanderController::SetDefenseRule(int slot,const std::string& key,float 
             return true;
         }
         float* field=key=="enabled"?&defenseSettings.enabled:key=="radius"?&defenseSettings.radius:
-            key=="surplus_metal"?&defenseSettings.surplusMetal:key=="surplus_energy_margin"?&defenseSettings.surplusEnergyMargin:
+            key=="surplus_metal"?&defenseSettings.surplusMetal:key=="surplus_income"?&defenseSettings.surplusIncome:
+            key=="surplus_energy_margin"?&defenseSettings.surplusEnergyMargin:
             key=="surplus_fire_seconds"?&defenseSettings.surplusFireSeconds:key=="surplus_limit"?&defenseSettings.surplusLimit:
             key=="memory"?&defenseSettings.memory:key=="strategic_memory"?&defenseSettings.strategicMemory:
             key=="heavy_metal"?&defenseSettings.heavyMetal:key=="heavy_health"?&defenseSettings.heavyHealth:
             key=="baseline_health"?&defenseSettings.baselineHealth:key=="stable_seconds"?&defenseSettings.stableSeconds:
             key=="stable_distance"?&defenseSettings.stableDistance:key=="urgent_band"?&defenseSettings.urgentBand:
-            key=="shield_in_plasma_zone"?&defenseSettings.shieldInPlasmaZone:key=="shield_safe_seconds"?&defenseSettings.shieldSafeSeconds:nullptr;
+            key=="shield_in_plasma_zone"?&defenseSettings.shieldInPlasmaZone:key=="shield_safe_seconds"?&defenseSettings.shieldSafeSeconds:
+            key=="approach"?&defenseSettings.approach:key=="seat_grace"?&defenseSettings.seatGrace:nullptr;
         if(!field) return false;
         *field=value;
     } else {
         if(slot<0 || slot>=dp::MAX_RULES) return false;
         auto& r=defenseRules[slot];
-        int* integer=key=="def"?&r.def:key=="band"?&r.band:key=="limit"?&r.limit:nullptr;
+        int* integer=key=="def"?&r.def:key=="band"?&r.band:key=="limit"?&r.limit:key=="fallback_for"?&r.fallbackFor:nullptr;
         if(integer) {
             if(value!=std::floor(value) || (key=="def" && !ai->GetCircuitDefSafe(int(value)))) return false;
+            // D-469: an earlier slot, so one in-order pass has its reason.
+            if(key=="fallback_for" && (value<-1 || value>=slot)) return false;
             *integer=int(value);
         } else {
             float* field=key=="metal"?&r.minMetal:key=="energy"?&r.minEnergy:key=="seconds"?&r.seconds:
@@ -138,8 +149,14 @@ std::array<float,dp::COUNT> CCommanderController::DefenseCapacity(CCircuitDef* d
             if((w.category & defenseDemand[k].category)==0 || w.damage.empty()) continue;
             // Zero contribution cannot affect allocation; avoid its terrain ray.
             if(rule.weights[k]*defenseDemand[k].health==0.f) continue;
-            if(site && (site->SqDistance2D(defenseTargets[k])>SQUARE(world->Range(w,*site,defenseTargets[k]))
-                || !world->Trajectory(w,*site,defenseTargets[k]))) continue;
+            if(site) {
+                // D-469: an approaching ground army counts within range plus
+                // `approach`; the line of fire is tested only inside real range.
+                const float reach=world->Range(w,*site,defenseTargets[k]);
+                const float sqDistance=site->SqDistance2D(defenseTargets[k]);
+                if(sqDistance>SQUARE(dp::CoverRange(k,reach,defenseSettings))) continue;
+                if(sqDistance<=SQUARE(reach) && !world->Trajectory(w,*site,defenseTargets[k])) continue;
+            }
             shares[k]=rule.weights[k]*defenseDemand[k].health;total+=shares[k];
         }
         if(total<=0) continue;
@@ -258,7 +275,7 @@ void CCommanderController::AssessDefenseCoverage(CCircuitUnit* anchor,int frame)
         for(int k=0;k<dp::COUNT;++k) {
             if(capacity[k]<=0) continue;
             const bool covers=k>=dp::NUCLEAR?at.SqDistance2D(center)<=SQUARE(facts.coverage):
-                at.SqDistance2D(defenseTargets[k])<=SQUARE(facts.range);
+                at.SqDistance2D(defenseTargets[k])<=SQUARE(dp::CoverRange(k,facts.range,defenseSettings));
             if(!covers) continue;
             if(k==dp::PLASMA && active && shieldPower>=std::min(def->GetMaxShield(),defensePlasmaAlpha)
                 && shieldPower>0 && facts.coverage>defenseShieldRadius) {
@@ -322,7 +339,8 @@ void CCommanderController::AssessDefenseCoverage(CCircuitUnit* anchor,int frame)
         // Foreign-faction guns count even when this group's build catalog does
         // not contain them. Claims use the same real-site trajectory as frames.
         const auto cap=DefenseCapacity(def,*rule,&at);
-        for(int k=0;k<dp::COUNT;++k) if(at.SqDistance2D(k>=dp::NUCLEAR?center:defenseTargets[k])<=SQUARE(k>=dp::NUCLEAR?facts.coverage:facts.range)) {
+        for(int k=0;k<dp::COUNT;++k) if(at.SqDistance2D(k>=dp::NUCLEAR?center:defenseTargets[k])
+            <=SQUARE(k>=dp::NUCLEAR?facts.coverage:dp::CoverRange(k,facts.range,defenseSettings))) {
             if(k==dp::PLASMA) defensePending[k]=std::max(defensePending[k],cap[k]);
             else defensePending[k]+=cap[k];
         }
@@ -371,7 +389,7 @@ dp::Project CCommanderController::DefenseProject(CCircuitDef* def,const DefenseF
     return p;
 }
 
-IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand) {
+IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuitUnit* anchor,int frame,int minimumBand,bool allowSurplus) {
     if(defenseSettings.enabled<=0) return nullptr;
     AssessGroupDefense(anchor,frame);
     auto* eco=ai->GetEconomyManager();
@@ -383,17 +401,24 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     // definition pointers remain local to this callback; no worker cache ages.
     const auto builders=GatherDefenseBuilders(anchor);
     std::string blocked="no_demand";int blockedBand=-1;
-    for(int i=0;i<dp::MAX_RULES;++i) {
+    // D-469: this pass's reason per slot, for rules that stand in for an
+    // earlier slot; a skipped slot stays DISABLED and opens no fallback.
+    std::array<dp::Reason,dp::MAX_RULES> reasons;reasons.fill(dp::Reason::DISABLED);
+    // One rule against one builder set. False: not offered this pass
+    // (disabled, unavailable, placement retry, closed fallback, unstable).
+    const auto assess=[&](int i,const DefenseBuilders& seats,std::array<dp::Reason,dp::MAX_RULES>& why,
+        dp::Evaluation& result,float& benefit) -> bool {
         const auto& rule=defenseRules[i];
         auto* def=ai->GetCircuitDefSafe(rule.def);
-        if(!def || rule.priority<=0 || !def->IsAvailable(frame) || frame<defensePlacementRetry[i]) continue;
-        if(rule.weights[dp::STATIC]>0 && frame-defenseStableSince<defenseSettings.stableSeconds*FRAMES_PER_SEC) continue;
+        if(!def || rule.priority<=0 || !def->IsAvailable(frame) || frame<defensePlacementRetry[i]) return false;
+        if(rule.fallbackFor>=0 && !dp::FallbackOpen(rule,why[rule.fallbackFor])) return false;
+        if(rule.weights[dp::STATIC]>0 && frame-defenseStableSince<defenseSettings.stableSeconds*FRAMES_PER_SEC) return false;
         const auto& facts=DefenseFactsFor(def);
         auto capacity=DefenseCapacity(def,rule);
         if(rule.weights[dp::STATIC]>0 && anchor->GetPos(frame).SqDistance2D(defenseTargets[dp::STATIC])>SQUARE(facts.range)) capacity[dp::STATIC]=0;
-        const float benefit=dp::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM());
-        const auto project=DefenseProject(def,facts,builders);
-        auto result=dp::Evaluate(rule,project,economy,benefit,defenseCounts[i]);
+        benefit=dp::Marginal(defenseDemand,defenseActive,defensePending,capacity,rule,def->GetCostM());
+        const auto project=DefenseProject(def,facts,seats);
+        result=dp::Evaluate(rule,project,economy,benefit,defenseCounts[i]);
         bool immediate=false;
         for(int k=0;k<dp::STATIC;++k) immediate=immediate || (defenseUrgent[k] && rule.weights[k]>0 && capacity[k]>0
             && dp::Residual(defenseDemand[k].health,defenseActive[k],defensePending[k])>0
@@ -401,7 +426,18 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
         result.band=dp::UrgencyBand(rule.band,int(defenseSettings.urgentBand),immediate,benefit);
         const auto surplus=dp::EvaluateSurplus(defenseSettings,rule,project,economy,defenseCounts[i]);
         if(dp::Better(surplus,result)) result=surplus;
-        if(benefit>0 && result.reason!=dp::Reason::READY && rule.band>blockedBand) {
+        why[i]=result.reason;
+        return true;
+    };
+    for(int i=0;i<dp::MAX_RULES;++i) {
+        const auto& rule=defenseRules[i];
+        dp::Evaluation result;float benefit=0;
+        if(!assess(i,builders,reasons,result,benefit)) continue;
+        auto* def=ai->GetCircuitDefSafe(rule.def);
+        // D-469: an evaluated fallback's reason replaces the slot it stands in
+        // for (that one is always needs_builder) and says why nothing is built.
+        if(benefit>0 && result.reason!=dp::Reason::READY
+            && (rule.band>blockedBand || (rule.fallbackFor>=0 && rule.band>=blockedBand))) {
             blocked=def->GetDef()->GetName()+std::string(" ")+dp::Name(result.reason);blockedBand=rule.band;
         }
         if(std::getenv("CIRCUIT_COMMANDER_TRACE") && frame%(5*FRAMES_PER_SEC)<FRAMES_PER_SEC)
@@ -412,39 +448,128 @@ IUnitTask* CCommanderController::GroupPlannedDefense(CCircuitUnit* unit,CCircuit
     }
     defenseChoice=selected;
     defenseEvaluation=best;
+    // D-470: a choice the anchor cannot build waits for a seat. Score the same
+    // rules with the anchor as the only builder, so its own fallbacks open,
+    // and start the grace clock. A second pass of MAX_RULES evaluations once a
+    // second, only while the choice is seat-only; no extra engine query.
+    defenseOwnChoice=-1;defenseOwnEvaluation={};
+    auto* chosen=selected>=0?ai->GetCircuitDefSafe(defenseRules[selected].def):nullptr;
+    if(chosen && !anchor->GetCircuitDef()->CanBuild(chosen) && builders[0].def) {
+        DefenseBuilders own{};own[0]=builders[0];
+        std::array<dp::Reason,dp::MAX_RULES> ownReasons;ownReasons.fill(dp::Reason::DISABLED);
+        for(int i=0;i<dp::MAX_RULES;++i) {
+            dp::Evaluation result;float benefit=0;
+            if(!assess(i,own,ownReasons,result,benefit) || result.reason!=dp::Reason::READY) continue;
+            if(!anchor->GetCircuitDef()->CanBuild(ai->GetCircuitDefSafe(defenseRules[i].def))) continue;
+            if(dp::Better(result,defenseOwnEvaluation)) { defenseOwnEvaluation=result;defenseOwnChoice=i; }
+        }
+        if(defenseSeatWaitSince<0) defenseSeatWaitSince=frame;
+    } else defenseSeatWaitSince=-1;
     defenseReason=selected<0?blocked:ai->GetCircuitDefSafe(defenseRules[selected].def)->GetDef()->GetName();
+    CheckOwnGroundDefense(anchor,frame);
+    CheckSeatWait(anchor,frame);
     }
     // The priority probe and ordinary fallback reuse the same cached assessment
     // and winner. Reject below-band offers before capability/site/claim work.
-    if(selected<0 || best.band<minimumBand || frame<defenseOfferNext) return nullptr;
-    if(groupNanoDue && best.band<3) return nullptr; // strategic urgency may defer, never erase, the nano obligation
+    const bool trace=std::getenv("CIRCUIT_COMMANDER_TRACE")!=nullptr;
+    const auto skip=[&](const char* why) -> IUnitTask* {
+        if(trace && selected>=0) ai->LOG("[DefensePlanner] offer_skip unit=%i def=%s band=%i min=%i why=%s",unit->GetId(),
+            ai->GetCircuitDefSafe(defenseRules[selected].def)->GetDef()->GetName(),best.band,minimumBand,why);
+        return nullptr;
+    };
+    if(selected<0) return nullptr;
+    if(best.band<minimumBand) return skip("band");
+    if(best.surplus && !allowSurplus) return skip("surplus_later");
+    if(frame<defenseOfferNext) return skip("offer_cadence");
+    const auto seats=GatherDefenseBuilders(anchor);
+    // Strategic urgency may defer, never erase, the nano obligation. D-469:
+    // only while a present, free seat can build the nano; a commander alone
+    // (no nano in its build list) otherwise refused every later defence for
+    // the rest of the game (played: ~125 skips per 16-AI game).
+    // D-476: only owed nanos that no expansion job is building yet block.
+    if(NanoUnassigned() && best.band<3) {
+        auto* nano=ai->GetCircuitDefSafe(groupNano);
+        if(nano && std::any_of(seats.begin(),seats.end(),[&](const DefenseBuilder& seat) {
+            return seat.def && seat.def->CanBuild(nano); })) return skip("nano_due");
+    }
     auto* def=ai->GetCircuitDefSafe(defenseRules[selected].def);
-    if(!unit->GetCircuitDef()->CanBuild(def)) return nullptr; // preserve choice for the capable seat
-    const auto project=DefenseProject(def,DefenseFactsFor(def),GatherDefenseBuilders(anchor));
+    bool ownChoice=false;
+    if(!unit->GetCircuitDef()->CanBuild(def)) {
+        // Preserve the choice for a capable seat for seat_grace seconds. A
+        // seat counted as free may be walking away or taking other work
+        // (KI-752); a started choice is the group job, which GroupWork has
+        // this unit assist. After the grace the anchor builds its own best
+        // READY rule of no lower band.
+        const float waited=defenseSeatWaitSince<0?0.f:float(frame-defenseSeatWaitSince)/FRAMES_PER_SEC;
+        if(unit!=anchor || defenseOwnChoice<0
+            || !dp::OwnChoiceOpen(false,waited,defenseSettings.seatGrace,defenseOwnEvaluation,best))
+            return skip(unit==anchor && waited<defenseSettings.seatGrace?"seat_grace":"cannot_build");
+        auto* own=ai->GetCircuitDefSafe(defenseRules[defenseOwnChoice].def);
+        ai->LOG("[DefensePlanner] own_choice unit=%i choice=%s own=%s waited=%.0f",unit->GetId(),
+            def->GetDef()->GetName(),own->GetDef()->GetName(),waited);
+        selected=defenseOwnChoice;best=defenseOwnEvaluation;def=own;ownChoice=true;
+    }
+    const auto project=DefenseProject(def,DefenseFactsFor(def),seats);
     const auto admission=best.surplus
         ?dp::EvaluateSurplus(defenseSettings,defenseRules[selected],project,economy,defenseCounts[selected])
         :dp::Evaluate(defenseRules[selected],project,economy,1,defenseCounts[selected]);
-    if(admission.reason!=dp::Reason::READY) { defenseDecisionNext=0; return nullptr; }
+    if(admission.reason!=dp::Reason::READY) { defenseDecisionNext=0; return skip(dp::Name(admission.reason)); }
     defenseOfferNext=frame+FRAMES_PER_SEC;
     const auto center=anchor->GetPos(frame);
     // Snapshot scoring is shared for one second, but a neighboring AI may
     // reserve protection earlier in this very frame. Revalidate that small
     // ledger at the transaction boundary, before any expensive placement.
-    if(PendingProtection(def,center)) { defenseReason="allied_protection_committed";defenseNext=defenseDecisionNext=0;return nullptr; }
+    if(PendingProtection(def,center)) { defenseReason="allied_protection_committed";defenseNext=defenseDecisionNext=0;return skip("protection"); }
     // Fixed bounded sites, expensive placement only for the winning proposal.
     // Existing task placement owns reachability, lane, threat and layout claims.
     const std::array<AIFloat3,5> offsets={AIFloat3(0,0,0),AIFloat3(192,0,0),AIFloat3(-192,0,0),AIFloat3(0,0,192),AIFloat3(0,0,-192)};
     for(const auto& offset:offsets) if(auto* task=GroupBuild(unit,def,center+offset,false,selected,best.surplus)) {
-        ai->LOG("[DefensePlanner] choice=%s band=%i ready=%.1f score=%.5f surplus=%i",def->GetDef()->GetName(),best.band,best.ready,best.score,int(best.surplus));
+        ai->LOG("[DefensePlanner] choice=%s band=%i ready=%.1f score=%.5f surplus=%i own=%i",def->GetDef()->GetName(),best.band,best.ready,best.score,int(best.surplus),int(ownChoice));
         TrackGroupJob(task,supportAnchor<0); defenseNext=defenseDecisionNext=0;
         return task;
     }
     defenseReason+=" placement_blocked";
+    skip("placement");
     // Give the next shared decision an opportunity to choose an alternative.
     // No live project is cancelled and retry remains at the existing cadence.
     defensePlacementRetry[selected]=frame+2*FRAMES_PER_SEC;
     defenseDecisionNext=0;
     return nullptr;
+}
+
+// INV-253 (D-469): with enemy ground units near the group, its anchor can
+// start at least one enabled ground-defence rule by itself. Armada and Cortex
+// catalogs once held only constructor-built turrets (Beamer, Twin Guard, HLT),
+// so a lone commander under attack had nothing it could place and held idle.
+// Cost: one pass over MAX_RULES slots per decision (once a second), only under
+// local danger; the log is limited to one line per DEFENSE_INVARIANT_LOG_FRAMES.
+void CCommanderController::CheckOwnGroundDefense(CCircuitUnit* anchor,int frame) {
+    if(!defenseLocalDanger || frame<defenseCoverageLogNext
+        || defenseDemand[dp::LIGHT].health+defenseDemand[dp::HEAVY].health<=0) return;
+    CCircuitDef* anchorDef=anchor->GetCircuitDef();
+    for(const auto& rule:defenseRules) {
+        auto* def=ai->GetCircuitDefSafe(rule.def);
+        if(def && rule.priority>0 && rule.weights[dp::LIGHT]+rule.weights[dp::HEAVY]>0 && anchorDef->CanBuild(def)) return;
+    }
+    defenseCoverageLogNext=frame+DEFENSE_INVARIANT_LOG_FRAMES;
+    ai->LOG("[INVARIANT] INV-253 group anchor %i (%s) can build no enabled ground-defence rule under local danger",
+        anchor->GetId(),anchorDef->GetDef()->GetName());
+}
+
+// INV-254 (D-470): a group defence choice the anchor cannot build is started
+// by a seat (the group job) or replaced by the anchor's own READY rule; the
+// anchor never stays idle or on a Wait past seat_grace plus slack while it
+// holds such a rule. Constant work per decision; log limited like INV-253.
+void CCommanderController::CheckSeatWait(CCircuitUnit* anchor,int frame) {
+    if(defenseSeatWaitSince<0 || defenseOwnChoice<0 || ExpansionJobCount()>0 || frame<defenseSeatLogNext) return;
+    if(float(frame-defenseSeatWaitSince)/FRAMES_PER_SEC<defenseSettings.seatGrace+SEAT_WAIT_INVARIANT_SLACK_SECONDS) return;
+    auto* task=anchor->GetTask();
+    if(task && task->GetType()!=IUnitTask::Type::IDLE && task->GetType()!=IUnitTask::Type::WAIT) return;
+    defenseSeatLogNext=frame+DEFENSE_INVARIANT_LOG_FRAMES;
+    ai->LOG("[INVARIANT] INV-254 group anchor %i (%s) idle %.0f s on seat-only %s with own %s ready",anchor->GetId(),
+        anchor->GetCircuitDef()->GetDef()->GetName(),float(frame-defenseSeatWaitSince)/FRAMES_PER_SEC,
+        defenseChoice>=0?ai->GetCircuitDefSafe(defenseRules[defenseChoice].def)->GetDef()->GetName():"none",
+        ai->GetCircuitDefSafe(defenseRules[defenseOwnChoice].def)->GetDef()->GetName());
 }
 
 bool CCommanderController::IsGroupStructure(int id) const {
@@ -494,10 +619,12 @@ IUnitTask* CCommanderController::SupportDefenseWork(CCircuitUnit* unit,int ancho
     if(unit->GetPos(frame).SqDistance2D(anchor->GetPos(frame))>SQUARE(cfg->group.radius)) return nullptr;
     // CanAssignTo admits additional build power; it may reject an already
     // assigned repairer once the remaining repair is small. Retain that worker.
-    if(groupJob && !groupJob->IsDead() && GroupProjectAllowed(unit,groupJob)
-        && (current==groupJob || groupJob->CanAssignTo(unit))) return groupJob;
-    if(groupJob && !groupJob->IsDead() && !groupJob->GetAssignees().empty()) return nullptr;
-    if(groupJob) groupJob->GetManager()->AbortTask(groupJob);
+    // Engineering keeps one shared job: its first expansion slot.
+    auto* job=FirstExpansionJob();
+    if(job && !job->IsDead() && GroupProjectAllowed(unit,job)
+        && (current==job || job->CanAssignTo(unit))) return job;
+    if(job && !job->IsDead() && !job->GetAssignees().empty()) return nullptr;
+    if(job) job->GetManager()->AbortTask(job);
     if(auto* defense=GroupPlannedDefense(unit,anchor,frame)) return defense;
     return GroupLocalMaintenance(unit,anchor);
 }

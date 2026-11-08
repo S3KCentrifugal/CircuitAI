@@ -1,0 +1,41 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "factory completion",
+      "pattern": "\\[FrontLayout\\] factory adopted tier=0",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "support allocation",
+      "pattern": "\\[FrontLayout\\] support state=",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "completed support",
+      "pattern": "\\[Playtest\\] finished (armnanotc|cornanotc|legnanotc) team 0",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "connected factory corridor",
+      "pattern": "\\[FactoryCorridor\\] def=.* lane=0 segments=[1-9]",
+      "scope": "any",
+      "by_minute": 3
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

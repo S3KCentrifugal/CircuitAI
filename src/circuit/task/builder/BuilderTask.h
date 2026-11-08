@@ -155,6 +155,8 @@ protected:
 	// timeout (none in the mode); engage when inside the range, or inside the
 	// direct range on safe ground, cancelling the AI path.
 	bool IsExperimental() const;
+	// The engine's own build range, unscaled (D-467: where a wait may apply).
+	float EngineBuildRange(CCircuitUnit* unit);
 	float EngageRange(CCircuitUnit* unit);
 	int CmdTimeout(int frame) const;
 	bool TryEngage(CCircuitUnit* unit);
@@ -190,6 +192,7 @@ protected:
 	bool pinRequired;
 	bool pinFailed;
 	bool layoutOwned;
+	float siteRadius;  // > 0: the site search stays this close to position, and an empty search aborts the task
 	void TakeReservation(CTerrainManager* terrainMgr);  // after a FindBuildSite that may have served one
 public:
 	bool PinReservation(int id);

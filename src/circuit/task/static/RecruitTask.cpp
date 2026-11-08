@@ -240,6 +240,8 @@ bool CRecruitTask::ExecuteLagRepeat(CCircuitUnit* unit, int frame)
 	auto* factoryMgr = static_cast<CFactoryManager*>(manager);
 	CCircuitUnit* stray = factoryMgr->TakeLagStray(unit);
 	if (stray != nullptr && stray->GetCircuitDef() == buildDef) {
+		// D-477 (KI-762): a frame this task already owns stops being mapped to it.
+		if ((target != nullptr) && (target != stray)) factoryMgr->ForgetUnfinished(target, this);
 		SetTarget(stray);
 		factoryMgr->AdoptUnfinished(stray, this);
 		lastBuildCommandFrame = frame;

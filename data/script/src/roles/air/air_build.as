@@ -286,6 +286,30 @@ namespace AirBuild {
         }
         return t;
     }
+    // D-465: AIR owns geothermal vents only aircraft can serve: no allied
+    // ground start reaches a build stance (native IsGeoAirOnly, the RACE_AIR
+    // test of the mex race). Ground roles cannot take these vents (native
+    // EnqueueLocalGeo now needs a 3D ground stance). Joins our queued air-only
+    // GEO job first, else orders the nearest air-only vent; a search that
+    // finds none waits TheatreGeoRetrySeconds (vents x starts stance tests).
+    int theatreGeoNext = 0;
+    IUnitTask@ TheatreGeo(CCircuitUnit@ worker)
+    {
+        if (worker is null || !worker.circuitDef.IsAbleToFly() || ai.frame < theatreGeoNext) return null;
+        const string side = UnitHelpers::GetSideForUnitName(worker.circuitDef.GetName());
+        CCircuitDef@ geo = ai.GetCircuitDef((side == "armada" ? "arm" : side == "cortex" ? "cor" : "leg") + "geo");
+        if (geo is null || !worker.circuitDef.CanBuild(geo) || !geo.IsAvailable(ai.frame)) return null;
+        IBuilderTask@ queued = cast<IBuilderTask>(aiBuilderMgr.FindQueuedTask(worker, int(Task::BuildType::GEO)));
+        if (queued !is null && aiEconomyMgr.IsGeoAirOnly(queued.GetBuildPos())) return queued;
+        IUnitTask@ t = aiEconomyMgr.EnqueueAirGeo(worker, geo, Global::Map::StartPos, Global::RoleSettings::Air::TheatreGeoRadius);
+        if (t is null) {
+            theatreGeoNext = ai.frame + int(Global::RoleSettings::Air::TheatreGeoRetrySeconds * SECOND);
+            return null;
+        }
+        const AIFloat3 site = cast<IBuilderTask>(t).GetBuildPos();
+        GenericHelpers::LogUtil("[AIR][TheatreGeo] worker " + worker.id + " air-only vent " + int(site.x) + ":" + int(site.z), 1);
+        return t;
+    }
     IUnitTask@ TransitionMex(CCircuitUnit@ worker)
     {
         if (!Global::RoleSettings::Air::FundFirstLab || FundedLab() !is null
@@ -557,6 +581,9 @@ namespace AirBuild {
     }
     bool StarterReadyToRetire(CCircuitUnit@ plant)
     {
+        // Periodic mixed reconnaissance needs the T1 scout build options even
+        // after the advanced aircraft plant is complete.
+        if (AirScoutSweep::Enabled()) return false;
         if (plant is null || !UnitHelpers::IsT1AircraftPlant(plant.circuitDef.GetName())
             || Team::Ferry::requestPending || aiTerrainMgr.GetLayoutInt("air.starter.retired", 0) != 0
             || AirEconomy::CompletedConstructors() < Global::RoleSettings::Air::OpeningAirConstructors
@@ -622,7 +649,7 @@ namespace AirBuild {
         if (Busy(d, Task::BuildType::FACTORY)) return null;
         const int count = AirEconomy::Planned(d, Task::BuildType::FACTORY);
         if (!advanced && count > 0) return null;
-        if (!advanced && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) != 0 && !Team::Ferry::requestPending
+        if (!advanced && !AirScoutSweep::Enabled() && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) != 0 && !Team::Ferry::requestPending
             && (AirEconomy::t2 == 0 || !AirEconomy::HasAdvancedBuilder() || AirEconomy::bankM < d.costM)) return null;
         if (!advanced && UnitHelpers::IsCommander(u.circuitDef) && AirEconomy::t1+AirEconomy::t2 == 0
             && !AirEconomy::HasMobileConstructor()) {

@@ -354,7 +354,7 @@ def prepare(args):
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
     pins={'dll_sha256':hashlib.sha256(args.dll.read_bytes()).hexdigest(),
           'diagnostics':{name:os.environ[name] for name in
-              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
+              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
               if name in os.environ},
           'files':{str(p.relative_to(staged)):storage.file_hash(p) for p in staged.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
           'observer_sha256':storage.file_hash(HERE/'widgets/ranged_arena.lua'),

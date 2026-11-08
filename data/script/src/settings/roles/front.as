@@ -4,6 +4,40 @@
 namespace Global {
 namespace RoleSettings {
 namespace Front {
+            bool FactoryLayoutsEnabled = true;
+            int FactorySupportRows = 4; // reserved growth, not an instruction to build all turrets
+            // D-486: fill mode. While metal floats (10 s minimum income at least
+            // FillIncome, and the bank at least FillBank of storage or spare
+            // income at least FillSpare, energy not stalling) base constructors
+            // build construction turrets into every reserved factory turret slot,
+            // the T1 cluster first, then the T2 cluster even before its plant;
+            // at most FillWorkers at once; off FillHoldSeconds after it stops.
+            bool FillEnabled = true;
+            float FillIncome = 30.0f;
+            float FillBank = 0.75f;
+            float FillSpare = 10.0f;
+            int FillWorkers = 2;
+            float FillHoldSeconds = 20.0f;
+            float FactoryUtilityBlastMargin = 32.f;
+            // D-459: the opening builder's walking budget when FRONT plans
+            // its first district; later factories keep their district slot.
+            float FactoryTravelSeconds = 3.0f;
+            // D-461: with no factory standing after this many seconds, the
+            // commander takes the queued start factory itself. 0 disables.
+            float StartFactoryTakeoverSeconds = 60.0f;
+            // D-494: before the first factory the commander takes no mex farther than
+            // this from the start; it builds the factory first (0 disables).
+            float StartFactoryMexRadius = 900.0f;
+            int StartFactoryOrderSeconds = 300;          // D-494: the planned start factory order's timeout
+            float StartFactoryGraceSeconds = 60.0f;      // D-494: INV-267 allows this long past the takeover
+            float StartFactoryRetrySeconds = 5.0f;       // D-494: after an order died without a frame
+            float StartFactoryShake = 256.0f;            // D-494: the ordinary site's search radius round the start
+            float FactoryProductionBudgetShare = 0.65f;
+            // D-468, INV-252: a construction turret holding a repair order on a
+            // target outside its reach this long is logged as a violation
+            // (native releases it on the task's next update).
+            float TurretRepairReachGraceSeconds = 5.0f;
+            float FactoryT1BudgetShare = 0.6f;
             float BaseSupportRadius = 1000.0f; // first land constructor stays with home economy
             bool GeothermalEnabled = true;
             uint GeothermalBuilders = 2;
@@ -13,6 +47,57 @@ namespace Front {
             float GeothermalBudgetSeconds = 180.0f;
             float GeothermalIncomeFraction = 0.5f;
             float GeothermalBootstrapEnergy = 120.0f;
+
+            // D-463: the T1 energy seat. It first builds a free geothermal
+            // vent within EnergySeatGeoRadius of the factory that produced it.
+            // When the map's average wind ((min + max) / 2) is above
+            // EnergySeatWindAverage it builds wind turbines in dense blocks,
+            // else native's energy choice. While energy income (lowest of the
+            // last 10 s) is above EnergySeatReleaseIncome it does default work.
+            // D-466: before any energy, the seat builds every unbuilt mex this
+            // AI owns within EnergySeatMexRadius of its start (native
+            // ownership and allied-territory rules, 3D reach).
+            float EnergySeatMexRadius = 1000.0f;
+            // A base mex order that ends without a mex (the same spot offered
+            // again) skips that spot EnergySeatMexRetrySeconds x failures;
+            // after EnergySeatMexAttempts failures the seat skips it for good.
+            float EnergySeatMexRetrySeconds = 60.0f;
+            int EnergySeatMexAttempts = 3;
+            float EnergySeatGeoRadius = 900.0f;
+            // A geothermal order that ends without a geothermal (re-offered at
+            // the same vent) backs off EnergySeatGeoRetrySeconds x failures;
+            // after EnergySeatGeoAttempts failures the seat stops trying.
+            float EnergySeatGeoRetrySeconds = 60.0f;
+            int EnergySeatGeoAttempts = 3;
+            // An own geothermal order not started (no frame) within this many
+            // seconds is aborted and counted as a failure.
+            float EnergySeatGeoOrderSeconds = 90.0f;
+            float EnergySeatWindAverage = 7.0f;
+            float EnergySeatReleaseIncome = 2000.0f;
+            // D-463: the fifth T1 constructor builds T1 energy converters in
+            // dense blocks (not on metal maps or with converters disabled)
+            // until metal income (lowest of the last 10 s) first exceeds
+            // ConverterSeatReleaseMetalIncome, then does default work for
+            // good. A converter is ordered only with energy storage at least
+            // ConverterSeatEnergyFill full and no stall; else it assists the
+            // energy seat.
+            bool ConverterSeatEnabled = true;
+            float ConverterSeatReleaseMetalIncome = 60.0f;
+            float ConverterSeatEnergyFill = 0.5f;
+            // D-463 dense blocks: columns x rows touching footprints (no gap),
+            // searched on a lattice behind the start position within
+            // BaseSupportRadius. A block is kept when EcoBlockMinimumFill of
+            // its slots reserve; a failed search retries after
+            // EcoBlockRetrySeconds.
+            int WindBlockColumns = 4;
+            int WindBlockRows = 3;
+            int ConverterBlockColumns = 4;
+            int ConverterBlockRows = 3;
+            float EcoBlockRearOffset = 192.0f;
+            int EcoBlockSearchRings = 3;
+            float EcoBlockMinimumFill = 0.75f;
+            float EcoBlockRetrySeconds = 20.0f;
+            float EcoBlockOrderSeconds = 120.0f;
 
             // Role switch cadence (seconds)
             int MinAiSwitchTime = 20;
@@ -93,6 +178,9 @@ namespace Front {
             int RaiderOpenerCount = 10;
             // Opt-in profile policy: retain the first scout, then choose tanks.
             float VehicleTankOpenerChance = 0.0f;
+            // D-471: Cortex vehicle labs keep the Rascal scout, then open with
+            // the RaiderOpenerCount batch as Incisors (corgator), not Rascals.
+            float VehicleTankOpenerChanceCortex = 1.0f;
             int VehicleTankGatherSeconds = 300; // release a disrupted/incomplete batch
             float SwitchFactoryCostMultiplier = 1.2f;
             int ScoutAssignmentLimit = 5;

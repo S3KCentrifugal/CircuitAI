@@ -252,6 +252,25 @@ inline bool PackBefore(const PackKey& a, const PackKey& b, bool grouped)
 	return a.anchorSq < b.anchorSq;
 }
 
+// D-491 (owner): the TECH core - the first advanced lab, fusion and aircraft
+// lab - is packed touching: the smallest edge gap (cells) to the core's
+// footprints first, then nearest a turret, then nearest the anchor.
+struct CoreKey {
+	int gap = 1 << 20;     // NearestEdgeGap to the core footprints, 0 = touching
+	float turretSq = 0.f;  // TurretDistanceSq
+	float anchorSq = 0.f;
+};
+inline bool CoreBefore(const CoreKey& a, const CoreKey& b)
+{
+	if (a.gap != b.gap) {
+		return a.gap < b.gap;
+	}
+	if (a.turretSq != b.turretSq) {
+		return a.turretSq < b.turretSq;
+	}
+	return a.anchorSq < b.anchorSq;
+}
+
 struct Slot {
 	Pt pos;
 	bool served = false;

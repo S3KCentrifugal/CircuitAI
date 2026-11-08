@@ -1030,15 +1030,7 @@ int CEconomyManager::MexOwnerTeam(const springai::AIFloat3& pos)
 		auto* terrain = circuit->GetTerrainManager();
 		if (!std::isfinite(pos.x) || !std::isfinite(pos.z) || pos.x < 0 || pos.z < 0
 				|| pos.x >= terrain->GetTerrainWidth() || pos.z >= terrain->GetTerrainHeight()) return MEX_OWNER_UNKNOWN;
-		const int ownTeam = circuit->GetTeamId();
-		if (mexStarts.find(ownTeam) == mexStarts.end()) {
-			SMexStart own;
-			own.pos = circuit->GetSetupManager()->GetStartPos();
-			const auto* def = circuit->GetSetupManager()->GetCommChoice();
-			if (def) own.definition = def->GetId();
-			mexStarts.emplace(ownTeam, std::move(own));
-			mexOwnersDirty = true;
-		}
+		EnsureOwnMexStart();
 		const auto revision = terrain->GetAreaData()->heightRevision;
 		const auto& spots = circuit->GetMetalManager()->GetSpots();
 		if (mexOwnersDirty || mexOwnerRevision != revision || mexOwners.size() != spots.size()) {
@@ -1430,6 +1422,17 @@ float CEconomyManager::GetMetalPull()
 		}
 	}
 	return metal.pull;
+}
+
+economy::EnergyState CEconomyManager::GetEnergyState()
+{
+	economy::EnergyState state;
+	state.stalling = isEnergyStalling;
+	state.current = GetEnergyCur();
+	state.storage = GetEnergyStore();
+	state.income = GetAvgEnergyIncome();
+	state.pull = GetEnergyPull();
+	return state;
 }
 
 float CEconomyManager::GetEnergyCur()
@@ -1839,7 +1842,7 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 	return task;
 }
 
-IBuilderTask* CEconomyManager::UpdateEnergyTasks(const AIFloat3& position, CCircuitUnit* unit)
+IBuilderTask* CEconomyManager::UpdateEnergyTasks(const AIFloat3& position, CCircuitUnit* unit, bool buildableOnly)
 {
 	ZoneScoped;
 	if (circuit->GetBuilderManager()->IsExperimentalBuild()) {
@@ -1877,10 +1880,14 @@ IBuilderTask* CEconomyManager::UpdateEnergyTasks(const AIFloat3& position, CCirc
 
 	const auto& infos = energyDefs.GetInfos();
 	const float curWind = circuit->GetMap()->GetCurWind();
-	auto checkWind = [curWind, terrainMgr, position, metalIncome, energyIncome, &infos](unsigned i) {
+	// Scoped script offers must never enqueue an energy definition their worker
+	// cannot build. Legacy callers retain their cross-builder planning semantics.
+	const auto* builderDef = buildableOnly && unit ? unit->GetCircuitDef() : nullptr;
+	auto checkWind = [curWind, terrainMgr, position, metalIncome, energyIncome, &infos, builderDef](unsigned i) {
 		int lowerIdx = -1;
 		for (unsigned j = i + 1; j < infos.size(); ++j) {
-			if ((infos[j].data.cond.metalIncome < metalIncome)
+			if ((!builderDef || builderDef->CanBuild(infos[j].cdef))
+				&& (infos[j].data.cond.metalIncome < metalIncome)
 				&& (infos[j].data.cond.energyIncome < energyIncome)
 				&& terrainMgr->CanBeBuiltAtSafe(infos[j].cdef, position))
 			{
@@ -1894,6 +1901,7 @@ IBuilderTask* CEconomyManager::UpdateEnergyTasks(const AIFloat3& position, CCirc
 	for (unsigned i = 0; i < infos.size(); ++i) {  // sorted by high-tech first
 		const auto& engy = infos[i];
 		if (engy.data.isOld || !engy.cdef->IsAvailable(frame)
+			|| (builderDef && !builderDef->CanBuild(engy.cdef))
 			|| !terrainMgr->CanBeBuiltAtSafe(engy.cdef, position))
 		{
 			continue;
@@ -1935,7 +1943,7 @@ IBuilderTask* CEconomyManager::UpdateEnergyTasks(const AIFloat3& position, CCirc
 		bestDef = hopeDef;
 	}
 	if (bestDef == nullptr) {
-		return UpdateGeoTasks(position, unit);
+		return buildableOnly ? nullptr : UpdateGeoTasks(position, unit);
 	}
 
 	// Find place to build

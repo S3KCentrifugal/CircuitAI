@@ -1,0 +1,57 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "rules",
+      "pattern": "\\[DefenseFixture\\] applied",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "enemy",
+      "pattern": "spawn id=\\d+ team=1 unit=armpw",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "finished",
+      "pattern": "defense_ready def=armllt count=[1-9]",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "enemy"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "rule rejected",
+      "pattern": "\\[DefenseFixture\\] ERROR",
+      "scope": "any"
+    }
+  ]
+}

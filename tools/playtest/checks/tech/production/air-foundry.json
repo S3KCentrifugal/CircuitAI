@@ -1,0 +1,40 @@
+{
+  "stop_minute": 3,
+  "expect": [
+    {
+      "key": "ownership",
+      "scope": "any",
+      "pattern": "TechOwnershipTest] PASS seats=6",
+      "by_minute": 3
+    },
+    {
+      "key": "physical guards",
+      "scope": "any",
+      "pattern": "TechAirFoundryTest] PASS guards=6",
+      "by_minute": 3
+    },
+    {
+      "key": "sixth foundry member",
+      "scope": "any",
+      "pattern": "\\[TechAirFoundry\\] admitted unit=\\d+ seat=5",
+      "by_minute": 3
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script runtime",
+      "scope": "any",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|TechOwnershipTest] FAIL"
+    },
+    {
+      "key": "overflow",
+      "scope": "any",
+      "pattern": "\\[TechAirFoundry\\] admitted unit=\\d+ seat=6"
+    },
+    {
+      "key": "invariant",
+      "scope": "any",
+      "pattern": "\\[INVARIANT\\]"
+    }
+  ]
+}

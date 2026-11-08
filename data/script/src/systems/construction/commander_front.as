@@ -8,6 +8,7 @@ namespace CommanderFront {
     bool Ready() {
         if(Global::AISettings::Role!=AiRole::FRONT) return false;
         if(wasReady && aiSetupMgr.ConfigFloat("commander/combat/front_persistent",0.f)>0.f) return true;
+        if(FrontConstructors::OpeningFactory() !is null) return FrontConstructors::OpeningComplete();
         if(aiFactoryMgr.GetFactoryCount()<1) return false;
         for(uint i=0;i<nanos.length();++i) {
             CCircuitDef@ def=ai.GetCircuitDef(nanos[i]);

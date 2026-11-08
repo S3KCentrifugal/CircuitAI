@@ -8,6 +8,7 @@
  */
 
 #include "task/fighter/RouteTask.h"
+#include "task/fighter/MissileTargetPolicy.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/RangedGeometry.h"
@@ -91,6 +92,8 @@ void CRouteTask::RemoveAssignee(CCircuitUnit* unit)
 	// when the factory is gone. Fighter tasks have no timeout, so an empty
 	// route task simply idles in the update list.
 	IFighterTask::RemoveAssignee(unit);
+	ghostFire.erase(unit->GetId());
+	sniping.erase(unit);
 	lanes.erase(unit);
     rows.erase(unit);
     const auto slot = formationSlots.find(unit);
@@ -188,26 +191,67 @@ void CRouteTask::Update()
 	for (CCircuitUnit* unit : units) {
 		CCircuitAI* circuit = manager->GetCircuit();
 		CCircuitDef* def = unit->GetCircuitDef();
+		// Owner 2026-11-03: the artillery snipe comes before range micro and
+		// ghost fire; the route resumes (below) once it lets go.
+		if (ArtySpamRetreatStep(circuit, unit, circuit->GetLastFrame())) {
+			engaging.insert(unit);  // 2026-11-06: backing off from spam; route orders wait (ArtySnipeOwns)
+			continue;
+		}
+		if (ArtySnipeStep(circuit, unit, circuit->GetLastFrame())) {
+			sniping.insert(unit);
+			engaging.insert(unit);
+			continue;
+		}
+		sniping.erase(unit);
 		CEnemyInfo* nearest = nullptr;
 		float nearestSq = SQUARE(def->GetMaxRange() * 1.1f);
-		if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
+		// Owner 2026-11-04 16:58Z: a locked target is kept (not the nearest re-pick)
+		// within range + margin; a locked structure farther out gets a step in,
+		// never the route resume.
+		float lockDist = 0.f;
+		CEnemyInfo* locked = ArtyLockGet(circuit, unit, circuit->GetLastFrame(), lockDist);
+		if ((locked != nullptr) && (lockDist > def->GetMaxRange(CCircuitDef::RangeType::LAND)
+				+ circuit->GetMilitaryManager()->GetArtyCommInfo().lockMargin)) {
+			if (ArtyLockDrive(circuit, unit, circuit->GetLastFrame(), locked, lockDist)) {
+				engaging.insert(unit);
+				continue;
+			}
+		}
+		if (locked != nullptr) {
+			nearest = locked;
+			nearestSq = SQUARE(lockDist);
+			ArtyLockHeld(circuit, unit, circuit->GetLastFrame());
+		} else if (def->GetStandoff() > 0.f && !(seaControl && holdPosition)) {
 			const AIFloat3 here = unit->GetPos(circuit->GetLastFrame());
 			for (const auto& kv : circuit->GetEnemyInfos()) {
 				CEnemyInfo* enemy = kv.second;
 				const CCircuitDef* edef = enemy->GetCircuitDef();
-				if (enemy->IsHidden() || !enemy->IsInRadarOrLOS() || edef == nullptr
+				if (enemy->IsHidden() || !enemy->IsInRadarOrLOS() || !MissileTargetAllowed(def, enemy) || edef == nullptr
 						|| !(edef->GetCategory() & def->GetTargetCategory())
 						|| (!def->HasSurfToWater() && enemy->GetPos().y < -SQUARE_SIZE * 5)) continue;
 				const float sq = here.SqDistance(enemy->GetPos());
 				if (sq < nearestSq) { nearestSq = sq; nearest = enemy; }
 			}
+			// 2026-11-07 (@Barscrewl): LOS and identified radar contacts share one tier
+			// (nearest first); the LOS-first override for the 3 slow launchers is gone.
 		}
+		ArtyRangeTargetCheck(circuit, unit, nearest);  // 2026-11-06: a target turned identified T1 is dropped
 		if (nearest != nullptr) {
 			if (engaging.insert(unit).second) { // before Stop can cause an idle callback
 				circuit->LOG("RANGE: %s(%i) pauses route at %.0f for weapon range %.0f",
 						def->GetDef()->GetName(), unit->GetId(), std::sqrt(nearestSq), def->GetMaxRange());
 			}
+			if (locked == nullptr) ArtyLockSet(circuit, unit, circuit->GetLastFrame(), nearest);
 			if (unit->KeepWeaponRange(nearest, circuit->GetLastFrame() + FRAMES_PER_SEC * 10)) continue;
+		} else if (ArtyRadarDotStep(circuit, unit, circuit->GetLastFrame(), unit->GetPos(circuit->GetLastFrame()))) {
+			engaging.insert(unit);  // owner 2026-11-04 20:03Z: unidentified radar dot in range
+			continue;
+		} else if (GhostFireStep(circuit, unit, unit->GetPos(circuit->GetLastFrame()), circuit->GetLastFrame(),
+				ghostFire[unit->GetId()], ghostSupport)) {
+			// Owner 2026-11-02: a ghost volley pauses the route like range micro;
+			// the route resumes on the next update once it has fired.
+			engaging.insert(unit);
+			continue;
 		}
 		const bool resume = engaging.erase(unit) != 0;
 		if (resume) circuit->LOG("RANGE: %s(%i) resumes specialist route", def->GetDef()->GetName(), unit->GetId());
@@ -257,6 +301,7 @@ void CRouteTask::OnUnitIdle(CCircuitUnit* unit)
 
 void CRouteTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+    ArtySpamRetreatDamaged(manager->GetCircuit(), unit, attacker);  // 2026-11-06
     if (seaControl && !combatRetreat) return;
     if (seaControl && repairThreshold > 0.f && unit->GetHealthPercent() < repairThreshold) {
         // Opt-in task policy, never mutate a shared UnitDef retreat threshold.
@@ -417,6 +462,7 @@ unsigned int CRouteTask::NearestAheadIndex(CCircuitUnit* unit) const
 
 void CRouteTask::IssueDirect(CCircuitUnit* unit)
 {
+	if ((sniping.count(unit) != 0) || ArtySnipeOwns(manager->GetCircuit(), unit)) return;  // ArtySnipeStep owns it (also right after a transfer); resumes after
 	const auto& route = RouteFor(unit);
 	if (route.empty()) {
 		return;
@@ -442,6 +488,7 @@ void CRouteTask::IssueDirect(CCircuitUnit* unit)
 
 void CRouteTask::IssueRoute(CCircuitUnit* unit, unsigned int fromIdx)
 {
+	if ((sniping.count(unit) != 0) || ArtySnipeOwns(manager->GetCircuit(), unit)) return;  // ArtySnipeStep owns it (also right after a transfer); resumes after
     if (airControl && airTarget >= 0) {
         auto* circuit = manager->GetCircuit();
         auto* enemy = circuit->GetEnemyInfo(airTarget);

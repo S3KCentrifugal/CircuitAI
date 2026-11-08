@@ -23,6 +23,9 @@ enum Phase {
     COMMANDER_DAMAGE, // immediate damage callback; separate root from scheduled decision
     SKIRMISHER_CONTROLLER, LINE_DECISION, // D-430: skirmisher unit controller loop, line group controller
     BACKLINE_CONTROLLER, // D-432: backline unit controller loop
+    FACTORY_CORRIDOR, // D-451: factory-corridor admission, cache checks, refresh and prune
+    RANGED_HISTORY, // D-462: per-AI contact history pass, nested in RANGED_SNAPSHOT
+    ARTILLERY_UPDATE, ARTILLERY_QUERY, // D-493: artillery controller pass, one gun's snapshot query
     PHASE_COUNT
 };
 extern const bool enabled;
