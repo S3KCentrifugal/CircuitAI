@@ -574,7 +574,9 @@ void CEnemyManager::KMeansIteration()
 		for (const std::vector<SEnemyData>& datas : {hostileDatas, peaceDatas}) {
 			for (const SEnemyData& enemy : datas) {
 				float closestDistance = std::numeric_limits<float>::max();
-				int closestIndex = -1;
+				// newK > 0, so mean 0 always exists; a NaN or infinite distance
+				// must not leave the index at -1 (cppcheck: out of bounds).
+				int closestIndex = 0;
 
 				for (int m = 0; m < newK; m++) {
 					const AIFloat3& mean = groupData1.enemyGroups[m].pos;
