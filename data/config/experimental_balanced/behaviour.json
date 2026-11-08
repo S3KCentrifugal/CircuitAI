@@ -351,6 +351,10 @@
 			"spam_retreat": true,
 			"spam_retreat_distance": 500,
 			"spam_retreat_quiet_seconds": 4,
+			// Owner 2026-11-08: the old CircuitAI path / FIGHT and APPROACH99 move these units only when no LOS,
+			// identified or unidentified slow (<= 12 elmos/s) radar contact is in range and no ghost structure
+			// in range is still owed its blind volleys (1, heavy porc 3); a skipped ghost is fired on before moving.
+			"hold_before_move": true,
 			"volleys": 3,
 			"visible_max_volleys": 0,     // owner 01:43Z: seen porc until dead (0 = no cap)
 			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS

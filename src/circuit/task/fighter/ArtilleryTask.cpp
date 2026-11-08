@@ -84,6 +84,7 @@ bool MissileTargetAllowed(const CCircuitDef* launcher, const CEnemyInfo* enemy)
 static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e);
 static bool GhostGone(CCircuitAI* circuit, int enemyId);
 static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame);
+static bool ArtyHoldBeforeMove(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AIFloat3& pos);
 // Owner 2026-11-04 20:08Z: one ghost volley count per unit and ghost dark period.
 // 2026-11-07: per launcher. Vanguard 5 volleys at heavy porc (1 other); Tremor is
 // timed, so its need is in frames (105 s heavy, 45 s other).
@@ -394,6 +395,12 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 	}
 
 	if (FireAtGhost(unit, pos, frame)) {
+		return;
+	}
+
+	// Owner 2026-11-08: the movers below (APPROACH99, the old path query / FIGHT)
+	// only when nothing is in range to shoot and no ghost in range is owed a volley.
+	if (ArtyHoldBeforeMove(circuit, unit, frame, pos)) {
 		return;
 	}
 
@@ -855,6 +862,130 @@ static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloa
 		st.unsafeHere = ArtyRealUnsafeAt(circuit, pos);
 	}
 	return st.unsafeHere;
+}
+
+/*
+ * Owner 2026-11-08 (Mescaline: Bastion 644 killed 20 Boreas). The two movers at
+ * the end of CArtilleryTask::Execute (ArtyApproach99 and the old CircuitAI path
+ * query, whose travel act issues FIGHT legs) come last: they run only when this
+ * returns false, i.e. nothing below is within the unit's weapon range:
+ *  1) a target in LOS or an identified radar contact that the default pick may
+ *     shoot (MissileTargetAllowed: structures, slow / stationary mobiles at most
+ *     min(12, 25% of top speed) elmos/s for the slow launchers);
+ *  2) an unidentified radar contact moving at most 12 elmos/s;
+ *  3) a ghost structure that has not had its blind volleys this dark period
+ *     (1, or `volleys` for heavy porc; GhostDoneHas is false).
+ * Holding stops a move or FIGHT already under way. For 3) the unit also fires
+ * its blind volley here (ground fire on the image; ArtySnipeStep counts it as a
+ * default-pick ghost volley), so a ghost the pick skipped is not left unfired.
+ * Ghost structures in range that are skipped as hidden ("seen empty") or gone
+ * are logged (GHOSTSKIP, one line per unit per 10 s) to find why the pick
+ * skipped them. Lever: artillery_snipe.hold_before_move. Units: ArtyGhostPicker.
+ * Cost: O(known enemies) per call, and only on the path that would otherwise
+ * run a pathfinder query, so it adds no work to units that already shoot.
+ */
+static bool ArtyHoldBeforeMove(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AIFloat3& pos)
+{
+	CMilitaryManager* military = circuit->GetMilitaryManager();
+	const CMilitaryManager::SArtySnipeInfo& si = military->GetArtySnipeInfo();
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	if (!si.holdBeforeMove || !ArtyGhostPicker(si, cdef)) return false;
+	CMilitaryManager::SArtySnipeState& st = military->GetArtySnipeState(unit->GetId(), frame);
+	const std::string lname = cdef->GetDef()->GetName();
+	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
+	const float sqRange = SQUARE(range);
+	const bool notAW = !cdef->HasSurfToWater();
+	const int canTargetCat = cdef->GetTargetCategory();
+	const float dotMaxSq = SQUARE(12.f / FRAMES_PER_SEC);  // elmos/frame
+	const bool timed = IsTimedGhostLauncher(lname);
+
+	CEnemyInfo* known = nullptr;   // 1) / 2): nearest
+	float knownSq = sqRange;
+	CEnemyInfo* ghost = nullptr;   // 3): nearest
+	float ghostSq = sqRange;
+	const CEnemyInfo* skipped = nullptr;
+	const char* skipWhy = nullptr;
+	for (const auto& kv : circuit->GetEnemyInfos()) {
+		CEnemyInfo* e = kv.second;
+		if ((e == nullptr) || e->GetData()->IsDead() || e->GetData()->IsDying()) continue;
+		const AIFloat3& ep = e->GetPos();
+		const float sq = pos.SqDistance2D(ep);
+		if (sq >= sqRange) continue;
+		if (notAW && (ep.y < -SQUARE_SIZE * 5)) continue;
+		const CCircuitDef* edef = e->GetCircuitDef();
+		if ((edef != nullptr) && (((edef->GetCategory() & canTargetCat) == 0) || edef->IsIgnore())) continue;
+		if (e->IsInRadarOrLOS()) {
+			if (e->IsHidden()) continue;
+			if (edef == nullptr) {
+				if (ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;  // air dot
+				if (e->GetVel().SqLength2D() > dotMaxSq) continue;
+			} else if (!MissileTargetAllowed(cdef, e)) {
+				continue;
+			}
+			if (sq < knownSq) { knownSq = sq; known = e; }
+			continue;
+		}
+		// a ghost image
+		if ((edef == nullptr) || edef->IsMobile() || edef->IsAbleToFly() || timed) continue;
+		if (e->IsHidden() || GhostGone(circuit, e->GetId())) {
+			if (skipWhy == nullptr) { skipped = e; skipWhy = e->IsHidden() ? "hidden (seen empty)" : GhostGoneWhy(circuit, e->GetId()); }
+			continue;
+		}
+		if (GhostDoneHas(st, e->GetData())) continue;  // its blind volleys are fired this dark period
+		if (sq < ghostSq) { ghostSq = sq; ghost = e; }
+	}
+
+	if ((skipWhy != nullptr) && (frame - st.skipLogFrame >= FRAMES_PER_SEC * 10)) {
+		st.skipLogFrame = frame;
+		circuit->LOG("GHOSTSKIP: %s %i skips ghost %s %i at %.0f: %s", lname.c_str(), unit->GetId(),
+				skipped->GetCircuitDef()->GetDef()->GetName(), skipped->GetId(),
+				std::sqrt(pos.SqDistance2D(skipped->GetPos())), skipWhy);
+	}
+	CEnemyInfo* why = (known != nullptr) ? known : ghost;
+	if (why == nullptr) {
+		st.holdLogKey = -1;
+		st.moveHeld = false;
+		return false;  // nothing in range: the movers may run
+	}
+
+	const bool newReason = (st.holdLogKey != why->GetId());
+	if (newReason || (frame - st.holdLogFrame >= FRAMES_PER_SEC * 10)) {
+		st.holdLogKey = why->GetId();
+		st.holdLogFrame = frame;
+		circuit->LOG("HOLDMOVE: %s %i holds for %s %s %i at %.0f%s", lname.c_str(), unit->GetId(),
+				(known != nullptr) ? (why->IsInLOS() ? "LOS" : "radar") : "ghost",
+				(why->GetCircuitDef() != nullptr) ? why->GetCircuitDef()->GetDef()->GetName() : "dot", why->GetId(),
+				std::sqrt(pos.SqDistance2D(why->GetPos())), (known == nullptr) ? ", fires its blind volley" : "");
+	}
+	if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
+	const bool holdStarts = !st.moveHeld;
+	st.moveHeld = true;
+	if (known != nullptr) {
+		// The pick or the engine shoots it; here only no move: a move / FIGHT under
+		// way is stopped once when the hold starts (no new one is issued while it lasts).
+		if (holdStarts) {
+			TRY_UNIT(circuit, unit,
+				unit->CmdStop();
+			)
+		}
+		return true;
+	}
+	// 3) the blind volley: the same bookkeeping as the default ghost pick in Execute
+	// (Execute clears ghostAim when its pick is empty; the count lives in ghostCount
+	// per dark period, so re-setting the aim here every call loses nothing).
+	const CCircuitDef* edef = ghost->GetCircuitDef();
+	st.ghostAim = ghost->GetId();
+	st.ghostHeavy = (si.threats.count(edef->GetId()) > 0) || (si.directThreats.count(edef->GetId()) > 0);
+	st.ghostNeed = GhostNeedFor(si, edef, cdef);
+	st.ghostShots = GhostCountRef(st, ghost->GetData());
+	if (newReason) {
+		circuit->LOG("SNIPE: %s %i fires blind on ghost %s %i at (%.0f, %.0f), volleys %i/%i (hold before move)", lname.c_str(),
+				unit->GetId(), edef->GetDef()->GetName(), ghost->GetId(), ghost->GetPos().x, ghost->GetPos().z, st.ghostShots, st.ghostNeed);
+	}
+	TRY_UNIT(circuit, unit,
+		unit->CmdAttackGround(ghost->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 8);
+	)
+	return true;
 }
 
 /*
