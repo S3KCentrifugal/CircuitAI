@@ -1041,6 +1041,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
 			over.Stocking() ? ", stocking the salvo first" : "");
 	circuit->GetMilitaryManager()->NoteOvernukeRound();  // our silo began it: we ask AIR (team/nuke_recon.as)
+	StopStraySilos("began");  // owner 2026-11-08: no allied silo keeps an older order of its own
 	if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
 		return false;
 	}
@@ -1188,6 +1189,7 @@ bool CSuperTask::ReleaseSalvo(int frame, const std::function<bool ()>& scan)
 		circuit->LOG("NUKE: overnuke salvo moves from (%.0f, %.0f) to (%.0f, %.0f): a better target found since",
 				at.x, at.z, targetPos.x, targetPos.z);
 		over.Retarget({targetPos.x, targetPos.z});
+		StopStraySilos("moved");
 	}
 	targetPos = keep;
 	over.Release(stocked, policy.overnukeFireAll);
@@ -1208,6 +1210,36 @@ void CSuperTask::StopNukeSilos()
 		st->SetTarget(nullptr);
 		st->isTargetOverride = false;
 		st->state = State::ROAM;
+	});
+}
+
+/*
+ * One target for every silo (owner 2026-11-08). A silo of another allied AI
+ * can still hold the attack-ground order its own last update gave - picked
+ * while the ally team counted fewer silos (a silo just finished is counted only
+ * once its SUPER task exists) - and its update runs only every TARGET_DELAY, so
+ * a missile stocked in between flew at that old target (headless: an armsilo
+ * fired 5148 elmos off the overnuke 8 s after a corsilo began it). When an
+ * overnuke begins or moves, every other allied silo aiming outside it stops and
+ * re-selects on its next update, which joins the overnuke.
+ */
+void CSuperTask::StopStraySilos(const char* why)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const strategic::Overnuke& over = circuit->GetMilitaryManager()->GetOvernuke();
+	if (!over.Active()) return;
+	ForEachAllyNukeSilo(circuit, [&](CCircuitAI* owner, CSuperTask* st, CCircuitUnit* silo) {
+		if ((st == this) || st->debugEngaged || (st->state != State::ENGAGE)) return;
+		const AIFloat3 aim = st->GetAimPos();
+		if (over.Covers({aim.x, aim.z})) return;
+		TRY_UNIT(owner, silo, silo->CmdStop();)
+		st->SetTarget(nullptr);
+		st->isTargetOverride = false;
+		st->state = State::ROAM;
+		st->targetFrame = 0;  // re-select on its next update, not TARGET_DELAY later
+		circuit->LOG("NUKE: overnuke %s at (%.0f, %.0f): %s(%i) of team %i stops its own aim (%.0f, %.0f)",
+				why, over.Pos().x, over.Pos().z, silo->GetCircuitDef()->GetDef()->GetName(), silo->GetId(),
+				owner->GetTeamId(), aim.x, aim.z);
 	});
 }
 

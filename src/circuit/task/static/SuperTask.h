@@ -141,6 +141,7 @@ private:
 	// scan is SelectNuclearTarget's aim-point scan (it moves targetPos).
 	bool ReleaseSalvo(int frame, const std::function<bool ()>& scan);
 	void StopNukeSilos();  // every allied BARb nuke silo: stop and drop the target
+	void StopStraySilos(const char* why);  // every other allied silo aiming off the overnuke: stop, re-aim at once
 	bool SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	bool CanAimStrategic(CCircuitUnit* unit, const springai::AIFloat3& pos) const;
 	// Tactical launchers (Perdition, Catalyst): the richest blast in range.
