@@ -23,6 +23,7 @@ local hostUnits={}   -- unitID -> def (hive, porc, drones)
 local inReach={}     -- builder unitID -> true while inside the porc's reach
 local firstHit
 local drones={born=0,dead=0}
+local tanked={}
 
 local function echo(s) Spring.Echo("[DroneAAFix] "..s) end
 local function cmd(s) queue[#queue+1]=s end
@@ -135,6 +136,15 @@ local function gameFrame(f)
     if f==(cfg.aiAt or 240) then
         for _,e in ipairs(cfg.ai) do give(e[1],A,cfg.sx+e[2],cfg.sz+e[3]) end
         echo(string.format("AI structures at (%d,%d): %d",cfg.sx,cfg.sz,#cfg.ai))
+    end
+    if cfg.tank and f==cfg.tank.at then
+        for i=1,cfg.tank.n do give(cfg.tank.def,myTeam,cfg.tank.x+40*i,cfg.tank.z) end
+        echo(string.format("tanks %s x%d at (%d,%d), fight to (%d,%d)",cfg.tank.def,cfg.tank.n,cfg.tank.x,cfg.tank.z,cfg.sx,cfg.sz))
+    end
+    if cfg.tank and f>cfg.tank.at and f<cfg.tank.at+300 and f%30==0 then
+        for _,u in ipairs(Spring.GetTeamUnits(myTeam) or {}) do
+            if hostUnits[u]==cfg.tank.def and not tanked[u] then tanked[u]=true; Spring.GiveOrderToUnit(u,CMD.FIGHT,{cfg.sx,Spring.GetGroundHeight(cfg.sx,cfg.sz),cfg.sz},0) end
+        end
     end
     if f==(cfg.hiveAt or 450) then
         for _,h in ipairs(cfg.hives or {{cfg.hx,cfg.hz}}) do give("leghive",myTeam,h[1],h[2]) end

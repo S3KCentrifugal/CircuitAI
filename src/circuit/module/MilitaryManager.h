@@ -970,6 +970,17 @@ private:
 	void ReadDroneAAConfig();
 	void DroneAAStrike(CCircuitUnit* unit, CEnemyInfo* attacker);
 	bool IsCarrierDef(CCircuitDef* cdef, float* reach);
+	// Owner 2026-11-08: a dead T1.5 site bans a semicircle facing the drones;
+	// the re-order goes behind it at once, held while ground enemies threaten.
+	void DroneAAUnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker);
+	void UpdateDroneAA();  // 1 s job; returns at once with nothing pending
+	bool DroneAADirection(const springai::AIFloat3& from, springai::AIFloat3& dir);
+	bool DroneAAInZone(const springai::AIFloat3& p) const;
+	bool DroneAAGroundThreat(const springai::AIFloat3& pos, springai::AIFloat3* enemyPos);
+	bool DroneAAFreeBuilder(CCircuitUnit* w, CCircuitDef* def) const;
+	bool DroneAASiteOk(CCircuitDef* def, const springai::AIFloat3& p);
+	bool IsDroneAAHeavyDef(const CCircuitDef* def) const;
+	void DroneAARetreat(CCircuitUnit* unit, const springai::AIFloat3& enemyPos, int frame);
 	struct SDroneAA {
 		bool enabled = true;
 		int count = 2;
@@ -989,7 +1000,25 @@ private:
 		float longBank = 900.f;
 		std::vector<std::string> longUnits;  // long-range T1.5 AA
 		std::vector<std::string> hardUnits;  // bomb-resistant T1.5 AA
+		// Owner 2026-11-08: dead T1.5 site memory and immediate re-order
+		float zoneRadius = 200.f;        // banned front semicircle (sides included) around a dead T1.5
+		int zoneTime = 300 * FRAMES_PER_SEC;
+		float backStep = 64.f;           // re-order site: zoneRadius behind, then this much further per step
+		int backSteps = 10;
+		int reorderTime = 180 * FRAMES_PER_SEC;  // a pending re-order gives up after this
+		int droneMemory = 30 * FRAMES_PER_SEC;   // a T1.5 death counts when drones hit us this recently nearby
+		float threatMargin = 150.f;      // a ground enemy holds a spot within its land range + this
+		float threatScan = 900.f;
+		int retreatTime = 15 * FRAMES_PER_SEC;
+		float anchorRadius = 500.f;      // a drone hit on a mobile unit counts for our structure this near
+		float carrierScan = 4000.f;
 	} droneAA;
+	struct SDroneAAZone { springai::AIFloat3 pos; springai::AIFloat3 dir; int frame; };
+	std::vector<SDroneAAZone> droneAAZones;  // bounded (32), pruned after zoneTime
+	// Only positions, ids and frames: no unit or task pointers survive a frame here.
+	struct SDroneAAPending { springai::AIFloat3 pos; springai::AIFloat3 dir; int defId; bool behind; int expire; int nextTry; int nextLog; };
+	std::vector<SDroneAAPending> droneAAPending;  // bounded (16)
+	std::unordered_map<int, int> droneAARetreat;  // builder unit id -> frame its retreat ends
 	int droneAANext = 0;
 	int droneAALogFrame = -1000;
 	std::unordered_map<const IUnitTask*, int> droneAATasks;  // task -> tier (0 light, 1 T1.5)

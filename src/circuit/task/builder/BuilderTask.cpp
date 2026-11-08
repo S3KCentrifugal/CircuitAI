@@ -600,10 +600,14 @@ void IBuilderTask::OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 				unit->GetId(), (buildDef != nullptr) ? buildDef->GetDef()->GetName() : "none",
 				int(committed), int(canAutoAbort && (target == nullptr) && !committed));
 	}
+	// Drone AA (owner 2026-11-08): the order outlives a worker that retreats
+	// under drones; the next free builder takes it (UpdateDroneAA re-staffs it).
+	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+	const bool droneAA = (militaryMgr != nullptr) && militaryMgr->IsDroneAATask(this);
 	CRetreatTask* task = manager->EnqueueRetreat();
 	manager->AssignTask(unit, task);
 
-	if (canAutoAbort && (target == nullptr) && !committed) {
+	if (canAutoAbort && (target == nullptr) && !committed && !droneAA) {
 		manager->AbortTask(this);  // Doesn't call RemoveAssignee
 	}
 }
@@ -1154,7 +1158,13 @@ void IBuilderTask::UpdatePath(CCircuitUnit* unit)
 	if (!geom::is_valid(endPos)) {
 		return;  // a cancelled site (buildPos reset): no path to an invalid point
 	}
-	if (canAutoAbort && (target == nullptr)
+	// Drone AA (owner 2026-11-08): drones fill the surface threat map around
+	// the very site their tower answers, so that threat cannot abort it (fixture
+	// 11-08: a re-ordered Eradicator died here five times unbuilt); mobile
+	// ground enemies are checked by CMilitaryManager::UpdateDroneAA instead.
+	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+	const bool droneAA = (militaryMgr != nullptr) && militaryMgr->IsDroneAATask(this);
+	if (canAutoAbort && (target == nullptr) && !droneAA
 		&& !circuit->GetTerrainManager()->CanReachAtSafe(unit, endPos, range, cdef->GetPower()))
 	{
 		manager->AbortTask(this);

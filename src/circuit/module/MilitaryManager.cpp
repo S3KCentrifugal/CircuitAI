@@ -1038,6 +1038,7 @@ void CMilitaryManager::InitMilitary()
 			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateCommanderSnipe, this),
 					commSnipeInfo.interval, offset + 2);
 		}
+		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDroneAA, this), FRAMES_PER_SEC, offset + 3);  // owner 2026-11-08: T1.5 re-order, retreat
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSpamFireHold, this),
 				FRAMES_PER_SEC / 2, offset + 4);
 
@@ -1092,6 +1093,7 @@ int CMilitaryManager::UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 
 int CMilitaryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	DroneAAUnitDestroyed(unit, attacker);  // owner 2026-11-08: dead T1.5 site memory + re-order
 	if (unit->GetCircuitDef()->IsAttrFence()) {
 		UnmarkPorc(unit);
 	}
