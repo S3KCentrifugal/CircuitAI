@@ -129,6 +129,19 @@
         "commander_group_artillery_energy_cover": 1,
         "commander_group_artillery_t2_definitions": "armamb,cortoast,legacluster",
         "commander_group_artillery_t1_definitions": "armguard,corpun,legcluster",
+        // D-495: a T1 gun (1250-1300 metal, a third to a half of a fusion or T2 lab)
+        // only for a target: an enemy T1 gun within t1_counter of our structures
+        // (Gauntlet and Agitator only), or enemy defences worth t1_value x the gun
+        // within t1_cluster round one out-ranging mobile artillery (t1_mobile_range,
+        // + t1_height_gain per elmo above our front). The site reaches the target
+        // (less t1_margin) outside every known enemy weapon; no T2 seat in the group,
+        // the first T2 lab started, at most t1_max per AI. FRONT only.
+        "commander_group_artillery_t1_counter_definitions": "armguard,corpun",
+        "commander_group_artillery_t1_counter": 1400, "commander_group_artillery_t1_value": 1,
+        "commander_group_artillery_t1_cluster": 400, "commander_group_artillery_t1_mobile_range": 820,
+        "commander_group_artillery_t1_height_gain": 0.6, "commander_group_artillery_t1_margin": 64,
+        "commander_group_artillery_t1_vision_seconds": 30, "commander_group_artillery_t1_max": 2,
+        "commander_group_artillery_t1_eval_seconds": 10,
         // Optional replacement: existing factory only, income gates rechecked.
         "commander_group_decoy_metal": 100, "commander_group_decoy_energy": 2000,
         "commander_group_decoy_seconds": 60,

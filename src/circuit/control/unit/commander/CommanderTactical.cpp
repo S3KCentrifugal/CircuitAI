@@ -95,8 +95,8 @@ bool CCommanderController::ArtilleryEconomy(CCircuitUnit* unit,CCircuitDef* def)
     return true;
 }
 // D-479: what this constructor would build on the tactical queue now, or null.
-// Launchers under the D-475 gate first, then T2 artillery, then the T1 fallback
-// (below the T2 income, or no T2 seat in the group). At most a dozen defs.
+// Launchers under the D-475 gate first, then T2 artillery, then a T1 gun only
+// for a planned target (D-495, CommanderArtilleryT1.cpp). At most a dozen defs.
 CCircuitDef* CCommanderController::TacticalChoice(CCircuitUnit* unit) const {
     const int frame=ai->GetLastFrame();
     const auto buildable=[&](int id) -> CCircuitDef* {
@@ -108,9 +108,12 @@ CCircuitDef* CCommanderController::TacticalChoice(CCircuitUnit* unit) const {
     const float income=ai->GetEconomyManager()->GetAvgMetalIncome();
     if(cfg->group.artilleryT2Income>0 && income>=cfg->group.artilleryT2Income)
         for(int id:artilleryT2Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def) && !ArtilleryCrowded(def)) return def; break; }
-    if(cfg->group.artilleryT1Income>0 && income>=cfg->group.artilleryT1Income
-        && (income<cfg->group.artilleryT2Income || cfg->group.artilleryT2Income<=0 || GroupT2Count()==0))
-        for(int id:artilleryT1Defs) if(auto* def=buildable(id)) { if(ArtilleryEconomy(unit,def) && !ArtilleryCrowded(def)) return def; break; }
+    // D-495: the T1 gun is past the profile's veto (IsCapAvailable, not
+    // IsAvailable) only through its plan: a justified target and a site in reach.
+    if(cfg->group.artilleryT1Income>0 && income>=cfg->group.artilleryT1Income)
+        if(const auto* plan=ArtilleryT1Plan(unit))
+            if(auto* def=ai->GetCircuitDefSafe(plan->defId); def && unit->GetCircuitDef()->CanBuild(def)
+                && def->IsCapAvailable(frame) && ArtilleryEconomy(unit,def) && !ArtilleryCrowded(def)) return def;
     return nullptr;
 }
 int CCommanderController::GroupT2Count() const {
@@ -145,6 +148,7 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
     auto& block=tacticalBlocks[def->GetId()];
     if(frame<tacticalNext) return false;
     tacticalNext=frame+int(cfg->group.tacticalRetrySeconds*FRAMES_PER_SEC);
+    if(IsArtilleryT1Def(def)) return ReserveArtilleryT1Site(def,block);  // D-495: one slot at the planned site
     auto* terrain=ai->GetTerrainManager();
     const auto center=anchor->GetPos(frame);
     // Forward: along the front lane at the commander; else base -> commander.
@@ -214,6 +218,7 @@ bool CCommanderController::TacticalSplit(CCircuitUnit* unit) const {
 IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUnit* anchor,bool nearby) {
     // D-476/D-479: any group constructor, for whatever TacticalChoice allows it.
     const int id=unit->GetId();
+    CheckArtilleryT1Job(ai->GetLastFrame());  // D-495: INV-268
     // Its own live job first: finished regardless of the opening gates below.
     if(tacticalJob && !tacticalJob->IsDead() && unit->GetTask()==tacticalJob && IsGroupMember(id))
         return TacticalJobAllowed(unit,tacticalJob,anchor)?tacticalJob:nullptr;
@@ -232,7 +237,10 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     auto& block=tacticalBlocks[def->GetId()];
     // A block the commander left behind is released (its unbuilt slots only
     // matter while the group is there); a full block gives way to a new one.
-    if(block.group>0 && (block.centre.SqDistance2D(center)>SQUARE(cfg->group.radius+block.radius)
+    // D-495: a T1 gun's slot also gives way when its plan moved elsewhere.
+    const bool t1Moved=IsArtilleryT1Def(def) && block.group>0
+        && (t1Plan.defId!=def->GetId() || block.centre.SqDistance2D(t1Plan.site)>SQUARE(block.radius));
+    if(block.group>0 && (t1Moved || block.centre.SqDistance2D(center)>SQUARE(cfg->group.radius+block.radius)
         || terrain->GetGroupCount(block.group,true)<=0)) {
         // An unfinished turret in the old block is finished first.
         if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def)) {
@@ -256,11 +264,15 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     // in the same frame, 37 of 45 artillery jobs. Do not start one it would drop.
     if(!terrain->CanReachAtSafe(unit,terrain->GetReservationPos(slot),unit->GetCircuitDef()->GetBuildDistance(),
         unit->GetCircuitDef()->GetPower())) return nullptr;
-    auto* task=builder->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,terrain->GetReservationPos(slot),
-        0.f,true,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC)));
+    const auto order=TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,def,terrain->GetReservationPos(slot),
+        0.f,true,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC));
+    const bool t1=IsArtilleryT1Def(def);
+    auto* task=t1?builder->EnqueueVetoed(order):builder->Enqueue(order);  // D-495: only a planned T1 gun passes the veto
     if(!task) return nullptr;
     if(!task->PinReservation(slot)) { builder->AbortTask(task); return nullptr; }
     tacticalJob=task;
+    t1Job=t1?task:nullptr;
+    if(t1) { t1JobTarget=t1Plan.target; t1JobRange=def->GetMaxRange(); t1JobChecked=false; }
     const auto at=terrain->GetReservationPos(slot);
     ai->LOG("[CommanderGroup] job_start queue=tactical def=%s slot=%i x=%.0f z=%.0f unit=%i team=%i",
         def->GetDef()->GetName(),slot,at.x,at.z,id,ai->GetTeamId());

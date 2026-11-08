@@ -409,6 +409,9 @@ public:
 	void ActivateTask(IBuilderTask* task);
 
 	IBuilderTask* Enqueue(const TaskB::SBuildTask& ti);
+	// D-495: Enqueue past the profile's construction veto. Only the FRONT
+	// commander group's gated T1 artillery (CommanderArtilleryT1.cpp) calls it.
+	IBuilderTask* EnqueueVetoed(const TaskB::SBuildTask& ti);
 	IBuilderTask* EnqueueLayout(const TaskB::SBuildTask& ti, const std::string& groupName, CCircuitUnit* builder);
 	IBuilderTask* EnqueueFactoryNano(const TaskB::SBuildTask& ti, CCircuitUnit* builder);
 	IUnitTask* Enqueue(const TaskB::SServBTask& ti);
@@ -578,6 +581,7 @@ private:
 public:
 	void UpdateAreaUsers();
 private:
+	bool vetoOverride = false;  // D-495: true only inside EnqueueVetoed
 	std::unordered_set<terrain::SMobileType::Id> workerMobileTypes;
 	std::map<terrain::SArea*, std::map<CCircuitDef*, int>> buildAreas;  // area <=> worker types
 
