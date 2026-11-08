@@ -6,8 +6,6 @@
 
 namespace Main {
 
-    const int NukeRushSecondCallSeconds = 18 * 60;
-
 	// One roll (owner, 2026-10-30): exactly one rush, T3 35%, heavy T2 25%, nuke 25%, capital 10%; the 5% left is "none".
 	// Roll 2, on its own, adds the spam rush at Tech_Spam_Rush (85%); SingleRoll true would skip it.
 	// History: two rolls from 2026-10-17 (nuke 25%, T3 35%, heavy 25%, none 15%; spam 85%), T3 100% from 2026-10-26,
@@ -78,7 +76,6 @@ namespace Main {
 
 	void AiMain()
 	{
-		Global::FrontNukeRush::Chance = 0.15f; // owner 2026-11-04 (0.20 from 2026-11-03): front nukerush, one 15% draw at game start for the whole ally team (systems/team/front_nukerush.as)
         ThugFireAtWill::Enabled = true;
         // Missing working-copy policy. Existing pending-all overrides retain precedence.
         Global::RoleSettings::Air::BankFunding = true; // AIR: bank funds energy/cons/T2 turrets; far mexes past a small home (owner 2026-10-17)
@@ -87,9 +84,10 @@ namespace Main {
         Global::RoleSettings::Tech::LayoutNoRoomRetrySeconds = 1.0f; // owner 2026-10-19: no-room sweep backoff 1-3 s
         Global::RoleSettings::Air::EcoSlotRetrySeconds = 2.0f;      // owner 2026-10-19: one AIR reactor order per slot per 2 s
         Global::RoleSettings::Air::T2HeavyAirIncomeThreshold = 175.0f;
-        Global::RoleSettings::Tech::NukeRushSecondCallSeconds = NukeRushSecondCallSeconds;
-        Global::RoleSettings::Tech::NukeRushSecondCallLimit = 8;
-        Global::RoleSettings::Tech::NukeRushSiloPerAfus = true;
+        // owner 2026-11-08: a nuke rush TECH builds 1 silo - no second call (was 18 min, up to 8) and
+        // no silo per AFUS (was 1 + AFUS, up to NukeLimit); the FRONT silo grid (35 min) still feeds the overnuke
+        Global::RoleSettings::Tech::NukeRushSecondCallSeconds = -1;
+        Global::RoleSettings::Tech::NukeRushSiloPerAfus = false;
         Global::RoleSettings::Tech::NukeLimit = 15;
         Global::RoleSettings::Tech::HeavyAlternate = true; // owner 2026-10-22: late heavy batches alternate Thor / Titan (land and amphibious)
         // owner 2026-10-26: after the t3rush units, every TECH gantry alternates these pairs, first unit first, on every map
@@ -248,7 +246,6 @@ namespace Main {
 			Global::profileController.MainUpdate();
 		}
 		Team::Roster::Update();  // announce ourselves to allied BARb instances until the roster is complete
-		FrontNukeRush::Tick();     // owner, 2026-11-03: the front nukerush team roll, drawn at game start
 		OvernukeRecon::Tick();      // owner, 2026-10-28: AIR scouts the overnuke target every 10 launches
 		NukeLaunchRecon::Tick();    // owner, 2026-10-31: AIR learns each nuke spot, scouts every 3rd below overnuke
 		Spam::Update();          // economy-gated spam: activation, focus rotation

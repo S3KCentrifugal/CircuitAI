@@ -222,14 +222,14 @@ namespace NukeLaunchRecon {
 // plane to its own point spread over the blast, not all onto the centre
 // (LolCannonRecon::Route). Any role that owns silos asks; AIR flies it.
 //
-// Front nukerush (owner 2026-11-03, team/front_nukerush.as): with the team roll
-// on, the overnuke also asks AIR for a scout package across the map when it
-// begins (the trigger: 3+ finished silos across every allied BARb) and every
-// time a salvo is fully launched and the next target starts stocking - the AI
-// whose silo began the target asks (C++ GetOvernukeRounds). The request is
+// Overnuke rounds (owner 2026-11-06): every time a salvo is fully launched and the
+// next target starts stocking, the AI whose silo began the target asks AIR for a
+// scout package across the map (C++ GetOvernukeRounds). The request is
 // nukerecon|overnuke|x|z|spread|round: AIR drafts its built scouts at once and
 // owes the rest, ungated, as for TECH's nuke rush call (AirScoutSweep::Urgent);
-// with no AIR, TECH builds them (LolCannonRecon::Send).
+// with no AIR, TECH builds them (LolCannonRecon::Send). The overnuke's start
+// (round 1) called one too only under the front nukerush team roll (2026-11-03),
+// removed with it (owner 2026-11-08).
 namespace OvernukeRecon {
     const int T1Scouts = 10;
     int RadarScouts() { return Global::RoleSettings::Air::NukeScoutRadarCount; }  // owner 2026-11-06: 10 (was 3)
@@ -239,9 +239,9 @@ namespace OvernukeRecon {
         if (rounds <= seenRounds) return;
         seenRounds = rounds;
         // owner 2026-11-06: a full salvo out (round 2 on: every silo emptied, the next
-        // target stocks) always calls a wave at once; the start (round 1) only with the
-        // front nukerush roll, as before
-        if (rounds < 2 && (!Global::FrontNukeRush::RoundScouts || !FrontNukeRush::On())) return;
+        // target stocks) always calls a wave at once; the start (round 1) asked only under
+        // the front nukerush roll, removed 2026-11-08
+        if (rounds < 2) return;
         const AIFloat3 at = aiMilitaryMgr.GetOvernukePos();
         if (at.x < 0.0f) return;
         const float spread = aiMilitaryMgr.GetOvernukeRadius();

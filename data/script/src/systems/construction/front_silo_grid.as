@@ -28,10 +28,8 @@
 // cheap tests first; each later ask reads at most NukeLimit reservation states.
 // Log [FRONT][SiloGrid].
 //
-// Front nukerush (owner 2026-11-03, team/front_nukerush.as): when the team roll is on, the gates are
-// Global::FrontNukeRush's (20 min, 115 metal, 2000 energy, 6 silos, 3x2 first) for every FRONT and AIR,
-// and for TECH once its first gantry is finished (its rule row asks); a site may be no more than
-// MaxForwardShare of the way from our start to the nearest enemy start, at every tier.
+// The front nukerush team roll (2026-11-03 to 2026-11-08: FRONT, AIR and TECH silos from 20 min
+// in this grid) was removed (owner 2026-11-08); only FRONT asks, on its own gates.
 namespace FrontSiloGrid {
     int sustainedSince = -1;     // first frame of the current unbroken run above both incomes
     int nextSearch = 0;
@@ -52,7 +50,7 @@ namespace FrontSiloGrid {
     array<int> slotWait;         // per slot: no order before this frame
     array<int> slotDeaths;       // per slot: quick deaths in a row
     int nextLog = -100000;
-    int capsAt = 0;              // the silo cap last applied (the nukerush cap grows with our AFUS)
+    int capsAt = 0;              // the silo cap last applied
     array<int> slots;            // grid reservations, block by block, row by row in a block
     array<int> zones;            // one envelope zone per block
     AIFloat3 centre(-1.0f, 0.0f, -1.0f);
@@ -63,18 +61,13 @@ namespace FrontSiloGrid {
         const AiRole r = Global::AISettings::Role;
         return r == AiRole::FRONT ? "[FRONT]" : r == AiRole::AIR ? "[AIR]" : r == AiRole::TECH ? "[TECH]" : "[ROLE " + int(r) + "]";
     }
-    // the gates: the FRONT grid's own, or the front nukerush's when the team roll is on
-    bool Rush() { return FrontNukeRush::On(); }
-    int MinSeconds() { return Rush() ? (Global::AISettings::Role == AiRole::TECH ? 0 : Global::FrontNukeRush::MinSeconds) : Global::RoleSettings::Front::NukeMinSeconds; }
-    float MetalGate() { return Rush() ? Global::FrontNukeRush::MetalIncome : Global::RoleSettings::Front::NukeMetalIncome; }
-    float EnergyGate() { return Rush() ? Global::FrontNukeRush::EnergyIncome : Global::RoleSettings::Front::NukeEnergyIncome; }
-    int SustainSeconds() { return Rush() ? 0 : Global::RoleSettings::Front::NukeSustainSeconds; }
-    int Limit() { return Rush() ? FrontNukeRush::SiloLimit() : Global::RoleSettings::Front::NukeLimit; }
-    const array<int>@ Shapes()
-    {
-        if (Rush()) return @Global::FrontNukeRush::Shapes;
-        return @Global::RoleSettings::Front::SiloGridShapes;
-    }
+    // the FRONT grid's gates
+    int MinSeconds() { return Global::RoleSettings::Front::NukeMinSeconds; }
+    float MetalGate() { return Global::RoleSettings::Front::NukeMetalIncome; }
+    float EnergyGate() { return Global::RoleSettings::Front::NukeEnergyIncome; }
+    int SustainSeconds() { return Global::RoleSettings::Front::NukeSustainSeconds; }
+    int Limit() { return Global::RoleSettings::Front::NukeLimit; }
+    const array<int>@ Shapes() { return @Global::RoleSettings::Front::SiloGridShapes; }
 
     void Park(int slot, const string &in why)
     {
@@ -184,12 +177,8 @@ namespace FrontSiloGrid {
         }
         // candidates: centre, facing, lane distance, squared home distance, lane-clear
         array<AIFloat3> candC; array<int> candF; array<float> candLane, candHome; array<int> candTier;
-        int offMap = 0, far = 0, onLane = 0, refused = 0, unbuildable = 0, unreachable = 0, forward = 0, pastShare = 0;
+        int offMap = 0, far = 0, onLane = 0, refused = 0, unbuildable = 0, unreachable = 0, forward = 0;
         const float enemyD = enemy.x < 0.0f ? 0.0f : sqrt(MapHelpers::SqDist(home, enemy));
-        // nukerush: no block more than MaxForwardShare of the way to the nearest enemy start (along that line)
-        const bool rush = Rush();
-        const float shareMax = Global::FrontNukeRush::MaxForwardShare;
-        const float axisX = enemyD > 1.0f ? (enemy.x - home.x) / enemyD : 0.0f, axisZ = enemyD > 1.0f ? (enemy.z - home.z) / enemyD : 0.0f;
         const AIFloat3 origin0 = centre.x >= 0.0f ? centre : home;
         const float step = centre.x >= 0.0f ? Global::RoleSettings::Front::SiloGridSearchStep * 0.5f : Global::RoleSettings::Front::SiloGridSearchStep;
         for (int turn = 0; turn < 2; ++turn) {
@@ -207,8 +196,6 @@ namespace FrontSiloGrid {
                     const AIFloat3 c(origin0.x + cos(ang) * step * float(ring), 0.0f, origin0.z + sin(ang) * step * float(ring));
                     if (MapHelpers::SqDist(c, home) > Global::RoleSettings::Front::SiloGridMaxHomeDistance * Global::RoleSettings::Front::SiloGridMaxHomeDistance * homeReach * homeReach) { ++far; continue; }
                     if (c.x < own || c.z < own || c.x >= AiTerrainWidth() - own || c.z >= AiTerrainHeight() - own) { ++offMap; continue; }
-                    // the block's far edge counts: its centre's progress plus its own half size
-                    if (rush && enemyD > 1.0f && ((c.x - home.x) * axisX + (c.z - home.z) * axisZ) + own > shareMax * enemyD) { ++pastShare; continue; }
                     // not toward the enemy: played, grids 4-5 km out stood mid-map and no constructor ever started one
                     const bool fwd = enemy.x >= 0.0f && sqrt(MapHelpers::SqDist(c, enemy)) < enemyD - Global::RoleSettings::Front::SiloGridMaxForward;
                     if (fwd && maxTier < 2) { ++forward; continue; }
@@ -268,14 +255,14 @@ namespace FrontSiloGrid {
                 + int(candC[i].x) + ", " + int(candC[i].z) + ") facing " + f + ", " + int(sqrt(candHome[i]))
                 + " from home, " + int(candLane[i]) + " from the nearest allied lane"
                 + (candTier[i] == 0 ? "" : candTier[i] == 1 ? " (no lane-clear site: the farthest)" : candTier[i] == 2 ? " (toward the enemy)" : " (on a lane line: last resort)") + ", zone " + zones[zones.length() - 1] + "; "
-                + candC.length() + " candidates (skipped " + offMap + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + pastShare + " past " + int(shareMax * 100.0f) + "% to the enemy, " + onLane + " on lanes, "
+                + candC.length() + " candidates (skipped " + offMap + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + onLane + " on lanes, "
                 + unreachable + " unreachable, " + refused + " refused by layouts, " + unbuildable + " unbuildable), "
                 + tried + " tried", 1);
         }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
         if (!found)
             GenericHelpers::LogUtil(Tag() + "[SiloGrid] no grid site: " + candC.length() + " candidates (skipped " + offMap
-                + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + pastShare + " past " + int(shareMax * 100.0f) + "% to the enemy, " + onLane + " on lanes, " + unreachable + " unreachable, " + refused + " refused by layouts, "
+                + " off map, " + far + " too far from home, " + forward + " toward the enemy, " + onLane + " on lanes, " + unreachable + " unreachable, " + refused + " refused by layouts, "
                 + unbuildable + " unbuildable), " + tried + " tried; retry in " + Global::RoleSettings::Front::SiloGridRetrySeconds + " s", 1);
         return found;
     }
@@ -283,11 +270,8 @@ namespace FrontSiloGrid {
     IUnitTask@ Work(CCircuitUnit@ u)
     {
         if (u is null || u.circuitDef is null) return null;
-        // FRONT: its own grid, or the nukerush's; AIR and TECH: only the nukerush's (TECH asks once its gantry gate is open)
-        const bool rush = Rush();
-        const AiRole role = Global::AISettings::Role;
-        if (role == AiRole::FRONT ? !(rush || Global::RoleSettings::Front::SiloGrid)
-                : !(rush && (role == AiRole::AIR || role == AiRole::TECH))) return null;
+        // FRONT only (the AIR / TECH nukerush silos were removed, owner 2026-11-08)
+        if (Global::AISettings::Role != AiRole::FRONT || !Global::RoleSettings::Front::SiloGrid) return null;
         if (ai.frame < MinSeconds() * SECOND) return null;
         const int limit = Limit();
         // the grid's own def once reserved (played: a gifted builder of another faction ordered its own
@@ -318,20 +302,11 @@ namespace FrontSiloGrid {
         if (!EconomyHelpers::ShouldRushNuke(mi, ei, queued, total, limit, MetalGate(), EnergyGate())) {
             if (total < limit)
                 Held("10 s min income +" + int(mi) + " metal of " + int(MetalGate())
-                    + ", +" + int(ei) + " energy of " + int(EnergyGate()) + (rush ? " (nukerush)" : ""));
+                    + ", +" + int(ei) + " energy of " + int(EnergyGate()));
             return null;
         }
         if (limit > capsAt) {
-            if (role == AiRole::FRONT && !rush) {
-                UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllNukeSilos(), limit);
-            } else {
-                // only ever raised: TECH's own nuke plans keep their larger caps
-                array<string> names = UnitHelpers::GetAllNukeSilos();
-                for (uint i = 0; i < names.length(); ++i) {
-                    CCircuitDef@ sd = ai.GetCircuitDef(names[i]);
-                    if (sd !is null && sd.maxThisUnit < limit) sd.maxThisUnit = limit;
-                }
-            }
+            UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllNukeSilos(), limit);
             capsAt = limit;
         }
         if (!d.IsAvailable(ai.frame)) { Held(d.GetName() + " not available"); return null; }
@@ -381,7 +356,7 @@ namespace FrontSiloGrid {
             nextOrder = ai.frame + 10 * SECOND;
             @pending = t;
             pendingSlot = int(s); pendingFrame = ai.frame;
-            GenericHelpers::LogUtil(Tag() + "[SiloGrid] silo " + (total + 1) + " of " + limit + (rush ? " (nukerush)" : "")
+            GenericHelpers::LogUtil(Tag() + "[SiloGrid] silo " + (total + 1) + " of " + limit
                 + " on grid slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income sustained "
                 + (sustained / SECOND) + " s", 1);
             return t;

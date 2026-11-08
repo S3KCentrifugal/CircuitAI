@@ -11,7 +11,6 @@
 #include "pinpointer_pool.as"
 #include "ally_clear.as"
 #include "nuke_recon.as"
-#include "front_nukerush.as"
 #include "lolcannon_recon.as"
 #include "../combat/front_radar.as"
 #include "../combat/anti_spam.as"

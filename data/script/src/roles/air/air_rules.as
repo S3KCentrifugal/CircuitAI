@@ -40,9 +40,6 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "transition.turrets", u);
         @t = AirDefence::MakeTask(u, true);
         if (t !is null) return AirBuild::Record(t, "defence.antinuke", u);
-        // owner 2026-11-03: front nukerush roll on: silos in tight blocks off the layout, same gate as FRONT (front_silo_grid.as)
-        @t = FrontSiloGrid::Work(u);
-        if (t !is null) return AirBuild::Record(t, "nukerush.silo", u);
         // Home spots precede the starter. Recovery never repeats a paid opening.
         if (AirEconomy::t1 + AirEconomy::t2 == 0 && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) == 0) {
             // maxSpots limits native search candidates, not owned extractors.
