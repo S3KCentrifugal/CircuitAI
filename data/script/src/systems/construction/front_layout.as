@@ -156,6 +156,72 @@ namespace FrontLayout {
         return best;
     }
 
+    // D-494 (owner, 2026-11-07): the planned first factory, ordered on its
+    // reserved slot and pinned there (TECH's EnqueueOpeningFactory pattern).
+    // Native queues the start factory only once metal income covers it, and at
+    // the commander's position: on a start with few nearby mexes the commander
+    // walked from mex to mex for minutes and the factory then went up wherever it
+    // stood (played: Clyde, Pawn Retreat, Legion FRONT at the east edge, its
+    // factory at 3:54 and off the plan). Null without a plan or a usable slot.
+    //
+    // A pinned order the native serve refuses (played, Pawn Retreat east edge:
+    // "no connected factory corridor", D-451) dies at once. The order that died
+    // before a frame stood is remembered: the next order is an ordinary one near
+    // the start, where native placement applies the corridor rule itself; each
+    // retry waits StartFactoryRetrySeconds. One live order at a time.
+    IUnitTask@ firstOrder;
+    bool firstPinned = false;
+    int firstFails = 0;
+    int firstRetry = 0;
+    IUnitTask@ OrderFirstFactory()
+    {
+        if (firstOrder !is null && !firstOrder.IsDead()) return firstOrder;
+        if (firstOrder !is null) {
+            ++firstFails;
+            @firstOrder = null;
+            firstRetry = ai.frame + int(Global::RoleSettings::Front::StartFactoryRetrySeconds * SECOND);
+            GenericHelpers::LogUtil("[FrontLayout] first factory order ended without a frame ("
+                + (firstPinned ? "planned slot refused" : "ordinary site") + "): next order an ordinary site near the start (D-494)", 1);
+        }
+        if (ai.frame < firstRetry) return null;
+        const int defId=aiTerrainMgr.GetLayoutInt(ROOT+".first_def",-1);
+        if (defId<0) return null;
+        CCircuitDef@ def=ai.GetCircuitDef(defId);
+        if(def is null || !def.IsAvailable(ai.frame)) return null;
+        const int slot=aiTerrainMgr.GetLayoutInt(ROOT+".t1_slot",-1);
+        const bool pinned=firstFails==0 && slot>=0 && aiTerrainMgr.GetReservationState(slot)==0 && aiTerrainMgr.IsReservationBuildable(slot);
+        const AIFloat3 at=pinned?aiTerrainMgr.GetReservationPos(slot):Global::Map::StartPos;
+        IUnitTask@ task=aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW,def,at,null,
+            pinned?0.0f:Global::RoleSettings::Front::StartFactoryShake,false,true,
+            Global::RoleSettings::Front::StartFactoryOrderSeconds*SECOND));
+        if(task is null) return null;
+        if(pinned && !AiPinReservation(task,slot)) { aiBuilderMgr.AbortTask(task); return null; }
+        @firstOrder=task; firstPinned=pinned;
+        GenericHelpers::LogUtil("[FrontLayout] first factory "+def.GetName()+(pinned?" ordered on its slot at ":" ordered near the start at ")
+            +int(at.x)+","+int(at.z)+" (D-494)",1);
+        return task;
+    }
+
+    // INV-267 (D-494): a FRONT AI with a planned first factory has a factory
+    // standing, framed or ordered once StartFactoryTakeoverSeconds plus
+    // StartFactoryGraceSeconds have passed. From Front_EconomyUpdate; O(1) until
+    // the first factory stands, then nothing.
+    bool firstFactoryChecked = false;
+    void CheckFirstFactory()
+    {
+        if (firstFactoryChecked || Global::AISettings::Role != AiRole::FRONT) return;
+        if (aiFactoryMgr.GetFactoryCount() > 0) { firstFactoryChecked = true; return; }
+        const int defId = aiTerrainMgr.GetLayoutInt(ROOT + ".first_def", -1);
+        if (defId < 0) return;
+        const float after = Global::RoleSettings::Front::StartFactoryTakeoverSeconds + Global::RoleSettings::Front::StartFactoryGraceSeconds;
+        if (Global::RoleSettings::Front::StartFactoryTakeoverSeconds <= 0.f || ai.frame < int(after * SECOND)) return;
+        CCircuitDef@ def = ai.GetCircuitDef(defId);
+        if (def is null) return;
+        if (aiBuilderMgr.GetUnfinishedCount(def) > 0 || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), def) > 0) return;
+        Invariants::Violation("INV-267", "first-factory", "no first factory standing, framed or ordered " + int(ai.frame / SECOND)
+            + " s into the game (D-494)");
+    }
+
     void Adopt(CCircuitUnit@ factory) {
         if(factory is null || !Global::RoleSettings::Front::FactoryLayoutsEnabled) return;
         const string name=factory.circuitDef.GetName();
@@ -264,6 +330,7 @@ namespace FrontLayout {
                 const int rows=aiTerrainMgr.GetLayoutInt(ROOT+".rows",0);
                 GenericHelpers::LogUtil("[FrontLayout] reserved capacity="+capacity+" support rows="+rows+" facing="+facing,1);
                 const AIFloat3 site=aiTerrainMgr.GetReservationPos(aiTerrainMgr.GetLayoutInt(ROOT+".t1_slot",-1));
+                aiTerrainMgr.SetLayoutInt(ROOT+".first_def",first.id);  // D-494: OrderFirstFactory
                 GenericHelpers::LogUtil("[FrontLayout] first factory site="+site.x+","+site.z,1);
                 return;
             }

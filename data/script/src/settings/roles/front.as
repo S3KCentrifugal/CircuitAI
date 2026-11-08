@@ -25,6 +25,13 @@ namespace Front {
             // D-461: with no factory standing after this many seconds, the
             // commander takes the queued start factory itself. 0 disables.
             float StartFactoryTakeoverSeconds = 60.0f;
+            // D-494: before the first factory the commander takes no mex farther than
+            // this from the start; it builds the factory first (0 disables).
+            float StartFactoryMexRadius = 900.0f;
+            int StartFactoryOrderSeconds = 300;          // D-494: the planned start factory order's timeout
+            float StartFactoryGraceSeconds = 60.0f;      // D-494: INV-267 allows this long past the takeover
+            float StartFactoryRetrySeconds = 5.0f;       // D-494: after an order died without a frame
+            float StartFactoryShake = 256.0f;            // D-494: the ordinary site's search radius round the start
             float FactoryProductionBudgetShare = 0.65f;
             // D-468, INV-252: a construction turret holding a repair order on a
             // target outside its reach this long is logged as a violation
