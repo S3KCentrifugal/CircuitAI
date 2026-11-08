@@ -370,6 +370,10 @@ public:
 		bool spamRetreat = true;           // 2026-11-06: Ambassador/Negotiator/Boreas back off from spam
 		float spamRetreatDistance = 500.f;
 		int spamRetreatQuietFrames = 120;  // 4 s
+		// Owner 2026-11-08: no Approach99 / old path-query FIGHT while a known
+		// target (LOS, identified or unidentified radar, slow) or a ghost
+		// structure still owed its blind volleys is in weapon range.
+		bool holdBeforeMove = true;
 		int visibleMaxVolleys = 0;    // 0: seen porc until dead (owner 01:43Z)
 		int confirmFrames = 3 * 30;
 		int repeatFrames = 60 * 30;
@@ -434,6 +438,10 @@ public:
 		int approachTarget = -1;  // APPROACH99 target and order
 		int approachOrderUntil = -1;
 		springai::AIFloat3 approachSpot;
+		int holdLogKey = -1;      // 2026-11-08 hold before move: last logged reason (target id) ...
+		int holdLogFrame = -1;    // ... and when (one line per change or per 10 s)
+		int skipLogFrame = -1;    // ghost-skip reason lines, at most one per 10 s per unit
+		bool moveHeld = false;    // holding: the move / FIGHT under way was stopped once
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
