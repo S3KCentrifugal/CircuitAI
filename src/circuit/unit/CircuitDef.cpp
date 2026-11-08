@@ -263,6 +263,10 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 		costM *= 0.1f;  // avoid threat metal
 	}
 
+	// Artillery T1 exemption / priority_min_tech: BAR customparams.techlevel, 1 when absent.
+	it = customParams.find("techlevel");
+	techLevel = (it != customParams.end()) ? utils::string_to_float(it->second) : 1.f;
+
 //	if (customParams.find("boost_speed_mult") != customParams.end()) {
 //		AddAttribute(ATTR_TYPE(BOOST));
 //	}

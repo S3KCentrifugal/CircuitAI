@@ -14,9 +14,11 @@
 #define SRC_CIRCUIT_TASK_FIGHTER_ROUTETASK_H_
 
 #include "task/fighter/FighterTask.h"
+#include "task/fighter/ArtilleryTask.h"  // SGhostFire, GhostFireStep
 #include "spring/RouteCommand.h"
 
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace circuit {
@@ -96,6 +98,13 @@ private:
     const std::vector<springai::AIFloat3>& RouteFor(CCircuitUnit* unit) const;
 	std::map<CCircuitUnit*, int> lanes;   // unit -> signed lane index
 	std::set<CCircuitUnit*> engaging;  // temporarily paused for configured range micro
+	// Owner 2026-11-02: listed rocket artillery on a route (FRONT squads) also
+	// fires on ghost porc in range after ghost_idle_seconds (GhostFireStep).
+	std::unordered_map<int, SGhostFire> ghostFire;
+	std::unordered_map<int, bool> ghostSupport;
+	// Owner 2026-11-03: units the artillery snipe owns (ArtySnipeStep); route
+	// orders (script SetUnitRoute included) wait until it hands them back.
+	std::set<CCircuitUnit*> sniping;
 	int laneCount;
 	float laneSpacing;
     float rowSpacing = 0.f;

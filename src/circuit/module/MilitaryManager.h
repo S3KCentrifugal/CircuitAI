@@ -17,6 +17,7 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <unordered_map>
 #include <array>
 #include <type_traits>
 
@@ -292,6 +293,189 @@ public:
 		float acquireMargin = 64.f; // lock when within weapon range + this
 		float releaseMargin = 200.f; // keep it while within range + this
 	};
+	/*
+	 * Owner 2026-11-01: legacy-path artillery (no `ranged` attribute) only ever
+	 * ordered structures, so a human's commander parked in range was never shot.
+	 * Listed defs also take an enemy commander inside weapon range whose speed
+	 * is at most `maxSpeed` (stationary, building, walking slowly) as their first
+	 * target. Off unless the "artillery_commander" block in behaviour.json
+	 * enables it.
+	 */
+	struct SArtyCommInfo {
+		bool isEnabled = false;
+		std::unordered_set<CCircuitDef::Id> defs;
+		float maxSqSpeed = 0.f;  // (elmos/frame)^2
+		// Owner 2026-11-01: heavy units (Fatboy, Tzar, Mammoth ...) are the next
+		// targets after commanders, when moving at most `heavy_speed_fraction`
+		// of their own top speed. Value: that speed limit, (elmos/frame)^2.
+		std::unordered_map<CCircuitDef::Id, float> heavyMaxSqSpeed;
+		// Owner 2026-11-02: "ghost_units" fire on a ghost image of enemy porc
+		// (armed structure out of radar and LOS, spot not seen empty) already
+		// in weapon range, with nothing else to shoot, once they have not fired
+		// for "ghost_idle_seconds". They never move toward a ghost.
+		std::unordered_set<CCircuitDef::Id> ghostDefs;
+		int ghostIdleFrames = 300;
+		// Owner 2026-11-04 16:58Z: target lock. A unit of `defs` keeps the
+		// identified (LOS or radar) enemy it shoots until it dies; within
+		// range + lockMargin it holds and re-attacks, farther out (a structure)
+		// it only steps in to range - lockStepIn, never the forward path or a
+		// route resume. Only commander / heavy priority breaks it (and resumes
+		// it after). lockMobiles: also lock other mobiles (default structures,
+		// commanders and heavies only).
+		bool lockEnabled = true;
+		bool lockMobiles = false;
+		float lockMargin = 150.f;
+		float lockStepIn = 100.f;
+		// Owner 2026-11-04 20:03Z: after the normal pick and before the idle ghost
+		// volley, an unidentified radar dot (no def) in weapon range is fired on
+		// until dead; never walked toward.
+		bool radarDots = true;
+	};
+	const SArtyCommInfo& GetArtyCommInfo() const { return artyCommInfo; }
+	// Owner 2026-11-04 16:57Z: per enemy id, the last frame a wreck query ran
+	// and whether a wreck of it was seen at its ghost spot (ArtilleryTask).
+	std::unordered_map<int, std::pair<int, bool>>& GetWreckCache() { return wreckCache; }
+	/*
+	 * Owner 2026-11-03: artillery snipe ("artillery_snipe"). Listed long-range
+	 * rocket artillery (Thanatos, Arbiter, Boreas, Negotiator, Ambassador) that
+	 * comes near a known outranging pop-up artillery structure (Persecutor,
+	 * Rattlesnake, Eviscerator; seen, radar or ghost) first shoots the listed
+	 * non-light porc it can reach from outside every such structure's reach
+	 * (seen ones until dead, ghost images "volleys" times), then closes to
+	 * snipe_range_fraction of its own range and fires "volleys" at the
+	 * structure, and "volleys" more if radar or LOS shows it still alive.
+	 * Then the ordinary controller has the unit back. See ArtySnipeStep.
+	 * "direct_threats" (Pulsar, Bulwark, Bastion) skip the prep porc step.
+	 */
+	struct SArtySnipeInfo {
+		bool isEnabled = false;
+		std::unordered_set<CCircuitDef::Id> defs;     // the artillery that snipes
+		std::unordered_set<CCircuitDef::Id> threats;  // what it snipes
+		std::unordered_map<CCircuitDef::Id, int> threatRank;  // position in "threats": earlier goes first
+		// Owner 2026-11-03 01:36Z: Pulsar, Bulwark, Bastion. No prep porc: attacked
+		// from snipe_range_fraction (seen: until dead, at most visible_max_volleys;
+		// ghost: "volleys", then "volleys" more if seen alive).
+		std::unordered_set<CCircuitDef::Id> directThreats;
+		std::unordered_set<CCircuitDef::Id> porc;     // prep targets
+		bool avoidOtherPorc = true;   // prep spots also outside other armed porc
+		float threatMargin = 100.f;   // elmos past a structure's weapon range
+		float triggerDistance = 700.f;
+		float porcRadius = 1600.f;    // prep porc within this of the threat
+		float prepFraction = 0.99f;
+		float snipeFraction = 0.99f;
+		int volleys = 3;
+		// Owner 2026-11-04 05:45Z: blind volleys per unit at a ghost that is not a
+		// heavy (threats + direct threats get `volleys`).
+		int ghostVolleysOther = 1;
+		bool spamRetreat = true;           // 2026-11-06: Ambassador/Negotiator/Boreas back off from spam
+		float spamRetreatDistance = 500.f;
+		int spamRetreatQuietFrames = 120;  // 4 s
+		int visibleMaxVolleys = 0;    // 0: seen porc until dead (owner 01:43Z)
+		int confirmFrames = 3 * 30;
+		int repeatFrames = 60 * 30;
+		int stageFrames = 60 * 30;    // a stage/target with no volley this long is given up
+		// Test 2026-11-03 (ghost Persecutor): units went in one by one and all 8
+		// died. Units that must enter a threat's reach gather hold_margin outside
+		// it and go in together, once every unit on that threat is there or
+		// after group_wait_seconds.
+		float holdMargin = 150.f;
+		int groupWaitFrames = 240 * 30;
+		// Test round 2: gatherers went in alone while others were still on prep.
+		// Go in when every unit on the threat has gathered, or min_group have and
+		// settled for group_settle_seconds; past group_wait_seconds without
+		// min_group, give the threat up (repeat_seconds).
+		int minGroup = 3;
+		// Test rounds 3-7: 1200-range units (Thanatos, Arbiter) standing at 99%
+		// inside a 1390-1400 reach died nearly every time. Units with less range
+		// than this do the prep porc only and never close in on a threat whose
+		// reach is beyond their snipe spot (0: everyone closes in).
+		float closeMinRange = 1290.f;
+		int groupSettleFrames = 10 * 30;
+		// Owner 2026-11-03 20:53Z: double heavy = the aimed heavy's weapon-range
+		// half-disc (facing the group's hold point) and another heavy's share
+		// more than this fraction of the smaller one; then go in only with 3+.
+		float doubleHeavyOverlap = 0.5f;
+		// Owner 2026-11-03 21:58Z: at the double-heavy go-in, Boreas/Negotiator/
+		// Ambassador within this of the hold point or a gathered member join.
+		float recruitRadius = 500.f;
+	};
+	// Per unit, kept here so a task change (idle, re-task) keeps the sequence.
+	struct SArtySnipeState {
+		int stage = 0;          // 0 off, 1 prep porc, 2 snipe, 3 confirm wait, 4 confirm fire
+		int threat = -1;        // enemy unit id
+		bool direct = false;    // threat is a directThreats def
+		int target = -1;        // current prep target
+		bool targetGhost = false;
+		int volleys = 0;
+		int stageFrame = -1, targetFrame = -1;
+		int lastVolley = -1, reload = -1, fireSeen = -2;
+		int orderKey = -1, orderUntil = -1;
+		int lastCall = -1;
+		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
+		int recruitScan = -1;   // stage 2 gathering: recruitment scans at most every 0.5 s
+		int lockId = -1;        // owner 2026-11-04 16:58Z: locked target (enemy id), -1 none
+		int lockOrderUntil = -1;  // next re-issue of the lock's attack / step-in order
+		int lockLastHold = -1;  // last frame the lock drove the unit (resume log after a pause)
+		bool lockStepping = false;
+		int lockSeen = -1;      // last frame the lock was evaluated (task Execute / route update)
+		int missileTarget = -1, missileOrderUntil = -1;
+		int dotId = -1;         // owner 2026-11-04 20:03Z: unidentified radar dot fired on, -1 none
+		int dotOrderUntil = -1; // next re-issue of the attack on it
+		int dotScan = -1;       // no dot found: next scan frame
+		int pickTarget = -1;    // 2026-11-06: last default live pick (T1 exemption drop)
+		int rangeTarget = -1;   // 2026-11-06: last route range micro target (T1 exemption drop)
+		bool retreating = false;  // 2026-11-06: spam retreat
+		springai::AIFloat3 retreatPoint;
+		int retreatDamage = -1;   // last spam damage frame
+		int retreatAimed = -1;    // last re-aim frame
+		int retreatOrderUntil = -1;
+		int unsafeFrame = -1;     // 2026-11-06 Task C: real-reach safety, cached per frame
+		bool unsafeHere = false;
+		int approachTarget = -1;  // APPROACH99 target and order
+		int approachOrderUntil = -1;
+		springai::AIFloat3 approachSpot;
+		bool recruited = false; // joined by recruitment (does not recruit in turn)
+		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
+		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
+		bool go = false;        // stage 2: left the gathering spot (or no need to gather)
+		int goFrame = -1;       // stage 2: when it left the gathering spot
+		int ghostAim = -1;      // default targeting: ghost being given its blind volleys
+		int ghostShots = 0;
+		int ghostNeed = 3;      // its volleys: `volleys` for a heavy, ghost_volleys_other otherwise
+		bool ghostHeavy = true;
+		int ghostTick = -1;     // timed ghost fire (Tremor): last frame counted
+		int ghostTickAim = -1;  // ... and the ghost it was counted for
+		// Owner 2026-11-03 21:04Z synced volley: a gathered group walks in with
+		// fire held and all open fire in one frame (see ArtySnipeStep stage 2).
+		bool syncWait = false;  // stage 2: walking in, waiting for the group's volley
+		bool atSpot = false;    // stage 2: within 99% snipe range of the threat
+		bool fireHeld = false;  // fire state set to hold by the snipe (restore on exit)
+		float lastHp = -1.f;    // health percent last call (being hit releases the volley)
+		int hitFrame = -1;
+		int dhLoggedFor = -1;   // threat whose double-heavy share was last logged
+		bool atHold = false;    // stage 2: waiting at the gathering spot
+		int holdSince = -1;
+		bool hasSnipeSpot = false;  // stage 2: a checked snipe spot (outside other threats, safe walk)
+		springai::AIFloat3 snipeSpot;
+		int spotFor = -1;            // stage 2: threat the snipe / hold spots were chosen for
+		bool holding = false;        // stage 2: outranged (close_in_min_range), holding outside its reach
+		int drifts = 0;         // prep: times the unit slid into a threat's reach on this target
+		bool drifting = false;
+		// Owner 2026-11-04 20:08Z: ghost volleys per dark period. ghostDone: enemy id ->
+		// the dark period (CEnemyUnit::GetDarkSince) in which it got all its volleys;
+		// ghostCount: enemy id -> (dark period, volleys fired at it in that period).
+		// A re-sighting (radar or LOS) starts a new period: a fresh 3 (heavy) or 1.
+		std::unordered_map<int, int> ghostDone;
+		std::unordered_map<int, std::pair<int, int>> ghostCount;
+		springai::AIFloat3 spot;
+		std::unordered_map<int, int> skipUntil;  // enemy id -> frame (done prep targets, sniped threats)
+	};
+	const SArtySnipeInfo& GetArtySnipeInfo() const { return artySnipeInfo; }
+	SArtySnipeState& GetArtySnipeState(int unitId, int frame);
+	const std::unordered_map<int, SArtySnipeState>& GetArtySnipeStates() const { return artySnipeStates; }
+	// Double-heavy shares per (aimed, other) heavy pair: value, frame computed.
+	// Recomputed after ~10 s; pairs of dead heavies are dropped with the states.
+	std::unordered_map<uint64_t, std::pair<float, int>>& GetArtySnipeOverlaps() { return artySnipeOverlaps; }
 	// A def whose escort is rationed: a mobile radar or jammer.
 	bool IsSensorUnit(const CCircuitDef* cdef) const;
 	// Live sensors already escorting `task`.
@@ -511,6 +695,12 @@ private:
 	SNuclearInfo nuclearInfo;
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
+	std::unordered_map<int, std::pair<int, bool>> wreckCache;
+	SArtyCommInfo artyCommInfo;
+	SArtySnipeInfo artySnipeInfo;
+	std::unordered_map<int, SArtySnipeState> artySnipeStates;
+	std::unordered_map<uint64_t, std::pair<float, int>> artySnipeOverlaps;
+	int artySnipePrune = 0;
 
 	unsigned int preventCount = 0;
 	float amountFactor = 0.f;
