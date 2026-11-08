@@ -122,6 +122,15 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::artillerySpare>("commander_group_artillery_spare",0,100000),
         Group<&GC::artilleryEnergy>("commander_group_artillery_energy",0,1),
         Group<&GC::artilleryEnergyCover>("commander_group_artillery_energy_cover",0,1),
+        Group<&GC::artilleryT1Counter>("commander_group_artillery_t1_counter",0,6000),             // D-495
+        Group<&GC::artilleryT1Value>("commander_group_artillery_t1_value",0,100),
+        Group<&GC::artilleryT1Cluster>("commander_group_artillery_t1_cluster",0,3000),
+        Group<&GC::artilleryT1MobileRange>("commander_group_artillery_t1_mobile_range",0,3000),
+        Group<&GC::artilleryT1HeightGain>("commander_group_artillery_t1_height_gain",0,2),
+        Group<&GC::artilleryT1Margin>("commander_group_artillery_t1_margin",0,512),
+        Group<&GC::artilleryT1VisionSeconds>("commander_group_artillery_t1_vision_seconds",0,600),
+        Group<&GC::artilleryT1Max>("commander_group_artillery_t1_max",0,10),
+        Group<&GC::artilleryT1EvalSeconds>("commander_group_artillery_t1_eval_seconds",1,120),
         Group<&GC::seatMex>("commander_group_seat_mex",0,1),
         Group<&GC::seatBaseRadius>("commander_group_seat_base_radius",0,6000),
         Group<&GC::seatApproachAhead>("commander_group_seat_approach_ahead",-2000,4000),
@@ -360,8 +369,10 @@ bool CCommanderController::SetOption(const std::string& name,float value) {
             return true;
         }
     }
-    if(name=="commander_group_artillery_t2_definition" || name=="commander_group_artillery_t1_definition") {  // D-479
-        auto& defs=name=="commander_group_artillery_t2_definition"?artilleryT2Defs:artilleryT1Defs;
+    if(name=="commander_group_artillery_t2_definition" || name=="commander_group_artillery_t1_definition"
+        || name=="commander_group_artillery_t1_counter_definition") {  // D-479, D-495
+        auto& defs=name=="commander_group_artillery_t2_definition"?artilleryT2Defs
+            :name=="commander_group_artillery_t1_definition"?artilleryT1Defs:artilleryT1CounterDefs;
         if(value==-1) {defs.clear();return true;}
         if(value<0 || value!=std::floor(value) || value>100000 || !ai->GetCircuitDefSafe(int(value))) return false;
         if(std::find(defs.begin(),defs.end(),int(value))==defs.end()) defs.push_back(int(value));
