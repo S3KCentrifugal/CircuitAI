@@ -881,8 +881,16 @@
 				"power": 1.0
 			},
 			"legerailtank": {
+				// owner 2026-10-28: Daedalus on the ranged controller (was melee: walked onto its targets).
+				// owner 2026-11-04: low_trajectory: the rail is a no-gravity straight line, so it locks a
+				// commander (commander_snipe) only when the terrain test to it clears.
+				// It engages non-spam from near max range; its rail is flat, so a shot needs a clear
+				// straight line over the terrain from where it stands. Radar dots stay allowed: its sight
+				// (750) is shorter than its range (1000). Same spam roster and commander rule as the Myrmidon.
+				"fire_state": 2,
 				"role": ["assault"],
-				"attribute": ["melee"],
+				"attribute": ["ranged"],
+				"ranged": {"target_mode": "skirmish", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
