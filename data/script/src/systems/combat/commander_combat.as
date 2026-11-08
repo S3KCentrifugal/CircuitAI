@@ -151,6 +151,19 @@ namespace CommanderCombat {
             Option("commander_group_artillery_spare",15.f);
             Option("commander_group_artillery_energy",.5f);
             Option("commander_group_artillery_energy_cover",1.f);
+            // D-495: the T1 gun only for a target, at a site in its reach outside
+            // every known enemy weapon. FRONT only: the profile veto (D-142) stays
+            // for every other role, so their T1 income is forced to 0 below.
+            Option("commander_group_artillery_t1_counter",1400.f);
+            Option("commander_group_artillery_t1_value",1.f);
+            Option("commander_group_artillery_t1_cluster",400.f);
+            Option("commander_group_artillery_t1_mobile_range",820.f);
+            Option("commander_group_artillery_t1_height_gain",.6f);
+            Option("commander_group_artillery_t1_margin",64.f);
+            Option("commander_group_artillery_t1_vision_seconds",30.f);
+            Option("commander_group_artillery_t1_max",2.f);
+            Option("commander_group_artillery_t1_eval_seconds",10.f);
+            if(role!=int(AiRole::FRONT)) aiBuilderMgr.SetCommanderCombatOption("commander_group_artillery_t1_income",0.f);
             // D-480: the seat's T1 constructor collects base, then approach, mexes first (0: off).
             Option("commander_group_seat_mex",0.f);
             Option("commander_group_seat_base_radius",1200.f);
@@ -184,11 +197,14 @@ namespace CommanderCombat {
                     }
                 }
             }
-            for(uint tier=0;tier<2;++tier) {
-                const string key=tier==0?"commander_group_artillery_t2_definition":"commander_group_artillery_t1_definition";
+            // D-479 T2 and T1 artillery; D-495 the T1 guns that may take
+            // counter-battery work (not the Amputator: 1000 range loses that duel).
+            for(uint tier=0;tier<3;++tier) {
+                const string key=tier==0?"commander_group_artillery_t2_definition"
+                    :tier==1?"commander_group_artillery_t1_definition":"commander_group_artillery_t1_counter_definition";
                 aiBuilderMgr.SetCommanderCombatOption(key,-1.f);
                 array<string>@ names=aiSetupMgr.ConfigString("commander/combat/"+key+"s",
-                    tier==0?"armamb,cortoast,legacluster":"armguard,corpun,legcluster").split(",");
+                    tier==0?"armamb,cortoast,legacluster":tier==1?"armguard,corpun,legcluster":"armguard,corpun").split(",");
                 for(uint i=0;i<names.length();++i) {
                     CCircuitDef@ gun=ai.GetCircuitDef(names[i]);
                     if(gun !is null) aiBuilderMgr.SetCommanderCombatOption(key,float(gun.id));

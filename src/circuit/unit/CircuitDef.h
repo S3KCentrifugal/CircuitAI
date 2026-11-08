@@ -234,6 +234,9 @@ public:
 	void SetStandoff(float value) { standoff = value; }
 	void SetBuildAllowed(bool value) { buildAllowed = value; }
 	bool IsAvailable(int frame) const { return IsAvailable() && (frame >= sinceFrame); }
+	// D-495: the cap and the cooldown without the JSON construction veto, for
+	// the one gated caller allowed past it (the FRONT group's T1 artillery).
+	bool IsCapAvailable(int frame) const { return (maxThisUnit > count) && (frame >= sinceFrame); }
 
 	void IncBuild() { ++buildCounts; }
 	void DecBuild() { --buildCounts; }
