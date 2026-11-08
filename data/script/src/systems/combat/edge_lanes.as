@@ -296,17 +296,25 @@ namespace EdgeLanes {
         array<AIFloat3>@ rim = Rim(d, from);
         const int n = int(rim.length());
         array<bool> back(n);
+        array<bool> behind(n);
         const float ts = (toward.x - s0.x) * nx + (toward.z - s0.z) * nz;
         int i1 = -1;
         float best = 1.0e30f;
         for (int i = 0; i < n; ++i) {
             const AIFloat3 p = rim[i];
-            back[i] = false;
+            back[i] = false; behind[i] = false;
             if (p.x < 0.0f) continue;
             const float al = (p.x - s0.x) * ax + (p.z - s0.z) * az;
             if (al < backAlong) continue;
             const float de = NearestSq(p, theirs);
-            if (de > reach || de >= NearestSq(p, ours)) continue;   // never an ally's ground
+            if (de >= NearestSq(p, ours)) continue;   // never an ally's ground
+            // owner, 2026-11-08 (The Tartar Steppe): the enemy starts stand 1,950-2,230
+            // from the rim, so RimBackReach kept only the corner spawns' stretches and
+            // both edge lanes turned near their corner. Behind the median enemy start
+            // and nearer an enemy than us, the walk (and its middle) goes on past the
+            // reach; the reach still picks where the lane first meets the back.
+            behind[i] = true;
+            if (de > reach) continue;
             back[i] = true;
             const float sd = (p.x - s0.x) * nx + (p.z - s0.z) * nz;
             // where the lane's line meets the back (a little deeper wins), or its far end on the lane's side
@@ -325,10 +333,26 @@ namespace EdgeLanes {
             int j = i1, gap = 0;
             for (int c = 0; c < n; ++c) {
                 j = (j + dir + n) % n;
-                if (back[j]) { ends[k] = j; gap = 0; }
+                if (back[j] || behind[j]) { ends[k] = j; gap = 0; }
                 else if (gap < Global::Spam::RimGapSamples
                     && (rim[j].x < 0.0f || NearestSq(rim[j], theirs) < NearestSq(rim[j], ours))) ++gap;
-                else break;
+                else {
+                    // owner, 2026-11-08 (The Tartar Steppe): the top-left corner is
+                    // unreachable for 5-6 samples, but the rim either side of it (pulled
+                    // in) stands ~600 apart. Bridge such a pocket: the next back/behind
+                    // sample within RimBridgeSamples whose point is within RimBridgeReach
+                    // of the walk's last one. O(RimBridgeSamples) per break.
+                    int next = -1, skipped = 0, q = j;
+                    for (int b = 1; b <= Global::Spam::RimBridgeSamples; ++b) {
+                        q = (q + dir + n) % n;
+                        if (q == i1) break;
+                        if ((back[q] || behind[q]) && MapHelpers::SqDist(rim[q], rim[ends[k]])
+                            <= Global::Spam::RimBridgeReach * Global::Spam::RimBridgeReach) { next = q; skipped = b; break; }
+                    }
+                    if (next < 0) break;
+                    c += skipped;   // the skipped samples count toward the one lap
+                    j = next; ends[k] = j; gap = 0;
+                }
             }
         }
         int t = sideSign;
@@ -354,7 +378,7 @@ namespace EdgeLanes {
         const int im = (ends[1] + span / 2) % n;
         for (int k = 0; k <= span / 2; ++k) {
             const int a = (im + k) % n, b = (im - k + n) % n;
-            const int j = back[a] ? a : (back[b] ? b : -1);
+            const int j = behind[a] ? a : (behind[b] ? b : -1);
             if (j < 0) continue;
             if (MapHelpers::SqDist(rim[j], turn) > 400.0f * 400.0f && MapHelpers::SqDist(rim[j], home) > 400.0f * 400.0f) mid = rim[j];
             break;

@@ -119,6 +119,12 @@ namespace Spam {
         float RimDepth = 1536.0f;
         float RimBackReach = 2000.0f;
         int RimGapSamples = 3;
+        // owner, 2026-11-08 (The Tartar Steppe): past RimGapSamples the walk still
+        // bridges a pocket of up to RimBridgeSamples to a back sample within
+        // RimBridgeReach of its last one (an unreachable corner, the rim either side
+        // pulled in close together). A long sea or cliff run stays a stop.
+        int RimBridgeSamples = 8;
+        float RimBridgeReach = 1600.0f;
         // owner, 2026-10-26: after the jackknife to the back edge's far corner, every
         // lane (edge lanes, gantries, FRONT and TECH pumps) runs back along the same
         // edge: its middle, then its other corner (nearest where the lane reached it).
