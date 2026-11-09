@@ -59,6 +59,9 @@ const control::CConfigTable<BattleGroupConfig> kTable({
     F<&BattleGroupConfig::airMemorySeconds>("air_memory_seconds", 0.f, 300.f),
     F<&BattleGroupConfig::escortBehind>("escort_behind", 0.f, 1000.f),
     F<&BattleGroupConfig::escortSpacing>("escort_spacing", 16.f, 256.f),
+    // D-512: trade momentum (control/kernel/TradeMomentum.h)
+    F<&BattleGroupConfig::momentumPrior>("momentum_prior", 1.f, 10000.f),
+    F<&BattleGroupConfig::momentumHalfLife>("momentum_half_life", 1.f, 1200.f),
 });
 // D-509: the template rank whose types are anti-air escorts.
 constexpr const char* AIR_RANK = "air";
@@ -209,6 +212,7 @@ std::vector<CBattleGroupController::GroupView> CBattleGroupController::Snapshot(
         v.screens = l.screens; v.rears = l.rears;
         v.orderFrame = l.orderFrame; v.seen = l.seen; v.why = l.why;
         v.airNeed = l.airNeed; v.airCap = l.airCap; v.escorts = l.escorts; v.airHeld = l.airHeld;
+        v.momentum = l.momentum; v.killed = l.trades.killed; v.lost = l.trades.lost;
         if (l.tmpl >= 0 && l.tmpl < int(templates.size()) && templates[l.tmpl].spec.Enabled()) {
             const auto& t = templates[l.tmpl];
             const auto* screen = group_composition::Find(t.ranks, "screen");
@@ -307,6 +311,25 @@ void CBattleGroupController::AssignEscorts(int frame)
         const BattleGroupConfig& c = templates[l.tmpl].config;
         e.slot = air_defence::Slot(l.escortCenter, l.escortBack, l.rearDepth, c.escortBehind, l.escortIndex++, l.escorts, c.escortSpacing);
     }
+}
+
+CBattleGroupController::Group* CBattleGroupController::GroupOf(int unitId)
+{
+    int key = -1;
+    if (const auto d = directives.find(unitId); d != directives.end()) key = d->second.group;
+    else if (const auto e = escorts.find(unitId); e != escorts.end()) key = e->second.group;
+    const auto g = key >= 0 ? groups.find(key) : groups.end();
+    return g == groups.end() ? nullptr : &g->second;
+}
+void CBattleGroupController::RecordKill(int attackerId, float metal, int frame)
+{
+    if (Group* l = GroupOf(attackerId))
+        trade::Kill(l->trades, metal, frame, int(templates[l->tmpl].config.momentumHalfLife * FRAMES_PER_SEC));
+}
+void CBattleGroupController::RecordLoss(int unitId, float metal, int frame)
+{
+    if (Group* l = GroupOf(unitId))
+        trade::Loss(l->trades, metal, frame, int(templates[l->tmpl].config.momentumHalfLife * FRAMES_PER_SEC));
 }
 
 bool CBattleGroupController::HasAirGroups() const
@@ -425,6 +448,11 @@ void CBattleGroupController::Observe(Group& l, CRangedWorld& world, int frame)
     }
     l.escortCenter = P(center); l.escortBack = back; l.rearDepth = rear;
     ObserveAir(l, t, world, center, frame);
+    // D-512: the trade momentum, to both cohorts' plans. O(1).
+    trade::Decay(l.trades, frame, int(t.config.momentumHalfLife * FRAMES_PER_SEC));
+    l.momentum = trade::Momentum(l.trades, t.config.momentumPrior);
+    world.SetCohortMomentum(l.key, l.momentum);
+    if (l.partner >= 0) world.SetCohortMomentum(l.partner, l.momentum);
     // The battle group's own order: the cohort's assessment.
     const battle_group::Order internal = battle_group::InternalOrder(int(plan.mode), plan.target >= 0, plan.committed);
     if (l.script != battle_group::Order::NONE && frame - l.scriptFrame > int(t.config.scriptOrderSeconds * 30.f)) l.script = battle_group::Order::NONE;

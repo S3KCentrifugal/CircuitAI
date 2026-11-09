@@ -21,6 +21,7 @@
 #include "control/core/GroupController.h"
 #include "control/kernel/ActionWhy.h"
 #include "control/kernel/AirDefence.h"
+#include "control/kernel/TradeMomentum.h"
 #include "control/kernel/BattleGroup.h"
 #include "control/group/GroupRegistry.h"
 
@@ -60,6 +61,9 @@ struct BattleGroupConfig {
     // elmos behind the screen's rear edge, escort_spacing apart.
     float airRadius = 1600.f, airKillSeconds = 10.f, airMemorySeconds = 20.f;
     float escortBehind = 100.f, escortSpacing = 64.f;
+    // D-512 (control/kernel/TradeMomentum.h): the trade ledger's prior (metal
+    // a sign needs) and half-life (seconds).
+    float momentumPrior = 300.f, momentumHalfLife = 120.f;
 };
 
 class CBattleGroupController final : public IGroupController {
@@ -92,6 +96,10 @@ public:
     // the shortfall no assigned, spare, queued or building escort covers
     // (air_defence::Request). O(R + Q) for R rank types and Q factory tasks.
     CCircuitDef* AirRequest(const CCircuitDef* factoryDef) const;
+    // D-512: a kill by a member (the engine's enemy-destroyed attacker) and the
+    // loss of a member, booked to its group's trade ledger. O(1) expected.
+    void RecordKill(int attackerId, float metal, int frame);
+    void RecordLoss(int unitId, float metal, int frame);
     // A group with an air rank exists: an escort has somewhere to go. O(G).
     bool HasAirGroups() const;
 
@@ -112,6 +120,7 @@ public:
         int airNeed = 0, airCap = 0, escorts = 0;  // D-509: escorts needed, the most it takes, assigned
         float airHeld = 0.f;                       // D-509: the air HP it plans for
         std::vector<int> escortIds;                // D-509: its escorts, id order
+        float momentum = 0.f, killed = 0.f, lost = 0.f;  // D-512: the trade ledger, decayed to the last update
     };
     std::vector<GroupView> Snapshot() const;
 
@@ -141,7 +150,10 @@ private:
         int airNeed = 0, airCap = 0, escorts = 0;
         ranged::Point escortCenter{0.f, 0.f}, escortBack{1.f, 0.f};
         int escortIndex = 0;  // the next slot index while slots are laid out (AssignEscorts)
+        trade::Ledger trades;  // D-512: metal killed and lost, decaying
+        float momentum = 0.f;  // D-512: from `trades`, set by Observe
     };
+    Group* GroupOf(int unitId);  // D-512: the group a member or escort is in, or null
     struct Escort { int group = -1; ranged::Point slot{0.f, 0.f}; };
     void ObserveAir(Group& l, const Template& t, CRangedWorld& world, const springai::AIFloat3& center, int frame);
     void AssignEscorts(int frame);

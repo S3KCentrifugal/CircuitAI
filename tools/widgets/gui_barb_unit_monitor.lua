@@ -57,10 +57,10 @@ end
 
 -- ---------------------------------------------------------------- constants
 
-local WIN_W, WIN_H = 360, 680          -- unscaled px
+local WIN_W, WIN_H = 360, 694          -- unscaled px
 local LAUNCHER = 26                    -- unscaled px, as the team link's
 local ROW_H = 20
-local DETAIL_H = 236
+local DETAIL_H = 250
 local UNIT_CARD_H = 100
 local POLL_SECONDS = 1.0
 local LEASE_RENEW_SECONDS = 15
@@ -251,6 +251,8 @@ local function parseGroups(payload)
 				-- D-509: anti-air escorts needed, the most it takes, the air HP planned for, the escorts
 				airNeed = tonumber(f[29]) or 0, airCap = tonumber(f[30]) or 0, airHeld = tonumber(f[31]) or 0,
 				escorts = members(f[32]),
+				-- D-512: trade momentum and the decayed metal killed and lost
+				momentum = tonumber(f[33]) or 0, killed = tonumber(f[34]) or 0, lost = tonumber(f[35]) or 0,
 			}
 		elseif f[1] == "C" and #f >= 17 then
 			local c = {
@@ -357,6 +359,7 @@ local PHRASE = {
 	rushed = "rushed by shorter-ranged raiders: kiting them", toward_help = "retreating toward allied help",
 	down_lane = "retreating back down the lane", to_base = "retreating toward the base",
 	stands = "raiders too fast to kite and help too far: stands and fires",
+	pressing = "trading well: pushes on", falling_back = "trading badly: falls back to heal",
 	escape = "inside an enemy's reach: stepping out", poke_in = "weapon ready: stepping in", poke_out = "reloading: stepping out",
 	hold_incoming = "letting a closing enemy into range", shooting = "has a shot: stays and fires", to_slot = "walking to its place in the rows",
 	siege_station = "on the siege station", siege_step = "last step into range of the tower", tuck = "enemy leaked: tucking behind the screen",
@@ -732,6 +735,9 @@ local function detailRows(g)
 			{ "Support", d.rears },
 			{ "Spread", string.format("%.2fx", d.spread) }, { "Separation", string.format("%d", d.separation) },
 			{ "Stand firm", d.standFirm and "yes" or "no" },
+			-- D-512: trading well (green) or badly (warn)
+			{ "Trades", string.format("%+.2f (killed %d, lost %d)", d.momentum or 0, d.killed or 0, d.lost or 0),
+				(d.momentum or 0) < 0 and C.warn or ((d.momentum or 0) > 0 and C.ok or nil) },
 			-- D-509: escorts with it / needed (the most it takes)
 			{ "Anti-air", string.format("%d / %d (max %d)", #(d.escorts or {}), d.airNeed or 0, d.airCap or 0),
 				(#(d.escorts or {}) < (d.airNeed or 0)) and C.warn or nil },

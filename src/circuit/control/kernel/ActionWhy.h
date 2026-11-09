@@ -67,6 +67,8 @@ enum Bit : int {
     DOWN_LANE,        // D-510: no help in reach: its retreat heads back down the lane
     TO_BASE,          // D-510: no help and no lane behind it: its retreat heads for the base
     STANDS,           // D-510: rushed by raiders it cannot outrun, help too far: stands and fires
+    PRESSING,         // D-512: trading well: commits sooner and pushes on with nothing in sight
+    FALLING_BACK,     // D-512: trading badly: falls back toward help to heal
     COUNT
 };
 inline constexpr const char* CODES[] = {
@@ -74,7 +76,7 @@ inline constexpr const char* CODES[] = {
     "favorable", "outmatched", "unknown_contact", "hazard_on_path", "battery", "target_repaired",
     "too_far", "off_map", "static_cover", "outranged", "siege", "assembling", "spread_out",
     "jammer_hold", "screening", "rush", "rush_cooldown", "follows_screen",
-    "rushed", "toward_help", "down_lane", "to_base", "stands",
+    "rushed", "toward_help", "down_lane", "to_base", "stands", "pressing", "falling_back",
 };
 static_assert(sizeof(CODES) / sizeof(CODES[0]) == COUNT, "why::plan::CODES must follow why::plan::Bit");
 } // namespace plan

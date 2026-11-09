@@ -29,7 +29,9 @@ MICRO_KEYS = ('threat_weight', 'overkill_skip', 'retreat_health', 'retreat_veter
               'jammer_hold', 'siege_standoff', 'sustained_rush_static_weight',  # D-505, D-507
               'rush_kite', 'rush_range_margin', 'rush_closing_speed', 'rush_detect_radius', 'rush_min_count',  # D-510
               'rush_value_share', 'rush_hold_seconds', 'rush_help_slack', 'retreat_to_help', 'help_radius', 'help_ratio',
-              'help_static_weight', 'help_cone', 'help_lane_step', 'escape_help_weight')
+              'help_static_weight', 'help_cone', 'help_lane_step', 'escape_help_weight',
+              'momentum_press', 'momentum_caution', 'momentum_push', 'momentum_fall_back', 'push_step',  # D-512
+              'fall_back_distance')
 
 
 # D-500: the formation families the base still names by their old (line) names.

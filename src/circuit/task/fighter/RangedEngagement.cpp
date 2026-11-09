@@ -86,19 +86,39 @@ void CRangedEngagement::Release(CCircuitUnit* unit,bool commands)
     if(!commands || !unit || unit->IsDead()) return;
     if(target>=0) {
         TRY_UNIT(ai,unit,
-            unit->CancelTaskTarget(target);
+            if(groundTarget) unit->CancelTaskGroundTarget(); else unit->CancelTaskTarget(target);
         )
     }
     unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
     unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
 }
+// D-511: BAR drops a unit priority target once it is neither in sight nor on
+// radar (unit_target_on_the_move: TARGET_UNSEEN past its grace), so rockets
+// that outrange their own sight stopped firing at a tower they had nearly
+// killed when the spotter's sight moved off it. A structure cannot move: an
+// identified one out of sight and radar (kept as a contact since D-507) is
+// targeted at its last known position instead, which BAR keeps. One enemy
+// lookup per call, O(log E).
+bool CRangedEngagement::RememberedStructure(int enemyId,AIFloat3& pos) const
+{
+    const auto* e=ai->GetEnemyManager()->GetEnemyUnit(enemyId);
+    if(e==nullptr || e->IsInRadarOrLOS() || e->GetCircuitDef()==nullptr || e->GetCircuitDef()->IsMobile()) return false;
+    pos=e->GetPos();
+    return true;
+}
+
 void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,float damage,float score)
 {
     const int frame=ai->GetLastFrame();
-    if(selected==target && weapon==weaponIndex) {
+    AIFloat3 ground;
+    const bool atGround=selected>=0 && RememberedStructure(selected,ground);  // D-511
+    if(selected==target && weapon==weaponIndex && atGround==groundTarget) {
         // BAR owns the actual priority target. A lost command must be repaired;
-        // an unchanged live intent must not be resent each decision tick.
-        if(selected<0 || frame-targetFrame<30 || int(unit->GetUnit()->GetRulesParamFloat("unitTargetID",-1.f))==selected) return;
+        // an unchanged live intent must not be resent each decision tick. A
+        // ground target reports no unitTargetID: a STOP clearing it is seen
+        // through the unit's own record (HasTaskGround).
+        if(selected<0 || frame-targetFrame<30) return;
+        if(atGround ? unit->HasTaskGround() : int(unit->GetUnit()->GetRulesParamFloat("unitTargetID",-1.f))==selected) return;
     }
     // Owner 2026-10-19: a live priority target is kept for target_min_seconds;
     // each swap costs CANCEL+SET. The held target must have passed this tick's
@@ -128,9 +148,16 @@ void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,
     if(selected!=target || weapon!=weaponIndex) world.ReleaseShot(id);
     TRY_UNIT(ai,unit,
         // Through the unit, so a D-352 commander lock keeps BAR's list.
-        if(target>=0 && target!=selected) unit->CancelTaskTarget(target);
-        if(selected>=0) unit->SendTaskTarget(selected);
+        if(target>=0 && (target!=selected || groundTarget!=atGround)) {
+            if(groundTarget) unit->CancelTaskGroundTarget(); else unit->CancelTaskTarget(target);
+        }
+        if(selected>=0) {
+            if(atGround) unit->SendTaskGroundTarget(ground); else unit->SendTaskTarget(selected);
+        }
     )
+    if(atGround && (selected!=target || !groundTarget))   // D-511: once per new ground target
+        ai->LOG("RANGED: ground target unit=%d enemy=%d at=%.0f,%.0f frame=%d",id,selected,ground.x,ground.z,frame);
+    groundTarget=atGround;
     if(weapon!=weaponIndex) {
         liveWeapon.reset(weapon>=0 ? unit->GetUnit()->GetWeapon(caps.weapons[weapon].mount.get()) : nullptr);
         lastReload=liveWeapon ? liveWeapon->GetReloadFrame() : -1;

@@ -148,6 +148,9 @@ public:
         bool rushed=false, backToHelp=false;
         int rushUntil=-1, helpFrame=-1, helpKind=0;  // helpKind: 0 away, 1 help, 2 lane, 3 base
         int rushDecision=-1;                          // the last rush response: 1 kite, 0 stand, -1 none (log on change)
+        // D-512: the battle group's trade momentum, written by its controller
+        // (CBattleGroupController::Observe); 0 outside a battle group.
+        float momentum=0.f;
         rush_response::Detection rush;
         springai::AIFloat3 helpAnchor;
     };
@@ -171,6 +174,8 @@ public:
     void MergeCohorts(int from,int into);
     int SplitCohort(int key,const std::vector<int>& leaving);
     void SetRecruitTarget(int key,int target,bool urgent=false);
+    // D-512: the battle group's trade momentum for a cohort, O(log K).
+    void SetCohortMomentum(int key,float momentum) { const auto it=cohorts.find(key); if(it!=cohorts.end()) it->second.momentum=momentum; }
     int CohortOf(int id) const { const auto it=membership.find(id); return it==membership.end()?-1:it->second; }
     // D-508: a member's factors from its last decision (why::unit bits), for
     // the unit monitor. One hash write per member decision; erased in Leave.
@@ -236,6 +241,10 @@ private:
     ranged::Point AwayFromThreat(const CohortPlan& g) const;
     void FindHelp(CCircuitUnit* unit, CohortPlan& g, ranged::Point away);
     void TurnToHelp(CCircuitUnit* unit, CohortPlan& g);
+    // D-512: with nothing in sight, push on down the lane (winning) or walk
+    // to help and hold there (losing). O(log lane) / FindHelp's cost.
+    void PushOn(CCircuitUnit* unit, CohortPlan& g);
+    void FallBackToHelp(CCircuitUnit* unit, CohortPlan& g);
     std::vector<rush_response::Cell> helpCells;  // reused per anchor search
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;

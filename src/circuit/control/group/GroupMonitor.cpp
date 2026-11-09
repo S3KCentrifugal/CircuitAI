@@ -92,7 +92,8 @@ std::string DescribeGroups(CCircuitAI* ai, int minTaskMembers)
 			// D-509: appended, the anti-air need, its cap, the air HP held and the escorts.
 			out += "," + std::to_string(l.airNeed) + "," + std::to_string(l.airCap) + "," + Num(l.airHeld, 0) + ",";
 			AppendMembers(out, l.escortIds);
-			out += ";";
+			// D-512: appended, the trade momentum and the decayed metal killed and lost.
+			out += "," + Num(l.momentum, 2) + "," + Num(l.killed, 0) + "," + Num(l.lost, 0) + ";";
 		}
 	}
 

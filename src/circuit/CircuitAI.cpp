@@ -402,6 +402,9 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			struct SEnemyDestroyedEvent* evt = (struct SEnemyDestroyedEvent*)data;
 			CEnemyInfo* enemy = GetEnemyInfo(evt->enemy);
 			if (enemy != nullptr) {
+				// D-512: a kill by a battle group member books its metal to the group.
+				if (battleGroupController != nullptr && evt->attacker >= 0)
+					battleGroupController->RecordKill(evt->attacker, enemy->GetCost(), lastFrame);
 				allyTeam->DyingEnemy(enemy->GetData(), lastFrame);
 				ret = 0;
 			} else {
@@ -1338,6 +1341,8 @@ int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	unit->MarkDestroying();
 	destroyed.insert(unit->GetId());
 	const int lostId = unit->GetId();
+	// D-512: before its membership is erased, a member's loss books to its group.
+	if (battleGroupController != nullptr) battleGroupController->RecordLoss(lostId, unit->GetCircuitDef()->GetCostM(), lastFrame);
 	allyTeam->GetNuclearHistory().Prune(lastFrame, [lostId](int owner) { return owner != lostId; });
 	allyTeam->GetPulseClaims().ReleasePending(lostId);
 	if (battle != nullptr) {

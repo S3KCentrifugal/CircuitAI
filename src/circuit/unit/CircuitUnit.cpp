@@ -367,6 +367,7 @@ void CCircuitUnit::CmdStop(short options, int timeout)
 	unit->Stop(options, timeout);
 	priorityTarget = -1; // BAR STOP cancels the priority list; allow a new intent.
 	taskTarget = -1;
+	taskGround = false;  // D-511: so is a ground target
 	if (commanderTarget >= 0) {  // D-352: STOP must not end a commander lock
 		float params[] = {float(commanderTarget)};
 		SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
@@ -406,6 +407,24 @@ void CCircuitUnit::SendTaskTarget(int targetId)
     SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
 }
 
+void CCircuitUnit::SendTaskGroundTarget(const AIFloat3& pos)
+{
+    taskGround = true; taskGroundPos = pos;
+    if (commanderTarget >= 0) return;  // restored when the commander lock ends
+    float params[] = {pos.x, pos.y, pos.z};
+    SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_SET_TARGET, params);
+}
+
+void CCircuitUnit::CancelTaskGroundTarget()
+{
+    if (!taskGround) return;
+    taskGround = false;
+    if (commanderTarget >= 0) return;
+    // BAR cancels a ground target by its position (within its cancel distance).
+    float params[] = {taskGroundPos.x, taskGroundPos.y, taskGroundPos.z};
+    SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_CANCEL_TARGET, params);
+}
+
 void CCircuitUnit::CancelTaskTarget(int targetId)
 {
     if (taskTarget == targetId) taskTarget = -1;
@@ -427,6 +446,7 @@ void CCircuitUnit::SetCommanderTarget(int commId, int frame)
         SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_UNIT_CANCEL_TARGET, params);
         commanderTarget = -1;
         if (taskTarget >= 0) SendTaskTarget(taskTarget);
+        else if (taskGround) SendTaskGroundTarget(taskGroundPos);  // D-511
         return;
     }
     // BAR keeps the list across MOVE/FIGHT; STOP is repaired in CmdStop. The

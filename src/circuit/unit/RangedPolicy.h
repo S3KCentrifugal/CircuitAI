@@ -129,6 +129,15 @@ struct RangedPolicy {
     // a member's escape leans escape_help_weight toward that axis.
     float retreatToHelp = 0.f, helpRadius = 2500.f, helpRatio = 1.f, helpStaticWeight = 3.f;
     float helpCone = 70.f, helpLaneStep = 800.f, escapeHelpWeight = .5f;
+    // D-512 (control/kernel/TradeMomentum.h): the battle group's trade momentum m
+    // in (-1, 1). momentum_press: winning lowers the advantage a commitment needs
+    // and raises its loss limit by press x m; momentum_caution: losing does the
+    // opposite by caution x |m|; momentum_push: at m >= push a group with nothing
+    // in sight keeps advancing push_step down the lane; momentum_fall_back: at
+    // m <= -fall_back it falls back fall_back_distance past the enemy's reach,
+    // toward help, and holds there to heal. 0 switches each off.
+    float momentumPress = 0.f, momentumCaution = 0.f, momentumPush = 0.f, momentumFallBack = 0.f;
+    float pushStep = 800.f, fallBackDistance = 600.f;
     float intentGain = 0.f; // required relative endpoint improvement; zero preserves old micro
     // D-294: per-shooter target exclusion, resolved once from JSON
     // "avoid_categories" (BAR category names, e.g. "GROUNDSCOUT"). Zero = none.

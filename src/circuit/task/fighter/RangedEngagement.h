@@ -28,6 +28,8 @@ public:
     float MaxRange() const;
 private:
     void SelectTarget(CCircuitUnit* unit,int id,int weapon,float damage,float score=-1.f);
+    // D-511: an identified structure out of sight and radar, and its last known position.
+    bool RememberedStructure(int enemyId,springai::AIFloat3& pos) const;
     bool Move(CCircuitUnit* unit,const springai::AIFloat3& destination,bool escape,bool urgent=false);
     void Hold(CCircuitUnit* unit,bool unsafe=false);
     static bool Spam(const RangedPolicy& policy,const CRangedWorld::Contact& c);
@@ -64,6 +66,7 @@ private:
     int lineOrderFrame=-1; // D-430: the line order this hull last moved under
     bool tucking=false;    // D-432: moving to the support tuck point
     int siegeTower=-1;     // D-507: the tower this rear hull besieges (SafeMove), -1: none
+    bool groundTarget=false; // D-511: `target` is held as a ground target at its last known position
     Danger lastDanger;     // D-433
     int noScreenOrderFrame=-1; // D-433: the fallback station this hull last moved under
     bool moving=false, issuing=false, released=false, cloakWanted=false, reorient=false;

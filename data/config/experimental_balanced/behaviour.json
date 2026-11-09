@@ -68,7 +68,13 @@
 			// away-from-the-threat that can face it beside us (towers count 3x their metal), else
 			// 800 back down the lane, else the base; an escape leans halfway to that axis
 			"retreat_to_help": 1, "help_radius": 2500, "help_ratio": 1.0, "help_static_weight": 3,
-			"help_cone": 70, "help_lane_step": 800, "escape_help_weight": 0.5
+			"help_cone": 70, "help_lane_step": 800, "escape_help_weight": 0.5,
+			// D-512 (control/kernel/TradeMomentum.h): the group's trades m in (-1, 1). Winning lowers the
+			// advantage a commitment needs and raises its loss limit by half of m; at m >= 0.3 a group with
+			// nothing in sight (enemy jammer, fog) keeps advancing 800 down the lane. Losing does the opposite;
+			// at m <= -0.4 the group falls back 600 past the enemy's reach toward help and heals there
+			"momentum_press": 0.5, "momentum_caution": 0.5, "momentum_push": 0.3, "momentum_fall_back": 0.4,
+			"push_step": 800, "fall_back_distance": 600
 		},
 		"thug": {
 			"extends": "t1_skirmisher",
@@ -180,6 +186,8 @@
 		// asks for the escorts that shoot it down within air_kill_seconds (its HP held for
 		// air_memory_seconds); escorts stand escort_behind elmos behind the screen's rear edge
 		"air_radius": 1600, "air_kill_seconds": 10, "air_memory_seconds": 20,
+		// D-512: the trade ledger: a sign needs 300 metal of evidence, trades halve every 120 s
+		"momentum_prior": 300, "momentum_half_life": 120,
 		"escort_behind": 100, "escort_spacing": 64,
 		// a rank admits types by role (assault, riot, skirmish) or by "units"; types one rank
 		// admits share a cohort. support: half the screen target, at most 12.
