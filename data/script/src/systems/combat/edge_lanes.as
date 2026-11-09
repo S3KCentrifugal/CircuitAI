@@ -32,6 +32,10 @@ shares (left out where that side has none, e.g. sea), the end of the enemy's
 back edge on the lane's side, then the jackknife to the back edge's other end.
 The rectangle points above remain the fallback when no back edge is found.
 
+Owner, 2026-10-26 (Global::Spam::RimReturnEnabled): two more points run back
+along that same back edge: its middle, then its first end again (the corner
+nearest where the lane reached it), so the run sweeps the enemy's back side.
+
 Each point is pulled inward from the edge (map corner toward the centre) until
 it stands in the spam unit's own movement area reachable from its lab: the
 same test Spam uses for its routes (CanTraverse), so a rally point is never on
@@ -248,7 +252,19 @@ namespace EdgeLanes {
     bool RimEnds(CCircuitDef@ d, const AIFloat3 &in from, const AIFloat3 &in toward, int sideSign,
         const string &in key, AIFloat3 &out end, AIFloat3 &out turn)
     {
-        end = AIFloat3(-1.0f, 0.0f, -1.0f); turn = end;
+        AIFloat3 mid, home;
+        return RimEnds(d, from, toward, sideSign, key, end, turn, mid, home);
+    }
+    // Owner, 2026-10-26: after the jackknife the lane runs back along the same back
+    // edge, `mid` the back edge's middle sample and `home` its other end (the corner
+    // nearest where the lane first reached it), so the run sweeps the whole enemy
+    // back side twice. Both x < 0 when there is no turn or Spam::RimReturnEnabled is
+    // off; `mid` also when it would stand within 400 of the turn or home. Rim samples,
+    // so playable and reachable from the lab like the rest. Cost: O(rim samples).
+    bool RimEnds(CCircuitDef@ d, const AIFloat3 &in from, const AIFloat3 &in toward, int sideSign,
+        const string &in key, AIFloat3 &out end, AIFloat3 &out turn, AIFloat3 &out mid, AIFloat3 &out home)
+    {
+        end = AIFloat3(-1.0f, 0.0f, -1.0f); turn = end; mid = end; home = end;
         if (!Global::Spam::RimEnabled || d is null) return false;
         array<AIFloat3> ours, theirs;
         Starts(ours, theirs);
@@ -267,17 +283,25 @@ namespace EdgeLanes {
         array<AIFloat3>@ rim = Rim(d, from);
         const int n = int(rim.length());
         array<bool> back(n);
+        array<bool> behind(n);
         const float ts = (toward.x - s0.x) * nx + (toward.z - s0.z) * nz;
         int i1 = -1;
         float best = 1.0e30f;
         for (int i = 0; i < n; ++i) {
             const AIFloat3 p = rim[i];
-            back[i] = false;
+            back[i] = false; behind[i] = false;
             if (p.x < 0.0f) continue;
             const float al = (p.x - s0.x) * ax + (p.z - s0.z) * az;
             if (al < backAlong) continue;
             const float de = NearestSq(p, theirs);
-            if (de > reach || de >= NearestSq(p, ours)) continue;   // never an ally's ground
+            if (de >= NearestSq(p, ours)) continue;   // never an ally's ground
+            // owner, 2026-11-08 (The Tartar Steppe): the enemy starts stand 1,950-2,230
+            // from the rim, so RimBackReach kept only the corner spawns' stretches and
+            // both edge lanes turned near their corner. Behind the median enemy start
+            // and nearer an enemy than us, the walk (and its middle) goes on past the
+            // reach; the reach still picks where the lane first meets the back.
+            behind[i] = true;
+            if (de > reach) continue;
             back[i] = true;
             const float sd = (p.x - s0.x) * nx + (p.z - s0.z) * nz;
             // where the lane's line meets the back (a little deeper wins), or its far end on the lane's side
@@ -286,16 +310,36 @@ namespace EdgeLanes {
         }
         if (i1 < 0) return false;
         end = rim[i1];
-        // follow the rim both ways through the back, over short gaps; the far end on the other side
+        // follow the rim both ways through the back, over short gaps; the far end on the other side.
+        // Owner, 2026-10-30 (Starwatcher): a gap is also a playable sample that is not back but
+        // not an ally's either - the map's corner sample, just past RimBackReach of every enemy
+        // start, cut the left edge lane's walk there, so it never crossed to the far corner
         array<int> ends = { i1, i1 };
         for (int k = 0; k < 2; ++k) {
             const int dir = (k == 0) ? 1 : -1;
             int j = i1, gap = 0;
             for (int c = 0; c < n; ++c) {
                 j = (j + dir + n) % n;
-                if (back[j]) { ends[k] = j; gap = 0; }
-                else if (rim[j].x < 0.0f && gap < Global::Spam::RimGapSamples) ++gap;
-                else break;
+                if (back[j] || behind[j]) { ends[k] = j; gap = 0; }
+                else if (gap < Global::Spam::RimGapSamples
+                    && (rim[j].x < 0.0f || NearestSq(rim[j], theirs) < NearestSq(rim[j], ours))) ++gap;
+                else {
+                    // owner, 2026-11-08 (The Tartar Steppe): the top-left corner is
+                    // unreachable for 5-6 samples, but the rim either side of it (pulled
+                    // in) stands ~600 apart. Bridge such a pocket: the next back/behind
+                    // sample within RimBridgeSamples whose point is within RimBridgeReach
+                    // of the walk's last one. O(RimBridgeSamples) per break.
+                    int next = -1, skipped = 0, q = j;
+                    for (int b = 1; b <= Global::Spam::RimBridgeSamples; ++b) {
+                        q = (q + dir + n) % n;
+                        if (q == i1) break;
+                        if ((back[q] || behind[q]) && MapHelpers::SqDist(rim[q], rim[ends[k]])
+                            <= Global::Spam::RimBridgeReach * Global::Spam::RimBridgeReach) { next = q; skipped = b; break; }
+                    }
+                    if (next < 0) break;
+                    c += skipped;   // the skipped samples count toward the one lap
+                    j = next; ends[k] = j; gap = 0;
+                }
             }
         }
         int t = sideSign;
@@ -312,6 +356,20 @@ namespace EdgeLanes {
         const float sd1 = (rim[ends[1]].x - s0.x) * nx + (rim[ends[1]].z - s0.z) * nz;
         if (sd1 * float(t) < sd0 * float(t)) i2 = ends[1];
         if (MapHelpers::SqDist(rim[i2], end) > 400.0f * 400.0f) turn = rim[i2];
+        if (turn.x < 0.0f || !Global::Spam::RimReturnEnabled) return true;
+        const int i3 = (i2 == ends[0]) ? ends[1] : ends[0];
+        home = rim[i3];
+        if (MapHelpers::SqDist(home, turn) <= 400.0f * 400.0f) { home = AIFloat3(-1.0f, 0.0f, -1.0f); return true; }
+        // the middle of the walk from ends[1] (+1 steps) to ends[0]; the nearest back sample to it
+        const int span = (ends[0] - ends[1] + n) % n;
+        const int im = (ends[1] + span / 2) % n;
+        for (int k = 0; k <= span / 2; ++k) {
+            const int a = (im + k) % n, b = (im - k + n) % n;
+            const int j = behind[a] ? a : (behind[b] ? b : -1);
+            if (j < 0) continue;
+            if (MapHelpers::SqDist(rim[j], turn) > 400.0f * 400.0f && MapHelpers::SqDist(rim[j], home) > 400.0f * 400.0f) mid = rim[j];
+            break;
+        }
         return true;
     }
     // The rim on side `s` at `share` of the axis, the furthest out; x < 0 when none
@@ -346,8 +404,8 @@ namespace EdgeLanes {
         if (side == 0 || d is null || !Ends(s0, e0)) return r;
         // owner, 2026-10-25: the playable rim on the lane's side, then the end of the
         // enemy's back edge on that side, then the jackknife to its other end
-        AIFloat3 end, turn;
-        if (RimEnds(d, from, from, side, "", end, turn)) {
+        AIFloat3 end, turn, mid, home;
+        if (RimEnds(d, from, from, side, "", end, turn, mid, home)) {
             const float ax = e0.x - s0.x, az = e0.z - s0.z;
             const float endAlong = (end.x - s0.x) * ax + (end.z - s0.z) * az;
             const array<float> shares = { Global::Spam::EdgeFirstShare, Global::Spam::EdgeSecondShare };
@@ -357,6 +415,8 @@ namespace EdgeLanes {
             }
             r.insertLast(end);
             if (turn.x >= 0.0f) r.insertLast(turn);
+            if (mid.x >= 0.0f) r.insertLast(mid);      // owner, 2026-10-26: back along the back edge
+            if (home.x >= 0.0f) r.insertLast(home);
             return r;
         }
         const AIFloat3 r1 = EdgePoint(d, from, s0, e0, side, Global::Spam::EdgeFirstShare);
@@ -736,7 +796,11 @@ namespace EdgeLanes {
     // Spam::_RouteOfKey: the edge lab's route (cached; recomputed if it went empty)
     array<AIFloat3> Route(CCircuitDef@ d, const AIFloat3 &in from)
     {
-        if (rally.length() == 0) rally = Rally(d, from);
+        if (rally.length() == 0) {
+            rally = Rally(d, from);
+            if (rally.length() > 0) GenericHelpers::LogUtil("[EdgeLanes] " + Name(lane) + " lane route from (" + int(from.x) + ","
+                + int(from.z) + "); rally" + Spam::RouteText(rally), 1);
+        }
         return rally;
     }
 
