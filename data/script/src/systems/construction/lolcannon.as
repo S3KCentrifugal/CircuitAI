@@ -2227,7 +2227,6 @@ namespace LolCannon {
             const string name = u.circuitDef.GetName();
             if (!IsT2Air(name) && T2_GROUND.find(name) < 0) continue;   // constructors only, never labs or turrets
             if (u.task !is null && u.task.GetType() == int(Task::Type::PLAYER)) continue;   // a player's own unit
-            if (LrpcBlock::IsCrew(u.id)) continue;
             if (!CanCover(u) || !Claim(u, STORE, "taken off its task for the cover")) continue;
             IUnitTask@ t = BuilderTask(u);
             if (t !is null) aiBuilderMgr.AssignTask(u, t);
