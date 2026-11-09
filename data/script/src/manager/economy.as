@@ -30,7 +30,6 @@ namespace Economy {
 		if (aiFactoryMgr.GetEnemyReclaimMisses() > 0)
 			Invariants::Violation("INV-128", "turret.enemy", "eligible construction turret failed to take highest-priority enemy reclaim");
 		LolCannon::Tick();   // lolcannon caps, vetoes and the FRONT/TECH program (every 1 s)
-		LrpcBlock::Tick();   // the TECH heavy LRPC block, when rolled (every 1 s)
 		const SResourceInfo@ metal = aiEconomyMgr.metal;
 		const SResourceInfo@ energy = aiEconomyMgr.energy;
 
