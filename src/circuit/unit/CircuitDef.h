@@ -144,6 +144,7 @@ public:
 	void AddRole(RoleT type, RoleT bindType);
 	bool IsRespRoleAny(RoleM value) const { return (respRole & value) != 0; }
 	bool IsRoleAny(RoleM value)     const { return (role & value) != 0; }
+	RoleM GetRoleMask() const { return role; }  // D-501: a battle group rank's role admission
 //	bool IsRoleEqual(RoleM value)   const { return role == value; }
 //	bool IsRoleContain(RoleM value) const { return (role & value) == value; }
 
@@ -267,6 +268,7 @@ public:
 	float GetPwrDamage() const { return pwrDmg; }  // ally
 	float GetDefDamage() const { return defThrDmg; }  // enemy, for influence
 	float GetSurfaceDps() const { return surfaceDps; }  // D-433: raw surface DPS, no profile threat modifier (target score threat term)
+	float GetAirDps() const { return airDpsRaw; }       // D-509: raw anti-air DPS (battle group air-defence need)
 	float GetAirDmg(RoleT type) const { return airThrDmg * thrDmgMod[type]; }  // enemy
 	float GetSurfDmg(RoleT type) const { return surfThrDmg * thrDmgMod[type]; }  // enemy
 	float GetWaterDmg(RoleT type) const { return waterThrDmg * thrDmgMod[type]; }  // enemy
@@ -445,6 +447,7 @@ private:
 	float pwrDmg, pwrMod;  // ally damage
 	float defThrDmg, defThrMod;  // enemy damage, for influence
 	float surfaceDps;  // D-433: raw surface DPS of the definition
+	float airDpsRaw;   // D-509: raw anti-air DPS of the definition
 	float airThrDmg, airThrMod;  // air enemy damage
 	float surfThrDmg, surfThrMod;  // surface, even on water
 	float waterThrDmg, waterThrMod;  // underwater enemy damage

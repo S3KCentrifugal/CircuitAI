@@ -1,5 +1,5 @@
 #pragma once
-// D-433: what a skirmisher or backline controller does on a damage event,
+// D-433: what a skirmisher or support controller does on a damage event,
 // shared by both: the legacy retreat floor, then the retreat rule
 // (control/kernel/Disengage.h: threshold, veterancy, escape feasibility),
 // then the heavy repair and the repair rotation, then self-destruct. Levers
@@ -24,7 +24,7 @@ struct Memory {
 };
 
 // Returns true when the unit was handed to the retreat task (the caller's
-// lease ends there). `tag` prefixes the log lines ("SKIRMISHER", "BACKLINE").
+// lease ends there). `tag` prefixes the log lines ("SKIRMISHER", "SUPPORT").
 bool Apply(CCircuitAI* ai, CCircuitUnit* unit, const CRangedEngagement& engagement, const RangedPolicy& policy,
            Memory& memory, int frame, const char* tag);
 

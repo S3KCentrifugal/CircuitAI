@@ -15,7 +15,7 @@
 // controlled Thug plays as an attribute Thug did. What changes is ownership:
 // the controller is the single writer of the unit's fire and move state, the
 // registry's arbiter answers who owns the unit, and the type needs no `ranged`
-// attribute. The line group controller (control/group/LineController.h) reads
+// attribute. The line group controller (control/group/BattleGroupController.h) reads
 // the same engagement's cohort and writes directives the engagement consumes.
 #include "control/core/CommandWriter.h"
 #include "control/core/UnitController.h"

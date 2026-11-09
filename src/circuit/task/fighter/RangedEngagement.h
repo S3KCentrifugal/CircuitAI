@@ -18,7 +18,7 @@ public:
     void Release(CCircuitUnit* unit, bool commands=true);
     int Target() const { return target; }
     bool IsSustainedRush() const { return world.IsSustainedRush(id); }
-    // D-432: read by the backline controller to build its directive.
+    // D-432: read by the support controller to build its directive.
     CRangedWorld& World() { return world; }
     const CRangedWorld::Capabilities& Caps() const { return caps; }
     // D-433: the hazard the last cohort decision escaped from, for the
@@ -62,7 +62,8 @@ private:
     int moveObjective=-1, moveMode=-1;
     int pokePhase=-1; // owner 2026-10-17: -1 not poking, 1 stepping in, 0 stepping out
     int lineOrderFrame=-1; // D-430: the line order this hull last moved under
-    bool tucking=false;    // D-432: moving to the backline tuck point
+    bool tucking=false;    // D-432: moving to the support tuck point
+    int siegeTower=-1;     // D-507: the tower this rear hull besieges (SafeMove), -1: none
     Danger lastDanger;     // D-433
     int noScreenOrderFrame=-1; // D-433: the fallback station this hull last moved under
     bool moving=false, issuing=false, released=false, cloakWanted=false, reorient=false;

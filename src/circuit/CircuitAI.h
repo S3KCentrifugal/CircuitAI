@@ -62,8 +62,9 @@ class CBattleAnalysis;
 class CBuilderManager;
 class CCommanderController;
 class CSkirmisherController;
-class CBacklineController;
-class CLineController;
+class CSupportController;
+class CEscortController;
+class CBattleGroupController;
 class IArtilleryCensus;
 class CControllerRegistry;
 class CWidgetState;
@@ -348,8 +349,9 @@ public:
     CControllerRegistry* GetControllers() const { return controllers.get(); }
     CCommanderController* GetCommanderController() const { return commanderController; }
     CSkirmisherController* GetSkirmisherController() const { return skirmisherController; }  // D-430, D-432
-    CBacklineController* GetBacklineController() const { return backlineController; }        // D-432
-    CLineController* GetLineController() const { return lineController; }        // D-430
+    CSupportController* GetSupportController() const { return supportController; }        // D-432
+    CEscortController* GetEscortController() const { return escortController; }            // D-509
+    CBattleGroupController* GetBattleGroupController() const { return battleGroupController; }        // D-430
     // D-493: what the commander group may ask about our artillery (crowding).
     IArtilleryCensus* GetArtilleryCensus() const { return artilleryCensus; }
     CWidgetState* GetWidgetState() const { return widgetState.get(); }  // D-300
@@ -412,8 +414,9 @@ private:
     std::unique_ptr<CControllerRegistry> controllers;  // owns every unit controller
     CCommanderController* commanderController=nullptr;  // owned by controllers
     CSkirmisherController* skirmisherController=nullptr; // owned by controllers (D-430, D-432)
-    CBacklineController* backlineController=nullptr;     // owned by controllers (D-432)
-    CLineController* lineController=nullptr;            // owned by controllers (D-430)
+    CSupportController* supportController=nullptr;     // owned by controllers (D-432)
+    CEscortController* escortController=nullptr;       // owned by controllers (D-509)
+    CBattleGroupController* battleGroupController=nullptr;            // owned by controllers (D-430)
     IArtilleryCensus* artilleryCensus=nullptr;          // D-493: owned by controllers
     std::unique_ptr<CWidgetState> widgetState;  // D-300: AI -> widget state file
 	std::shared_ptr<CFactoryManager> factoryManager;

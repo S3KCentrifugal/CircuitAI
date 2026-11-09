@@ -598,6 +598,15 @@ public:
 	float GetRangeUnitCountCompensatorScale();
 	IUnitTask* TryMakeRangedTask(CCircuitUnit* unit);
 	std::shared_ptr<CRangedWorld> GetRangedWorld();
+	// The unit monitor reads the world without creating it (GroupMonitor.h).
+	const CRangedWorld* PeekRangedWorld() const { return rangedWorld.get(); }
+	// Unit monitor widget feed (control/group/GroupMonitor.h): on request only.
+	std::string DescribeGroups(int minTaskMembers) const;
+	std::string DescribeUnitGroups(int unitId) const;
+	std::string DescribeMonitorCodes() const;  // D-508: the decode table of the two above
+	// D-509: the anti-air escort type this factory should start now for the
+	// battle groups, or null (CBattleGroupController::AirRequest).
+	CCircuitDef* BattleGroupAirRequest(CCircuitUnit* factory) const;
 	bool HasRangedUnits() const;
 
 private:

@@ -19,6 +19,15 @@ namespace circuit {
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
 static float Projection(const AIFloat3& p,const AIFloat3& axis) { return p.x*axis.x+p.z*axis.z; }
+// An ally damaged within this many seconds is engaged (the objective's pull).
+static constexpr int ENGAGED_SECONDS=3;
+// The cohort's enemy sight around its centre.
+static constexpr float COHORT_SIGHT_RADIUS=1400.f;
+// D-508: plan factors for the unit monitor (control/kernel/ActionWhy.h); one OR each.
+namespace wp=why::plan;
+static void Mark(CRangedWorld::CohortPlan& g,int bit) { g.why|=why::Of(bit); }
+// D-510: how often a retreating cohort looks for help again.
+static constexpr int HELP_REFRESH_FRAMES=2*FRAMES_PER_SEC;
 
 void CRangedWorld::JoinCohort(CCircuitUnit* unit)
 {
@@ -31,7 +40,8 @@ void CRangedWorld::JoinCohort(CCircuitUnit* unit)
         auto& g=cohorts.at(m->second);
         if(g.members.size()>=size_t(policy.cohortSize)) return;
         auto* ally=circuit->GetTeamUnit(other);
-        if(!ally || ally->GetCircuitDef()!=def || ally->GetArea()!=unit->GetArea()) return;
+        // D-501: a type the same battle group rank admits may join too.
+        if(!ally || !Compatible(ally->GetCircuitDef(),def) || ally->GetArea()!=unit->GetArea()) return;
         if(policy.engagementSeconds>0.f) {
             auto* anchor=circuit->GetTeamUnit(g.members.front());
             if(!anchor || !cohort::Admit(P(pos),P(anchor->GetPos(circuit->GetLastFrame())),
@@ -77,7 +87,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
             auto m=membership.find(other);
             if(m==membership.end() || m->second>=key) return;
             auto& g=cohorts.at(m->second); auto* ally=circuit->GetTeamUnit(other);
-            if(g.formationPartner>=0 || !ally || ally->GetCircuitDef()!=def || ally->GetArea()!=unit->GetArea()
+            if(g.formationPartner>=0 || !ally || !Compatible(ally->GetCircuitDef(),def) || ally->GetArea()!=unit->GetArea()
                 || current.members.size()+g.members.size()>size_t(policy.cohortSize)
                 || ally->GetPos(now).SqDistance2D(pos)>policy.cohortRadius*policy.cohortRadius) return;
             if(policy.engagementSeconds>0.f) {
@@ -103,6 +113,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
     auto& g=cohorts.at(key);
     if(g.frame==now) return g;
     g.frame=now;
+    g.why=0;
     // Cohort bounds make the friendly pass O(K), K <= configured 12; no engine
     // inventory callback here. Enemy work is one local bucket query plus the
     // existing 16-objective shortlist per group, not per shooter.
@@ -118,24 +129,32 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
         if(policy.engagementSeconds<=0.f) value+=cohort::HealthValue(def->GetCostM(),u->GetUnit()->GetHealth(),def->GetHealth());
     }
     g.center*=1.f/float(std::max(1u,core));
-    auto& nearby=g.candidates; Nearby(g.center,1400.f,nearby);
+    g.jammerCover=policy.jammerHold>0.f && InJammerCover(g.center);
     // A damaged allied vanguard is a useful direction of combat, not another
     // unit inventory scan per enemy. The local spatial pass is once per cohort
     // plan and observes only legal friendly state. Assessment below still has
     // to admit the battle; an ally being hit is not permission to charge DGuns.
+    // D-503: with support_members a damaged member of this or another
+    // formation counts too, so the whole group turns to the fight its own
+    // vanguard is in instead of the enemy nearest its centre.
     AIFloat3 alliedFront=g.center; int engagedAllies=0;
     if(policy.supportAllies) {
         EnsureAllies();
         AIFloat3 sum;
+        const bool members=policy.supportMembers>0.f;
         allies.Query(P(g.center),policy.cohortRadius,[&](int i) {
             const auto& f=friends[i];
-            if(!f.def || !f.def->IsMobile() || !f.def->IsAttacker() || membership.count(f.id)) return;
+            if(!f.def || !f.def->IsMobile() || !f.def->IsAttacker() || (!members && membership.count(f.id))) return;
             auto* ally=circuit->GetTeamUnit(f.id);
-            if(!ally || ally->GetDamagedFrame()<now-3*FRAMES_PER_SEC) return;
+            if(!ally || ally->GetDamagedFrame()<now-ENGAGED_SECONDS*FRAMES_PER_SEC) return;
             sum+=f.pos; ++engagedAllies;
         });
-        if(engagedAllies) alliedFront=sum/float(engagedAllies);
+        if(engagedAllies) { alliedFront=sum/float(engagedAllies); Mark(g,wp::ALLY_ENGAGED); }
     }
+    // D-503: sight reaches past the engaged front, so the enemies a spread
+    // group's vanguard fights are candidates (at most cohort_radius further).
+    const float sight=COHORT_SIGHT_RADIUS+(engagedAllies?std::sqrt(g.center.SqDistance2D(alliedFront)):0.f);
+    auto& nearby=g.candidates; Nearby(g.center,sight,nearby);
     int objective=-1; float score=std::numeric_limits<float>::max();
     const auto consider=[&](int index) {
         const auto& c=contacts[index];
@@ -146,16 +165,25 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
         // close defensive fire. Published grid lookup is O(1), with no scan or
         // callback added per target (D-354 coverage-lane regression).
         auto* battle=circuit->GetBattle();
+        // D-503: an enemy within weapon reach of the engaged front is close
+        // defensive fire as well, wherever the lane runs.
+        const float reach=SQUARE(def->GetMaxRange()+battle->GetFrontLaneRangeSlack());
         if(battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f && battle->GetFrontLaneDistance(c.pos)>battle->GetFrontLaneWidth()
-            && distance>SQUARE(def->GetMaxRange()+battle->GetFrontLaneRangeSlack()))return;
+            && distance>reach && !(engagedAllies && alliedFront.SqDistance2D(c.pos)<=reach))return;
         if(engagedAllies) distance=.4f*distance+.6f*alliedFront.SqDistance2D(c.pos);
         if(c.id==g.target) distance/=policy.targetHysteresis;
         if(policy.engagementSeconds>0.f)
             distance/=Progress(c.id,policy.repairedTargetPenalty);
         if(distance<score) { score=distance; objective=index; }
     };
-    for(int i:nearby) consider(i);
-    if(objective<0) for(int i:objectives) consider(i);
+    // D-504: a group the registry recalled from its own fight walks to the
+    // main group; each member still escapes danger and fires on the way.
+    const bool recalled=g.recruitUrgent && g.recruitTarget>=0;
+    if(recalled) Mark(g,wp::RECALLED);
+    if(!recalled) {
+        for(int i:nearby) consider(i);
+        if(objective<0) for(int i:objectives) consider(i);
+    } else g.protectedTarget=-1;
     if(objective<0) {
         const bool lostContact=g.target>=0;
         g.target=-1;
@@ -168,6 +196,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
                 // invalidates memory or supplies another usable objective.
                 g.mode=cohort::Mode::HOLD; g.focus=g.center; g.radius=0.f;
                 g.assault.clear(); g.committed=false; g.reason=cohort::Reason::UNKNOWN;
+                Mark(g,wp::LOST_CONTACT);
                 return g;
             }
             g.protectedTarget=-1;
@@ -182,11 +211,24 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
             g.strategic=circuit->GetMilitaryManager()->GroundObjective(unit,g.focus);
             g.focus=g.strategic; g.objectiveFrame=now;
         }
+        // D-501: a group below its size target walks to the group the registry
+        // chose (control/group/GroupRegistry.cpp) and merges on arrival. Only
+        // while nothing is in sight: a fight always takes precedence.
+        if(g.recruitTarget>=0) {
+            const auto other=cohorts.find(g.recruitTarget);
+            auto* leader=other!=cohorts.end() && !other->second.members.empty()
+                ? circuit->GetTeamUnit(other->second.members.front()) : nullptr;
+            if(leader && !leader->IsDead()) { g.focus=leader->GetPos(now); if(!recalled) Mark(g,wp::JOINING); }
+            else g.recruitTarget=-1;
+        }
+        if(g.recruitTarget<0) Mark(g,wp::OBJECTIVE);
         if(g.focus.SqLength2D()<1.f)
             g.focus=circuit->GetSetupManager()->GetLanePos();
         g.mode=g.center.SqDistance2D(g.focus)<16384.f?cohort::Mode::HOLD:cohort::Mode::ADVANCE;
+        if(g.mode==cohort::Mode::HOLD) Mark(g,wp::ARRIVED);
         g.radius=0.f;
         g.assault.clear(); g.committed=false; g.reason=cohort::Reason::TRAVEL;
+        g.rushed=false; g.backToHelp=false;  // D-510
         // Keep formation orientation after arrival. Recomputing a direction
         // from its near-zero centroid error rotates every member's slot and
         // creates endless orders even though the battle has finished.
@@ -197,6 +239,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
         return g;
     }
     const auto& enemy=contacts[objective];
+    Mark(g,wp::TARGET_IN_SIGHT);
     if(policy.engagementSeconds>0.f && (enemy.def->IsEnemyRoleAny(CCircuitDef::COMM)
         || enemy.def->IsAbleToReclaim())) g.protectedTarget=enemy.id;
     // Retain formation orientation across small target motion, but a pursuer
@@ -210,10 +253,25 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
     const auto& capabilities=CapabilitiesFor(unit->GetCircuitDef());
     float range=def->GetMaxRange(CCircuitDef::RangeType::LAND);
     if(!capabilities.weapons.empty()) range=Range(capabilities.weapons.front(),g.center,enemy.pos);
+    DetectRush(unit,g,def->GetMaxRange(CCircuitDef::RangeType::LAND));  // D-510
     // A sustained campaign still selects fresh legal objectives here, but its
     // fixed-loss contract supersedes the ordinary exposure estimator.
     if(policy.sustainedRush && rushes.Active(id)) return g;
-    if(policy.engagementSeconds>0.f) { AssessCohort(unit,g,enemy,range); return g; }
+    if(policy.engagementSeconds>0.f) {
+        AssessCohort(unit,g,enemy,range);
+        // D-505: inside our jammer cover the group never falls back: a
+        // withdraw or kite becomes a hold at its current distance (or the
+        // approach to its firing band). Members still escape a commander or a
+        // reclaimer (RangedEngagement), and the repair retreat stands.
+        if(g.jammerCover && g.reason!=cohort::Reason::SIEGE && (g.mode==cohort::Mode::WITHDRAW || g.mode==cohort::Mode::KITE)) {
+            const float firing=range*policy.rangeFraction;
+            g.mode=cohort::Mode::ADVANCE;
+            g.radius=std::max(firing,std::min(g.radius,std::sqrt(g.center.SqDistance2D(enemy.pos))));
+            Mark(g,wp::JAMMER_HOLD);
+        }
+        RespondToRush(unit,g,range*policy.rangeFraction);  // D-510
+        return g;
+    }
     const float firing=range*policy.rangeFraction;
     float hostileValue=0.f, danger=0.f; bool outranged=false;
     for(int i:nearby) {
@@ -259,6 +317,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
                           value,hostileValue,policy.rushRatio,policy.catchSeconds,
                           std::sqrt(g.center.SqDistance2D(enemy.pos)));
     g.mode=rush?cohort::Mode::RUSH:cohort::Mode::ADVANCE;
+    if(rush) Mark(g,wp::FAVORABLE);
     g.radius=firing;
     if(!enemy.mobile && enemy.armed)
         g.radius=std::max(g.radius,enemy.hazardRadius+policy.safetyMargin+policy.spacing);
@@ -266,6 +325,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
         g.radius=std::max(firing,danger+policy.hysteresis);
         if(enemy.armed) g.radius=std::max(g.radius,enemy.hazardRadius+policy.safetyMargin+policy.hysteresis);
         g.mode=outranged?cohort::Mode::WITHDRAW:cohort::Mode::KITE;
+        Mark(g,wp::OUTRANGED);
     }
     float rear=0.f,front=std::numeric_limits<float>::max();
     for(int member:g.members) {
@@ -283,7 +343,9 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
         // the vanguard is waiting. A real escape overrides this bounded wait.
         g.radius=std::max(g.radius,rear-policy.spacing);
         if(g.mode!=cohort::Mode::WITHDRAW && g.mode!=cohort::Mode::KITE) g.mode=cohort::Mode::REGROUP;
+        Mark(g,wp::SPREAD_OUT);
     } else if(rear-front<=policy.spacing) g.regroupUntil=now;
+    RespondToRush(unit,g,firing);  // D-510
     return g;
 }
 
@@ -302,7 +364,7 @@ void CRangedWorld::ApplyRush(CCircuitUnit* unit, CohortPlan& g)
         rushes.Finish(key,now); key=-1;
     }
     g.sustainedRush=false; g.rushFallback=rushes.Cooldown(id)>now;
-    if(key<0 && !g.rushFallback && g.rushFrame!=now && g.target>=0
+    if(key<0 && !g.rushFallback && g.rushFrame!=now && g.target>=0 && g.reason!=cohort::Reason::SIEGE  // D-507
         && g.center.SqDistance2D(g.focus)<std::pow(p.sustainedRushRadius,2.f)) {
         g.rushFrame=now;
         EnsureAllies(); rushCandidates.clear();
@@ -344,7 +406,7 @@ void CRangedWorld::ApplyRush(CCircuitUnit* unit, CohortPlan& g)
                 if(!c.def && c.pos.SqDistance2D(g.center)<=p.sustainedRushRadius*p.sustainedRushRadius) unknown=true;
                 if(c.def && !c.def->IsAbleToFly() && c.pos.y>=-20.f
                     && c.pos.SqDistance2D(g.center)<=std::pow(p.sustainedRushRadius+c.hazardRadius,2.f))
-                    hostile+=c.cost;
+                    hostile+=c.cost*(!c.mobile && c.armed?p.sustainedRushStaticWeight:1.f);  // D-507
             });
             const float aggression=circuit->GetMilitaryManager()->GetAggression();
             if(!unknown && hostile>0.f && rush::Score(own,hostile,p.sustainedRushRatio,aggression)>=0.f) {
@@ -361,12 +423,179 @@ void CRangedWorld::ApplyRush(CCircuitUnit* unit, CohortPlan& g)
         circuit->LOG("[INVARIANT] INV-196 local rush membership or original-front casualty accounting is inconsistent");
     if(key>=0) {
         g.sustainedRush=true; g.committed=true; g.mode=cohort::Mode::RUSH;
+        Mark(g,wp::RUSH);
         g.radius=unit->GetCircuitDef()->GetMaxRange()*p.sustainedRushRange;
         g.formationRear=false;
-    } else if(g.rushFallback) {
+    // D-505: no fallback inside our jammer cover. D-507: and only against a
+    // target; with nothing in sight the cooldown flipped a travelling group
+    // between advance and withdraw (KI-786).
+    } else if(g.rushFallback && g.target>=0 && !g.jammerCover) {
         g.committed=false; g.assault.clear(); g.mode=cohort::Mode::WITHDRAW;
+        Mark(g,wp::RUSH_COOLDOWN);
         g.radius=std::max(g.radius,unit->GetCircuitDef()->GetMaxRange()+p.spacing*3.f);
     }
+}
+
+float CRangedWorld::SupportReach(const CohortPlan& g)
+{
+    // D-507: the land reach of the reciprocal support cohort (0: none), from
+    // its leader's definition; O(1).
+    if(g.formationPartner<0) return 0.f;
+    const auto partner=cohorts.find(g.formationPartner);
+    if(partner==cohorts.end() || partner->second.members.empty() || partner->second.formationPartner!=CohortOf(g.members.front()))
+        return 0.f;
+    auto* leader=circuit->GetTeamUnit(partner->second.members.front());
+    return leader && !leader->IsDead() ? leader->GetCircuitDef()->GetMaxRange(CCircuitDef::RangeType::LAND) : 0.f;
+}
+
+// D-510 (control/kernel/RushResponse.h): the shorter-ranged armed mobiles
+// closing on the plan's centre; rushed while enough of them hold enough metal,
+// held rush_hold_seconds past the last such sighting while any remain. One
+// pass over the plan's candidates, O(C), and its members' costs, O(M).
+void CRangedWorld::DetectRush(CCircuitUnit* unit,CohortPlan& g,float ownRange)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    const int now=circuit->GetLastFrame();
+    g.rushed=false;
+    if(p.rushKite<=0.f) return;
+    rush_response::Detection d;
+    float own=0.f;
+    for(int member:g.members) if(auto* u=circuit->GetTeamUnit(member)) own+=u->GetCircuitDef()->GetCostM();
+    for(int index:g.candidates) {
+        const auto& c=contacts[index];
+        if(!c.def || !c.mobile || !c.armed || c.def->IsAbleToFly() || c.pos.y< -20.f
+            || c.def->IsEnemyRoleAny(CCircuitDef::COMM)) continue;
+        const float distance=std::sqrt(g.center.SqDistance2D(c.pos));
+        const float closing=ranged::ClosingSpeed(P(g.center),P(c.pos),P(c.velocity));
+        if(rush_response::Rushes(distance,closing,c.groundRange,ownRange,p.rushRangeMargin,p.rushClosingSpeed,p.rushDetectRadius))
+            rush_response::Add(d,P(c.pos),c.cost*std::min(1.f,c.health/std::max(1.f,c.def->GetHealth())),
+                distance,c.def->GetSpeed(),c.groundRange);
+    }
+    if(rush_response::Rushed(d,own,int(p.rushMinCount),p.rushValueShare)) g.rushUntil=now+int(p.rushHoldSeconds*FRAMES_PER_SEC);
+    g.rushed=d.count>0 && now<g.rushUntil;
+    if(g.rushed) g.rush=d;
+}
+
+// D-510: a rush (not inside our jammer cover, D-505, nor in a siege
+// stand-off, D-507) is kited at our firing band only while the kite buys
+// something (rush_response::KiteWorthwhile: we hold range, or reach help
+// first); otherwise the group keeps its assessed plan and fires. Any withdraw
+// or kite turns toward help (retreat_to_help); once the retreat ends the
+// group faces its target again.
+void CRangedWorld::RespondToRush(CCircuitUnit* unit,CohortPlan& g,float firing)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    if(g.rushed && !g.jammerCover && g.reason!=cohort::Reason::SIEGE) {
+        Mark(g,wp::RUSHED);
+        const ranged::Point away=AwayFromThreat(g);
+        if(away.x!=0.f || away.z!=0.f) FindHelp(unit,g,away);
+        const float help=g.helpKind==1?std::sqrt(g.center.SqDistance2D(g.helpAnchor)):-1.f;
+        const bool kite=rush_response::KiteWorthwhile(g.rush,unit->GetCircuitDef()->GetSpeed(),help,p.rushHelpSlack);
+        if(kite) {
+            g.mode=cohort::Mode::KITE; g.reason=cohort::Reason::RUSHED;
+            g.committed=false; g.assault.clear(); g.radius=firing;
+        } else Mark(g,wp::STANDS);
+        if(int(kite)!=g.rushDecision)
+            circuit->LOG("COHORT: rush group=%d kite=%d rushers=%d nearest=%.0f speed=%.0f reach=%.0f help=%.0f",
+                CohortOf(g.members.front()),int(kite),g.rush.count,g.rush.nearest,g.rush.speed,g.rush.range,help);
+        g.rushDecision=int(kite);
+    } else g.rushDecision=-1;
+    const bool retreat=(g.mode==cohort::Mode::WITHDRAW || g.mode==cohort::Mode::KITE)
+        && g.reason!=cohort::Reason::SIEGE && g.target>=0;
+    if(p.retreatToHelp>0.f && retreat) { TurnToHelp(unit,g); return; }
+    if(g.backToHelp) {
+        AIFloat3 back=g.center-g.focus; back.Normalize2D();
+        if(back.SqLength2D()>=.5f) g.back=back;
+        g.backToHelp=false;
+    }
+}
+
+// D-510: away from the rushers' centroid (else the target), unit length; else
+// the plan's back; zero only with neither.
+ranged::Point CRangedWorld::AwayFromThreat(const CohortPlan& g) const
+{
+    const ranged::Point from=P(g.center);
+    const ranged::Point threat=g.rushed && g.rush.count>0 ? g.rush.centroid : P(g.focus);
+    const ranged::Point away=rush_response::Unit({from.x-threat.x,from.z-threat.z});
+    return (away.x!=0.f || away.z!=0.f) ? away : rush_response::Unit(P(g.back));
+}
+
+// D-510: the retreat axis toward the nearest help that can fight beside the
+// group, within help_cone of away-from-the-threat; else back down the lane;
+// else the base; else straight away.
+void CRangedWorld::TurnToHelp(CCircuitUnit* unit,CohortPlan& g)
+{
+    const ranged::Point from=P(g.center);
+    const ranged::Point away=AwayFromThreat(g);
+    if(away.x==0.f && away.z==0.f) return;
+    FindHelp(unit,g,away);
+    const ranged::Point axis=g.helpKind>0?rush_response::Axis(from,away,P(g.helpAnchor)):away;
+    g.back=AIFloat3(axis.x,0.f,axis.z); g.backToHelp=true;
+    if(g.helpKind==1) Mark(g,wp::TOWARD_HELP);
+    else if(g.helpKind==2) Mark(g,wp::DOWN_LANE);
+    else if(g.helpKind==3) Mark(g,wp::TO_BASE);
+}
+
+// D-510: the help anchor (helpKind: 1 allied strength, 2 the lane, 3 the base,
+// 0 none), searched at most every HELP_REFRESH_FRAMES: one friend query within
+// help_radius, O(F + cells).
+void CRangedWorld::FindHelp(CCircuitUnit* unit,CohortPlan& g,ranged::Point away)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    const int now=circuit->GetLastFrame();
+    const ranged::Point from=P(g.center);
+    if(g.helpFrame<0 || now-g.helpFrame>=HELP_REFRESH_FRAMES) {
+        const int previousKind=g.helpKind;
+        g.helpFrame=now; g.helpKind=0;
+        const int key=CohortOf(g.members.front());
+        float own=0.f;
+        for(int member:g.members) if(auto* u=circuit->GetTeamUnit(member)) own+=u->GetCircuitDef()->GetCostM();
+        const float threatValue=g.rushed?g.rush.value:g.hostileValue;
+        helpCells.clear();
+        EnsureAllies();
+        allies.Query(from,p.helpRadius,[&](int i) {
+            const Friend& f=friends[i];
+            if(!f.def || !f.def->IsAttacker() || f.def->IsAbleToFly()) return;
+            const auto m=membership.find(f.id);
+            if(m!=membership.end() && (m->second==key || m->second==g.formationPartner)) return;  // the group itself
+            if(f.pos.SqDistance2D(g.center)>p.helpRadius*p.helpRadius) return;
+            rush_response::AddHelp(helpCells,P(f.pos),f.def->GetCostM()*(f.def->IsMobile()?1.f:p.helpStaticWeight));
+        });
+        const int best=rush_response::ChooseHelp(helpCells,from,away,rush_response::Needed(threatValue,own,p.helpRatio),p.helpRadius,p.helpCone);
+        if(best>=0) {
+            const auto c=rush_response::Centre(helpCells[best]);
+            g.helpAnchor=AIFloat3(c.x,0.f,c.z); g.helpKind=1;
+        } else {
+            auto* battle=circuit->GetBattle();
+            if(battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f) {
+                const AIFloat3 lane=battle->GetFrontLanePoint(std::max(0.f,battle->GetFrontLaneProgress(g.center)-p.helpLaneStep));
+                if(rush_response::InCone(from,away,P(lane),p.helpCone)) { g.helpAnchor=lane; g.helpKind=2; }
+            }
+            const AIFloat3& base=circuit->GetSetupManager()->GetBasePos();
+            if(g.helpKind==0 && rush_response::InCone(from,away,P(base),p.helpCone)) { g.helpAnchor=base; g.helpKind=3; }
+        }
+        if(g.helpKind!=previousKind)
+            circuit->LOG("COHORT: help group=%d kind=%d anchor=%.0f,%.0f rushed=%d rushers=%d threat=%.0f own=%.0f",
+                key,g.helpKind,g.helpAnchor.x,g.helpAnchor.z,int(g.rushed),g.rush.count,threatValue,own);
+    }
+}
+
+bool CRangedWorld::InJammerCover(const AIFloat3& pos)
+{
+    // The query bound is the largest jammer radius of any ground type: found
+    // once, O(D) over the definitions; each check is one friendly bucket query
+    // per cohort plan, O(F) in that radius.
+    if(largestJammer<0.f) {
+        largestJammer=0.f;
+        for(auto& def:circuit->GetCircuitDefs())
+            if(!def.IsAbleToFly()) largestJammer=std::max(largestJammer,float(def.GetDef()->GetJammerRadius()));
+    }
+    if(largestJammer<=0.f) return false;
+    EnsureAllies();
+    return allies.Any(P(pos),largestJammer,[&](int i) {
+        const auto& f=friends[i];
+        return f.jammer>0.f && f.pos.SqDistance2D(pos)<f.jammer*f.jammer;
+    });
 }
 
 float CRangedWorld::EffectiveDps(CCircuitDef* def,int armor,int category,
@@ -403,6 +632,7 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
         g.committed=false; g.supporting=false; g.assault.clear();
         g.mode=cohort::Mode::HOLD; g.reason=cohort::Reason::UNREACHABLE;
         g.focus=g.center; g.radius=0.f; g.loss=0.f; g.advantage=0.f;
+        Mark(g,wp::OFF_MAP);
         return;
     }
     firingPoint.y=area->GetElevationAt(firingPoint.x,firingPoint.z);
@@ -411,6 +641,7 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     float danger=0.f;
     bool uncertain=false,forbidden=false,staticCoverage=false;
     int hostileArmed=0;
+
     g.assault.clear();
     const int armor=MetadataFor(def).armor;
     // One enemy pass plus one friendly bucket pass per cohort plan. Weapon
@@ -423,12 +654,16 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
         const float builderReach=c.def->IsAbleToReclaim()?c.def->GetBuildDistance()+c.radius:0.f;
         const float specialReach=std::max(c.explosionRadius,builderReach)+p.safetyMargin;
         if((specialReach>p.safetyMargin && ranged::SegmentDistanceSq(P(c.pos),P(g.center),P(firingPoint))<specialReach*specialReach)
-            || (c.def->IsEnemyRoleAny(CCircuitDef::COMM) && firingPoint.SqDistance2D(c.pos)<std::pow(c.hazardRadius+p.spacing,2.f))) forbidden=true;
+            || (c.def->IsEnemyRoleAny(CCircuitDef::COMM) && firingPoint.SqDistance2D(c.pos)<std::pow(c.hazardRadius+p.spacing,2.f))) {
+            forbidden=true; Mark(g,wp::HAZARD_ON_PATH);
+        }
         const bool covers=c.armed && (ranged::SegmentDistanceSq(P(c.pos),P(g.center),P(firingPoint))
             <std::pow(c.hazardRadius+p.safetyMargin,2.f)
             || (c.mobile && c.pos.SqDistance2D(enemy.pos)<600.f*600.f));
         if(!covers && c.id!=enemy.id) continue;
-        if(!c.los) uncertain=true;
+        // D-507: a remembered or radar-only structure is identified and cannot
+        // move; only an unseen mobile leaves the assessment uncertain.
+        if(!c.los && c.mobile) uncertain=true;
         hostile.health+=c.health;
         hostile.value+=cohort::HealthValue(c.cost,c.health,c.def->GetHealth());
         if(c.armed) {
@@ -446,8 +681,8 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
                 staticCoverage=true;
                 // A small explicit permission set keeps segment checks O(H)
                 // for H local hazards. Larger batteries remain excluded.
-                if(g.assault.size()<8) g.assault.push_back(c.id); else forbidden=true;
-                if(Progress(c.id,p.repairedTargetPenalty)<1.f) forbidden=true;
+                if(g.assault.size()<8) g.assault.push_back(c.id); else { forbidden=true; Mark(g,wp::BATTERY); }
+                if(Progress(c.id,p.repairedTargetPenalty)<1.f) { forbidden=true; Mark(g,wp::TARGET_REPAIRED); }
             }
         }
     }
@@ -496,7 +731,43 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
         }
     });
     g.ownValue=own.value; g.hostileValue=hostile.value;
+    if(uncertain) Mark(g,wp::UNKNOWN_CONTACT);
+    if(staticCoverage) Mark(g,wp::STATIC_COVER);
     const float distance=std::sqrt(g.center.SqDistance2D(enemy.pos));
+    // D-507: siege. The paired support outranges every armed static met here
+    // and nothing armed moves among them: the screen has nothing to trade,
+    // so it stands off outside the statics' reach (no commitment, no rush)
+    // while the support besieges them (SupportController siege station).
+    // Advance resumes as each falls: the next objective is assessed afresh.
+    // Every armed static that can reach the ground within the support's
+    // reach of the objective (the siege spots, the screen's line) counts, and
+    // any armed mobile within cohort_radius of it: one pass over the plan's
+    // candidates, O(C).
+    const float supportReach=p.siegeStandoff>0.f && staticCoverage?SupportReach(g):0.f;
+    // An unidentified contact does not block it: standing off is the cautious
+    // choice (a closed Dragon's Claw shows as a radar dot), and advancing into
+    // the firing band past it is what lost hulls.
+    bool siegeable=supportReach>0.f;
+    for(int index:g.candidates) {
+        if(!siegeable) break;
+        const auto& c=contacts[index];
+        if(!c.def || !c.armed || c.def->IsAbleToFly() || c.pos.y< -20.f) continue;
+        const float d=std::sqrt(c.pos.SqDistance2D(enemy.pos));
+        if(c.mobile) { if(d<p.cohortRadius) siegeable=false; }
+        else if(d<=c.groundRange+supportReach && c.groundRange+p.safetyMargin>=supportReach) siegeable=false;
+    }
+    if(siegeable) {
+        g.committed=false; g.assault.clear(); g.supporting=false;
+        g.mode=cohort::Mode::WITHDRAW; g.reason=cohort::Reason::SIEGE;
+        // The screen stands just behind the support's firing line (its reach
+        // plus one spacing): in front, it stood in the rockets' line of fire
+        // and every shot was vetoed (FriendlyLine). Statics cannot reach it
+        // there; it still covers the rockets against anything mobile.
+        g.radius=std::max({firing,danger+p.hysteresis,enemy.hazardRadius+p.safetyMargin+p.hysteresis,supportReach+p.spacing});
+        g.loss=0.f; g.advantage=0.f;
+        Mark(g,wp::SIEGE);
+        return;
+    }
     AIFloat3 pursuit=enemy.pos-g.center; pursuit.Normalize2D();
     const float fleeing=std::max(0.f,Projection(enemy.velocity,pursuit));
     const float closing=def->GetSpeed()-fleeing;
@@ -506,7 +777,11 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     // batteries never inherit this mobile-support allowance. JSON controls the
     // HP budget; low-health hulls still leave through the normal retreat task.
     const bool screening=g.supporting && !staticCoverage;
-    const float limit=staticCoverage?p.staticLossFraction:
+    // D-499: with its rear support beside it, a screen may spend more against
+    // static coverage, so the rockets' siege of a tower that outranges them
+    // has a screen in front of it (static_support_loss_fraction; 0 keeps the old rule).
+    const float staticLimit=g.supporting?std::max(p.staticLossFraction,p.staticSupportLossFraction):p.staticLossFraction;
+    const float limit=staticCoverage?staticLimit:
         screening?std::max(p.lossFraction,p.supportLossFraction):p.lossFraction;
     // Preserve the established dodging/repair policy at a neutral slider.
     // Automatic army balance influences rush admission; only the explicit
@@ -524,6 +799,10 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     g.committed=result.commit && !uncertain && !forbidden && approach<=p.catchSeconds;
     if(staticCoverage && p.staticLossFraction<=0.f) g.committed=false;
     if(!g.committed) g.assault.clear();
+    if(g.supporting) Mark(g,wp::SCREENING);
+    if(approach>=horizon || approach>p.catchSeconds) Mark(g,wp::TOO_FAR);
+    // A trade worth taking that a veto above holds back is neither favourable nor outmatched.
+    if(g.committed) Mark(g,wp::FAVORABLE); else if(!result.commit) Mark(g,wp::OUTMATCHED);
     g.reason=g.committed?cohort::Reason::FAVORABLE:forbidden?cohort::Reason::STATIC
         :uncertain?cohort::Reason::UNKNOWN:approach>=horizon?cohort::Reason::UNREACHABLE:cohort::Reason::OUTMATCHED;
     g.radius=firing;
@@ -532,7 +811,7 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
         g.mode=cohort::Mode::RUSH;
         if(g.supporting) g.radius=std::min(g.radius,g.screenDepth);
     }
-    else if(danger>firing) { g.radius=danger+p.hysteresis; g.mode=cohort::Mode::WITHDRAW; }
+    else if(danger>firing) { g.radius=danger+p.hysteresis; g.mode=cohort::Mode::WITHDRAW; Mark(g,wp::OUTRANGED); }
     // Assemble once for this contact. Late arrivals occupy vacancies/catch up;
     // they never reset a timer or move the ready core back toward the factory.
     if(g.assemblyTarget!=enemy.id) {
@@ -545,11 +824,12 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     }
     if(!g.supporting && now<g.regroupUntil && ready*4<g.members.size()*3 && distance>enemy.hazardRadius+p.spacing) {
         g.committed=false; g.assault.clear(); g.mode=cohort::Mode::REGROUP; g.reason=cohort::Reason::ASSEMBLE;
+        Mark(g,wp::ASSEMBLING);
         g.radius=std::max(firing,distance); // hold vanguard; do not pull it rearward
     }
 }
 
-bool CRangedWorld::CohortSafe(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,float margin,bool escaping)
+bool CRangedWorld::CohortSafe(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,float margin,bool escaping,bool siege)
 {
     const auto& g=PlanCohort(unit);
     // Sustained assault deliberately spends the local force until its fixed
@@ -569,8 +849,9 @@ bool CRangedWorld::CohortSafe(CCircuitUnit* unit,const AIFloat3& from,const AIFl
         if(special>0.f && !ranged::SafeSegment(P(from),P(to),P(c.pos),special+margin)) return true;
         if(c.mobile || c.hazardRadius<=0.f) return false;
         if(g.committed && std::find(g.assault.begin(),g.assault.end(),c.id)!=g.assault.end()) return false;
-        return escaping?!ranged::SafeSegment(P(from),P(to),P(c.pos),c.hazardRadius+margin)
-            :ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))<std::pow(c.hazardRadius+margin,2.f);
+        const float reach=siege && c.armed?c.groundRange:c.hazardRadius;  // D-507
+        return escaping?!ranged::SafeSegment(P(from),P(to),P(c.pos),reach+margin)
+            :ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))<std::pow(reach+margin,2.f);
     };
     const bool safe=!enemies.Any(P(center),radius,blocked);
     static const bool verify=std::getenv("CIRCUIT_VERIFY_RANGED_QUERIES")!=nullptr;

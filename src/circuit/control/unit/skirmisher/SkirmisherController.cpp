@@ -36,7 +36,7 @@ std::vector<Field> BuildFields(std::index_sequence<I...>) {
 	return fields;
 }
 const control::CConfigTable<SkirmisherConfig>& Table() {
-	static const control::CConfigTable<SkirmisherConfig> table(BuildFields(std::make_index_sequence<64>{}));
+	static const control::CConfigTable<SkirmisherConfig> table(BuildFields(std::make_index_sequence<96>{}));
 	return table;
 }
 constexpr int DECISION_SLICE = TEAM_SLOWUPDATE_RATE;  // the task module's own update stagger

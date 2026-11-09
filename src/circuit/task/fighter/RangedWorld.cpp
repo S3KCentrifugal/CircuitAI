@@ -231,7 +231,7 @@ void CRangedWorld::Leave(int id) {
     rushes.Leave(id);
     if(verifyRangedQueries && !rushes.Valid())
         circuit->LOG("[INVARIANT] INV-196 local rush membership or original-front casualty accounting is inconsistent");
-    slots.erase(id); ReleaseShot(id);
+    slots.erase(id); ReleaseShot(id); unitWhy.erase(id);
     auto member=membership.find(id);
     if(member!=membership.end()) {
         auto group=cohorts.find(member->second);
@@ -250,6 +250,95 @@ void CRangedWorld::Leave(int id) {
         membership.erase(member);
     }
 }
+const group_layout::Slot* CRangedWorld::LayoutSlot(const CohortPlan& g,int id,const AIFloat3& origin,
+                                                   const AIFloat3& back,float rowWidth,float spacing) const
+{
+    const int now=circuit->GetLastFrame();
+    if(g.layoutFrame!=now) {
+        // One layout per cohort per frame: every member of it reads the same
+        // order, so nobody's slot depends on which member decided first.
+        g.layoutFrame=now;
+        layoutMembers.clear();
+        for(int member:g.members) {
+            auto* u=circuit->GetTeamUnit(member);
+            if(!u || u->IsDead()) continue;
+            const AIFloat3 p=u->GetPos(now);
+            layoutMembers.push_back({member,{p.x,p.z}});
+        }
+        group_layout::Order({origin.x,origin.z},{back.x,back.z},
+            group_layout::PerRow(rowWidth,spacing,int(layoutMembers.size())),layoutMembers,g.layout);
+    }
+    for(const auto& slot:g.layout) if(slot.id==id) return &slot;
+    return nullptr;
+}
+
+void CRangedWorld::MergeCohorts(int from,int into)
+{
+    if(from==into) return;
+    auto source=cohorts.find(from), target=cohorts.find(into);
+    if(source==cohorts.end() || target==cohorts.end()) return;
+    for(int member:source->second.members) { target->second.members.push_back(member); membership[member]=into; }
+    // The target keeps its own partner; without one it takes the source's, so a
+    // screen merging into a lone screen keeps its rockets. Otherwise the
+    // source's partner is free again and pairs anew (GroundFormations.cpp).
+    auto partner=cohorts.find(source->second.formationPartner);
+    if(partner!=cohorts.end() && partner->second.formationPartner==from) {
+        if(target->second.formationPartner<0) {
+            target->second.formationPartner=source->second.formationPartner;
+            target->second.formationRear=source->second.formationRear;
+            partner->second.formationPartner=into;
+        } else {
+            partner->second.formationPartner=-1; partner->second.formationRear=false;
+        }
+    }
+    for(auto& [key,plan]:cohorts) if(plan.recruitTarget==from) plan.recruitTarget=into;
+    InvalidateCohortPlans(target->second);
+    target->second.recruitTarget=-1; target->second.recruitUrgent=false;
+    circuit->LOG("COHORT: merged group=%d members=%u by=registry",into,unsigned(target->second.members.size()));
+    cohorts.erase(source);
+}
+
+int CRangedWorld::SplitCohort(int key,const std::vector<int>& leaving)
+{
+    auto source=cohorts.find(key);
+    if(source==cohorts.end() || leaving.empty()) return -1;
+    const int fresh=nextCohort++;
+    auto& part=cohorts[fresh];
+    auto& group=source->second;   // std::map inserts keep references valid
+    for(int member:leaving) {
+        if(std::find(group.members.begin(),group.members.end(),member)==group.members.end()) continue;
+        std::erase(group.members,member);
+        part.members.push_back(member); membership[member]=fresh;
+    }
+    if(part.members.empty()) { cohorts.erase(fresh); return -1; }
+    InvalidateCohortPlans(group);
+    part.frame=part.formationFrame=-1;
+    if(group.members.empty()) {
+        // Everyone left: the new part takes over the old one's partner.
+        part.formationPartner=group.formationPartner; part.formationRear=group.formationRear;
+        auto partner=cohorts.find(group.formationPartner);
+        if(partner!=cohorts.end() && partner->second.formationPartner==key) partner->second.formationPartner=fresh;
+        cohorts.erase(key);
+    }
+    circuit->LOG("COHORT: split group=%d part=%d members=%u",key,fresh,unsigned(part.members.size()));
+    return fresh;
+}
+
+bool CRangedWorld::CompositionDue(int key,int frame,int period)
+{
+    auto group=cohorts.find(key);
+    if(group==cohorts.end() || frame<group->second.nextComposition) return false;
+    // Stagger by key so groups formed together are not all checked on one frame.
+    group->second.nextComposition=frame+std::max(1,period)+key%std::max(1,period/2);
+    return true;
+}
+
+void CRangedWorld::SetRecruitTarget(int key,int target,bool urgent)
+{
+    auto group=cohorts.find(key);
+    if(group!=cohorts.end()) { group->second.recruitTarget=target; group->second.recruitUrgent=target>=0 && urgent; }
+}
+
 void CRangedWorld::SetSlot(int id,const AIFloat3& pos,float spacing,float value)
 {
     auto old=slots.find(id);

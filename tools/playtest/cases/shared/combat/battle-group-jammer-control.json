@@ -1,0 +1,97 @@
+{
+  "name": "battle-group-jammer-control",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "enemy_destination": [
+    3900,
+    3400
+  ],
+  "waves": [
+    {
+      "name": "12 Rocketeers",
+      "after_seconds": 18,
+      "units": [
+        "armrock"
+      ]
+    }
+  ],
+  "description": "D-507: control for the jammer hold: 4 Thugs and 2 Aggravators met by 12 Rocketeers that outrange the Thugs, no jammer. Expected: the battle group withdraws at least once (this is the case the jammer must change).",
+  "storage_scenario": "bg-jammer-control",
+  "groups": [
+    {
+      "unit": "corthud",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 4,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 2,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 2,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armrock",
+      "count": 12,
+      "team": 1,
+      "position": [
+        3900,
+        5000
+      ],
+      "columns": 4,
+      "spacing": 80,
+      "after_seconds": 18
+    }
+  ],
+  "assertions": {
+    "min_withdraw_orders": 1,
+    "max_losses": 6,
+    "min_kills": 0,
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_types_assigned": 2
+  }
+}

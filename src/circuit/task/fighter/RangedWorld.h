@@ -4,6 +4,9 @@
 #include "task/fighter/RangedObservation.h"
 #include "terrain/RangedGeometry.h"
 #include "terrain/GroundCohort.h"
+#include "control/kernel/ActionWhy.h"
+#include "control/kernel/GroupLayout.h"
+#include "control/kernel/RushResponse.h"
 #include "terrain/LocalRush.h"
 #include "AIFloat3.h"
 #include <map>
@@ -122,14 +125,76 @@ public:
         bool sustainedRush=false, rushFallback=false;
         int rushFrame=-1;
         float screenDepth=0.f;
+        // D-501: the rank layout, computed once per frame on first use (LayoutSlot);
+        // the cohort the group registry has this one walk to and merge with (-1:
+        // none); the frame of its next composition check (recruit, merge, split).
+        mutable std::vector<group_layout::Slot> layout;
+        mutable int layoutFrame=-1;
+        // D-502: the frame this cohort's current withdraw or kite began (-1: not
+        // retreating), kept by its members (RetreatStarted).
+        mutable int retreatFrame=-1;
+        int recruitTarget=-1, nextComposition=0;
+        // D-504: the registry recalled this group from its own fight to
+        // recruitTarget: it travels there and ignores objectives on the way.
+        bool recruitUrgent=false;
+        // D-505: the centre stands inside an allied jammer's radius (jammer_hold).
+        bool jammerCover=false;
+        // D-508: every factor behind this plan (why::plan bits), reset on each
+        // plan; diagnostics for the unit monitor, read by no decision.
+        why::Set why=0;
+        // D-510: rushed by shorter-ranged raiders (held until rushUntil while
+        // any remain); the retreat anchor (refreshed every HELP_REFRESH_FRAMES)
+        // and whether `back` currently points at it rather than away from the target.
+        bool rushed=false, backToHelp=false;
+        int rushUntil=-1, helpFrame=-1, helpKind=0;  // helpKind: 0 away, 1 help, 2 lane, 3 base
+        int rushDecision=-1;                          // the last rush response: 1 kite, 0 stand, -1 none (log on change)
+        rush_response::Detection rush;
+        springai::AIFloat3 helpAnchor;
     };
     const CohortPlan& PlanCohort(CCircuitUnit* unit);
     bool IsSustainedRush(int id) const { return rushes.Active(id); }
+    // D-507: a besieging hull (siege) checks armed statics against their
+    // weapon reach instead of their hazard radius (reach plus body radius): a
+    // siege station, and the gap between towers of a cluster, sit between the two.
     bool CohortSafe(CCircuitUnit* unit,const springai::AIFloat3& from,
-                    const springai::AIFloat3& to,float margin,bool escaping);
+                    const springai::AIFloat3& to,float margin,bool escaping,bool siege=false);
     void ReleaseEscort(int id) { escorts.erase(id); }
-    // D-430: read by the line group controller (control/group/LineController.cpp).
+    // D-430: read by the battle group controller (control/group/BattleGroupController.cpp).
     const std::map<int,CohortPlan>& Cohorts() const { return cohorts; }
+    // D-501: the slot of `id` in its cohort's layout, computed once per frame
+    // for the whole cohort (group_layout::Order, O(M log M)); null when the unit
+    // is not a member. `origin` is the target or the travel focus.
+    const group_layout::Slot* LayoutSlot(const CohortPlan& g,int id,const springai::AIFloat3& origin,
+                                         const springai::AIFloat3& back,float rowWidth,float spacing) const;
+    // D-501: membership edits, called only by the group registry
+    // (control/group/GroupRegistry.h), which decides them.
+    void MergeCohorts(int from,int into);
+    int SplitCohort(int key,const std::vector<int>& leaving);
+    void SetRecruitTarget(int key,int target,bool urgent=false);
+    int CohortOf(int id) const { const auto it=membership.find(id); return it==membership.end()?-1:it->second; }
+    // D-508: a member's factors from its last decision (why::unit bits), for
+    // the unit monitor. One hash write per member decision; erased in Leave.
+    void NoteUnitWhy(int id,why::Set set) { unitWhy[id]=set; }
+    why::Set UnitWhy(int id) const { const auto it=unitWhy.find(id); return it==unitWhy.end()?0:it->second; }
+    // D-501: true once per `period` frames for a cohort (staggered by key), the
+    // registry's composition clock.
+    bool CompositionDue(int key,int frame,int period);
+    // D-502: the frame the cohort's retreat began, or -1; O(1).
+    int RetreatStarted(const CohortPlan& g,int frame) const {
+        const bool retreat=g.mode==cohort::Mode::WITHDRAW || g.mode==cohort::Mode::KITE;
+        if(!retreat) g.retreatFrame=-1; else if(g.retreatFrame<0) g.retreatFrame=frame;
+        return g.retreatFrame;
+    }
+    // D-501: the types that may share a cohort. The battle group controller pushes
+    // one class per type its templates' ranks admit (data, no callback into the
+    // controller); a type without a class joins only its own type, as before.
+    // O(1) per join or merge candidate.
+    void SetCohortClasses(std::unordered_map<const CCircuitDef*,int> classes) { cohortClass=std::move(classes); }
+    bool Compatible(const CCircuitDef* a,const CCircuitDef* b) const {
+        if(a==b) return true;
+        const auto ia=cohortClass.find(a), ib=cohortClass.find(b);
+        return ia!=cohortClass.end() && ib!=cohortClass.end() && ia->second==ib->second;
+    }
     // The largest weapon area of effect of a definition, cached once per type.
     float MaxSplash(CCircuitDef* def) { return MetadataFor(def).maxSplash; }
 
@@ -158,6 +223,20 @@ private:
     mutable float engagedMargin = -1.f;
     mutable unsigned engagedGeneration = 0;
     float largestCohortHazard = 0.f;
+    // D-505: the largest jammer radius of any ground type, found once (-1: not yet).
+    float largestJammer = -1.f;
+    bool InJammerCover(const springai::AIFloat3& pos);
+    float SupportReach(const CohortPlan& g);  // D-507
+    // D-510 (control/kernel/RushResponse.h): the rushers near the plan's
+    // centre, O(C); the kite of a rush and the turn of a retreat toward help,
+    // the anchor refreshed at most every HELP_REFRESH_FRAMES (one friend query
+    // within help_radius, O(F) plus O(cells)).
+    void DetectRush(CCircuitUnit* unit, CohortPlan& g, float ownRange);
+    void RespondToRush(CCircuitUnit* unit, CohortPlan& g, float firing);
+    ranged::Point AwayFromThreat(const CohortPlan& g) const;
+    void FindHelp(CCircuitUnit* unit, CohortPlan& g, ranged::Point away);
+    void TurnToHelp(CCircuitUnit* unit, CohortPlan& g);
+    std::vector<rush_response::Cell> helpCells;  // reused per anchor search
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;
     const CRangedObservation::Metadata& MetadataFor(CCircuitDef* def) { return observation->MetadataFor(def); }
@@ -184,6 +263,9 @@ private:
     // are sampled per plan, once per decision frame, not once per shooter.
     std::map<int,CohortPlan> cohorts;
     std::unordered_map<int,int> membership;
+    std::unordered_map<int,why::Set> unitWhy;  // D-508: member id -> last decision's factors
+    mutable std::vector<group_layout::Member> layoutMembers; // D-501: reused by LayoutSlot
+    std::unordered_map<const CCircuitDef*,int> cohortClass;  // D-501: SetCohortClasses
     int nextCohort=0;
     rush::Registry rushes;
     std::vector<rush::Registry::Member> rushCandidates;

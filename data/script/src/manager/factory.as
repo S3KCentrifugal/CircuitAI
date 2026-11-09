@@ -161,6 +161,8 @@ namespace Factory {
 		// Emergency AIR production must reach its role before optional spam.
 		if (AirBaseResponse::Emergency() && (UnitHelpers::IsT1AircraftPlant(u.circuitDef.GetName())
 			|| UnitHelpers::IsT2AircraftPlant(u.circuitDef.GetName()))) return AirProduction::MakeTask(u);
+		@t = BattleGroupAir::Produce(u);   // D-509: the anti-air escort a battle group is short of
+		if (t !is null) return t;
 		@t = SeaCoast::Produce(u);
 		if (t is null) @t = Spam::FactoryMakeTask(u);   // coastal recovery owns its land labs
 		if (t !is null) return t;

@@ -3,7 +3,7 @@
  *
  * D-440: the one-unit task that hosts a CRangedEngagement for a definition
  * with an engagement policy (the `ranged` attribute path). Formerly the
- * engagement branch inside CArtilleryTask; the skirmisher and backline
+ * engagement branch inside CArtilleryTask; the skirmisher and support
  * controllers host the same engagement on their CLeaseTask instead.
  */
 

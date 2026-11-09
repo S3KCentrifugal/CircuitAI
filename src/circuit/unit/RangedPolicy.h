@@ -78,6 +78,57 @@ struct RangedPolicy {
     float lossFraction = .35f, staticLossFraction = 0.f;
     bool supportAllies = false; // opt-in frontline screening; never waives hard hazards
     float supportLossFraction = 0.f; // explicit HP budget when joining an allied mobile engagement
+    // D-499: a screen cohort with its rear support beside it may spend this
+    // HP fraction against static coverage (0: the static_loss_fraction alone).
+    float staticSupportLossFraction = 0.f;
+    // D-499: a rear cohort pairs with a screen this far away and walks to it
+    // (0: cohort_radius, as before).
+    float pairSeekRadius = 0.f;
+    // D-501 (control/kernel/GroupLayout.h): the group's layout. row_width wraps the
+    // line into rows (0: one row, D-430); row_depth spaces the rows (0: the spacing);
+    // direct_slots pulls in a slot the member cannot walk to directly from the
+    // group's centre (0: off).
+    float rowWidth = 0.f, rowDepth = 0.f, directSlots = 0.f;
+    // D-502: a screen paired with support holds this long after its cohort turns
+    // to withdraw, so the support leads the retreat (0: off); with
+    // retreat_behind_support a screen never withdraws past its support cohort
+    // from a mobile threat (0: off). A static, commander or reclaimer hazard escape
+    // always wins.
+    float screenRetreatDelay = 0.f, retreatBehindSupport = 0.f;
+    // D-503: with support_members a damaged formation member (this cohort's or
+    // another's) draws the cohort's objective like any engaged ally (0: off,
+    // only units outside formations count). slot_hold_distance: a member of a
+    // laid-out group farther than this from its slot walks to the slot instead
+    // of shooting from where it stands, and its poke stays on the slot's line
+    // (0: off, any shooter holds where it is).
+    float supportMembers = 0.f, slotHoldDistance = 0.f;
+    // D-505: inside an allied jammer's radius the cohort never withdraws or
+    // kites, and a member escapes only a commander or a reclaimer (0: off).
+    float jammerHold = 0.f;
+    // D-507: a front cohort whose paired support outranges every armed static
+    // it would face, with no armed mobile among them, stands off outside the
+    // statics' reach while the support besieges them, and starts no rush (0: off).
+    float siegeStandoff = 0.f;
+    // D-507: a sustained rush counts an armed static's metal this many times
+    // (a tower trades far above its cost); 1 keeps the plain cost.
+    float sustainedRushStaticWeight = 1.f;
+    // D-510 (control/kernel/RushResponse.h): rush_kite: a cohort rushed by
+    // shorter-ranged raiders kites them at its firing band (0: off); a rusher's
+    // reach is short of ours by rush_range_margin, it closes at rush_closing_speed
+    // within rush_detect_radius, at least rush_min_count holding rush_value_share
+    // of our metal; the kite holds rush_hold_seconds past the last such sighting.
+    float rushKite = 0.f, rushRangeMargin = 60.f, rushClosingSpeed = 15.f, rushDetectRadius = 800.f;
+    float rushMinCount = 2.f, rushValueShare = .3f, rushHoldSeconds = 4.f;
+    // D-510: a kite from faster raiders runs only when help is reached before they
+    // close, with this factor on their closing time (rush_response::KiteWorthwhile).
+    float rushHelpSlack = 1.f;
+    // D-510: retreat_to_help: a withdraw or kite heads for the nearest help within
+    // help_radius and help_cone degrees of away-from-the-threat (allied statics x
+    // help_static_weight, allied mobiles; enough to face help_ratio x the threat),
+    // else help_lane_step back down the lane, else the base (0: straight away);
+    // a member's escape leans escape_help_weight toward that axis.
+    float retreatToHelp = 0.f, helpRadius = 2500.f, helpRatio = 1.f, helpStaticWeight = 3.f;
+    float helpCone = 70.f, helpLaneStep = 800.f, escapeHelpWeight = .5f;
     float intentGain = 0.f; // required relative endpoint improvement; zero preserves old micro
     // D-294: per-shooter target exclusion, resolved once from JSON
     // "avoid_categories" (BAR category names, e.g. "GROUNDSCOUT"). Zero = none.
@@ -133,7 +184,7 @@ struct RangedPolicy {
     float assistMargin = 150.f; // ally counts as engaged within its ground range + margin + contact radius
     bool assistScreen = true;   // assist firing sites require an allied screen toward the target
     // D-433 (thug-micro-fixes-proposal.md). Every default reproduces the
-    // D-432 behaviour; the balanced skirmisher and backline presets opt in.
+    // D-432 behaviour; the balanced skirmisher and support presets opt in.
     float splashVetoHealth = 0.f;    // splash_veto_health: 0 = any friend in the splash vetoes the shot; else only a friend
                                      // below factor x the weapon's hit on it (or a commander) does (CRangedWorld::FriendlySplash)
     float threatWeight = 0.f;        // threat_weight: target score x (1 + weight x target DPS / own DPS) (ranged::ThreatFactor)

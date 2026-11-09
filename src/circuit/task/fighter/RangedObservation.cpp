@@ -133,7 +133,11 @@ void CRangedObservation::BuildContacts(CCircuitAI* ai, std::vector<Contact>& out
 	// Profile threat suppression must not erase an actual weapon's coverage.
 	// Respect true fog, neutral/dying contacts and BAR's explicit ignoredByAI.
 	for (const auto& [id,e]:ai->GetEnemyManager()->GetEnemyUnits()) {
-		if (!e || !e->IsInRadarOrLOS()) continue;
+		// D-507: an identified structure seen before stays a contact out of
+		// sight (it cannot move; a player remembers its ghost): its reach keeps
+		// guarding moves and assessments. Shots still need sight or radar.
+		const bool remembered=e && !e->IsInRadarOrLOS() && e->GetCircuitDef() && !e->GetCircuitDef()->IsMobile();
+		if (!e || (!e->IsInRadarOrLOS() && !remembered)) continue;
 		const auto& data=e->GetData();
 		if (data.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
 		if (e->IsIgnore() && (!e->GetCircuitDef() || !e->GetCircuitDef()->IsIgnore()

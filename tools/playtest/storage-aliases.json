@@ -15,6 +15,11 @@
   "tools/playtest/air_cases/t2-intercept.json": "tools/playtest/cases/air/combat/t2-intercept.json",
   "tools/playtest/air_cases/torpedo-covered.json": "tools/playtest/cases/air/combat/torpedo-covered.json",
   "tools/playtest/air_cases/torpedo.json": "tools/playtest/cases/air/combat/torpedo.json",
+  "tools/playtest/cases/shared/combat/backline-leak.json": "tools/playtest/cases/shared/combat/support-leak.json",
+  "tools/playtest/cases/shared/combat/backline-vs-beamers.json": "tools/playtest/cases/shared/combat/support-vs-beamers.json",
+  "tools/playtest/cases/shared/combat/backline-vs-sentries.json": "tools/playtest/cases/shared/combat/support-vs-sentries.json",
+  "tools/playtest/cases/shared/combat/line-waves-mirror.json": "tools/playtest/cases/shared/combat/battle-group-waves-mirror.json",
+  "tools/playtest/cases/shared/combat/line-waves-mixed.json": "tools/playtest/cases/shared/combat/battle-group-waves-mixed.json",
   "tools/playtest/checks/air_afus_handoff.json": "tools/playtest/checks/air/combat/air_afus_handoff.json",
   "tools/playtest/checks/air_arena.json": "tools/playtest/checks/air/combat/air_arena.json",
   "tools/playtest/checks/air_attack.json": "tools/playtest/checks/air/combat/air_attack.json",
@@ -76,6 +81,9 @@
   "tools/playtest/checks/rush_nuke.json": "tools/playtest/checks/tech/economy/rush_nuke.json",
   "tools/playtest/checks/rush_t2.json": "tools/playtest/checks/tech/economy/rush_t2.json",
   "tools/playtest/checks/rush_titan.json": "tools/playtest/checks/tech/economy/rush_titan.json",
+  "tools/playtest/checks/shared/combat/backline-leak.json": "tools/playtest/checks/shared/combat/support-leak.json",
+  "tools/playtest/checks/shared/combat/backline.json": "tools/playtest/checks/shared/combat/support.json",
+  "tools/playtest/checks/shared/combat/line-waves.json": "tools/playtest/checks/shared/combat/battle-group-waves.json",
   "tools/playtest/checks/smoke.json": "tools/playtest/checks/shared/reliability/smoke.json",
   "tools/playtest/checks/strategic_juno.json": "tools/playtest/checks/shared/combat/strategic_juno.json",
   "tools/playtest/checks/strategic_nuclear.json": "tools/playtest/checks/shared/combat/strategic_nuclear.json",
@@ -95,5 +103,8 @@
   "tools/playtest/checks/telchine_shore.json": "tools/playtest/checks/shared/combat/telchine_shore.json",
   "tools/playtest/checks/theatres_multi.json": "tools/playtest/checks/shared/terrain/theatres_multi.json",
   "tools/playtest/checks/theatres_supreme.json": "tools/playtest/checks/shared/terrain/theatres_supreme.json",
-  "tools/playtest/checks/wall_exclusion.json": "tools/playtest/checks/shared/layout/wall_exclusion.json"
+  "tools/playtest/checks/wall_exclusion.json": "tools/playtest/checks/shared/layout/wall_exclusion.json",
+  "tools/playtest/cases/shared/combat/line-demo-small.json": "tools/playtest/cases/shared/combat/battle-group-demo-small.json",
+  "tools/playtest/cases/shared/combat/line-demo-medium.json": "tools/playtest/cases/shared/combat/battle-group-demo-medium.json",
+  "tools/playtest/cases/shared/combat/line-demo-large.json": "tools/playtest/cases/shared/combat/battle-group-demo-large.json"
 }

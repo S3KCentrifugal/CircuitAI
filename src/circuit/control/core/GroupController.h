@@ -1,6 +1,6 @@
 #pragma once
 // D-430: group controllers (unit-controller-architecture.md section 9), the
-// first being the line (control/group/LineController.h). A group controller
+// first being the battle group (control/group/BattleGroupController.h). A group controller
 // is one object per formation type per AI. It owns formation templates from
 // behaviour.json "formations" (named like presets, with "extends"), decides
 // where its groups stand and which stance each member takes, and writes that

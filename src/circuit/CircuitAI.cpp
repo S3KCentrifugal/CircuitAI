@@ -17,8 +17,9 @@
 #include "module/BuilderManager.h"
 #include "control/core/ControllerRegistry.h"
 #include "control/unit/skirmisher/SkirmisherController.h"
-#include "control/unit/backline/BacklineController.h"
-#include "control/group/LineController.h"
+#include "control/unit/support/SupportController.h"
+#include "control/unit/escort/EscortController.h"
+#include "control/group/BattleGroupController.h"
 #include "control/unit/artillery/ArtilleryController.h"
 #include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
@@ -696,8 +697,9 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     controllers=std::make_unique<CControllerRegistry>(this);
     commanderController=controllers->Add(std::make_unique<CCommanderController>(this));
     skirmisherController=controllers->Add(std::make_unique<CSkirmisherController>(this));
-    backlineController=controllers->Add(std::make_unique<CBacklineController>(this));
-    lineController=controllers->AddGroup(std::make_unique<CLineController>(this));
+    supportController=controllers->Add(std::make_unique<CSupportController>(this));
+    escortController=controllers->Add(std::make_unique<CEscortController>(this));  // D-509
+    battleGroupController=controllers->AddGroup(std::make_unique<CBattleGroupController>(this));
     artilleryCensus=controllers->Add(std::make_unique<CArtilleryController>(this));  // D-493
     controllers->ReadConfig(setupManager->GetConfig());
     // D-300: before script init, so AiMain can already publish widget state.

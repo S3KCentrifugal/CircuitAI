@@ -6,6 +6,7 @@
  */
 
 #include "module/MilitaryManager.h"
+#include "control/group/GroupMonitor.h"
 #include "terrain/BattleAnalysis.h"
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
@@ -38,7 +39,9 @@
 #include "task/fighter/RangedWorld.h"
 #include "control/core/LeaseTask.h"
 #include "control/unit/skirmisher/SkirmisherController.h"
-#include "control/unit/backline/BacklineController.h"
+#include "control/unit/support/SupportController.h"
+#include "control/unit/escort/EscortController.h"
+#include "control/group/BattleGroupController.h"
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
@@ -2464,6 +2467,27 @@ std::shared_ptr<CRangedWorld> CMilitaryManager::GetRangedWorld()
 	return rangedWorld;
 }
 
+std::string CMilitaryManager::DescribeGroups(int minTaskMembers) const
+{
+	return monitor::DescribeGroups(circuit, minTaskMembers);
+}
+
+std::string CMilitaryManager::DescribeUnitGroups(int unitId) const
+{
+	return monitor::DescribeUnit(circuit, unitId);
+}
+
+std::string CMilitaryManager::DescribeMonitorCodes() const
+{
+	return monitor::Dictionary();
+}
+
+CCircuitDef* CMilitaryManager::BattleGroupAirRequest(CCircuitUnit* factory) const
+{
+	const CBattleGroupController* groups = circuit->GetBattleGroupController();
+	return (groups != nullptr && factory != nullptr) ? groups->AirRequest(factory->GetCircuitDef()) : nullptr;
+}
+
 bool CMilitaryManager::HasRangedUnits() const
 {
 	return rangedWorld && rangedWorld->HasMembers();
@@ -2473,6 +2497,13 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 {
 	if (unit == nullptr) return nullptr;
 	CCircuitDef* def = unit->GetCircuitDef();
+	// D-509: a type bound to an escort preset (the T1 anti-air bots) rides
+	// with a battle group under the escort controller's lease. Here, not in
+	// DefaultMakeTask, because script asks this before any role's policy.
+	if (CEscortController* escort = circuit->GetEscortController(); escort != nullptr
+			&& def->IsMobile() && !def->IsAbleToFly()) {
+		if (IUnitTask* lease = escort->MakeLease(unit)) return lease;
+	}
 	// Ordinary assignment only: specialist missions and player control keep
 	// their owner. No polling loop steals already assigned units.
 	if (!def->HasEngagementPolicy() || !def->IsMobile() || !def->IsLander()
@@ -2483,7 +2514,7 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 	if (CSkirmisherController* controller = circuit->GetSkirmisherController()) {
 		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
 	}
-	if (CBacklineController* controller = circuit->GetBacklineController()) {
+	if (CSupportController* controller = circuit->GetSupportController()) {
 		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
 	}
 	return Enqueue(TaskF::Common(IFighterTask::FightType::ENGAGE));

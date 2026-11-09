@@ -125,6 +125,14 @@ def prepare(args):
         if name=='builder' and case.get('commander_repair_only'):
             repair+='\n if (ai.teamId==0 && u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)) { aiBuilderMgr.SetCommanderCombatOption("front_ready",1.f); IUnitTask@ repair=aiBuilderMgr.CommanderFrontWork(u,21,null,0.f); if(repair !is null) return repair; return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); } // stationary repair isolation fixture\n'
         path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
+    # KI-785: with every builder and factory frozen no first factory can
+    # appear, so D-494's first-factory check (INV-267) cannot judge the arena.
+    # Only that check is skipped; every other invariant stays forbidden.
+    first_factory_skipped = not (case.get('builders') or case.get('commander_front_work') or case.get('production'))
+    if first_factory_skipped:
+        path = staged/'script/src/systems/construction/front_layout.as'
+        source = path.read_text(); start = source.index('{', source.index('void CheckFirstFactory()'))+1
+        path.write_text(source[:start]+'\n if (ai.frame>=0) return; // supplied arena: builders and factories frozen (KI-785)\n'+source[start:])
     path = staged/'script/src/manager/military.as'
     source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
     # Normal combat cases leave friendly commands to the AI. Production-only
@@ -364,6 +372,8 @@ def prepare(args):
                if args.profile.startswith('experimental_') else ['native legacy economy remains active'])}
     if case.get('commander_trace'):
         pins['diagnostics']['CIRCUIT_COMMANDER_TRACE']='1'
+    if first_factory_skipped:
+        pins['overrides'] += ['FRONT first-factory check (INV-267) skipped: no builder or factory can act (KI-785)']
     if case.get('production'):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
     if case.get('commander_repair_only'):

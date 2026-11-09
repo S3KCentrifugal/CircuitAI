@@ -1,4 +1,5 @@
 #include "unit/RangedPolicyParse.h"
+#include "control/kernel/GroupLayout.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,7 +40,7 @@ const std::vector<NumericKey> kNumeric{
     {"splash_weight", Field<&RangedPolicy::splashWeight>, 0.f, 3.f},
     {"spam_max_cost", Field<&RangedPolicy::spamMaxCost>, 0.f, 2000.f},
     {"commander_priority", Field<&RangedPolicy::commanderPriority>, 1.f, 100.f},
-    {"cohort_size", Field<&RangedPolicy::cohortSize>, 1.f, 12.f},
+    {"cohort_size", Field<&RangedPolicy::cohortSize>, 1.f, float(group_layout::MAX_GROUP_SIZE)},  // D-501: was 12
     {"cohort_radius", Field<&RangedPolicy::cohortRadius>, 128.f, 1600.f},
     {"regroup_seconds", Field<&RangedPolicy::regroupSeconds>, 0.f, 20.f},
     {"rush_ratio", Field<&RangedPolicy::rushRatio>, 1.f, 5.f},
@@ -56,6 +57,33 @@ const std::vector<NumericKey> kNumeric{
     {"loss_fraction", Field<&RangedPolicy::lossFraction>, 0.f, .9f},
     {"static_loss_fraction", Field<&RangedPolicy::staticLossFraction>, 0.f, .9f},
     {"support_loss_fraction", Field<&RangedPolicy::supportLossFraction>, 0.f, .9f},
+    {"static_support_loss_fraction", Field<&RangedPolicy::staticSupportLossFraction>, 0.f, .9f},  // D-499
+    {"pair_seek_radius", Field<&RangedPolicy::pairSeekRadius>, 0.f, 6000.f},  // D-499
+    {"row_width", Field<&RangedPolicy::rowWidth>, 0.f, 2000.f},  // D-501
+    {"row_depth", Field<&RangedPolicy::rowDepth>, 0.f, 512.f},  // D-501
+    {"direct_slots", Field<&RangedPolicy::directSlots>, 0.f, 1.f},  // D-501
+    {"screen_retreat_delay", Field<&RangedPolicy::screenRetreatDelay>, 0.f, 5.f},  // D-502
+    {"retreat_behind_support", Field<&RangedPolicy::retreatBehindSupport>, 0.f, 1.f},  // D-502
+    {"support_members", Field<&RangedPolicy::supportMembers>, 0.f, 1.f},  // D-503
+    {"slot_hold_distance", Field<&RangedPolicy::slotHoldDistance>, 0.f, 512.f},  // D-503
+    {"jammer_hold", Field<&RangedPolicy::jammerHold>, 0.f, 1.f},  // D-505
+    {"siege_standoff", Field<&RangedPolicy::siegeStandoff>, 0.f, 1.f},  // D-507
+    {"sustained_rush_static_weight", Field<&RangedPolicy::sustainedRushStaticWeight>, 1.f, 10.f},  // D-507
+    {"rush_kite", Field<&RangedPolicy::rushKite>, 0.f, 1.f},  // D-510
+    {"rush_range_margin", Field<&RangedPolicy::rushRangeMargin>, 0.f, 400.f},  // D-510
+    {"rush_closing_speed", Field<&RangedPolicy::rushClosingSpeed>, 0.f, 200.f},  // D-510
+    {"rush_detect_radius", Field<&RangedPolicy::rushDetectRadius>, 0.f, 3000.f},  // D-510
+    {"rush_min_count", Field<&RangedPolicy::rushMinCount>, 1.f, 32.f},  // D-510
+    {"rush_value_share", Field<&RangedPolicy::rushValueShare>, 0.f, 10.f},  // D-510
+    {"rush_hold_seconds", Field<&RangedPolicy::rushHoldSeconds>, 0.f, 30.f},  // D-510
+    {"rush_help_slack", Field<&RangedPolicy::rushHelpSlack>, 0.f, 5.f},  // D-510
+    {"retreat_to_help", Field<&RangedPolicy::retreatToHelp>, 0.f, 1.f},  // D-510
+    {"help_radius", Field<&RangedPolicy::helpRadius>, 0.f, 8000.f},  // D-510
+    {"help_ratio", Field<&RangedPolicy::helpRatio>, 0.f, 10.f},  // D-510
+    {"help_static_weight", Field<&RangedPolicy::helpStaticWeight>, 1.f, 10.f},  // D-510
+    {"help_cone", Field<&RangedPolicy::helpCone>, 0.f, 90.f},  // D-510
+    {"help_lane_step", Field<&RangedPolicy::helpLaneStep>, 0.f, 4000.f},  // D-510
+    {"escape_help_weight", Field<&RangedPolicy::escapeHelpWeight>, 0.f, 1.f},  // D-510
     {"intent_gain", Field<&RangedPolicy::intentGain>, 0.f, .5f},
     {"evasion_limit", Field<&RangedPolicy::evasionLimit>, 0.f, 10.f},
     {"poke_in", Field<&RangedPolicy::pokeIn>, POKE_MIN_IN_RANGE, POKE_MAX_IN_RANGE},

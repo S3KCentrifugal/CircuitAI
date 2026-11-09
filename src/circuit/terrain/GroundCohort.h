@@ -4,7 +4,9 @@
 
 namespace circuit::cohort {
 enum class Mode { ADVANCE, HOLD, KITE, WITHDRAW, RUSH, REGROUP };
-enum class Reason { TRAVEL, FAVORABLE, HOLD_FIRE, OUTMATCHED, UNREACHABLE, UNKNOWN, STATIC, ASSEMBLE };
+// D-507: SIEGE, the screen stands off while its support outranges every armed static in reach.
+// D-510: RUSHED, shorter-ranged raiders close on the group: it kites them.
+enum class Reason { TRAVEL, FAVORABLE, HOLD_FIRE, OUTMATCHED, UNREACHABLE, UNKNOWN, STATIC, ASSEMBLE, SIEGE, RUSHED };
 struct Force {
     float health=0.f, dps=0.f, value=0.f;
     float hullHealth=0.f;

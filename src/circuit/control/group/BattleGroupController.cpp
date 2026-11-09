@@ -1,0 +1,541 @@
+#include "control/group/BattleGroupController.h"
+#include "control/kernel/GroupLayout.h"
+#include "module/FactoryManager.h"
+#include "module/MilitaryManager.h"
+#include "task/fighter/RangedWorld.h"
+#include "task/static/RecruitTask.h"
+#include "unit/CircuitDef.h"
+#include "unit/CircuitUnit.h"
+#include "util/Performance.h"
+#include "CircuitAI.h"
+#include "util/Utils.h"
+#include "Log.h"
+
+#include <algorithm>
+#include <cstdlib>
+
+namespace circuit {
+
+namespace {
+using Field = control::ConfigField<BattleGroupConfig>;
+template <auto M> Field F(const char* name, float lo, float hi) {
+    return {name, [](BattleGroupConfig& c) -> float& { return c.*M; }, lo, hi};
+}
+// JSON keys of a "battle_group" template and the aiControllers.SetOption levers.
+const control::CConfigTable<BattleGroupConfig> kTable({
+    F<&BattleGroupConfig::withdrawScreenDelay>("withdraw_screen_delay", 0.f, 10.f),
+    F<&BattleGroupConfig::withdrawRearDelay>("withdraw_rear_delay", -1.f, 10.f),
+    F<&BattleGroupConfig::withdrawScreenCover>("withdraw_screen_cover", 0.f, 1.f),
+    F<&BattleGroupConfig::advanceScreenDelay>("advance_screen_delay", 0.f, 10.f),
+    F<&BattleGroupConfig::advanceRearDelay>("advance_rear_delay", -1.f, 10.f),
+    F<&BattleGroupConfig::attackScreenDelay>("attack_screen_delay", 0.f, 10.f),
+    F<&BattleGroupConfig::attackRearDelay>("attack_rear_delay", -1.f, 10.f),
+    F<&BattleGroupConfig::holdDelay>("hold_delay", 0.f, 10.f),
+    F<&BattleGroupConfig::orderMinSeconds>("order_min_seconds", 0.f, 30.f),
+    F<&BattleGroupConfig::scriptOrderSeconds>("script_order_seconds", 0.f, 600.f),
+    F<&BattleGroupConfig::orient>("orient", 0.f, 1.f),
+    F<&BattleGroupConfig::headingDeadband>("heading_deadband", 0.f, 90.f),
+    F<&BattleGroupConfig::threatRadius>("threat_radius", 200.f, 4000.f),
+    F<&BattleGroupConfig::peerBand>("peer_band", 0.f, 1.f),
+    F<&BattleGroupConfig::standShortShare>("stand_short_share", 0.f, 1.f),
+    F<&BattleGroupConfig::spreadEnabled>("spread", 0.f, 1.f),
+    F<&BattleGroupConfig::spreadCap>("spread_cap", 1.f, 4.f),
+    F<&BattleGroupConfig::period>("period", 1.f, 300.f),
+    F<&BattleGroupConfig::log>("log", 0.f, 1.f),
+    // D-501: group size and cohesion (control/group/GroupRegistry.h)
+    F<&BattleGroupConfig::sizeMin>("size_min", 1.f, float(group_layout::MAX_GROUP_SIZE)),
+    F<&BattleGroupConfig::sizeTarget>("size_target", 0.f, float(group_layout::MAX_GROUP_SIZE)),
+    F<&BattleGroupConfig::sizeMax>("size_max", 1.f, float(group_layout::MAX_GROUP_SIZE)),
+    F<&BattleGroupConfig::joinSeekRadius>("join_seek_radius", 0.f, 6000.f),
+    F<&BattleGroupConfig::recruitSeconds>("recruit_seconds", 0.5f, 60.f),
+    F<&BattleGroupConfig::strayRadius>("stray_radius", 0.f, 4000.f),
+    F<&BattleGroupConfig::straySeconds>("stray_seconds", 1.f, 120.f),
+    F<&BattleGroupConfig::splitLink>("split_link", 0.f, 2000.f),
+    F<&BattleGroupConfig::recallSize>("recall_size", 0.f, float(group_layout::MAX_GROUP_SIZE)),  // D-504
+    F<&BattleGroupConfig::homeRadius>("home_radius", 0.f, 8000.f),  // D-504
+    // D-509: anti-air escorts (control/kernel/AirDefence.h)
+    F<&BattleGroupConfig::airRadius>("air_radius", 0.f, 6000.f),
+    F<&BattleGroupConfig::airKillSeconds>("air_kill_seconds", 1.f, 120.f),
+    F<&BattleGroupConfig::airMemorySeconds>("air_memory_seconds", 0.f, 300.f),
+    F<&BattleGroupConfig::escortBehind>("escort_behind", 0.f, 1000.f),
+    F<&BattleGroupConfig::escortSpacing>("escort_spacing", 16.f, 256.f),
+});
+// D-509: the template rank whose types are anti-air escorts.
+constexpr const char* AIR_RANK = "air";
+// D-501: a template rank's max is bounded like the group size.
+constexpr int RANK_MAX = group_layout::MAX_GROUP_SIZE;
+constexpr float PER_SCREEN_MAX = 4.f;
+// One cohort class per template and formation position (SetCohortClasses).
+constexpr int CLASSES_PER_TEMPLATE = 4;
+ranged::Point P(const springai::AIFloat3& p) { return {p.x, p.z}; }
+}
+
+CBattleGroupController::CBattleGroupController(CCircuitAI* ai) : ai(ai), trace(std::getenv("CIRCUIT_RANGED_TRACE") != nullptr), registry(ai) {}
+
+// D-501: "ranks": {"screen": {"roles": [...], "units": [...], "max": n, "per_screen": f}, "support": {...}}.
+// screen is the front cohort, support the rear (CGroupRegistry::RankName).
+void CBattleGroupController::ParseRanks(Template& t, const Json::Value& ranks, std::vector<std::string>& problems) const
+{
+    t.ranks.clear();
+    if (ranks.isNull()) return;
+    if (!ranks.isObject()) { problems.push_back(t.name + ".ranks: not an object"); return; }
+    const auto& roleNames = CCircuitDef::GetRoleNames();
+    for (const std::string& name : ranks.getMemberNames()) {
+        const Json::Value& r = ranks[name];
+        if (name != "screen" && name != "support" && name != AIR_RANK) { problems.push_back(t.name + ".ranks." + name + ": unknown rank (screen, support, air)"); continue; }
+        if (!r.isObject()) { problems.push_back(t.name + ".ranks." + name + ": not an object"); continue; }
+        group_composition::RankSpec spec;
+        spec.name = name;
+        for (const std::string& key : r.getMemberNames()) {
+            const Json::Value& v = r[key];
+            if (key == "roles" && v.isArray()) {
+                for (const auto& role : v) {
+                    const auto it = roleNames.find(role.asString());
+                    if (it == roleNames.end()) problems.push_back(t.name + ".ranks." + name + ": unknown role " + role.asString());
+                    else spec.roleMask |= it->second.mask;
+                }
+            } else if (key == "units" && v.isArray()) {
+                for (const auto& unit : v) {
+                    const CCircuitDef* def = ai->GetCircuitDef(unit.asCString());
+                    if (def == nullptr) problems.push_back(t.name + ".ranks." + name + ": unknown unit " + unit.asString());
+                    else spec.defs.push_back(def->GetId());
+                }
+            } else if (key == "max" && v.isNumeric()) {
+                spec.max = std::clamp(v.asInt(), 0, RANK_MAX);
+            } else if (key == "per_screen" && v.isNumeric()) {
+                spec.perScreen = std::clamp(v.asFloat(), 0.f, PER_SCREEN_MAX);
+            } else problems.push_back(t.name + ".ranks." + name + "." + key + ": unknown or wrong type");
+        }
+        std::sort(spec.defs.begin(), spec.defs.end());
+        t.ranks.push_back(std::move(spec));
+    }
+}
+
+const GroupSpec* CBattleGroupController::SpecFor(const CCircuitDef* def) const
+{
+    const int index = TemplateIndex(def->GetRangedPolicy().formationFamily);
+    return index < 0 ? nullptr : &templates[index].spec;
+}
+
+// D-501: the types each template rank admits share a cohort class, so the
+// cohort world lets them join one cohort. A rank with neither roles nor
+// units gives no class: its types join only their own type (D-430).
+// O(D x T) over the unit defs, once after a template parse.
+void CBattleGroupController::PushClasses(CRangedWorld& world)
+{
+    classesDirty = false;
+    std::unordered_map<const CCircuitDef*, int> classes;
+    for (const CCircuitDef& def : ai->GetCircuitDefs()) {
+        const auto& policy = def.GetRangedPolicy();
+        if (policy.formationFamily.empty() || policy.formationPosition == RangedPolicy::FormationPosition::NONE) continue;
+        const int index = TemplateIndex(policy.formationFamily);
+        if (index < 0) continue;
+        const auto* rank = group_composition::Find(templates[index].ranks, CGroupRegistry::RankName(policy.formationPosition));
+        if (rank == nullptr || (rank->roleMask == 0 && rank->defs.empty())) continue;
+        if (!group_composition::Admits(*rank, def.GetId(), def.GetRoleMask())) continue;
+        classes[&def] = index * CLASSES_PER_TEMPLATE + int(policy.formationPosition);
+    }
+    world.SetCohortClasses(std::move(classes));
+}
+
+int CBattleGroupController::ParseTemplate(const std::string& name, const Json::Value& resolved, std::vector<std::string>& problems)
+{
+    Template t;
+    t.name = name;
+    kTable.Apply(t.config, resolved, {"type", "ranks"}, problems);
+    ParseRanks(t, resolved["ranks"], problems);
+    classesDirty = true;
+    const int existing = TemplateIndex(name);
+    if (existing >= 0) { templates[existing] = std::move(t); return existing; }
+    templates.push_back(std::move(t));
+    return int(templates.size()) - 1;
+}
+int CBattleGroupController::TemplateIndex(const std::string& name) const
+{
+    for (std::size_t i = 0; i < templates.size(); ++i) if (templates[i].name == name) return int(i);
+    return -1;
+}
+bool CBattleGroupController::SetTemplateOption(const std::string& name, const std::string& key, float value)
+{
+    const int index = TemplateIndex(name);
+    return index >= 0 && kTable.Set(templates[index].config, key, value);
+}
+bool CBattleGroupController::Order(const std::string& name, const std::string& kind, const springai::AIFloat3& pos)
+{
+    const int index = TemplateIndex(name);
+    if (index < 0) return false;
+    battle_group::Order order;
+    if (kind == "hold") order = battle_group::Order::HOLD;
+    else if (kind == "advance") order = battle_group::Order::ADVANCE;
+    else if (kind == "attack") order = battle_group::Order::ATTACK;
+    else if (kind == "withdraw") order = battle_group::Order::WITHDRAW;
+    else if (kind == "release") order = battle_group::Order::NONE;
+    else return false;
+    const int frame = ai->GetLastFrame();
+    for (auto& [key, l] : groups) {
+        if (l.tmpl != index) continue;
+        l.script = order; l.scriptFrame = frame; l.scriptGoal = pos;
+    }
+    ai->LOG("GROUP: script order template=%s kind=%s groups=%u", name.c_str(), kind.c_str(), unsigned(groups.size()));
+    return true;
+}
+void CBattleGroupController::UnitRemoved(int unitId) { directives.erase(unitId); registry.UnitRemoved(unitId); escorts.erase(unitId); }
+
+std::string CBattleGroupController::Describe(int groupKey) const
+{
+    const auto it = groups.find(groupKey);
+    if (it == groups.end()) return "";
+    const Group& l = it->second;
+    const auto& c = l.composition;
+    return std::string("order=") + battle_group::Name(l.effective) + " screen=" + battle_group::Name(l.screenStance)
+        + " rear=" + battle_group::Name(l.rearStance) + " short=" + std::to_string(c.count[0]) + " peer=" + std::to_string(c.count[1])
+        + " long=" + std::to_string(c.count[2]) + " static=" + std::to_string(c.count[3]) + " comm=" + std::to_string(c.count[4])
+        + " spread=" + std::to_string(l.spread);
+}
+
+std::vector<CBattleGroupController::GroupView> CBattleGroupController::Snapshot() const
+{
+    std::vector<GroupView> out;
+    out.reserve(groups.size());
+    for (const auto& [key, l] : groups) {
+        GroupView v;
+        v.key = l.key; v.partner = l.partner;
+        v.templateName = (l.tmpl >= 0 && l.tmpl < int(templates.size())) ? templates[l.tmpl].name : std::string();
+        v.effective = l.effective; v.script = l.script; v.internal = l.internal;
+        v.screenStance = l.screenStance; v.rearStance = l.rearStance;
+        v.spread = l.spread; v.separation = l.separation;
+        v.facing = l.facing; v.facingSet = l.facingSet;
+        v.scripted = l.scripted; v.standFirm = l.standFirm;
+        v.screens = l.screens; v.rears = l.rears;
+        v.orderFrame = l.orderFrame; v.seen = l.seen; v.why = l.why;
+        v.airNeed = l.airNeed; v.airCap = l.airCap; v.escorts = l.escorts; v.airHeld = l.airHeld;
+        if (l.tmpl >= 0 && l.tmpl < int(templates.size()) && templates[l.tmpl].spec.Enabled()) {
+            const auto& t = templates[l.tmpl];
+            const auto* screen = group_composition::Find(t.ranks, "screen");
+            v.sizeTarget = group_composition::Target(screen, t.spec.size);
+            v.sizeMax = group_composition::Max(screen, t.spec.size);
+        }
+        v.composition = l.composition;
+        for (const auto& [id, e] : escorts) if (e.group == l.key) v.escortIds.push_back(id);  // O(E), on request only
+        out.push_back(std::move(v));
+    }
+    return out;
+}
+
+// D-509: the least anti-air DPS among the air rank's types (0: no air rank):
+// the conservative figure, so a group never plans on more than it gets. O(R).
+float CBattleGroupController::EscortDps(const Template& t) const
+{
+    const auto* rank = group_composition::Find(t.ranks, AIR_RANK);
+    if (rank == nullptr) return 0.f;
+    float least = 0.f;
+    for (int id : rank->defs) {
+        const CCircuitDef* def = ai->GetCircuitDefSafe(id);
+        const float dps = def ? def->GetAirDps() : 0.f;
+        if (dps > 0.f) least = least > 0.f ? std::min(least, dps) : dps;
+    }
+    return least;
+}
+
+// D-509: armed enemy air within air_radius of the screen, its HP held over
+// air_memory_seconds, and the escorts that answer it (air_defence::Need).
+// One bounded contact query per group update, O(K) for K contacts in reach.
+void CBattleGroupController::ObserveAir(Group& l, const Template& t, CRangedWorld& world, const springai::AIFloat3& center, int frame)
+{
+    const auto* rank = group_composition::Find(t.ranks, AIR_RANK);
+    if (rank == nullptr) { l.airNeed = 0; l.airCap = 0; l.airHeld = 0.f; return; }
+    const BattleGroupConfig& c = t.config;
+    float health = 0.f;
+    world.Nearby(center, c.airRadius, airNearby);
+    const auto& contacts = world.Contacts();
+    for (int i : airNearby) {
+        const auto& e = contacts[i];
+        if (!e.def || !e.def->IsAbleToFly() || !e.armed) continue;
+        if (e.pos.SqDistance2D(center) > c.airRadius * c.airRadius) continue;
+        health += e.health;
+    }
+    l.airHeld = air_defence::Held(l.airMemory, health, frame, int(c.airMemorySeconds * FRAMES_PER_SEC));
+    l.airCap = air_defence::Cap(l.screens, rank->perScreen, rank->max);
+    l.airNeed = air_defence::Need(l.airHeld, EscortDps(t), c.airKillSeconds, l.airCap);
+}
+
+// D-509: every escort rides with a group. One surplus escort per update moves
+// to a group short of escorts (no churn); an escort without a group takes the
+// nearest group short of escorts, else the nearest group with an air rank
+// (it stays with the army). Then each group's escorts, in id order, get
+// their slots. O(E x G) for E escorts and G groups, once per update.
+void CBattleGroupController::AssignEscorts(int frame)
+{
+    airDeficit = 0; airUnassigned = 0;
+    for (auto& [key, l] : groups) { l.escorts = 0; l.escortIndex = 0; }
+    for (auto& [id, e] : escorts) {
+        const auto g = e.group >= 0 ? groups.find(e.group) : groups.end();
+        if (g == groups.end() || g->second.airCap <= 0) { e.group = -1; continue; }
+        ++g->second.escorts;
+    }
+    const auto shortOf = [](const Group& l) { return l.airNeed - l.escorts; };
+    bool anyShort = false;
+    for (const auto& [key, l] : groups) anyShort = anyShort || shortOf(l) > 0;
+    if (anyShort) {
+        for (auto it = escorts.rbegin(); it != escorts.rend(); ++it) {
+            if (it->second.group < 0) continue;
+            Group& from = groups.at(it->second.group);
+            if (from.escorts <= from.airNeed) continue;
+            --from.escorts; it->second.group = -1;
+            break;
+        }
+    }
+    for (auto& [id, e] : escorts) {
+        if (e.group >= 0) continue;
+        CCircuitUnit* unit = ai->GetTeamUnit(id);
+        if (unit == nullptr || unit->IsDead()) continue;
+        const ranged::Point pos = P(unit->GetPos(frame));
+        int best = -1, nearest = -1; float bestDistance = 0.f, nearestDistance = 0.f;
+        for (const auto& [key, l] : groups) {
+            if (l.airCap <= 0) continue;
+            const float d = ranged::DistanceSq(pos, l.escortCenter);
+            if (shortOf(l) > 0 && (best < 0 || d < bestDistance)) { best = key; bestDistance = d; }
+            if (nearest < 0 || d < nearestDistance) { nearest = key; nearestDistance = d; }
+        }
+        e.group = best >= 0 ? best : nearest;
+        if (e.group >= 0) ++groups.at(e.group).escorts;
+    }
+    for (const auto& [key, l] : groups) airDeficit += std::max(0, shortOf(l));
+    for (auto& [id, e] : escorts) {
+        if (e.group < 0) { ++airUnassigned; continue; }
+        Group& l = groups.at(e.group);
+        const BattleGroupConfig& c = templates[l.tmpl].config;
+        e.slot = air_defence::Slot(l.escortCenter, l.escortBack, l.rearDepth, c.escortBehind, l.escortIndex++, l.escorts, c.escortSpacing);
+    }
+}
+
+bool CBattleGroupController::HasAirGroups() const
+{
+    for (const auto& [key, l] : groups) if (l.airCap > 0) return true;
+    return false;
+}
+void CBattleGroupController::EscortJoin(int unitId) { escorts.emplace(unitId, Escort{}); }
+void CBattleGroupController::EscortLeave(int unitId) { escorts.erase(unitId); }
+bool CBattleGroupController::EscortPoint(int unitId, springai::AIFloat3& point, int& group) const
+{
+    const auto it = escorts.find(unitId);
+    if (it == escorts.end() || it->second.group < 0) return false;
+    point = springai::AIFloat3(it->second.slot.x, 0.f, it->second.slot.z);
+    group = it->second.group;
+    return true;
+}
+
+CCircuitDef* CBattleGroupController::AirRequest(const CCircuitDef* factoryDef) const
+{
+    if (factoryDef == nullptr || airDeficit <= 0) return nullptr;
+    const auto escortType = [this](const CCircuitDef* def) {
+        if (def == nullptr) return false;
+        for (const Template& t : templates) {
+            const auto* rank = group_composition::Find(t.ranks, AIR_RANK);
+            if (rank && std::binary_search(rank->defs.begin(), rank->defs.end(), def->GetId())) return true;
+        }
+        return false;
+    };
+    int inProduction = 0;  // queued or being built
+    for (const CRecruitTask* task : ai->GetFactoryManager()->GetTasks())
+        if (!task->IsDead() && escortType(task->GetBuildDef())) ++inProduction;
+    if (air_defence::Request(airDeficit, airUnassigned, inProduction) <= 0) return nullptr;
+    const int frame = ai->GetLastFrame();
+    for (const Template& t : templates) {
+        const auto* rank = group_composition::Find(t.ranks, AIR_RANK);
+        if (rank == nullptr) continue;
+        for (int id : rank->defs) {
+            CCircuitDef* def = ai->GetCircuitDefSafe(id);
+            if (def && factoryDef->CanBuild(def) && def->IsAvailable(frame)) return def;
+        }
+    }
+    return nullptr;
+}
+
+void CBattleGroupController::Observe(Group& l, CRangedWorld& world, int frame)
+{
+    const auto& cohorts = world.Cohorts();
+    const auto front = cohorts.find(l.key);
+    if (front == cohorts.end() || front->second.members.empty()) return;
+    const auto& plan = front->second;
+    auto* leader = ai->GetTeamUnit(plan.members.front());
+    if (leader == nullptr || leader->IsDead()) return;
+    const CCircuitDef* def = leader->GetCircuitDef();
+    const Template& t = templates[l.tmpl];
+    // Centre from live member positions: the plan's centre is refreshed only
+    // when a member decides, and this update may run between decisions.
+    springai::AIFloat3 center; int counted = 0;
+    for (int id : plan.members) {
+        auto* u = ai->GetTeamUnit(id);
+        if (u && !u->IsDead()) { center += u->GetPos(frame); ++counted; }
+    }
+    if (counted == 0) return;
+    center *= 1.f / float(counted);
+    l.screens = counted; l.screenSpeed = std::max(1.f, def->GetSpeed());
+    l.partner = plan.formationPartner;
+    l.rears = 0; l.separation = 0.f;
+    if (l.partner >= 0) {
+        const auto rear = cohorts.find(l.partner);
+        if (rear != cohorts.end() && rear->second.formationPartner == l.key) {
+            l.rears = int(rear->second.members.size());
+            l.separation = rear->second.formationScreenOffset;
+        } else l.partner = -1;
+    }
+    // Composition of armed hostiles near the battle group, from the shared snapshot.
+    const float ownRange = def->GetMaxRange(CCircuitDef::RangeType::LAND);
+    l.composition = battle_group::Composition();
+    world.Nearby(center, t.config.threatRadius, nearby);
+    const auto& contacts = world.Contacts();
+    for (int i : nearby) {
+        const auto& c = contacts[i];
+        if (!c.def || c.def->IsAbleToFly() || c.pos.y < -20.f) continue;
+        const bool commander = c.def->IsEnemyRoleAny(CCircuitDef::COMM);
+        if (!c.armed && !commander) continue;
+        const battle_group::Threat kind = battle_group::Classify(c.mobile, commander, c.groundRange, ownRange, t.config.peerBand);
+        l.composition.Add(kind, cohort::HealthValue(c.cost, c.health, c.def->GetHealth()), P(c.pos), world.MaxSplash(c.def));
+    }
+    if (plan.backToHelp) {
+        // D-510: a retreat toward help turns the rows to its axis (the plan's
+        // back points at the help), past the heading deadband as any turn.
+        const ranged::Point wanted = P(plan.back);
+        if (!l.facingSet || battle_group::Reorient(l.facing, wanted, t.config.headingDeadband)) { l.facing = wanted; l.facingSet = true; }
+    } else if (t.config.orient > 0.f && l.composition.any) {
+        const ranged::Point wanted = battle_group::Facing(P(center), l.composition.Centroid());
+        if (battle_group::Reorient(l.facingSet ? l.facing : ranged::Point{0.f, 0.f}, wanted, t.config.headingDeadband)) {
+            l.facing = wanted; l.facingSet = true;
+        }
+    } else if (!l.composition.any) {
+        // D-502: nothing hostile near: the cohort's own travel axis (along its
+        // lane) orients the rows again, perpendicular to the push. The last
+        // threat's facing used to persist and turned a marching line sideways.
+        l.facingSet = false;
+    }
+    l.spread = t.config.spreadEnabled > 0.f ? battle_group::Spread(l.composition.maxSplash, def->GetRangedPolicy().spacing, t.config.spreadCap) : 1.f;
+    l.standFirm = battle_group::StandFirm(l.composition, t.config.standShortShare);
+    // D-509: the escort geometry (the axis away from the enemy, the screen's
+    // rear edge along it) and the air near the screen. O(M + K_air).
+    ranged::Point back = l.facingSet ? l.facing : P(plan.back);
+    if (back.x == 0.f && back.z == 0.f) back = {1.f, 0.f};
+    float rear = 0.f;
+    for (int id : plan.members) {
+        auto* u = ai->GetTeamUnit(id);
+        if (u == nullptr || u->IsDead()) continue;
+        const auto p = u->GetPos(frame);
+        rear = std::max(rear, (p.x - center.x) * back.x + (p.z - center.z) * back.z);
+    }
+    l.escortCenter = P(center); l.escortBack = back; l.rearDepth = rear;
+    ObserveAir(l, t, world, center, frame);
+    // The battle group's own order: the cohort's assessment.
+    const battle_group::Order internal = battle_group::InternalOrder(int(plan.mode), plan.target >= 0, plan.committed);
+    if (l.script != battle_group::Order::NONE && frame - l.scriptFrame > int(t.config.scriptOrderSeconds * 30.f)) l.script = battle_group::Order::NONE;
+    const battle_group::Order wanted = battle_group::Effective(internal, l.script);
+    const bool scripted = l.script != battle_group::Order::NONE && battle_group::Caution(l.script) > battle_group::Caution(internal);
+    l.internal = internal;
+    if (l.effective == battle_group::Order::NONE || battle_group::Replace(l.effective, wanted, frame - l.orderFrame, int(t.config.orderMinSeconds * 30.f))) {
+        if (wanted != l.effective) {
+            const auto& c = l.composition;
+            if (t.config.log > 0.f) ai->LOG("GROUP: group=%i order=%s from=%s source=%s screens=%i rears=%i short=%i peer=%i long=%i static=%i comm=%i metal=%.0f facing=%.2f,%.2f spread=%.2f firm=%i cover=%i reason=%i frame=%i",
+                l.key, battle_group::Name(wanted), battle_group::Name(l.effective), scripted ? "script" : "cohort",
+                l.screens, l.rears, c.count[0], c.count[1], c.count[2], c.count[3], c.count[4], c.total, l.facing.x, l.facing.z, l.spread, int(l.standFirm),
+                int(plan.jammerCover), int(plan.reason), frame);
+            l.effective = wanted; l.orderFrame = frame; l.scripted = scripted;
+        }
+    }
+    // D-508: the order's factors for the unit monitor (Route adds STAGGERED).
+    l.why = 0;
+    if (l.scripted) l.why |= why::Of(why::group::SCRIPT_ORDER);
+    if (wanted != l.effective) l.why |= why::Of(why::group::ORDER_HELD);
+    if (l.standFirm) l.why |= why::Of(why::group::STAND_FIRM);
+    if (l.airNeed > 0) l.why |= why::Of(why::group::AIR_THREAT);
+    Route(l, t, frame);
+    Write(l, plan.members, battle_group::Slot::SCREEN, l.screenStance);
+    if (l.partner >= 0) Write(l, cohorts.at(l.partner).members, battle_group::Slot::REAR, l.rearStance);
+}
+
+void CBattleGroupController::Route(Group& l, const Template& t, int frame)
+{
+    battle_group::Routing routing;
+    switch (l.effective) {
+        case battle_group::Order::WITHDRAW:
+            routing = {t.config.withdrawScreenDelay, t.config.withdrawRearDelay, t.config.withdrawScreenCover > 0.f}; break;
+        case battle_group::Order::ADVANCE:
+            routing = {t.config.advanceScreenDelay, t.config.advanceRearDelay, false}; break;
+        case battle_group::Order::ATTACK:
+            routing = {t.config.attackScreenDelay, t.config.attackRearDelay, false}; break;
+        case battle_group::Order::HOLD:
+            routing = {t.config.holdDelay, t.config.holdDelay, false}; break;
+        default: break;
+    }
+    const int elapsed = frame - l.orderFrame;
+    const int screenDelay = battle_group::DelayFrames(routing.screenDelay, l.separation, l.screenSpeed);
+    const int rearDelay = battle_group::DelayFrames(routing.rearDelay, l.separation, l.screenSpeed);
+    const battle_group::Stance screen = battle_group::StanceFor(l.effective, battle_group::Slot::SCREEN, routing, elapsed, screenDelay);
+    const battle_group::Stance rear = battle_group::StanceFor(l.effective, battle_group::Slot::REAR, routing, elapsed, rearDelay);
+    if (t.config.log > 0.f && (screen != l.screenStance || rear != l.rearStance))
+        ai->LOG("GROUP: group=%i order=%s screen=%s rear=%s elapsed=%i screen_delay=%i rear_delay=%i frame=%i",
+            l.key, battle_group::Name(l.effective), battle_group::Name(screen), battle_group::Name(rear), elapsed, screenDelay, rearDelay, frame);
+    l.screenStance = screen; l.rearStance = rear;
+    if (l.partner >= 0 && screen != rear) l.why |= why::Of(why::group::STAGGERED);
+}
+
+void CBattleGroupController::Write(const Group& l, const std::vector<int>& members, battle_group::Slot /*slot*/, battle_group::Stance stance)
+{
+    for (int id : members) {
+        auto& d = directives[id];
+        d.stance = stance; d.order = l.effective; d.orderFrame = l.orderFrame;
+        d.scripted = l.scripted; d.standFirm = l.standFirm;
+        d.facingSet = l.facingSet; d.facing = l.facing; d.spread = l.spread;
+        d.group = l.key; d.generation = generation;
+    }
+}
+
+void CBattleGroupController::Update()
+{
+    if (templates.empty()) return;
+    const int frame = ai->GetLastFrame();
+    if (frame < nextFrame) return;
+    auto* military = ai->GetMilitaryManager();
+    if (military == nullptr || !military->HasRangedUnits()) { nextFrame = frame + 30; return; }
+    performance::Scope measured(ai, performance::BATTLE_GROUP_DECISION);
+    auto world = military->GetRangedWorld();
+    world->Refresh();  // idempotent per frame
+    ++generation;
+    // D-501: membership first, so this update's directives see the groups it leaves.
+    bool registryOn = false;
+    for (Template& t : templates) {
+        const auto& c = t.config;
+        const int sizeMax = std::max(1, int(c.sizeMax));
+        t.spec.size = {std::clamp(int(c.sizeMin), 1, sizeMax), std::min(int(c.sizeTarget), sizeMax), sizeMax};
+        t.spec.ranks = &t.ranks;
+        t.spec.joinSeekRadius = c.joinSeekRadius; t.spec.recruitSeconds = c.recruitSeconds;
+        t.spec.strayRadius = c.strayRadius; t.spec.straySeconds = c.straySeconds; t.spec.splitLink = c.splitLink;
+        t.spec.recallSize = int(c.recallSize); t.spec.homeRadius = c.homeRadius;
+        registryOn = registryOn || t.spec.Enabled();
+    }
+    if (classesDirty) PushClasses(*world);
+    if (registryOn) registry.Tick(*world, frame, [this](const CCircuitDef* def) { return SpecFor(def); });
+    int period = 300;
+    for (const auto& [key, plan] : world->Cohorts()) {
+        if (plan.members.empty()) continue;
+        auto* leader = ai->GetTeamUnit(plan.members.front());
+        if (leader == nullptr || leader->IsDead()) continue;
+        const auto& policy = leader->GetCircuitDef()->GetRangedPolicy();
+        if (policy.formationPosition != RangedPolicy::FormationPosition::FRONT) continue;
+        const int tmpl = TemplateIndex(policy.formationFamily);
+        if (tmpl < 0) continue;
+        Group& l = groups[key];
+        l.key = key; l.tmpl = tmpl; l.seen = frame;
+        period = std::min(period, int(templates[tmpl].config.period));
+        Observe(l, *world, frame);
+    }
+    for (auto it = groups.begin(); it != groups.end();) {
+        if (it->second.seen != frame) it = groups.erase(it); else ++it;
+    }
+    for (auto it = directives.begin(); it != directives.end();) {
+        if (it->second.generation != generation) it = directives.erase(it); else ++it;
+    }
+    AssignEscorts(frame);
+    nextFrame = frame + std::max(1, period);
+}
+
+} // namespace circuit

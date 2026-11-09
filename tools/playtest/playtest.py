@@ -358,8 +358,18 @@ def stage(args):
     shutil.copy2(HERE / 'widgets' / 'playtest_lifecycle.lua', wdir / 'playtest_lifecycle.lua')
     # extra widgets under test (e.g. tools/widgets/gui_barb_team_link.lua), staged into
     # the playtest's own write dir only, never the live game's
-    for extra in (args.extra_widget or []):
-        src = Path(extra)
+    extras = [Path(e) for e in (args.extra_widget or [])]
+    # D-498: the team link is the hub of the BARb widgets; its overlays live in
+    # BARb map, BARb plans and the unit monitor beside it. Staging the hub
+    # stages them too, so every caller that staged the single widget still
+    # gets every view and every WG.barblink member it forwards.
+    for src in list(extras):
+        if src.name == "gui_barb_team_link.lua":
+            for companion in ("gui_barb_map.lua", "gui_barb_plans.lua", "gui_barb_unit_monitor.lua"):
+                path = src.parent / companion
+                if path.is_file() and all(e.name != companion for e in extras):
+                    extras.append(path)
+    for src in extras:
         (wdir / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         log("staged widget %s" % src.name)
 

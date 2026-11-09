@@ -712,6 +712,10 @@ public:
 	std::pair<terrain::SArea*, bool> GetCurrentMapArea(CCircuitDef* cdef, const int indexSector);
 	int GetSectorIndex(const springai::AIFloat3& position) const { return terrainData->GetSectorIndex(position); }
 	bool CanMoveToPos(terrain::SArea* area, const springai::AIFloat3& destination);
+	// D-501: every sector on the straight line from `from` to `to` belongs to
+	// `area` (no obstacle on the way, so a unit walks there directly rather than
+	// round a mountain). Half-sector steps, O(length / 32) sector reads.
+	bool IsDirectPassable(terrain::SArea* area, const springai::AIFloat3& from, const springai::AIFloat3& to);
 	bool IsMovementDestinationFree(CCircuitDef* def, const springai::AIFloat3& destination) const;
 	springai::AIFloat3 GetBuildPosition(CCircuitDef* cdef, const springai::AIFloat3& position);
 	springai::AIFloat3 GetMovePosition(terrain::SArea* sourceArea, const springai::AIFloat3& position);

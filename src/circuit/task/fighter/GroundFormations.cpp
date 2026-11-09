@@ -23,6 +23,10 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanCohort(CCircuitUnit* unit)
     // Positive and negative decisions are shared by the whole cohort. All
     // membership writers invalidate both partners before another callback.
     if(rear.formationFrame==now) return rear;
+    // D-499: how far a rear cohort looks for a screen to stand behind. Rockets
+    // without one walk to the nearest free screen within pair_seek_radius
+    // (the support station leads them there); 0 keeps cohort_radius.
+    const float pairRadius=std::max(policy.cohortRadius,policy.pairSeekRadius);
     const auto compatible=[&](int candidate, bool retained) {
         auto found=cohorts.find(candidate);
         if(found==cohorts.end() || found->second.members.empty()) return false;
@@ -38,7 +42,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanCohort(CCircuitUnit* unit)
         }
         return formation::Compatible(policy.formationFamily==other.formationFamily,
             leader->GetArea()==unit->GetArea(),true,
-            leader->GetPos(now).SqDistance2D(rear.center),policy.cohortRadius,retained);
+            leader->GetPos(now).SqDistance2D(rear.center),pairRadius,retained);
     };
     const int previousPartner=rear.formationPartner;
     if(!compatible(rear.formationPartner,true)) {
@@ -47,11 +51,11 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanCohort(CCircuitUnit* unit)
             previous->second.formationPartner=-1;
         rear.formationPartner=-1;
         rear.formationRear=false;
-        float nearest=policy.cohortRadius*policy.cohortRadius;
+        float nearest=pairRadius*pairRadius;
         // Pair by actual positions, not projected destination slots: a long
         // route may reserve a point far beyond two physically adjacent groups.
         EnsureAllies();
-        allies.Query({rear.center.x,rear.center.z},policy.cohortRadius,[&](int index) {
+        allies.Query({rear.center.x,rear.center.z},pairRadius,[&](int index) {
             auto member=membership.find(friends[index].id);
             if(member==membership.end() || !compatible(member->second,false)) return;
             auto* leader=circuit->GetTeamUnit(cohorts.at(member->second).members.front());
@@ -92,6 +96,8 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanCohort(CCircuitUnit* unit)
     // controller still evaluates its own trajectory, slot and escape safety.
     rear.target=front.target; rear.focus=front.focus; rear.back=front.back;
     rear.mode=front.mode==cohort::Mode::RUSH ? cohort::Mode::ADVANCE : front.mode; rear.committed=false; rear.assault.clear();
+    rear.why=front.why|why::Of(why::plan::FOLLOWS_SCREEN);  // D-508: the screen's reasons are the support's
+    rear.backToHelp=front.backToHelp; rear.rushed=front.rushed;  // D-510: the screen's retreat axis is the support's
     rear.radius=formation::RearRadius(front.radius,frontRange,rearRange,
         policy.formationSeparationMinimum,policy.formationSeparationMaximum);
     if(front.target<0) rear.focus+=front.back*separation;

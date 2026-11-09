@@ -75,6 +75,11 @@ namespace circuit {
 // D-074: the exit a factory keeps clear, in elmos (the first lab's exit cone: 320 long, 32 margin)
 static constexpr float EXIT_CLEAR_LENGTH = 320.f;
 static constexpr float EXIT_CLEAR_MARGIN = 32.f;
+// D-501: IsDirectPassable samples every half sector along the line.
+static constexpr float DIRECT_STEP_SECTORS = .5f;
+// D-502: a run of off-area samples up to this many sectors long (a steep
+// 64-elmo patch on a walkable hillside) is not an obstacle; a mountain is wider.
+static constexpr float DIRECT_GAP_SECTORS = 2.f;
 
 
 using namespace springai;
@@ -6265,6 +6270,26 @@ bool CTerrainManager::CanMoveToPos(SArea* area, const AIFloat3& destination)
 		return true;
 	}
 	return false;
+}
+
+bool CTerrainManager::IsDirectPassable(SArea* area, const AIFloat3& from, const AIFloat3& to)
+{
+	if (area == nullptr) return true;  // a flying unit, as CanMoveToPos
+	const std::vector<SAreaSector>& sectors = GetSectorList(area);
+	const float dx = to.x - from.x, dz = to.z - from.z;
+	const float length = std::sqrt(dx * dx + dz * dz);
+	const float step = std::max(1.f, float(CTerrainData::convertStoP) * DIRECT_STEP_SECTORS);
+	const int steps = std::max(1, int(std::ceil(length / step)));
+	const int gapLimit = std::max(1, int(DIRECT_GAP_SECTORS / DIRECT_STEP_SECTORS));
+	int gap = 0;
+	for (int i = 0; i <= steps; ++i) {
+		const float t = float(i) / float(steps);
+		const int iS = GetSectorIndex(AIFloat3(from.x + dx * t, 0.f, from.z + dz * t));
+		if (!terrainData->IsSectorValid(iS)) return false;
+		if (sectors[iS].area != area) { if (++gap > gapLimit) return false; }
+		else gap = 0;
+	}
+	return true;
 }
 
 AIFloat3 CTerrainManager::GetBuildPosition(CCircuitDef* cdef, const AIFloat3& position)

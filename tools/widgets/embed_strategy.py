@@ -3,7 +3,7 @@ import argparse
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
-widget = root / 'gui_barb_team_link.lua'
+widget = root / 'gui_barb_plans.lua'   # D-498: the strategy view moved to BARb plans
 start, end = '-- BEGIN STRATEGY MODULE\n', '-- END STRATEGY MODULE\n'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--check', action='store_true')

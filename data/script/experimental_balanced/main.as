@@ -132,6 +132,7 @@ namespace Main {
 		Military::UpdateEnemyCostCache();
         Aggression::Update();
         CommanderCombat::Update();
+        BattleGroupSize::Update();  // D-501: battle group size target from the army
 
 		if (Global::profileController !is null) {
 			Global::profileController.MainUpdate();

@@ -1,0 +1,116 @@
+{
+  "name": "battle-group-rush-near-help",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    3600,
+    1500
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    60,
+    80,
+    120
+  ],
+  "min_spawn_spacing": 64,
+  "judge_to_completion": true,
+  "enemy_destination": [
+    3900,
+    3000
+  ],
+  "description": "D-510: 14 Pawns rush 6 Thugs and 6 Aggravators with two Guardians 350 behind the Thugs, reachable before the Pawns close. Expected: the group kites to the Guardians (COHORT: rush kite=1) and fights beside them.",
+  "storage_scenario": "bg-rush-near-help",
+  "checks": "battle-group-rush-kite",
+  "groups": [
+    {
+      "unit": "corllt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3650,
+        3150
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corllt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4050,
+        3150
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corthud",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 6,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 6,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armpw",
+      "count": 14,
+      "team": 1,
+      "position": [
+        3900,
+        5000
+      ],
+      "columns": 7,
+      "spacing": 60,
+      "after_seconds": 20
+    }
+  ],
+  "waves": [
+    {
+      "name": "14 Pawns",
+      "after_seconds": 20,
+      "units": [
+        "armpw"
+      ]
+    }
+  ],
+  "assertions": {
+    "min_kills": 12,
+    "max_losses": 6,
+    "min_shooters": 1,
+    "min_damage": 2000,
+    "min_types_assigned": 2
+  }
+}

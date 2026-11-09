@@ -1,5 +1,5 @@
 #pragma once
-// D-433: the retreat rule and the repair rotation of a skirmisher or backline
+// D-433: the retreat rule and the repair rotation of a skirmisher or support
 // hull, engine-free (tests/disengage_test.cpp). The meta
 // (knowledge/60-tactics/61-micro.md): a unit that can outrun its attacker
 // leaves at 30 to 40 percent, one that cannot stays and fires, a veteran

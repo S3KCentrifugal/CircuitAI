@@ -64,7 +64,20 @@ namespace Military {
         if(Global::AISettings::Role==AiRole::FRONT && aiBattle.ArmyFrontLanesEnabled() && aiBattle.GetFrontLaneLength()>0.f) {
             CoverageLanes::Load();
             const float progress=aiBattle.GetFrontLaneProgress(pos);
-            return aiBattle.GetFrontLaneGoal(pos,aiBattle.LimitLaneAdvance(progress,progress+CoverageLanes::advance)-progress);
+            float goal=progress+CoverageLanes::advance;
+            // D-502: the army walks its lane ahead of the commander, never behind
+            // it: at least BattleGroupLeadDistance past the commander's progress.
+            // The lane's own advance limit (enemy defences) still bounds the goal.
+            CCircuitUnit@ commander=Builder::GetCommander();
+            if(commander !is null && Global::Military::BattleGroupLeadDistance>0.f) {
+                const float lead=aiBattle.GetFrontLaneProgress(commander.GetPos(ai.frame))+Global::Military::BattleGroupLeadDistance;
+                if(lead>goal) goal=lead;
+            }
+            // D-505: a battle group pushes the front: its goal is not capped where
+            // the enemy's defences start. What it meets (a static, a wave) is the
+            // cohort's own fight assessment's to take or stand off from.
+            if(!Global::Military::BattleGroupPushPastLimit) goal=aiBattle.LimitLaneAdvance(progress,goal);
+            return aiBattle.GetFrontLaneGoal(pos,goal-progress);
         }
         const int lane = Lanes::BestLane(Lanes::BOT);
         if (lane >= 0) {

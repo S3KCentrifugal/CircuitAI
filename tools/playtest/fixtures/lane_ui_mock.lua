@@ -1,6 +1,32 @@
 -- Lua 5.1 rendering/interaction harness. No engine, GPU or live installation.
 local function noop() end
-widget={}; WG={}; UnitDefs={}; Game={mapSizeX=16384,mapSizeZ=8192}
+-- D-498: the BARb widgets are several files. Each loads into its own
+-- environment with its own `widget` table, as BAR's handler does (loadWidget);
+-- the global `widget` the tests call forwards a callin to every loaded widget
+-- in load order and returns the first non-nil result.
+widgets={}
+widget=setmetatable({}, {__index=function(_, name)
+    return function(_, ...)
+        local result
+        for _, w in ipairs(widgets) do
+            local f = rawget(w, name)
+            if f then
+                local r = f(w, ...)
+                if result == nil and r ~= nil then result = r end
+            end
+        end
+        return result
+    end
+end})
+function loadWidget(source, name)
+    local env = setmetatable({widget={}}, {__index=_G})
+    local chunk = assert(loadstring(source, name))
+    setfenv(chunk, env)
+    chunk()
+    widgets[#widgets+1] = env.widget
+    return env.widget
+end
+WG={}; UnitDefs={}; Game={mapSizeX=16384,mapSizeZ=8192}
 GL={LINES=1,LINE_STRIP=2,TRIANGLE_FAN=3,LINE_LOOP=4}
 gl=setmetatable({GetViewSizes=function() return 1920,1080 end,
     GetTextWidth=function(s) return #s*0.5 end,
