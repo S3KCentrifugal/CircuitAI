@@ -57,7 +57,7 @@ namespace Main {
 		GenericHelpers::LogUtil(
 			"[Strategy] (EXPERIMENTAL BALANCED) Decided: Tech mask=" + Global::RoleSettings::Tech::StrategyMask +
 			" (" + StrategyUtil::NamesFromMask(Global::RoleSettings::Tech::StrategyMask) + "); roll 3: heavy LRPC block " + (Global::LrpcBlock::Enabled ? "on" : "off"),
-			1);
+			2);
 	}
 
 	void AiMain()
