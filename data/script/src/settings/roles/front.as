@@ -200,11 +200,11 @@ namespace Front {
 
             // Economy Scaling Limits
             float MetalIncomePerLab = 35.0f;
-            // Owner (2026-11-09): FRONT starts its gantry once metal income holds 125+ and energy income 5000+
+            // Owner (2026-11-09): FRONT starts its gantry once metal income holds 125+ and energy income 2300+ (5000 until later 11-09)
             // for 10 continuous seconds each (min of the last 10 s). Played (merge1108-ab): with smrt-test's eco
             // the native gate at 250 opened 250 times and no gantry was ever picked; 250 from smrt-test, 225 from 2026-10-25
             float MetalIncomeForGantry = 125.0f;
-            float EnergyIncomeForGantry = 5000.0f;
+            float EnergyIncomeForGantry = 2300.0f;
             // Owner (2026-10-25): without the eco ladder, the T2 constructors order the gantry themselves at
             // MetalIncomeForGantry (roles/front/front.as Front_TryLadderGantry), not the native factory switch
             bool DirectGantry = true;
