@@ -26,10 +26,27 @@ def summarize(directory):
     spawned, sensor_advance = {}, {}
     detected, first_hit = {}, {}
     unit_commands, friendly_weapons = {}, {}
+    # D-507: damage the watched force took from the enemy, and shots per type.
+    enemy_team = str(cfg.get('enemy_team', 1))
+    damage_taken, shots_by_unit = 0, {}
     starts = cfg.get('starts') or [[0,0],[0,1]]
     dx = starts[1][0] - starts[0][0]
     dz = starts[1][1] - starts[0][1]
     norm = max(1, (dx*dx+dz*dz)**.5)
+    # D-507: a case with judge_to_completion that completed (complete_on) is
+    # judged up to its completion frame plus the check's grace in game frames:
+    # what follows its scenario (a battle group walking on to the enemy
+    # commander) is not under test. Without the key the survival-grace contract
+    # stands (casualties after completion count). The runner stops on wall
+    # time, so at high speed the engine runs on well past the scenario.
+    cutoff = cfg['minutes']*1800
+    runs = sorted((directory/'runs').glob('*/runner-timing.json')) if cfg.get('judge_to_completion') else []
+    if runs:
+        timing0 = json.loads(runs[-1].read_text())
+        checks0_path = runs[-1].parent/'checks.json'
+        checks0 = json.loads(checks0_path.read_text()) if checks0_path.is_file() else {}
+        if checks0.get('complete_on') and timing0.get('complete_frame') is not None:
+            cutoff = min(cutoff, int(timing0['complete_frame'])+int(30*float(checks0.get('completion_grace_seconds', 10))))
     for line in text.splitlines():
         if 'COHORT:' in line and 'reason=' in line:
             reason=re.search(r'reason=(\d+)',line)
@@ -54,7 +71,7 @@ def summarize(directory):
         last_frame = max(last_frame, frame)
         # Watcher shutdown includes a grace interval. Compare the same game
         # window across runs instead of counting whichever extra frames ran.
-        if frame > cfg['minutes']*1800: continue
+        if frame > cutoff: continue
         if ' spawn ' in line:
             units[int(row['id'])] = (row['unit'], int(row['team']))
             if 'x' in row: spawned[int(row['id'])] = (int(row['x']),int(row['z']))
@@ -67,6 +84,11 @@ def summarize(directory):
             fps.append(float(row['fps']))
         if ' unit id=' in line and row.get('cloak') == 'true':
             cloaked.add(int(row['id']))
+        if ' shot ' in line:
+            shots_by_unit[row['unit']] = shots_by_unit.get(row['unit'], 0)+1
+        if ' damage ' in line and row.get('team') == '0' and row.get('attackerTeam') == enemy_team:
+            victim = units.get(int(row['id']), ('', -1))[0]
+            if victim in cfg.get('units', [cfg['unit']]): damage_taken += max(0, int(row['amount']))
         if ' shot ' in line and row['unit'] in cfg.get('units', [cfg['unit']]):
             shooters.add(int(row['id']))
             shots.append(row)
@@ -125,6 +147,28 @@ def summarize(directory):
     if len(unrelated) < checks.get('min_unrelated_losses', 0): failures.append('unrelated death not exercised')
     if len(cloaked) < checks.get('min_cloaked', 0): failures.append('cloak never observed')
     if friendly_damage > checks.get('max_friendly_damage', float('inf')): failures.append('friendly splash damage')
+    # D-507: battle group decisions. Every enemy the fixture spawned dies;
+    # per-type shot caps (a screen that need not fire); the battle group's
+    # withdraw orders (GROUP: ... order=withdraw from=); damage taken.
+    enemy_ids = {uid for uid, (name, team) in units.items() if team == int(enemy_team)}
+    survivors = sorted(enemy_ids-{int(d['id']) for d in kills})
+    if checks.get('kill_all_enemy') and survivors:
+        failures.append('enemy survived: '+','.join(units[u][0]+'('+str(u)+')' for u in survivors))
+    for name, cap in checks.get('max_unit_shots', {}).items():
+        if shots_by_unit.get(name, 0) > cap: failures.append('unexpected %s shots: %d > %d' % (name, shots_by_unit.get(name, 0), cap))
+    withdraws = sum(1 for m in re.finditer(r'\[f=(-?\d+)\][^\n]*GROUP: group=\d+ order=withdraw from=', text) if int(m[1]) <= cutoff)
+    if withdraws < checks.get('min_withdraw_orders', 0): failures.append('battle group never withdrew')
+    if withdraws > checks.get('max_withdraw_orders', float('inf')): failures.append('battle group withdrew %d times' % withdraws)
+    # Inside our jammer cover (the order line's cover=1, D-505) a group never
+    # withdraws; an enemy that kills the jammers ends the cover, and a withdraw
+    # after that is the ordinary rule. At least min_cover_orders orders must
+    # have been issued in cover, or the case never exercised it.
+    # A siege stand-off (reason=8, cohort::Reason::SIEGE) faces statics; it is not a retreat.
+    covered = [(int(m[1]), m[2], m[3]) for m in re.finditer(r'\[f=(-?\d+)\][^\n]*GROUP: group=\d+ order=(\w+) from=[^\n]*cover=1 reason=(\d+)', text) if int(m[1]) <= cutoff]
+    covered_withdraws = sum(1 for _, order, reason in covered if order == 'withdraw' and reason != '8')
+    if covered_withdraws > checks.get('max_withdraw_in_cover', float('inf')): failures.append('battle group withdrew in jammer cover %d times' % covered_withdraws)
+    if len(covered) < checks.get('min_cover_orders', 0): failures.append('jammer cover never observed')
+    if damage_taken > checks.get('max_damage_taken', float('inf')): failures.append('damage taken %d' % damage_taken)
     first_shot=min((int(s['frame']) for s in shots),default=None)
     if damage<checks.get('min_damage',0): failures.append('insufficient useful engagement damage')
     if 'max_first_shot_seconds' in checks and (first_shot is None or first_shot/30>checks['max_first_shot_seconds']):
@@ -155,7 +199,7 @@ def summarize(directory):
     if not completed and last_frame < cfg['minutes']*1800-300: failures.append('incomplete observation window')
     if verdict and verdict != 'PASS': failures.append('original watch verdict: '+verdict)
     if re.search(r'\[INVARIANT\]|\[RangedArena\].*ERROR|Error in.*ranged_arena', text): failures.append('runtime/fixture error')
-    result = dict(schema=10, case=cfg['name'], variant=cfg['variant'], seed=cfg['seed'], directory=str(directory),
+    result = dict(schema=14, case=cfg['name'], variant=cfg['variant'], seed=cfg['seed'], directory=str(directory),
                   completed_with_survival_grace=completed,
                   measurement_deadline_frame=cfg['minutes']*1800,
                   first_damage_seconds=first/30 if first else None, raw_damage_including_overkill=damage,
@@ -176,10 +220,13 @@ def summarize(directory):
                   minimum_forward_projection=min(forward) if forward else None,
                   maximum_forward_projection=max(forward) if forward else None,
                   engagement_reason_samples=reasons,
-                  engine_ai_windows=samples, failures=failures, passed=not failures)
+                  engine_ai_windows=samples, enemy_survivors=survivors, shots_by_unit=shots_by_unit,
+                  battle_group_withdraw_orders=withdraws, covered_orders=len(covered), covered_withdraws=covered_withdraws,
+                  damage_taken_from_enemy=damage_taken,
+                  failures=failures, passed=not failures)
     # New analysis schema gets a new path. Earlier immutable measurements
     # remain valid evidence rather than being silently recomputed in place.
-    output = directory / 'ranged-measurements-v10.json'
+    output = directory / 'ranged-measurements-v14.json'
     if output.exists() and json.loads(output.read_text()) != result:
         raise RuntimeError('Refusing to overwrite a different measurement: ' + str(output))
     output.write_text(json.dumps(result, indent=2)+'\n')
@@ -199,7 +246,7 @@ def main():
     parser.add_argument('--speed', type=int, default=8)
     parser.add_argument('--seed', type=int, default=2071)
     parser.add_argument('--headless', action='store_true')
-    parser.add_argument('--keep-going', action='store_true', help='Pass to ranged_arena: continue after a recorded failure')
+    parser.add_argument('--keep-going', action='store_true', help='passed to ranged_arena.py (KI-734 diagnostic)')
     args = parser.parse_args()
     if args.summarize:
         print(json.dumps(summarize(args.summarize), indent=2))

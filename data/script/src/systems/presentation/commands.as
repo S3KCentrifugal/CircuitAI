@@ -229,6 +229,13 @@ namespace Commands {
             WidgetLink::SetLayoutOverlay(parts[3] != "off", parts[3] == "on");
             return true;
         }
+        // barb|monitor|<team>|on|off : the unit monitor widget's lease (renewed while it is open)
+        // barb|monitor|<team>|unit|<unitId> : the unit whose memberships to publish (-1: none)
+        if (cmd == "monitor" && parts.length() >= 4) {
+            if (parts[3] == "unit" && parts.length() >= 5) WidgetLink::SetMonitorUnit(parseInt(parts[4]));
+            else WidgetLink::SetMonitor(parts[3] != "off");
+            return true;
+        }
         GenericHelpers::LogUtil("[Commands] Unknown command: " + data, 2);
         return true;
     }
@@ -259,6 +266,7 @@ namespace Commands {
     void DrawTick()
     {
         WidgetLink::LayoutTick();
+        WidgetLink::MonitorTick();
         if (drawQueued && AiDrawQueueSize() == 0) {
             drawQueued = false;
             GenericHelpers::LogUtil("[Commands] map drawing complete: " + drawnStarts.length() + " stroke(s) on the map", 1);

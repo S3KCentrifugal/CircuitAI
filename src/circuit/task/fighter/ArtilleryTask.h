@@ -15,7 +15,6 @@
 namespace circuit {
 class CCircuitAI;
 class CCircuitDef;
-class CRangedEngagement;
 class CEnemyInfo;
 
 // Owner 2026-11-02: ghost porc fire (SArtyCommInfo::ghostDefs), shared by
@@ -70,7 +69,6 @@ public:
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
 
 private:
-	std::unique_ptr<CRangedEngagement> ranged;
 	void Execute(CCircuitUnit* unit);
 	CEnemyInfo* FindTarget(CCircuitUnit* unit, const springai::AIFloat3& pos);
 	void ApplyTargetPath(const CQueryPathMulti* query);

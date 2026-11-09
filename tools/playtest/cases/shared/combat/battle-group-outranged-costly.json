@@ -1,0 +1,141 @@
+{
+  "name": "battle-group-outranged-costly",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "description": "D-507: 12 Thugs and 6 Aggravators against one HLT (620) and two Beamers (490): outranged, and the towers trade far above their 820 metal (a sustained rush lost 9 Thugs to them on bgroup-b06). Expected: the group does not throw itself at them: at most two losses.",
+  "storage_scenario": "bg-outranged-costly",
+  "groups": [
+    {
+      "unit": "corrad",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4000,
+        3940
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corrad",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3800,
+        3860
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corrad",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4200,
+        3860
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corthud",
+      "count": 12,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 8,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 6,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armhlt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4000,
+        4600
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armbeamer",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3800,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armbeamer",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4200,
+        4500
+      ],
+      "after_seconds": 5
+    }
+  ],
+  "waves": [
+    {
+      "name": "outranging towers",
+      "after_seconds": 5,
+      "units": [
+        "armhlt",
+        "armbeamer"
+      ]
+    }
+  ],
+  "assertions": {
+    "max_losses": 2,
+    "min_kills": 0,
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_types_assigned": 2
+  }
+}

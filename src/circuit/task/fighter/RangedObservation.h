@@ -46,6 +46,7 @@ public:
 		float health = 1.f, radius = 16.f, cost = 1.f, groundRange = 0.f;
 		float explosionRadius = 0.f, hazardRadius = 0.f;
 		float tech = 1.f; // BAR customparams.techlevel, 1 when absent
+		float dps = 0.f;  // D-433: raw surface DPS of the type (CCircuitDef::GetSurfaceDps), per-type cached
 		bool los = false, armed = false, mobile = false;
 	};
 	struct Friend {
@@ -56,7 +57,7 @@ public:
 		float range=0.f;    // D-295: LAND weapon range of a screen definition
 		bool assist=false;  // D-295: definition itself assists (excluded as engager)
 	};
-	struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; };
+	struct Metadata { float radar=0.f, jammer=0.f, los=0.f; int armor=0; float explosionRadius=0.f; float tech=1.f; float maxSplash=0.f; float dps=0.f; };
 	struct ContactBounds {
 		float largestRange=0.f, largestStaticRange=0.f, largestCohortHazard=0.f;
 		bool nonnegativeHazardCosts=true, finiteStaticHazards=true;

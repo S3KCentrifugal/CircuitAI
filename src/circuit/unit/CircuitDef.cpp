@@ -126,6 +126,8 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 		, weaponMount(nullptr)
 		, pwrDmg(.0f), pwrMod(1.f)
 		, defThrDmg(.0f), defThrMod(1.f)
+		, surfaceDps(.0f)
+		, airDpsRaw(.0f)
 		, airThrDmg(.0f), airThrMod(1.f)
 		, surfThrDmg(.0f), surfThrMod(1.f)
 		, waterThrDmg(.0f), waterThrMod(1.f)
@@ -625,6 +627,8 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 
 	// TODO: Include projectile-speed/range, armor
 	//       health /= def->GetArmoredMultiple();
+	surfaceDps = surfDps;  // D-433: kept raw; the profile's threat modifiers scale defThrDmg only
+	airDpsRaw = airDps;    // D-509: likewise for anti-air
 	const float dmg = std::max(std::max(waterDmg, surfDmg), airDmg);
 	const float dps = std::max(std::max(waterDps, surfDps), airDps);
 	defThrDmg = pwrDmg = sqrtf(dps) * std::pow(dmg, 0.25f) * THREAT_MOD;
@@ -669,7 +673,7 @@ void CCircuitDef::Init(CCircuitAI* circuit)
 			if ((mtId < 0) || (mtUsability.find(mtId) != mtUsability.end())) {
 				continue;
 			}
-			SMobileType& mt = terrainData.areaData0.mobileType[mtId];
+			SMobileType& mt = terrainData.GetAreaAt(0).mobileType[mtId];
 			mtUsability[mtId] = mt.area.empty() ? 00.0 : mt.areaLargest->percentOfMap;
 		}
 		float useMost = .0f;
@@ -698,12 +702,12 @@ void CCircuitDef::Init(CCircuitAI* circuit)
 	};
 	if (IsMobile()) {
 		if (mobileTypeId >= 0) {
-			SMobileType& mt = terrainData.areaData0.mobileType[mobileTypeId];
+			SMobileType& mt = terrainData.GetAreaAt(0).mobileType[mobileTypeId];
 			fillSurface(mt.minElevation, mt.maxElevation);
 		}
 	} else {
 		if (immobileTypeId >= 0) {
-			SImmobileType& it = terrainData.areaData0.immobileType[immobileTypeId];
+			SImmobileType& it = terrainData.GetAreaAt(0).immobileType[immobileTypeId];
 			fillSurface(it.minElevation, it.maxElevation);
 		}
 	}

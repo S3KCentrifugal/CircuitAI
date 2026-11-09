@@ -11,12 +11,22 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'build-theatres/widget-test-deps'))
 from lupa.lua51 import LuaRuntime
 
+# D-498: the team link is the hub; the lanes and blueprints live in BARb plans.
+BARB_WIDGETS = ('gui_barb_team_link.lua', 'gui_barb_map.lua', 'gui_barb_plans.lua', 'gui_barb_unit_monitor.lua')
+
+
+def load_barb_widgets(lua):
+    """The hub and its companions, each in its own environment (lane_ui_mock.lua loadWidget)."""
+    load = lua.globals().loadWidget
+    for name in BARB_WIDGETS:
+        load((ROOT / 'tools/widgets' / name).read_text(encoding='utf-8'), name)
+
 
 class LaneUIMemoryTests(unittest.TestCase):
     def setUp(self):
         self.lua = LuaRuntime()
         self.lua.execute((ROOT / 'tools/playtest/fixtures/lane_ui_mock.lua').read_text())
-        self.lua.execute((ROOT / 'tools/widgets/gui_barb_team_link.lua').read_text(encoding='utf-8'))
+        load_barb_widgets(self.lua)
         self.lua.execute("widget:Initialize(); WG.barblink.SetOpen(true); WG.barblink.TheatreOptions({x=8,y=1000})")
 
     def test_front_publication_does_not_replace_sea_routes(self):

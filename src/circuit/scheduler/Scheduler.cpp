@@ -6,37 +6,25 @@
  */
 
 #include "scheduler/Scheduler.h"
+#include "scheduler/WorkerPool.h"
 #include "util/Utils.h"
 #include "util/Data.h"
+#include "util/Performance.h"
 #include "util/Profiler.h"
+#include "CircuitAI.h"
+#include "Log.h"
 
-#include "angelscript/include/angelscript.h"
+#include <algorithm>
+#include <cstdlib>
 
 namespace circuit {
-
-#define MAX_JOB_THREADS		8
-
-CMultiQueue<CScheduler::WorkTask> CScheduler::gWorkTasks;
-std::vector<spring::thread> CScheduler::gWorkThreads;
-int CScheduler::gMaxWorkThreads = 2;
-std::atomic<bool> CScheduler::gIsWorkerRunning(false);
-unsigned int CScheduler::gInstanceCount = 0;
-std::atomic<int> CScheduler::gWorkerPauseId(0);
-spring::mutex CScheduler::gPauseMutex;
-spring::condition_variable_any CScheduler::gPauseCV;
-spring::condition_variable_any CScheduler::gProceedCV;
-std::size_t CScheduler::gPauseCount = 0;
 
 CScheduler::CScheduler()
 		: lastFrame(0)
 		, isProcessing(false)
+		, isRunning(true)
 {
-	if (gInstanceCount == 0) {
-		int maxThreads = spring::thread::hardware_concurrency();
-		gMaxWorkThreads = utils::clamp(maxThreads - 1, 2, MAX_JOB_THREADS);
-	}
-	gInstanceCount++;
-	isRunning = true;
+	if (const char* budget = std::getenv("CIRCUIT_FINISH_BUDGET")) finishBudget = std::max(0, std::atoi(budget));
 }
 
 CScheduler::~CScheduler()
@@ -44,19 +32,30 @@ CScheduler::~CScheduler()
 	Release();
 }
 
+void CScheduler::Init(const std::shared_ptr<CScheduler>& thisPtr, CCircuitAI* ai)
+{
+	self = thisPtr;
+	circuit = ai;
+	// D-441: acquire the pool here, not in ProcessInit. Between the AI's
+	// construction and ProcessInit, CCircuitAI::Init launches the field
+	// analysis (a background job) and the widget state; the pool refuses a push
+	// from an owner it does not know, so those jobs were silently lost after
+	// D-431 (the old global queue held them until its threads started).
+	CWorkerPool::Instance().Acquire(thisPtr);
+}
+
 void CScheduler::ProcessInit()
 {
-	for (auto& task : initTasks) {
-		task->Run();
+	for (auto& job : initJobs) {
+		job->Run();
 	}
-//	initTasks.clear();
-	StartThreads();
+//	initJobs.clear();
 }
 
 void CScheduler::ProcessRelease()
 {
-	for (auto& task : releaseTasks) {
-		task->Run();
+	for (auto& job : releaseJobs) {
+		job->Run();
 	}
 
 	Release();
@@ -68,62 +67,13 @@ void CScheduler::Release()
 		return;
 	}
 	isRunning = false;
-	gInstanceCount--;
-
-	if (gIsWorkerRunning.load()) {
-		if (gInstanceCount == 0) {
-			gIsWorkerRunning = false;
-			// At this point workTasks may be empty. Push dummy task in case worker stuck at Pop().
-			for (unsigned int i = 0; i < gWorkThreads.size(); ++i) {
-				gWorkTasks.PushBack({self, nullptr});
-			}
-
-			for (std::thread& t : gWorkThreads) {
-				if (t.joinable()) {
-					t.join();
-				}
-			}
-
-			gWorkThreads.clear();
-			gWorkTasks.Clear();
-
-		} else {
-
-			gPauseCount = gWorkThreads.size();
-			{
-				std::unique_lock<spring::mutex> lock(gPauseMutex);
-				++gWorkerPauseId;
-				// At this point workTasks may be empty. Push dummy task in case worker stuck at Pop().
-				for (unsigned int i = 0; i < gWorkThreads.size(); ++i) {
-					gWorkTasks.PushBack({self, nullptr});
-				}
-				gPauseCV.wait(lock, [] { return gPauseCount == 0; });
-			}
-
-			std::weak_ptr<CScheduler>& scheduler = self;
-			gWorkTasks.RemoveAllIf([&scheduler](WorkTask& item) -> bool {
-				return !scheduler.owner_before(item.scheduler) && !item.scheduler.owner_before(scheduler);
-			});
-
-			++gWorkerPauseId;
-			gProceedCV.notify_all();
-		}
-	}
-
-	finishTasks.Clear();
+	CWorkerPool::Instance().Release(this);
+	finishJobs.Clear();
 }
 
-void CScheduler::StartThreads()
+int CScheduler::GetMaxWorkThreads()
 {
-	if (gIsWorkerRunning.load()) {
-		return;
-	}
-	gIsWorkerRunning = true;
-
-	assert(gWorkThreads.empty());
-	for (int i = 0; i < gMaxWorkThreads; ++i) {
-		gWorkThreads.emplace_back(&CScheduler::WorkerThread, i);
-	}
+	return CWorkerPool::Instance().Threads();
 }
 
 void CScheduler::ProcessJobs(int frame)
@@ -131,112 +81,123 @@ void CScheduler::ProcessJobs(int frame)
 	isProcessing = true;
 	lastFrame = frame;
 
-	// Process once tasks
-	std::list<OnceTask>::iterator ionce = onceTasks.begin();
-	while (ionce != onceTasks.end()) {
+	// Process once jobs
+	std::list<OnceJob>::iterator ionce = onceJobs.begin();
+	while (ionce != onceJobs.end()) {
 		if (ionce->frame <= frame) {
-			ionce->task->Run();
-			ionce = onceTasks.erase(ionce);  // alternatively, onceTasks.erase(iter++);
+			ionce->job->Run();
+			ionce = onceJobs.erase(ionce);  // alternatively, onceJobs.erase(iter++);
 		} else {
 			++ionce;
 		}
 	}
 
-	// Process repeat tasks
-	for (auto& container : repeatTasks) {
+	// Process repeat jobs
+	for (auto& container : repeatJobs) {
 		if (frame - container.lastFrame >= container.frameInterval) {
-			container.task->Run();
+			container.job->Run();
 			container.lastFrame = frame;
 		}
 	}
 
-	// Process onComplete from parallel tasks
-	CMultiQueue<FinishTask>::ProcessFunction process = [](FinishTask& item) {
-		item.task->Run();
+	// Process onComplete from parallel jobs. Every completion lands this
+	// frame unless a finish budget was set explicitly; the burst size is the
+	// telemetry that says whether a budget would ever matter.
+	std::size_t processed = 0;
+	CMultiQueue<FinishJob>::ProcessFunction process = [&processed](FinishJob& item) {
+		item.job->Run();
+		++processed;
 	};
-	finishTasks.PopAndProcessAll(process);  // one heavy / lite ???
+	if (finishBudget <= 0) {
+		finishJobs.PopAndProcessAll(process);
+	} else {
+		while (processed < std::size_t(finishBudget) && finishJobs.PopAndProcess(process)) {}
+		finishCarried = std::max(finishCarried, finishJobs.Size());
+	}
+	finishBurstMax = std::max(finishBurstMax, processed);
 
-	// Update task queues
-	if (!removeTasks.empty()) {
-		for (auto& task : removeTasks) {
-			onceTasks.remove({task, 0});
-			repeatTasks.remove({task, 0, 0});
+	// Update job queues
+	if (!removeJobs.empty()) {
+		for (auto& job : removeJobs) {
+			onceJobs.remove({job, 0});
+			repeatJobs.remove({job, 0, 0});
 		}
-		removeTasks.clear();
+		removeJobs.clear();
 	}
 
 	isProcessing = false;
 }
 
-void CScheduler::RunParallelJob(const std::shared_ptr<IThreadJob>& task)
+bool CScheduler::Queue(jobs::Lane lane, const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
 {
-    gWorkTasks.PushBefore({self, task}, [](WorkTask& queued) { return queued.background; });
+	if (!isRunning) return false;  // released: the old threads were stopping too; nothing would run it
+	const bool queued = CWorkerPool::Instance().Push(this, {job, name}, lane, key);
+	if (queued) return true;
+	if (key != 0) { ++coalesced; return false; }  // a job with this key already waits: by design
+	// INV-248: a keyless push is never refused while the scheduler runs; a
+	// refusal means the owner is not registered and the job is lost (D-441).
+	++refused;
+	if (circuit != nullptr) circuit->LOG("[INVARIANT] INV-248 scheduler job '%s' refused: pool not acquired (lane %i)", name, int(lane));
+	return false;
 }
 
-void CScheduler::RunBackgroundJob(const std::shared_ptr<IThreadJob>& task)
+bool CScheduler::RunParallelJob(const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
 {
-    gWorkTasks.PushBack({self, task, true});
+	return Queue(jobs::Lane::NORMAL, job, name, key);
 }
 
-void CScheduler::RunPriorityJob(const std::shared_ptr<IThreadJob>& task)
+bool CScheduler::RunBackgroundJob(const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
 {
-	gWorkTasks.PushFront({self, task});
+	return Queue(jobs::Lane::BACKGROUND, job, name, key);
 }
 
-void CScheduler::RemoveJob(const std::shared_ptr<IMainJob>& task)
+bool CScheduler::RunPriorityJob(const std::shared_ptr<IThreadJob>& job, const char* name, std::uint64_t key)
+{
+	return Queue(jobs::Lane::PRIORITY, job, name, key);
+}
+
+void CScheduler::WorkerCompleted(const char* name, double ms, const std::shared_ptr<IMainJob>& onComplete)
+{
+	if (onComplete != nullptr) finishJobs.PushBack(onComplete);
+	if (!performance::enabled) return;
+	std::lock_guard<spring::mutex> lock(statsMutex);
+	WorkerStat& stat = workerStats[name];
+	++stat.calls;
+	stat.total += ms;
+	stat.maximum = std::max(stat.maximum, ms);
+}
+
+void CScheduler::FlushWorkerStats(CCircuitAI* ai)
+{
+	if (!performance::enabled) return;
+	std::map<const char*, WorkerStat> stats;
+	{
+		std::lock_guard<spring::mutex> lock(statsMutex);
+		stats.swap(workerStats);
+	}
+	for (const auto& [name, stat] : stats) {
+		ai->LOG("[PerfWorker] team=%i frame=%i job=%s calls=%llu total_ms=%.3f max_ms=%.3f",
+			ai->GetTeamId(), ai->GetLastFrame(), name, static_cast<unsigned long long>(stat.calls), stat.total, stat.maximum);
+	}
+	ai->LOG("[PerfWorker] team=%i frame=%i finish_burst_max=%u finish_carried_max=%u coalesced=%llu refused=%llu pool_threads=%i pool_queued_max=%u",
+		ai->GetTeamId(), ai->GetLastFrame(), unsigned(finishBurstMax), unsigned(finishCarried),
+		static_cast<unsigned long long>(coalesced), static_cast<unsigned long long>(refused), CWorkerPool::Instance().Threads(), unsigned(CWorkerPool::Instance().QueuedMax()));
+	finishBurstMax = 0; finishCarried = 0; coalesced = 0; refused = 0;
+}
+
+void CScheduler::RemoveJob(const std::shared_ptr<IMainJob>& job)
 {
 	if (isProcessing) {
-		removeTasks.push_back(task);
+		removeJobs.push_back(job);
 	} else {
-		onceTasks.remove({task, 0});
-		repeatTasks.remove({task, 0, 0});
+		onceJobs.remove({job, 0});
+		repeatJobs.remove({job, 0, 0});
 	}
 }
 
-void CScheduler::RemoveReleaseJob(const std::shared_ptr<IMainJob>& task)
+void CScheduler::RemoveReleaseJob(const std::shared_ptr<IMainJob>& job)
 {
-	utils::really_remove(releaseTasks, task);
-}
-
-void CScheduler::WorkerThread(int num)
-{
-#ifdef CIRCUIT_PROFILING
-	tracy::SetThreadName(utils::int_to_string(num, "AI job %i").c_str());  // 15 chars max
-#endif
-
-	int workerPauseId = gWorkerPauseId;
-
-	while (gIsWorkerRunning.load()) {
-
-		if (workerPauseId != gWorkerPauseId) {  // parking
-			std::unique_lock<spring::mutex> lock(gPauseMutex);
-			int pauseId = gWorkerPauseId;
-			workerPauseId = gWorkerPauseId + 1;
-			if (--gPauseCount == 0) {
-				gPauseCV.notify_one();
-			}
-			gProceedCV.wait(lock, [pauseId] { return pauseId != gWorkerPauseId; });
-		}
-
-		TracyPlot("AI Jobs", (int64_t)gWorkTasks.Size());
-		WorkTask container = gWorkTasks.Pop();
-
-		std::shared_ptr<CScheduler> scheduler = container.scheduler.lock();
-		if (scheduler == nullptr) {
-			continue;
-		}
-
-		if (scheduler->isRunning.load()) {
-
-			std::shared_ptr<IMainJob> onComplete = container.task->Run(num);
-			if (onComplete != nullptr) {
-				scheduler->finishTasks.PushBack(onComplete);
-			}
-
-		}
-	}
-
-	asThreadCleanup();
+	utils::really_remove(releaseJobs, job);
 }
 
 } // namespace circuit

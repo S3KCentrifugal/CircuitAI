@@ -5,15 +5,17 @@
 #   Lint C++ (changed files)         git diff --check + cppcheck on the changed src/ C++ only
 #   Lint AngelScript (changed files) includes, brackets, line endings on the changed .as,
 #                                    then the script/registration parity and field-isolation checkers
+#   Lint Lua (changed files)         syntax (luac5.1), globals (luacheck, .luacheckrc) and whitespace
+#                                    on the changed .lua only; the embedded strategy module check
 #   C++ tests                        every tests/*_test.cpp, compiled with the runner's g++
 #   AngelScript tests                every tests/*_tests.as through the bundled AngelScript engine
 #   Summary                          one table of the results above
 #
-# The two lint jobs run only when a file of their kind changed; the test jobs
+# The three lint jobs run only when a file of their kind changed; the test jobs
 # always run. Findings are GitHub annotations on the changed lines plus a table
 # in each job's summary, so the result reads without opening a log.
 # Scripts: tools/ci/changed_files.sh, tools/ci/lint_cpp.sh,
-# tools/ci/lint_angelscript.py, tools/run_native_tests.sh --host.
+# tools/ci/lint_angelscript.py, tools/ci/lint_lua.sh, tools/run_native_tests.sh --host.
 name: PR checks
 
 on:
@@ -40,6 +42,7 @@ jobs:
     outputs:
       cpp: ${{ steps.list.outputs.cpp }}
       angelscript: ${{ steps.list.outputs.angelscript }}
+      lua: ${{ steps.list.outputs.lua }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,9 +54,11 @@ jobs:
           all="$(bash tools/ci/changed_files.sh "origin/$BASE_REF" all)"
           cpp="$(bash tools/ci/changed_files.sh "origin/$BASE_REF" cpp)"
           as="$(bash tools/ci/changed_files.sh "origin/$BASE_REF" angelscript)"
+          lua="$(bash tools/ci/changed_files.sh "origin/$BASE_REF" lua)"
           count() { printf '%s\n' "$1" | sed '/^$/d' | wc -l; }
           echo "cpp=$([ -n "$cpp" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "angelscript=$([ -n "$as" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "lua=$([ -n "$lua" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           {
             echo "### Changed files against \`$BASE_REF\`"
             echo
@@ -61,6 +66,7 @@ jobs:
             echo "|---|---|---|"
             echo "| C++ (src/AIExport.*, src/circuit/) | $(count "$cpp") | $([ -n "$cpp" ] && echo 'Lint C++ runs' || echo 'Lint C++ skipped') |"
             echo "| AngelScript (data/script/) | $(count "$as") | $([ -n "$as" ] && echo 'Lint AngelScript runs' || echo 'Lint AngelScript skipped') |"
+            echo "| Lua (widgets, watchers, gadgets) | $(count "$lua") | $([ -n "$lua" ] && echo 'Lint Lua runs' || echo 'Lint Lua skipped') |"
             echo "| all | $(count "$all") | C++ and AngelScript tests always run |"
             echo
             echo "<details><summary>Every changed file</summary>"
@@ -69,7 +75,7 @@ jobs:
             echo
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "C++: $(count "$cpp") file(s); AngelScript: $(count "$as") file(s); all: $(count "$all")"
+          echo "C++: $(count "$cpp") file(s); AngelScript: $(count "$as") file(s); Lua: $(count "$lua") file(s); all: $(count "$all")"
 
   lint-cpp:
     name: Lint C++ (changed files)
@@ -103,6 +109,23 @@ jobs:
           git fetch -q origin "$BASE_REF"
           python3 tools/ci/lint_angelscript.py "origin/$BASE_REF"
 
+  lint-lua:
+    name: Lint Lua (changed files)
+    needs: changes
+    if: needs.changes.outputs.lua == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Lua 5.1 and luacheck
+        run: sudo apt-get update -q && sudo apt-get install -y -q lua5.1 lua-check
+      - name: Lint the changed Lua files
+        run: |
+          git fetch -q origin "$BASE_REF"
+          bash tools/ci/lint_lua.sh "origin/$BASE_REF"
+
   test-cpp:
     name: C++ tests
     runs-on: ubuntu-latest
@@ -123,7 +146,7 @@ jobs:
 
   summary:
     name: Summary
-    needs: [changes, lint-cpp, lint-angelscript, test-cpp, test-angelscript]
+    needs: [changes, lint-cpp, lint-angelscript, lint-lua, test-cpp, test-angelscript]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -133,6 +156,7 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           LINT_CPP: ${{ needs.lint-cpp.result }}
           LINT_AS: ${{ needs.lint-angelscript.result }}
+          LINT_LUA: ${{ needs.lint-lua.result }}
           TEST_CPP: ${{ needs.test-cpp.result }}
           TEST_AS: ${{ needs.test-angelscript.result }}
         run: |
@@ -153,13 +177,14 @@ jobs:
             echo "| Changed files | $(word "$CHANGES") |"
             echo "| Lint C++ (changed files) | $(word "$LINT_CPP") |"
             echo "| Lint AngelScript (changed files) | $(word "$LINT_AS") |"
+            echo "| Lint Lua (changed files) | $(word "$LINT_LUA") |"
             echo "| C++ tests | $(word "$TEST_CPP") |"
             echo "| AngelScript tests | $(word "$TEST_AS") |"
             echo
             echo "The Windows and Linux builds are the \`build (...)\` checks of the release workflow."
           } >> "$GITHUB_STEP_SUMMARY"
           bad=0
-          for r in "$CHANGES" "$LINT_CPP" "$LINT_AS" "$TEST_CPP" "$TEST_AS"; do
+          for r in "$CHANGES" "$LINT_CPP" "$LINT_AS" "$LINT_LUA" "$TEST_CPP" "$TEST_AS"; do
             case "$r" in failure|cancelled) bad=1 ;; esac
           done
           [ "$bad" -eq 0 ] || { echo "::error title=PR checks::a check failed; see the table in this job's summary"; exit 1; }

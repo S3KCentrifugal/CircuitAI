@@ -1,4 +1,6 @@
 #include "task/fighter/RangedEngagement.h"
+#include "control/group/BattleGroupController.h"
+#include "control/unit/support/SupportController.h"
 #include "task/UnitTask.h"
 #include "CircuitAI.h"
 #include "module/MilitaryManager.h"
@@ -30,6 +32,10 @@ constexpr float PRESSED_STATIC_TARGET_MULTIPLIER = 2.f;
 // Owner 2026-11-07 (priority_min_tech): far above any value/HP score (those are
 // ~0.01-1000 even with commander_priority 100), so the tier always wins.
 constexpr float PRIORITY_TIER_OFFSET = 1.e6f;
+// D-507: a besieging hull just outside its reach of the tower steps in to
+// this many elmos inside that reach, if it is no more than the window out.
+constexpr float SIEGE_STEP_INSIDE = 8.f;
+constexpr float SIEGE_STEP_WINDOW = 96.f;
 }
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
@@ -137,6 +143,12 @@ bool CRangedEngagement::Spam(const RangedPolicy& p,const CRangedWorld::Contact& 
     return c.def && c.mobile && ((p.spamMaxCost>0.f && c.cost<=p.spamMaxCost) || p.spamDefs.count(c.def->GetId()))
         && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
 }
+float CRangedEngagement::MaxRange() const
+{
+    float range=0.f;
+    for(const auto& w:caps.weapons) range=std::max(range,w.range);
+    return range;
+}
 void CRangedEngagement::UpdateFireState(CCircuitUnit* unit,bool open)
 {
     // Holding is immediate; reopening waits a second after the last change.
@@ -168,7 +180,7 @@ void CRangedEngagement::Hold(CCircuitUnit* unit,bool unsafe)
 bool CRangedEngagement::SafeMove(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,float margin,bool escape)
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
-    return p.coordinated && p.engagementSeconds>0.f ? world.CohortSafe(unit,from,to,margin,escape)
+    return p.coordinated && p.engagementSeconds>0.f ? world.CohortSafe(unit,from,to,margin,escape,siegeTower>=0)
         :world.Safe(from,to,margin,escape,p.pressStatic);
 }
 bool CRangedEngagement::LegalPath(CCircuitUnit* unit,const std::vector<AIFloat3>& route,bool escape)
@@ -341,7 +353,18 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     if(member==group.members.end() || group.members.size()>size_t(policy.cohortSize)) {
         ai->LOG("[INVARIANT] INV-166 coordinated unit has invalid cohort membership unit=%d",id); return;
     }
-    if(group.target<0 && group.mode==cohort::Mode::HOLD && !policy.fireInRange && !policy.commanderFocus) {
+    // D-508: this decision's factors (why::unit), noted for the unit monitor
+    // on every exit below; one hash write per decision.
+    struct NoteFactors {
+        CRangedWorld& world; int id; why::Set set=0;
+        void Add(int bit) { set|=why::Of(bit); }
+        ~NoteFactors() { world.NoteUnitWhy(id,set); }
+    } note{world,id};
+    namespace wu=why::unit;
+    // D-502: a preset with a group layout keeps its rows at rest (slots below);
+    // dispersing is the D-430 behaviour of every other cohort.
+    const bool rowsAtRest=policy.rowWidth>0.f || policy.directSlots>0.f;
+    if(group.target<0 && group.mode==cohort::Mode::HOLD && !policy.fireInRange && !policy.commanderFocus && !rowsAtRest) {
         if(policy.fireAtWill && policy.pokeIn>0.f && unit->GetRequestedFireState()!=CCircuitDef::HOLD)
             unit->TrySetFireState(CCircuitDef::HOLD);
         // Cancel the old approach when a protected contact leaves vision.
@@ -359,7 +382,19 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         return;
     }
     const int rank=int(member-group.members.begin());
+    // D-430: the battle group this hull stands in (null outside one). Its facing
+    // replaces the cohort's for slot geometry, its spread widens the slot
+    // spacing, and its stance is applied below after every hazard rule.
+    const battle_group::Directive* directive=ai->GetBattleGroupController()?ai->GetBattleGroupController()->DirectiveFor(id):nullptr;
+    // D-432: the support controller's directive for a rear hull it runs
+    // (null for every other hull): station, target weights, step window, tuck.
+    const support::Directive* rear=ai->GetSupportController()?ai->GetSupportController()->DirectiveFor(id):nullptr;
+    siegeTower=rear && rear->siege?rear->siegeTarget:-1;  // D-507
+    AIFloat3 back=group.back;
+    if(directive && directive->facingSet) back=AIFloat3(directive->facing.x,0.f,directive->facing.z);
+    const float spacing=policy.spacing*(directive?directive->spread:1.f);
     float maxRange=0.f; for(const auto& w:caps.weapons) maxRange=std::max(maxRange,w.range);
+    const float ownDps=def->GetSurfaceDps(); // D-433: the threat term's reference
     world.Nearby(pos,maxRange+600.f,nearby);
     const auto& contacts=world.Contacts();
     const bool assessed=policy.engagementSeconds>0.f;
@@ -368,13 +403,15 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     const AIFloat3 velocity(rawVelocity[0]*FRAMES_PER_SEC,0.f,rawVelocity[2]*FRAMES_PER_SEC);
     int best=-1,weapon=-1; float score=-1.f,damage=0.f;
     bool bestCommander=false;
+    // D-433: the best target no reservation already covers (overkill split).
+    int open=-1,openWeapon=-1; float openScore=-1.f,openDamage=0.f; bool openCommander=false;
     const CRangedWorld::Contact* danger=nullptr; float penetration=0.f;
     const CRangedWorld::Contact* incoming=nullptr;
     const CRangedWorld::Contact* objective=nullptr;
     // Owner 2026-10-17: poke cadence. Any assessed, targeted front cohort pokes
     // the closest similar-range mobile, whatever the local metal balance; the
     // band is deeper when our side clearly outweighs the opposition. Sustained
-    // rushes, rush fallback, regrouping and the rear line keep their movement.
+    // rushes, rush fallback, regrouping and the support rank keep their movement.
     // Owner 2026-10-19: the local metal ratio picks the regime. PRESS holds
     // the deep band to win; EVEN trades once per reload; OUTMATCHED trades
     // only intermittently. EVEN and OUTMATCHED hulls pop out at poke_health.
@@ -416,19 +453,31 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         // Rear elements anticipate closing threats earlier, without forcing
         // their screen to wait. SET_TARGET remains active during this movement,
         // so a ready rocket can fire and its reload is useful escape time.
+        // D-499 (screen_shield): a mobile the paired screen stands in front of
+        // must get through the Thugs first. The rocket keeps firing at it
+        // instead of leaving early; its own reach plus the reaction time still
+        // applies, and a leaked hostile is the tuck's (SupportController).
+        const bool shielded=rear && rear->shield && c.mobile
+            && support::Shielded(P(pos),P(c.pos),rear->screen,rear->shieldCorridor);
         const float anticipation=policy.reactionSeconds
-            +(group.formationRear ? policy.withdrawalLeadSeconds : 0.f);
-        float reach=c.hazardRadius+policy.safetyMargin+closing*anticipation;
+            +(group.formationRear && !shielded ? policy.withdrawalLeadSeconds : 0.f);
+        // D-499: the besieged tower by its weapon reach, as the siege station
+        // was placed (SupportStation.h SiegeDistance); every other hazard as before.
+        const bool siegeTower=rear && rear->siege && !c.mobile && c.id==rear->siegeTarget;
+        float reach=(siegeTower?c.groundRange:c.hazardRadius)+policy.safetyMargin+closing*anticipation;
         // Predict relative to the screen's band. Without its depth, the rear's
         // extra second merely consumes part of its range advantage and can
         // still start withdrawing AFTER the screen. Stationary threats do not
         // gain this buffer: that would prevent a safe rocket siege.
-        if(group.formationRear && c.mobile && enemyClosing>0.f)
+        if(group.formationRear && c.mobile && enemyClosing>0.f && !shielded)
             reach+=group.formationScreenOffset;
         const float reclaim=assessed && c.def->IsAbleToReclaim()?c.def->GetBuildDistance()+c.radius+policy.safetyMargin:0.f;
         reach=std::max(reach,reclaim);
-        const bool approvedStatic=assessed && group.committed
-            && std::find(group.assault.begin(),group.assault.end(),c.id)!=group.assault.end();
+        const bool approvedStatic=(assessed && group.committed
+            && std::find(group.assault.begin(),group.assault.end(),c.id)!=group.assault.end())
+            // D-499 (follow_screen_assault): the screen committed against this
+            // static with the rockets counted in its force; the rockets go in too.
+            || (rear && std::find(rear->screenAssault.begin(),rear->screenAssault.end(),c.id)!=rear->screenAssault.end());
         const bool approvedMobile=c.mobile && !c.def->IsEnemyRoleAny(CCircuitDef::COMM)
             && group.mode==cohort::Mode::RUSH && (!assessed || c.groundRange>=maxRange
                 || (policy.supportAllies && group.supporting
@@ -451,19 +500,33 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             // A commander kill is explicitly preferred even inside its death
             // blast. Otherwise nearby Thugs veto every focused shot against
             // this short-range target. Our own splash/line safety still applies.
-            const float splash=focusCommander?w.splash:std::max(w.splash,c.explosionRadius);
-            if(distance>range || !world.Trajectory(w,pos,c.pos)
-                || world.FriendlySplash(id,c.pos,splash)
+            const float blast=focusCommander?0.f:c.explosionRadius;
+            // D-433: with splash_veto_health the weapon's own splash vetoes
+            // only a shot a friend inside it could not survive; the target's
+            // death blast keeps the legacy veto (any friend inside it).
+            const bool vetoed=policy.splashVetoHealth>0.f
+                ? (world.FriendlySplash(id,c.pos,blast) || world.FriendlySplash(id,c.pos,w.splash,w,policy.splashVetoHealth))
+                : world.FriendlySplash(id,c.pos,std::max(w.splash,blast));
+            if(distance>range || !world.Trajectory(w,pos,c.pos) || vetoed
                 || world.FriendlyLine(w,id,pos,c.pos)) continue;
             const float hit=c.armor>=0 && size_t(c.armor)<w.damage.size()?w.damage[c.armor]*w.alphaScale:0.f;
             if(hit<=0.f) continue;
             // Value per remaining HP favors killable repair support in range.
             // It never licenses movement past the firing line to chase it.
             float s=(1.f+c.cost)/std::max(hit,c.health)*world.Progress(c.id,policy.repairedTargetPenalty);
+            // D-433: threat per HP: what kills us fastest for its health comes first.
+            s*=ranged::ThreatFactor(c.dps,ownDps,policy.threatWeight);
             if(c.def->IsBuilder()) s*=2.f;
             if(c.id==target) s*=policy.targetHysteresis;
-            if(world.Reserved(c.id,id)>=c.health) s*=.2f;
+            const bool covered=world.Reserved(c.id,id)>=c.health;
+            if(covered) s*=.2f;
             if(c.def->IsEnemyRoleAny(CCircuitDef::COMM)) s*=policy.commanderPriority;
+            // D-432: the support controller's job weights: statics, what the screen cannot
+            // reach, a wasted missile on a fast runner unless it comes for us.
+            if(rear) s*=support::TargetWeight(c.mobile,
+                std::sqrt(ranged::DistanceSq(P(c.pos),rear->screenCentre)),rear->screenReach,
+                c.def->GetSpeed(),distance,rear->weights,
+                c.id==rear->screenTarget || c.id==rear->siegeTarget);  // D-499: screen_target_bonus
             if(def->IsPriorityTarget(c.def)) s+=PRIORITY_TIER_OFFSET;  // owner 2026-11-07, see Update
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
             // Commander focus is a tier, not a multiplier defeated by low HP
@@ -471,7 +534,15 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if((focusCommander && !bestCommander) || (focusCommander==bestCommander && s>score)) {
                 score=s; best=i; weapon=int(wi); damage=hit;bestCommander=focusCommander;
             }
+            if(!covered && ((focusCommander && !openCommander) || (focusCommander==openCommander && s>openScore))) {
+                openScore=s; open=i; openWeapon=int(wi); openDamage=hit; openCommander=focusCommander;
+            }
         }
+    }
+    // D-433: overkill split: a covered target is skipped for the best open
+    // one of the same tier (cohort::OverkillPick); the damping stands otherwise.
+    if(cohort::OverkillPick(policy.overkillSkip && openCommander==bestCommander,best,open)!=best) {
+        best=open; weapon=openWeapon; damage=openDamage; score=openScore;
     }
     if(policy.fireInRange) {
         // Open only once the existing shot geometry admits an in-range target.
@@ -481,7 +552,10 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         const int fire=best>=0?CCircuitDef::FireType::OPEN:CCircuitDef::FireType::HOLD;
         if(unit->GetRequestedFireState()!=fire) unit->TrySetFireState(fire);
     }
-    if(group.target<0 && group.mode==cohort::Mode::HOLD) {
+    // D-503: a laid-out group keeps its rows at rest here too (the D-502 rest
+    // rule above skipped only the first dispersal); a protected hold stands.
+    if(group.target<0 && group.mode==cohort::Mode::HOLD
+        && (!rowsAtRest || (policy.engagementSeconds>0.f && group.protectedTarget>=0))) {
         // Keep the old idle dispersion/movement; only permit defensive fire
         // and priority selection that the former early return skipped.
         if(policy.engagementSeconds>0.f && group.protectedTarget>=0) {
@@ -492,26 +566,107 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         return;
     }
     auto point=group.focus;
-    if(group.target>=0) {
-        const auto arc=cohort::Arc(P(group.focus),P(group.back),group.radius,rank,int(group.members.size()),policy.spacing);
-        point.x=arc.x; point.z=arc.z;
-        if(group.formationRear) {
-            point.x-=group.back.z*policy.spacing*.5f;
-            point.z+=group.back.x*policy.spacing*.5f;
+    // D-501 (control/kernel/GroupLayout.h): a preset with row_width or
+    // direct_slots takes its slot from the cohort's layout, computed once per
+    // frame for all members: the nearest to the enemy in front, left-to-right
+    // order kept within a row, rows of row_width. Without either the D-430
+    // join-order slots below stand unchanged.
+    const bool layout=policy.rowWidth>0.f || policy.directSlots>0.f;
+    const group_layout::Slot* slot=layout?world.LayoutSlot(group,id,group.focus,back,policy.rowWidth,spacing):nullptr;
+    const float rowDepth=policy.rowDepth>0.f?policy.rowDepth:spacing;
+    // D-507: whether an armed static other than `except` reaches `p` (its
+    // weapon reach plus the safety margin, as a besieging hull moves); O(nearby).
+    const auto siegeCovered=[&](const AIFloat3& p,int except) {
+        for(int i:nearby) {
+            const auto& o=contacts[i];
+            if(o.id==except || o.mobile || !o.armed || o.hazardRadius<=0.f) continue;
+            if(p.SqDistance2D(o.pos)<SQUARE(o.groundRange+policy.safetyMargin)) return true;
         }
+        return false;
+    };
+    const auto lanes=[&](const AIFloat3& anchor) {
+        const auto p=group_layout::Lanes(P(anchor),P(back),spacing,rowDepth,*slot);
+        return AIFloat3(p.x,anchor.y,p.z);
+    };
+    if(group.target>=0) {
+        if(slot) {
+            // A static armed target's further rows stand behind, never inside its reach.
+            const bool behind=objective && !objective->mobile && objective->armed;
+            const auto p=group_layout::Engaged(P(group.focus),P(back),group.radius,spacing,rowDepth,behind,*slot);
+            point.x=p.x; point.z=p.z;
+        } else {
+            const auto arc=cohort::Arc(P(group.focus),P(back),group.radius,rank,int(group.members.size()),spacing);
+            point.x=arc.x; point.z=arc.z;
+        }
+        if(rear && rear->stationSet) {
+            // D-432: the support station behind the paired screen, members
+            // spread laterally along the line as the travel lanes are.
+            const AIFloat3 station(rear->station.x,0.f,rear->station.z);
+            if(slot) point=lanes(station);
+            else {
+                const float offset=(rank-(group.members.size()-1)*.5f)*(spacing+1.f);
+                point=station+AIFloat3(-back.z,0,back.x)*offset;
+            }
+            // D-507: a siege station is a distance from the tower; spread along
+            // a straight row the outer hulls stood beyond their reach. Put each
+            // lane point back on the arc at the station's distance.
+            if(rear->siege) {
+                for(int i:nearby) {
+                    const auto& t=contacts[i];
+                    if(t.id!=rear->siegeTarget) continue;
+                    const float radius=std::sqrt(station.SqDistance2D(t.pos));
+                    AIFloat3 dir=point-t.pos; dir.y=0.f;
+                    const float length=std::sqrt(dir.SqLength2D());
+                    if(length>1.f && radius>1.f) point=t.pos+dir*(radius/length);
+                    break;
+                }
+                // A spread point another armed static reaches falls back to
+                // the station itself (checked clear by the support controller).
+                if(siegeCovered(point,rear->siegeTarget)) point=station;
+            }
+        } else if(group.formationRear) {
+            point.x-=back.z*spacing*.5f;
+            point.z+=back.x*spacing*.5f;
+        }
+    } else if(rear && rear->stationSet && (rear->noScreen || rear->siege || rear->joining)) {
+        // D-499: also the siege station and the walk to a distant screen.
+        // D-433: no screen left to travel behind: the fallback station.
+        const AIFloat3 station(rear->station.x,0.f,rear->station.z);
+        if(slot) point=lanes(station);
+        else {
+            const float offset=(rank-(group.members.size()-1)*.5f)*(spacing+1.f);
+            point=station+AIFloat3(-back.z,0,back.x)*offset;
+        }
+    } else if(slot) {
+        point=lanes(group.focus);
     } else {
         // Keep separate lanes during travel as well as at the firing band.
         // Keep a rounding margin between adjacent straight-line reservations,
         // just as Arc does for chord distance. Exact float spacing can round
         // below FreeSlot's strict boundary and churn between lateral slots.
-        const float offset=(rank-(group.members.size()-1)*.5f)*(policy.spacing+1.f);
-        point+=AIFloat3(-group.back.z,0,group.back.x)*offset;
+        const float offset=(rank-(group.members.size()-1)*.5f)*(spacing+1.f);
+        point+=AIFloat3(-back.z,0,back.x)*offset;
+    }
+    if(slot && policy.directSlots>0.f) {
+        // D-501: a slot the member cannot walk to directly from the group's
+        // centre (a mountain between) is pulled in along that line, so the
+        // group closes up on its side instead of walking round. Cost: at most
+        // length / spacing direct-passability tests, each length / 32 sector reads.
+        auto* terrain=ai->GetTerrainManager();
+        auto* area=unit->GetArea();
+        const auto p=group_layout::PullIn(P(group.center),P(point),spacing,[&](ranged::Point a,ranged::Point b) {
+            return terrain->IsDirectPassable(area,AIFloat3(a.x,0.f,a.z),AIFloat3(b.x,0.f,b.z));
+        });
+        point.x=p.x; point.z=p.z;
     }
     // In to the band while the weapon is ready, out to poke_out while it
     // reloads: roughly one step in per reload cycle, straight along the line
     // to the closest pokeable enemy so each step is as short as possible.
     // The regime (above) decides whether reload, health or a pause apply.
     const bool poke=closest!=nullptr;
+    // D-503: the slot this member keeps while it fights (slot_hold_distance).
+    const bool keepRows=slot && policy.slotHoldDistance>0.f;
+    const AIFloat3 slotPoint=point;
     // One owner, no polling watchdog or periodic resends. Phase (reload) changes
     // do not toggle fire state; only entering/leaving a peer engagement does.
     if(!policy.fireInRange && policy.fireAtWill && policy.pokeIn>0.f) {
@@ -527,15 +682,37 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         const float fraction=cohort::PokeFraction(regime,reloading,health,paused,
             policy.pokeIn,policy.pokeInDominant,policy.pokeOut,policy.pokeHealth,policy.pokePressHealth);
         phase=fraction<1.f?1:0;
+        note.Add(phase==1?wu::POKE_IN:wu::POKE_OUT);
         const float reach=world.Range(caps.weapons.front(),pos,closest->pos)*fraction;
         AIFloat3 away=pos-closest->pos; away.Normalize2D();
-        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
+        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=back;
         point=closest->pos+away*reach;
+        if(keepRows) {
+            // D-503: step in and out on the slot's own line: its lateral place
+            // in the row stays, only the depth follows the poke cadence.
+            const AIFloat3 side(-back.z,0.f,back.x);
+            point+=side*((slotPoint.x-point.x)*side.x+(slotPoint.z-point.z)*side.z);
+        }
     }
     if(group.sustainedRush) { danger=nullptr; incoming=nullptr; withdrawalUntil=0; }
+    // D-505: inside our jammer cover a member escapes only a commander or a
+    // reclaimer; a mobile or a tower is fought, not fled.
+    if(group.jammerCover && danger && !danger->def->IsEnemyRoleAny(CCircuitDef::COMM) && !danger->def->IsAbleToReclaim()) {
+        danger=nullptr; incoming=nullptr;
+    }
+    // D-433: the fallback station (no screen left) is held like a tuck: the
+    // kite away from the hunter would otherwise walk the hull into nothing.
+    if(rear && rear->noScreen && rear->stationSet) { danger=nullptr; incoming=nullptr; note.Add(wu::NO_SCREEN); }
+    if(rear && rear->siege && rear->stationSet) note.Add(wu::SIEGE_STATION);
     if(danger) {
+        note.Add(wu::ESCAPE);
         AIFloat3 away=pos-danger->pos; away.Normalize2D();
-        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
+        if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=back;
+        // D-510: a mobile is escaped toward the group's help, never toward the danger.
+        if(group.backToHelp && danger->mobile && policy.escapeHelpWeight>0.f) {
+            const auto lean=rush_response::Lean({away.x,away.z},{back.x,back.z},policy.escapeHelpWeight);
+            away=AIFloat3(lean.x,0.f,lean.z);
+        }
         const bool disengage=!group.committed || group.mode==cohort::Mode::WITHDRAW || !danger->mobile
             || danger->def->IsEnemyRoleAny(CCircuitDef::COMM) || danger->def->IsAbleToReclaim()
             || (!(policy.supportAllies && group.supporting)
@@ -547,6 +724,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             :std::max(192.f,penetration+policy.hysteresis));
         withdrawalUntil=assessed && !disengage?frame+15:frame+30;
     } else if(frame<withdrawalUntil && moving) {
+        note.Add(wu::ESCAPE);  // the escape still under way
         SelectTarget(unit,best>=0?contacts[best].id:-1,weapon,damage,score);
         return;
     } else if(incoming && !poke && !(policy.supportAllies && group.supporting && group.committed)
@@ -554,9 +732,12 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         // Hold the line when a shorter-ranged enemy is already approaching.
         // Advancing into it doubles closure and spends the entire range
         // advantage turning around. Let it enter our fire before pulling back.
-        point=pos;
+        point=pos; note.Add(wu::HOLD_INCOMING);
     } else if(best>=0 && !poke && !group.sustainedRush && !group.rushFallback && !group.formationRear && (assessed || group.mode!=cohort::Mode::REGROUP)
         && world.FreeSlot(id,pos,policy.spacing)
+        // D-503: a shooter far from its slot walks to it (firing on the way)
+        // instead of fighting alone wherever it stands.
+        && (!keepRows || pos.SqDistance2D(slotPoint)<=policy.slotHoldDistance*policy.slotHoldDistance)
         && !(policy.supportAllies && group.supporting && group.committed
             && (pos.x-group.focus.x)*group.back.x+(pos.z-group.focus.z)*group.back.z>group.screenDepth+policy.spacing)) {
         // A safe, spaced shooter already contributes to the firing line.
@@ -564,7 +745,10 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         // that spends movement orders and firing time without adding damage.
         // Danger/regrouping above override immediately; blocked rear members
         // still advance to their shared slots until they too can contribute.
-        point=pos;
+        point=pos; note.Add(wu::SHOOTING);
+    } else if(best>=0 && keepRows && !danger && !poke
+        && pos.SqDistance2D(slotPoint)>policy.slotHoldDistance*policy.slotHoldDistance) {
+        note.Add(wu::TO_SLOT);
     }
     // A stepping-in poker takes the same last step onto its closest enemy;
     // a reloading poker never steps forward.
@@ -581,6 +765,109 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             point=pos+(step->pos-pos)*((distance-reach+32.f)/distance);
         }
     }
+    // D-507: a besieging hull stops on its station a little outside its reach
+    // (engine arrival, crowding). It steps in to just inside its reach, never
+    // into the tower's own reach; the group's stand-off mode does not gate it.
+    if(!danger && best<0 && rear && rear->siege && pos.SqDistance2D(point)<4096.f) {
+        for(int i:nearby) {
+            const auto& t=contacts[i];
+            if(t.id!=rear->siegeTarget) continue;
+            const float distance=std::sqrt(pos.SqDistance2D(t.pos));
+            const float reach=world.Range(caps.weapons.front(),pos,t.pos);
+            const float stop=reach-SIEGE_STEP_INSIDE;
+            if(distance>reach && distance-reach<SIEGE_STEP_WINDOW && stop>t.groundRange+policy.safetyMargin && distance>0.f) {
+                const AIFloat3 in=pos+(t.pos-pos)*((distance-stop)/distance);
+                if(!siegeCovered(in,t.id)) { point=in; note.Add(wu::SIEGE_STEP); }
+            }
+            break;
+        }
+    }
+    // D-430: the battle group's stance. A cover, or a cohort-sourced hold, keeps this
+    // hull where it is (firing) only while the battle group stands firm against a
+    // shorter-ranged push; otherwise the cohort's own kite goes on. A script
+    // hold always holds. A withdraw ordered before the cohort itself withdraws
+    // steps back along the facing. A hazard escape above, and a sustained
+    // rush, always win over the battle group's timing.
+    bool lineUrgent=false;
+    if(directive && !danger && !group.sustainedRush) {
+        switch(directive->stance) {
+            case battle_group::Stance::COVER: if(directive->standFirm) { point=pos; note.Add(wu::GROUP_HOLD); } break;
+            case battle_group::Stance::HOLD: if(directive->standFirm || directive->scripted) { point=pos; note.Add(wu::GROUP_HOLD); } break;
+            case battle_group::Stance::WITHDRAW:
+                // The cohort executes its own withdrawals (its poke cadence
+                // included); the battle group steps a hull back only for a script order.
+                if(directive->scripted && group.mode!=cohort::Mode::WITHDRAW && group.mode!=cohort::Mode::KITE) {
+                    point=pos+back*std::max(192.f,policy.spacing*2.f); lineUrgent=true; note.Add(wu::GROUP_WITHDRAW);
+                }
+                break;
+            default: break;
+        }
+        if(directive->orderFrame!=lineOrderFrame) { lineUrgent=true; lineOrderFrame=directive->orderFrame; }
+    }
+    if(rear && rear->noScreen && rear->stationSet && rear->noScreenFrame!=noScreenOrderFrame) {
+        lineUrgent=true; noScreenOrderFrame=rear->noScreenFrame;
+    }
+    // D-502: a screen with its support behind it. The support leads a retreat:
+    // the screen holds and fires for screen_retreat_delay after its cohort
+    // turns to withdraw, and never withdraws past the support cohort's
+    // centre from a mobile threat. A static, commander or reclaimer
+    // hazard escape always wins; so does a sustained rush.
+    const CRangedWorld::CohortPlan* support=nullptr;
+    if(policy.formationPosition==RangedPolicy::FormationPosition::FRONT && group.formationPartner>=0) {
+        const auto found=world.Cohorts().find(group.formationPartner);
+        if(found!=world.Cohorts().end() && found->second.formationPartner==world.CohortOf(id) && !found->second.members.empty())
+            support=&found->second;
+    }
+    const bool hardDanger=danger && (!danger->mobile || danger->def->IsEnemyRoleAny(CCircuitDef::COMM)
+        || danger->def->IsAbleToReclaim());
+    // D-507: a siege puts the screen behind the rockets on purpose.
+    if(support && !group.sustainedRush && !hardDanger && group.reason!=cohort::Reason::SIEGE) {
+        const int started=world.RetreatStarted(group,frame);
+        // D-504: only a screen with a shot or under threat holds; one still
+        // walking up has nothing to cover with and keeps to the cohort's plan.
+        if(policy.screenRetreatDelay>0.f && started>=0 && frame-started<int(policy.screenRetreatDelay*FRAMES_PER_SEC)
+            && (best>=0 || danger)) {
+            point=pos; danger=nullptr; note.Add(wu::COVER_DELAY);
+        }
+        if(policy.retreatBehindSupport>0.f) {
+            // Depth along `back` (away from the enemy) from the group's focus.
+            const auto depth=[&](const AIFloat3& p) { return (p.x-group.focus.x)*back.x+(p.z-group.focus.z)*back.z; };
+            const float limit=depth(support->center)-spacing;
+            const float wanted=depth(point);
+            if(wanted>limit && wanted>depth(pos)) {
+                // Step back only as far as the support line, never toward the enemy.
+                const float allowed=std::max(depth(pos),limit);
+                point+=back*(allowed-wanted); note.Add(wu::BEHIND_SUPPORT);
+            }
+        }
+    }
+    // D-507: inside our jammer cover (D-505) a member never steps back from
+    // the enemy: an advancing enemy drags the band (and the slots) toward us,
+    // which walked the group out of the cover. Depth is measured along `back`
+    // from the group's focus; a commander or reclaimer escape still wins.
+    if(group.jammerCover && group.target>=0 && !hardDanger) {
+        const auto depth=[&](const AIFloat3& p) { return (p.x-group.focus.x)*back.x+(p.z-group.focus.z)*back.z; };
+        const float extra=depth(point)-depth(pos);
+        if(extra>0.f) { point-=back*extra; note.Add(wu::JAMMER_NO_BACK); }
+    }
+    // D-432: a leaked short-range hostile: tuck behind the nearest screen
+    // members with fire open instead of kiting alone; otherwise reposition
+    // only while the weapon has reload to spare (a move never costs a shot).
+    if(rear && rear->tuck && !group.sustainedRush) {
+        danger=nullptr; incoming=nullptr;
+        point=AIFloat3(rear->tuckPoint.x,0.f,rear->tuckPoint.z);
+        note.Add(wu::TUCK);
+        if(!tucking) lineUrgent=true;
+        tucking=true;
+    } else {
+        if(tucking) lineUrgent=true;
+        tucking=false;
+        if(rear && rear->moveAfterShot && !danger && !lineUrgent
+            && !support::MayStep(frame,lastReload,rear->aimHoldFrames,best>=0)) { point=pos; note.Add(wu::WAIT_RELOAD); }
+    }
+    // D-433: what this decision escaped from, for the retreat rule.
+    lastDanger.present=danger!=nullptr; lastDanger.frame=frame;
+    if(danger) { lastDanger.mobile=danger->mobile; lastDanger.speed=danger->def->GetSpeed(); lastDanger.range=danger->groundRange; }
     CTerrainManager::CorrectPosition(point);
     // Advancing enemies can move the ideal firing arc behind a committed
     // shooter. Hold and fire in that case instead of backing out to the arc.
@@ -596,7 +883,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         for(int k=3;k>=1;--k) {
             AIFloat3 stage=pos+delta*(k*.25f);
             if(pos.SqDistance2D(stage)>4096.f && SafeMove(unit,pos,stage,policy.safetyMargin,false)) {
-                point=stage; safe=true; break;
+                point=stage; safe=true; note.Add(wu::STAGED); break;
             }
         }
     }
@@ -608,9 +895,12 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     // legal shot. Requiring one here makes adjacent cohorts repeatedly trade
     // lateral slots. Retain only a reached, still-safe nearby reservation for
     // the SAME objective/mode; danger and fresh movement admission win above.
+    // D-507: a besieging rear hull is not staging: its station is inside its
+    // own reach of the tower, and holding where the move stopped (a little
+    // short) left the whole siege out of range.
     const bool formationStaging=policy.formationPosition!=RangedPolicy::FormationPosition::NONE
         && group.mode==cohort::Mode::WITHDRAW && objective && !objective->mobile
-        && moveObjective==group.target && moveMode==int(group.mode);
+        && moveObjective==group.target && moveMode==int(group.mode) && !(rear && rear->siege);
     // Recoil may finish a MOVE before its exact endpoint. The route walker
     // already accepts its final waypoint within 64 elmos; repeatedly sending
     // that completed command buys no progress. Adopt the reached position only
@@ -621,29 +911,58 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         && cohort::CompletedStage(P(pos),P(destination),P(point),policy.spacing)
         && world.FreeSlot(id,pos,policy.spacing)
         && SafeMove(unit,pos,pos,policy.safetyMargin,false);
-    if(completedStage) point=pos;
+    if(completedStage) { point=pos; note.Add(wu::STAGED); }
     if(!completedStage && !danger && !poke && group.mode!=cohort::Mode::REGROUP
         && destination.SqDistance2D(point)<4.f*policy.spacing*policy.spacing
         && pos.SqDistance2D(destination)<arrival*arrival
         && ((!group.sustainedRush && !group.rushFallback && best>=0) || group.target<0 || (formationStaging
             && SafeMove(unit,pos,destination,policy.safetyMargin,false)))
-        && world.FreeSlot(id,destination,policy.spacing)) point=destination;
-    urgentMove=danger || moveObjective!=group.target || moveMode!=int(group.mode) || phase!=pokePhase;
+        && world.FreeSlot(id,destination,spacing)) point=destination;
+    urgentMove=danger || moveObjective!=group.target || moveMode!=int(group.mode) || phase!=pokePhase || lineUrgent;
     pokePhase=phase;
     moveObjective=group.target; moveMode=int(group.mode);
     const bool settled=pos.SqDistance2D(point)<arrival*arrival;
+    if(settled) note.Add(wu::SETTLED);
+    if(!safe) note.Add(wu::NO_SAFE_MOVE);
     if(safe && !settled) {
         // Formation slots may overlap another cohort's arc. Try a few lateral
         // alternatives; bound work and retain static-path checks in Move.
         bool placed=false;
+        // D-433: with height_weight the free lateral candidates are ranked by
+        // height over the enemy point (cohort::HeightScore) before the first
+        // fit; six elevation reads where there were up to five. Weight 0
+        // keeps the lazy first-fit loop exactly.
+        const auto* area=ai->GetTerrainManager()->GetAreaData();
+        // The focus can lie off the map without a target: bound it before the read (KI-571 rule).
+        AIFloat3 enemyPoint=objective?objective->pos:group.focus;
+        CTerrainManager::CorrectPosition(enemyPoint);
+        const float enemyHeight=policy.heightWeight>0.f?area->GetElevationAt(enemyPoint.x,enemyPoint.z):0.f;
+        AIFloat3 candidates[5]; float scores[5]; int order[5]; int count=0;
         for(int k=0;k<5;++k) {
             const int side=k==0?0:(k%2?(k+1)/2:-k/2);
-            AIFloat3 candidate=point+AIFloat3(-group.back.z,0,group.back.x)*(side*(policy.spacing+1.f));
+            AIFloat3 candidate=point+AIFloat3(-back.z,0,back.x)*(side*(spacing+1.f));
             CTerrainManager::CorrectPosition(candidate);
             if(group.sustainedRush && (candidate.x-pos.x)*(group.focus.x-pos.x)
                 +(candidate.z-pos.z)*(group.focus.z-pos.z)<0.f) continue;
-            candidate.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(candidate.x,candidate.z);
-            if(world.FreeSlot(id,candidate,policy.spacing) && Move(unit,candidate,true,danger!=nullptr)) { placed=true; break; }
+            candidate.y=area->GetElevationAt(candidate.x,candidate.z);
+            if(policy.heightWeight<=0.f) {
+                if(world.FreeSlot(id,candidate,spacing) && Move(unit,candidate,true,danger!=nullptr)) { placed=true; break; }
+                continue;
+            }
+            if(!world.FreeSlot(id,candidate,spacing)) continue;
+            candidates[count]=candidate; order[count]=count;
+            scores[count]=cohort::HeightScore(candidate.y,enemyHeight,policy.heightWeight)-k*.001f; ++count;
+        }
+        if(count>0) {
+            // Insertion sort of at most five slots, best score first: cheaper than
+            // std::sort here, and GCC 13 reports -Warray-bounds for introsort's
+            // 16-element insertion threshold on a five-element array.
+            for(int i=1;i<count;++i) {
+                const int key=order[i]; int j=i;
+                while(j>0 && scores[order[j-1]]<scores[key]) { order[j]=order[j-1]; --j; }
+                order[j]=key;
+            }
+            for(int i=0;i<count && !placed;++i) placed=Move(unit,candidates[order[i]],true,danger!=nullptr);
         }
         // Spacing is subordinate to survival. A reserved retreat slot must not
         // leave the previous forward MOVE running into a closing assault.
@@ -666,10 +985,10 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     SelectTarget(unit,best>=0?contacts[best].id:-1,weapon,damage,score);
     if(trace && frame>=traceFrame+150) {
         traceFrame=frame;
-        ai->LOG("COHORT: unit=%d members=%u mode=%d target=%d radius=%.0f dest=%.0f,%.0f danger=%d reason=%d loss=%.3f advantage=%.3f committed=%d supporting=%d screen=%.0f poke=%d regime=%d own=%.0f hostile=%.0f closest=%d",
+        ai->LOG("COHORT: unit=%d members=%u mode=%d target=%d radius=%.0f dest=%.0f,%.0f danger=%d reason=%d loss=%.3f advantage=%.3f committed=%d supporting=%d screen=%.0f poke=%d regime=%d own=%.0f hostile=%.0f closest=%d group=%d stance=%d",
             id,unsigned(group.members.size()),int(group.mode),group.target,group.radius,point.x,point.z,danger?danger->id:-1,
             int(group.reason),group.loss,group.advantage,int(group.committed),int(group.supporting),group.screenDepth,
-            phase,int(regime),group.ownValue,group.hostileValue,closest?closest->id:-1);
+            phase,int(regime),group.ownValue,group.hostileValue,closest?closest->id:-1,directive?directive->group:-1,directive?int(directive->stance):-1);
     }
 }
 
@@ -816,7 +1135,9 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // own weapon is precise. Keep clear of its loaded death blast and
             // withhold the shot until the exposed cohort can leave it.
             if(c.explosionRadius>0.f && pos.SqDistance2D(c.pos)<std::pow(c.explosionRadius+caps.radius,2.f)) continue;
-            if(world.FriendlySplash(id,c.pos,std::max(w.splash,c.explosionRadius))) continue;
+            if(policy.splashVetoHealth>0.f
+                ? (world.FriendlySplash(id,c.pos,c.explosionRadius) || world.FriendlySplash(id,c.pos,w.splash,w,policy.splashVetoHealth))
+                : world.FriendlySplash(id,c.pos,std::max(w.splash,c.explosionRadius))) continue; // D-433
             if(world.FriendlyLine(w,id,pos,c.pos)) continue;
             const int armor=c.armor;
             const float damage=policy.mode==RangedPolicy::Mode::CARRIER?c.health:
@@ -826,6 +1147,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // never an invented heavy identity, HP estimate or threat source.
             float value=c.def ? ranged::UsefulScore(c.cost,c.health,damage,world.Reserved(c.id,id),policy.mode==RangedPolicy::Mode::PRECISION,
                 policy.preferHeavy && c.def->IsEnemyRoleAny(CCircuitDef::HEAVY|CCircuitDef::COMM),c.los,world.Progress(c.id,policy.repairedTargetPenalty)) : .01f/(1.f+world.Reserved(c.id,id));
+            if(c.def) value*=ranged::ThreatFactor(c.dps,def->GetSurfaceDps(),policy.threatWeight); // D-433
             if(c.def && policy.mode!=RangedPolicy::Mode::PRECISION)
                 value+=policy.splashWeight*std::max(0.f,world.ClusterValue(c.pos,w.splash)-c.cost);
             // D-294: opt-in hit-likelihood test for slow shells against fast

@@ -2,7 +2,7 @@
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "task/common/WaitTask.h"
 #include "unit/CircuitUnit.h"
 #include "unit/enemy/EnemyManager.h"
@@ -326,7 +326,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         if(build && !build->IsDead() && build->GetBuildDef() && CanResumeFrontTask(unit,build)
             && ((build->GetTarget() && !build->GetTarget()->IsFinished()) || build==s.work.task)
             && build->GetPosition().SqDistance2D(pos)<=std::pow(cfg->front.radius+unit->GetCircuitDef()->GetBuildDistance(),2.f)) return build;
-        if(dynamic_cast<CControlledTask*>(unit->GetTask())) return unit->GetTask();
+        if(dynamic_cast<CLeaseTask*>(unit->GetTask())) return unit->GetTask();
         // INV-235 (D-357): the commander advances by taking the next corridor
         // mex. The script ladder offers mex_lane before advance; if an admitted
         // corridor spot still exists here, the ladder order or the admission
@@ -337,7 +337,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
             return nullptr;
         }
         s.front.progressFrame=frame; s.front.progressPos=pos;
-        return ai->GetBuilderManager()->EnqueueControlled(this,nullptr);
+        return ai->GetBuilderManager()->EnqueueLease(this,nullptr);
     }
     // Script offers a bounded hold after productive front work. Engine PATROL
     // can acquire repair/reclaim work beyond its endpoint and out of the lane.
@@ -387,7 +387,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         // Not while the last fallback line still wants turrets (D-299).
         if(kind!=4 || (frame<s.work.lineUntil && !s.work.lineDone)) return nullptr;
         s.front.progressFrame=frame; s.front.progressPos=pos;
-        return builder->EnqueueControlled(this,nullptr);
+        return builder->EnqueueLease(this,nullptr);
     }
     if(s.front.arrived<0) s.front.arrived=frame; // D-299 timed defence clock
     if(ai->GetThreatMap()->GetThreatAt(unit,pos)>cfg->front.threat) return nullptr;

@@ -1,0 +1,185 @@
+{
+  "name": "battle-group-siege-sentries",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "description": "D-507: 6 Thugs and 6 Aggravators (475) against three Sentries (430) and two Guardians (435): everything the group meets is outranged by its rockets. Expected: the rockets kill every tower from outside its reach, the Thugs never fire (no need to enter 430), no losses.",
+  "storage_scenario": "bg-siege-sentries",
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3700,
+        4010
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3850,
+        4010
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4000,
+        4010
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4150,
+        4010
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4300,
+        4010
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corthud",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 6,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 6,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3700,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4000,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4300,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "corllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3850,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "corllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4150,
+        4500
+      ],
+      "after_seconds": 5
+    }
+  ],
+  "waves": [
+    {
+      "name": "outranged towers",
+      "after_seconds": 5,
+      "units": [
+        "armllt",
+        "corllt"
+      ]
+    }
+  ],
+  "assertions": {
+    "kill_all_enemy": true,
+    "max_losses": 0,
+    "max_unit_shots": {
+      "corthud": 0
+    },
+    "min_kills": 5,
+    "min_shooters": 1,
+    "min_damage": 1000,
+    "min_types_assigned": 2
+  }
+}

@@ -110,4 +110,49 @@ namespace WidgetLink {
         // same plan costs no file write.
         SetState("layout", Line("layout", snapshot.length() == 0 ? "none" : snapshot));
     }
+
+    // Unit monitor (tools/widgets/gui_barb_unit_monitor.lua): this AI's groups
+    // (battle groups, cohorts, fighter tasks) and one focused unit's memberships, as the
+    // state keys "groups" and "unitinfo". Diagnostics only, and only while the
+    // widget renews its lease, like the layout overlay: a closed or removed
+    // widget stops every serialization within MonitorLeaseSeconds.
+    // D-508: records carry activities and factors as codes; "monitorcodes"
+    // holds their names (native ActionWhy.h), published once per lease.
+    // Cost per refresh: native DescribeGroups, O(lines + cohorts + tasks + members).
+    int MonitorSeconds = 2;           // refresh period while leased
+    int MonitorLeaseSeconds = 45;     // a lease not renewed for this long ends
+    int MonitorMinTaskMembers = 2;    // fighter tasks with fewer members are not listed as groups
+    bool monitor = false;
+    int monitorUntil = -1, monitorFrame = -1, monitorUnit = -1;
+    void SetMonitor(bool on)
+    {
+        const bool starting = on && !monitor;
+        monitor = on;
+        monitorUntil = ai.frame + MonitorLeaseSeconds * SECOND;
+        if (!on) {
+            monitorUnit = -1; monitorFrame = -1;
+            SetState("groups", ""); SetState("unitinfo", "");
+            return;
+        }
+        // D-508: the activity and factor names the records carry as codes,
+        // once per lease (the native store skips an unchanged value).
+        if (starting) SetState("monitorcodes", Line("monitorcodes", aiMilitaryMgr.DescribeMonitorCodes()));
+        MonitorTick(starting);
+    }
+    void SetMonitorUnit(int unitId)
+    {
+        monitorUnit = unitId;
+        if (!monitor) SetMonitor(true);
+        MonitorTick(true);
+    }
+    void MonitorTick(bool force = false)
+    {
+        if (!monitor) return;
+        if (ai.frame > monitorUntil) { SetMonitor(false); return; }
+        if (!force && monitorFrame >= 0 && ai.frame - monitorFrame < MonitorSeconds * SECOND) return;
+        monitorFrame = ai.frame;
+        // The native store skips an unchanged value, so a quiet army writes nothing.
+        SetState("groups", Line("groups", aiMilitaryMgr.DescribeGroups(MonitorMinTaskMembers)));
+        SetState("unitinfo", monitorUnit < 0 ? "" : Line("unitinfo", aiMilitaryMgr.DescribeUnitGroups(monitorUnit)));
+    }
 }

@@ -2,7 +2,7 @@
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
 #include "module/MilitaryManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "task/fighter/RangedWorld.h"
 #include "unit/CircuitUnit.h"
 #include "unit/CircuitWDef.h"
@@ -115,7 +115,7 @@ bool CCommanderController::Fire(CCircuitUnit* unit,State& s,const commander::Lin
         const auto target=std::find_if(contacts.begin(),contacts.end(),[&](const commander::Contact& c) {
             return c.id==line.target && c.t3 && c.targetable && !c.friendly && !c.blocker && !c.reserved;
         });
-        auto* owner=dynamic_cast<CControlledTask*>(unit->GetTask());
+        auto* owner=dynamic_cast<CLeaseTask*>(unit->GetTask());
         if(cfg->t3.immediateShot<=0 || target==contacts.end() || !line.requiredHit || line.blocked
             || !owner || owner->GetAssignees().size()!=1 || !owner->GetAssignees().count(unit)) {
             ai->LOG("[INVARIANT] INV-233 invalid immediate T3 shot unit=%i target=%i",unit->GetId(),line.target);
@@ -127,7 +127,7 @@ bool CCommanderController::Fire(CCircuitUnit* unit,State& s,const commander::Lin
             return c.id==line.target && (c.t3 || (c.combatTier==2 && c.cost>=cfg->safety.jamHeavyCost))
                 && c.targetable && !c.friendly && !c.blocker && !c.reserved;
         });
-        auto* owner=dynamic_cast<CControlledTask*>(unit->GetTask());
+        auto* owner=dynamic_cast<CLeaseTask*>(unit->GetTask());
         if(!Jammed(unit) || target==contacts.end() || !line.requiredHit || line.blocked
             || !owner || owner->GetAssignees().size()!=1 || !owner->GetAssignees().count(unit)
             || !unit->IsDGunReady(frame,ai->GetEconomyManager()->GetEnergyCur()-std::max(0.f,reserve))) return false;

@@ -1,0 +1,37 @@
+{
+  "name": "thug-army-duel",
+  "description": "D-432 head-to-head: two Cortex armies of 12 Thugs and 6 Aggravators, each under its own AI build, meet in the middle of Comet Catcher. Run with --opponent-dll/--opponent-data so the enemy side plays a pinned build with its own controllers (not the fixture's route), then swap the builds between the sides (AB/BA). Both commanders stay at their starts. The summariser's kills and losses are team 0's; line_wave_report attributes the duel's kills and losses.",
+  "unit": "corthud",
+  "units": ["corthud", "corstorm"],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "thug-army-duel",
+  "starts": [[4000, 1800], [4000, 7000]],
+  "camera": [4000, 4400, 1400],
+  "photos": [30, 60, 90, 120],
+  "groups": [
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3500, 4300]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [4500, 4300]},
+    {"unit": "armeyes", "count": 1, "team": 1, "position": [3500, 4500]},
+    {"unit": "armeyes", "count": 1, "team": 1, "position": [4500, 4500]},
+    {"unit": "corthud", "count": 12, "team": 0, "position": [3800, 3500], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 6, "team": 0, "position": [3870, 3300], "columns": 6, "spacing": 80, "after_seconds": 15},
+    {"unit": "corthud", "count": 12, "team": 1, "position": [4200, 5300], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 6, "team": 1, "position": [4130, 5500], "columns": 6, "spacing": 80, "after_seconds": 15}
+  ],
+  "waves": [
+    {"name": "duel 12 Thugs 6 Aggravators", "after_seconds": 15, "units": ["corthud", "corstorm"]}
+  ],
+  "enemy_destination": [4000, 4400],
+  "assertions": {
+    "min_shooters": 6,
+    "min_types_assigned": 2,
+    "min_kills": 1,
+    "max_losses": 18,
+    "min_damage": 1000
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "army-duel"
+}

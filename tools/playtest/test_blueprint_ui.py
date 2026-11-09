@@ -1,6 +1,6 @@
 """Lua 5.1 tests of the actual host widget; uses the existing lane UI dependency."""
 import unittest
-from test_lane_ui_memory import ROOT, LuaRuntime
+from test_lane_ui_memory import ROOT, LuaRuntime, load_barb_widgets
 
 
 class BlueprintTests(unittest.TestCase):
@@ -21,7 +21,7 @@ class BlueprintTests(unittest.TestCase):
             end
             footprint='zone:1:1000:1000:0:320:320:z;slot:armap:1000:1000:0:64:96:p;'
         ''')
-        self.lua.execute((ROOT / 'tools/widgets/gui_barb_team_link.lua').read_text(encoding='utf-8'))
+        load_barb_widgets(self.lua)
         self.lua.execute('widget:Initialize(); WG.barblink.SetOpen(true)')
 
     def test_team_player_selection_and_lease(self):

@@ -47,7 +47,7 @@
 #include "task/builder/CombatTask.h"
 #include "task/builder/BraceTask.h"
 #include "control/kernel/ConstructorBrace.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/ControllerRegistry.h"
 #include "control/unit/commander/CommanderController.h"
 #include "task/builder/BuildChain.h"
@@ -854,7 +854,7 @@ void CBuilderManager::BraceTrigger(CCircuitUnit* unit, const AIFloat3* threat, c
 		state.threat = (threat != nullptr) ? *threat : AIFloat3();
 		return;
 	}
-	if (dynamic_cast<CControlledTask*>(task) != nullptr) {
+	if (dynamic_cast<CLeaseTask*>(task) != nullptr) {
 		return;  // another unit controller owns it (D-388)
 	}
 	StartBrace(unit, threat != nullptr, (threat != nullptr) ? *threat : AIFloat3(), reason);
@@ -1485,8 +1485,8 @@ IUnitTask* CBuilderManager::EnqueueCommanderGroupFollow(CCircuitUnit* leader,flo
     auto* task=new CCommanderGroupFollowTask(this,leader->GetId(),radius);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
-CControlledTask* CBuilderManager::EnqueueControlled(IUnitController* controller,IUnitTask* previous) {
-    auto* task=new CControlledTask(this,controller,previous);
+CLeaseTask* CBuilderManager::EnqueueLease(IUnitController* controller,IUnitTask* previous) {
+    auto* task=new CLeaseTask(this,controller,previous);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
 bool CBuilderManager::SetCommanderCombatOption(const std::string& name,float value) {

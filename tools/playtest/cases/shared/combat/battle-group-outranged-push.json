@@ -1,0 +1,122 @@
+{
+  "name": "battle-group-outranged-push",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "description": "D-507: 12 Thugs and 6 Aggravators against a Beamer (490, outranging the rockets) and a Sentry: the rockets cannot siege the Beamer, but the group is far stronger. Expected: the group pushes and kills both, at most two losses (closing 110 elmos on a Beamer costs about its metal).",
+  "storage_scenario": "bg-outranged-push",
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        3960
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4150,
+        4010
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corthud",
+      "count": 12,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 8,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 6,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armbeamer",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3900,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4150,
+        4500
+      ],
+      "after_seconds": 5
+    }
+  ],
+  "waves": [
+    {
+      "name": "a Beamer and a Sentry",
+      "after_seconds": 5,
+      "units": [
+        "armbeamer",
+        "armllt"
+      ]
+    }
+  ],
+  "assertions": {
+    "kill_all_enemy": true,
+    "max_losses": 2,
+    "min_kills": 2,
+    "min_shooters": 1,
+    "min_damage": 1500,
+    "min_types_assigned": 2
+  }
+}

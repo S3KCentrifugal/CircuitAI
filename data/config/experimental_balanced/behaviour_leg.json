@@ -746,6 +746,7 @@
 			},
 			"legaabot": {
 				"role": ["anti_air"],
+				"controller": "t1_aa",  // D-509: anti-air escort of the battle group
 				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
@@ -1190,5 +1191,11 @@
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			}
+		},
+
+		// D-509: with Legion loaded the battle group's anti-air escorts include its AA bot
+		// (an array replaces the base list: behaviour.json t1_cortex_group ranks.air)
+		"formations": {
+			"t1_cortex_group": {"ranks": {"air": {"units": ["armjeth", "corcrash", "legaabot"]}}}
 		}
 	}

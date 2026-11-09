@@ -11,6 +11,111 @@
 // combat block) still override these per AI. Lever table: CommanderController.cpp.
 "controllers": {
 	"presets": {
+		// D-430: the ranged controller (control/unit/ranged/RangedController.h).
+		// A preset is a `ranged` block without the attribute: one parser, same
+		// keys and ranges (unit/RangedPolicyParse.cpp). Thug and Aggravator are
+		// the first types on it; Mace and Rocketeer keep the attribute path as
+		// the unchanged control. The family names the battle group template below.
+		// D-432, D-500: a controller type is a job (skirmisher, support), a preset the
+		// unit's tuning; a preset carrying another job's lever fails to load.
+		"t1_skirmisher": {
+			"type": "skirmisher", "coordinated": true,
+			// sustained_rush itself sits on the children: it needs their formation to parse
+			"sustained_rush_ratio": 2.0, "sustained_rush_radius": 900.0,
+			"sustained_rush_min_front": 8, "sustained_rush_remaining": 0.25, "sustained_rush_cooldown": 20.0,
+			"sustained_rush_range": 0.8,
+			"spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25,
+			"cohort_radius": 900, "regroup_seconds": 8, "catch_seconds": 6,
+			// D-501, D-502 (battle-group-composition-proposal.md): up to 32 in a cohort, rows of 576
+			// elmos (ten abreast at 64) 64 apart across the lane, slots by position, a slot behind a
+			// mountain pulled in
+			"cohort_size": 32, "row_width": 576, "row_depth": 64, "direct_slots": 1,
+			"engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "intent_gain": 0.20,
+			"range_fraction": 0.97, "poke_in": 0.95, "poke_in_dominant": 0.90, "poke_out": 1.05,
+			"poke_ratio": 1.5, "poke_health": 0.8, "poke_press_health": 0.5, "poke_pause_seconds": 5,
+			"fire_at_will": false, "move_min_seconds": 0, "target_min_seconds": 0, "rush_ratio": 1.5,
+			"support_allies": true, "support_loss_fraction": 0.70,
+			"loss_fraction": 0.4, "static_loss_fraction": 0.12,
+			// D-499: beside its rockets the screen may spend 30% HP under porc cover, so a tower
+			// that outranges the rockets is taken together (the rockets follow its assault)
+			"static_support_loss_fraction": 0.3,
+			// D-433 (thug-micro-fixes-proposal.md): threat per HP, overkill split, the retreat rule and repair rotation, terrain preference
+			"threat_weight": 0.5, "overkill_skip": true,
+			"retreat_health": 0.35, "retreat_veteran_bonus": 0.1, "repair_health": 0.6, "repair_radius": 600, "repair_cooldown_seconds": 20,
+			"height_weight": 1, "ramp_height": 40, "ramp_penalty": 0.3,
+			// D-502: the rockets lead a retreat: the screen holds and fires 1 s after its cohort
+			// turns to withdraw, and never withdraws past its rockets from a mobile threat
+			"screen_retreat_delay": 1.0, "retreat_behind_support": 1,
+			// D-503: a damaged Thug or rocket of the group draws the whole group to its fight, and a
+			// Thug more than 96 from its row slot walks to it rather than fighting alone
+			"support_members": 1, "slot_hold_distance": 96,
+			// D-505: inside our jammer cover the group never falls back (a Thug still dodges a
+			// commander or a reclaimer)
+			"jammer_hold": 1,
+			// D-507: while the rockets outrange every tower in reach the Thugs stand off and let them siege
+			"siege_standoff": 1,
+			// D-507: a rush weighs a tower's metal threefold (HLT and Beamers trade far above their cost)
+			"sustained_rush_static_weight": 3,
+			// D-510 (control/kernel/RushResponse.h): two or more raiders at least 60 short of our reach
+			// (Pawn 180, Grunt 215, Goblin 261 against 380), closing at 15 elmos/s within 800 and holding
+			// 30% of our metal: the group kites them at its band, 4 s past the last sighting
+			"rush_kite": 1, "rush_range_margin": 60, "rush_closing_speed": 15, "rush_detect_radius": 800,
+			"rush_min_count": 2, "rush_value_share": 0.3, "rush_hold_seconds": 4,
+			// D-510: the kite runs only while it holds range or reaches help before the raiders close
+			// (the arenas: backing off from Pawns with help 800 away gained nothing); else stand and fire
+			"rush_help_slack": 1.0,
+			// D-510: every withdraw or kite heads for the nearest help within 2500 and 70 degrees of
+			// away-from-the-threat that can face it beside us (towers count 3x their metal), else
+			// 800 back down the lane, else the base; an escape leans halfway to that axis
+			"retreat_to_help": 1, "help_radius": 2500, "help_ratio": 1.0, "help_static_weight": 3,
+			"help_cone": 70, "help_lane_step": 800, "escape_help_weight": 0.5
+		},
+		"thug": {
+			"extends": "t1_skirmisher",
+			"formation": {"family": "t1_cortex_group", "position": "front"}, "sustained_rush": true,
+			"fire_in_range": true, "commander_focus": true
+		},
+		"mace": {
+			"extends": "t1_skirmisher",
+			"formation": {"family": "t1_bot_group", "position": "front"}, "sustained_rush": true
+		},
+		"t1_support": {
+			"type": "support", "coordinated": true,
+			"spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25,
+			"cohort_radius": 900, "regroup_seconds": 8, "catch_seconds": 6,
+			// D-501, D-502 (battle-group-composition-proposal.md): up to 32 in a cohort, rows of 576
+			// elmos (ten abreast at 64) 64 apart across the lane, slots by position, a slot behind a
+			// mountain pulled in
+			"cohort_size": 32, "row_width": 576, "row_depth": 64, "direct_slots": 1,
+			"engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "intent_gain": 0.20,
+			"range_fraction": 0.95, "loss_fraction": 0.25, "static_loss_fraction": 0.08,
+			// the parent carries a formation because every preset is parsed on its own
+			"formation": {"family": "t1_cortex_group", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0},
+			// the support controller's own levers (control/kernel/SupportStation.h)
+			"screen_radius": 900, "static_bonus": 1.5, "beyond_screen_bonus": 1.3,
+			"fast_target_speed": 70, "fast_target_penalty": 0.3, "self_defence_radius": 250, "self_defence_bonus": 4,
+			"move_after_shot": true, "aim_hold_seconds": 0.8,
+			"leak_radius": 350, "leak_corridor": 96, "tuck_count": 2, "tuck_offset": 96, "tuck_seconds": 8, "log": 1,
+			// D-433: the support contribution fixes (station from the bands, engine auto-fire while the priority target is vetoed,
+			// the damage-aware splash veto, the no-screen fallback) and the shared fixes
+			"station_slack": 48, "fire_at_will": true, "splash_veto_health": 2, "no_screen": 1, "no_screen_seconds": 6,
+			// D-499 (thug/aggravator coordination): shoot what the Thugs fight (x2), stay behind the Thugs
+			// instead of leaving early from a hostile they stand in front of, besiege towers the rockets
+			// outrange from just inside 475 (Sentry, Guard, Maw), go in with a screen committed against a
+			// tower, and walk to a screen up to 2500 away instead of standing alone
+			"screen_target_bonus": 2.0, "screen_shield": 1, "siege": 1, "siege_margin": 12, "siege_slack": 12, "siege_search": 800,  // D-507: siege_search reaches past a stood-off screen
+			"follow_screen_assault": 1, "pair_seek_radius": 2500,
+			"threat_weight": 0.5, "overkill_skip": true,
+			"retreat_health": 0.45, "retreat_veteran_bonus": 0.1, "repair_health": 0.6, "repair_radius": 600, "repair_cooldown_seconds": 20,
+			"height_weight": 1, "ramp_height": 40, "ramp_penalty": 0.3
+		},
+		"aggravator": {
+			"extends": "t1_support"
+		},
+		"rocketeer": {
+			"extends": "t1_support",
+			"formation": {"family": "t1_bot_group", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0}
+		},
 		"commander": {
 			"type": "commander",
 			// D-389 cloak posture (commander-cloak-policy.md section 4)
@@ -34,9 +139,59 @@
 			"heavy_cost": 600, "heavy_share": 0.5, "close_under_fire": 0, "log": 1
 		},
 		"artillery_popup": {"extends": "artillery_battery", "close_under_fire": 1, "close_seconds": 6, "hit_seconds": 2},
-		"artillery_fortified": {"extends": "artillery_battery"}
+		"artillery_fortified": {"extends": "artillery_battery"},
+		// D-509: the anti-air escort (control/unit/escort/EscortController.h): a T1 anti-air
+		// bot rides with a battle group in the slot it gives it (the template's escort_behind
+		// behind the screen), fire at will; with no group for release_seconds it goes back
+		// to its ordinary anti-air tasks
+		"t1_aa": {"type": "escort", "arrival": 48, "move_seconds": 20, "fire_at_will": 1, "release_seconds": 15, "log": 1}
 	},
 	"roles": {"commander": "commander"}
+},
+// D-430, D-500: formation templates (control/core/GroupController.h). A battle group
+// (type "battle_group", formerly "line") is a screen cohort with the support cohort paired behind it; the template of a
+// ranged preset's formation family routes every order to the two slot kinds
+// with these delays (seconds; -1 = until the rear's separation has opened),
+// turns the battle group to the enemy's weighted axis past "heading_deadband" degrees
+// and widens its spacing to the enemy's largest splash, at most "spread_cap"x.
+// Lever table: BattleGroupController.cpp. aiControllers.Order(template, kind, pos).
+"formations": {
+	"t1_cortex_group": {
+		"type": "battle_group",
+		"withdraw_screen_delay": 1.0, "withdraw_rear_delay": 0, "withdraw_screen_cover": 1,
+		// D-502: an advance moves both ranks at once (was -1: the rockets waited for the gap)
+		"advance_screen_delay": 0, "advance_rear_delay": 0,
+		"attack_screen_delay": 0, "attack_rear_delay": 0, "hold_delay": 0,
+		"order_min_seconds": 3, "script_order_seconds": 20,
+		"orient": 1, "heading_deadband": 20, "threat_radius": 1400, "peer_band": 0.25, "stand_short_share": 0.6,
+		"spread": 1, "spread_cap": 2, "period": 15, "log": 1,
+		// D-501 (control/group/GroupRegistry.h): a group aims for size_target screens (script
+		// battle_group_size.as moves it with the army), merges up to size_max, recruits from
+		// join_seek_radius every recruit_seconds, and sheds members with no direct way to the
+		// rest within split_link or away beyond stray_radius for stray_seconds.
+		// D-502: one main group takes every idle group on the map (GroupRegistry.h); 32 at most,
+		// a cohesion split needs the gap twice and never happens in a fight; split_link was 300
+		"size_min": 3, "size_target": 20, "size_max": 32, "join_seek_radius": 2000, "recruit_seconds": 2,
+		"stray_radius": 900, "stray_seconds": 6, "split_link": 600,
+		// D-504: one or two Thugs fighting alone walk back to the main group (firing on the way),
+		// except within 1500 of the base, where a small group defends
+		"recall_size": 3, "home_radius": 1500,
+		// D-509 (control/kernel/AirDefence.h): armed enemy air within air_radius of the screen
+		// asks for the escorts that shoot it down within air_kill_seconds (its HP held for
+		// air_memory_seconds); escorts stand escort_behind elmos behind the screen's rear edge
+		"air_radius": 1600, "air_kill_seconds": 10, "air_memory_seconds": 20,
+		"escort_behind": 100, "escort_spacing": 64,
+		// a rank admits types by role (assault, riot, skirmish) or by "units"; types one rank
+		// admits share a cohort. support: half the screen target, at most 12.
+		"ranks": {
+			"screen": {"roles": ["assault", "riot"]},
+			"support": {"roles": ["skirmish"], "per_screen": 0.5, "max": 12},
+			// D-509: the anti-air escorts the factories start for it: one per three screens at
+			// most, 6 at most (behaviour_leg.json adds Legion's)
+			"air": {"units": ["armjeth", "corcrash"], "per_screen": 0.34, "max": 6}
+		}
+	},
+	"t1_bot_group": {"extends": "t1_cortex_group"}
 },
 		// Native base-layout mechanism is permitted for this profile; TECH must
 		// also opt its own AI instance in. Other roles retain normal placement.
@@ -1574,34 +1729,19 @@
 			},
 			"armrock": {
 				"role": ["skirmish"],
-				"attribute": ["ranged"],
-				"ranged": {"coordinated": true,
-                "sustained_rush": true,
-                "sustained_rush_ratio": 2.0,
-                "sustained_rush_radius": 900.0,
-                "sustained_rush_min_front": 8,
-                "sustained_rush_remaining": 0.25,
-                "sustained_rush_cooldown": 20.0,
-                "sustained_rush_range": 0.8, "range_fraction": 0.95, "spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8, "catch_seconds": 6, "engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "loss_fraction": 0.25, "static_loss_fraction": 0.08, "intent_gain": 0.20, "formation": {"family": "t1_bot_line", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0}},
+				"controller": "rocketeer",  // D-432, D-500: support controller preset
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"armham": {
 				"role": ["assault"],
-				"attribute": ["ranged"],
-				"ranged": {"coordinated": true,
-                "sustained_rush": true,
-                "sustained_rush_ratio": 2.0,
-                "sustained_rush_radius": 900.0,
-                "sustained_rush_min_front": 8,
-                "sustained_rush_remaining": 0.25,
-                "sustained_rush_cooldown": 20.0,
-                "sustained_rush_range": 0.8, "formation": {"family": "t1_bot_line", "position": "front"}, "range_fraction": 0.97, "poke_in": 0.95, "poke_in_dominant": 0.90, "poke_out": 1.05, "poke_ratio": 1.5, "poke_health": 0.8, "poke_press_health": 0.5, "poke_pause_seconds": 5, "fire_at_will": false, "spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25, "move_min_seconds": 0, "target_min_seconds": 0, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8, "rush_ratio": 1.5, "catch_seconds": 6, "engagement_seconds": 12, "support_allies": true, "support_loss_fraction": 0.70, "intent_gain": 0.20, "advantage_enter": 1.4, "advantage_exit": 1.1, "loss_fraction": 0.4, "static_loss_fraction": 0.12},
+				"controller": "mace",  // D-432: skirmisher controller preset
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"armjeth": {
 				"role": ["anti_air"],
+				"controller": "t1_aa",  // D-509: anti-air escort of the battle group
 				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},
@@ -2148,34 +2288,19 @@
 			},
 			"corstorm": {
 				"role": ["skirmish"],
-				"attribute": ["ranged"],
-				"ranged": {"coordinated": true,
-                "sustained_rush": true,
-                "sustained_rush_ratio": 2.0,
-                "sustained_rush_radius": 900.0,
-                "sustained_rush_min_front": 8,
-                "sustained_rush_remaining": 0.25,
-                "sustained_rush_cooldown": 20.0,
-                "sustained_rush_range": 0.8, "range_fraction": 0.95, "spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8, "catch_seconds": 6, "engagement_seconds": 12, "advantage_enter": 1.4, "advantage_exit": 1.1, "loss_fraction": 0.25, "static_loss_fraction": 0.08, "intent_gain": 0.20, "formation": {"family": "t1_bot_line", "position": "rear", "separation_minimum": 64, "separation_maximum": 96, "withdrawal_lead_seconds": 1.0}},
+				"controller": "aggravator",  // D-430, D-432, D-500: support controller preset
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"corthud": {
 				"role": ["assault"],
-				"attribute": ["ranged"],
-				"ranged": {"fire_in_range": true, "commander_focus": true, "coordinated": true,
-                "sustained_rush": true,
-                "sustained_rush_ratio": 2.0,
-                "sustained_rush_radius": 900.0,
-                "sustained_rush_min_front": 8,
-                "sustained_rush_remaining": 0.25,
-                "sustained_rush_cooldown": 20.0,
-                "sustained_rush_range": 0.8, "formation": {"family": "t1_bot_line", "position": "front"}, "range_fraction": 0.97, "poke_in": 0.95, "poke_in_dominant": 0.90, "poke_out": 1.05, "poke_ratio": 1.5, "poke_health": 0.8, "poke_press_health": 0.5, "poke_pause_seconds": 5, "fire_at_will": false, "spacing": 64, "safety_margin": 4, "range_hysteresis": 16, "reaction_seconds": 1.25, "move_min_seconds": 0, "target_min_seconds": 0, "cohort_size": 12, "cohort_radius": 900, "regroup_seconds": 8, "rush_ratio": 1.5, "catch_seconds": 6, "engagement_seconds": 12, "support_allies": true, "support_loss_fraction": 0.70, "intent_gain": 0.20, "advantage_enter": 1.4, "advantage_exit": 1.1, "loss_fraction": 0.4, "static_loss_fraction": 0.12},
+				"controller": "thug",  // D-430, D-432: skirmisher controller preset
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"corcrash": {
 				"role": ["anti_air"],
+				"controller": "t1_aa",  // D-509: anti-air escort of the battle group
 				"threat": {"air": 1.0, "surf": 0.0, "water": 0.0, "default": 1.0},
 				"power": 1.0
 			},

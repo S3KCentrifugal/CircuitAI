@@ -5,9 +5,10 @@ against any base:
 
 | Script | What it does |
 | --- | --- |
-| `changed_files.sh <base> [all\|cpp\|angelscript]` | The files a branch adds, changes or renames against `<base>`, optionally only the lintable C++ (`src/AIExport.*`, `src/circuit/`) or the policy scripts (`data/script/*.as`). |
+| `changed_files.sh <base> [all\|cpp\|angelscript\|lua]` | The files a branch adds, changes or renames against `<base>`, optionally only the lintable C++ (`src/AIExport.*`, `src/circuit/`) or the policy scripts (`data/script/*.as`). |
 | `lint_cpp.sh <base> [files...]` | `git diff --check` on the changed lines and `cppcheck` (warning, performance, portability) on the changed C++ files only. Needs `cppcheck`. |
 | `lint_angelscript.py <base> [files...]` | Includes resolve, brackets balance, no carriage returns on the changed scripts; then `check_script_api.py` and `check_field_isolation.py` over the whole script graph. |
+| `lint_lua.sh <base> [files...]` | D-498: on the changed `.lua` only: `git diff --check`, `luac5.1 -p` (BAR's Lua), then luacheck with the root `.luacheckrc`, which reports only syntax errors and undefined or accidental globals (W111, W112, W113) and declares the engine names per kind of file; and `embed_strategy.py --check` when `gui_barb_plans.lua` or `tools/widgets/include/` changed. Needs `lua5.1` and `lua-check`. |
 | `../run_native_tests.sh --host --only cpp\|as` | The C++ tests and the AngelScript suites with the host compiler (the default mode cross-compiles in the Recoil build container and runs on Windows). |
 
 Findings print as GitHub annotations (`::error file=...,line=...`) and each

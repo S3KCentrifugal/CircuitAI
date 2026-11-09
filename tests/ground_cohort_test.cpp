@@ -133,5 +133,16 @@ int main() {
     assert(!cohort::CompletedStage({0,0},{64,0},{100,0},64));
     assert(!cohort::CompletedStage({0,0},{32,0},{160,0},64));
     assert(cohort::CompletedStage({0,0},{32,0},{159,0},64));
+    // D-433: overkill split, terrain preference.
+    assert(cohort::OverkillPick(true,3,5)==5);
+    assert(cohort::OverkillPick(true,3,-1)==3);
+    assert(cohort::OverkillPick(false,3,5)==3);
+    assert(cohort::HeightScore(140.f,100.f,1.f)==.4f);
+    assert(cohort::HeightScore(100.f,140.f,1.f)==-.4f);
+    assert(cohort::HeightScore(140.f,100.f,0.f)==0.f);
+    assert(cohort::RampEntry(1.4f,200.f,100.f,40.f,.3f)==1.7f);  // the enemy 100 above: a ramp
+    assert(cohort::RampEntry(1.4f,130.f,100.f,40.f,.3f)==1.4f);  // 30 above: not a ramp
+    assert(cohort::RampEntry(1.4f,200.f,100.f,40.f,0.f)==1.4f);  // off
+    assert(cohort::RampEntry(1.4f,100.f,200.f,40.f,.3f)==1.4f);  // we hold the high ground
     std::puts("ground cohort: catchability, strength, health and 78 firing slots PASS");
 }

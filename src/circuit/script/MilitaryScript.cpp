@@ -93,6 +93,11 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ Enqueue(const SFightTask& in)", asMETHODPR(CMilitaryManager, Enqueue, (const TaskF::SFightTask&), IFighterTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueGather(const SFightTask& in, const AIFloat3& in, int)", asMETHOD(CMilitaryManager, EnqueueGather), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetGatherPower(IUnitTask@, float)", asMETHOD(CMilitaryManager, SetGatherPower), asCALL_THISCALL); ASSERT(r >= 0);
+	// Unit monitor widget feed (control/group/GroupMonitor.h), diagnostics only.
+	r = engine->RegisterObjectMethod("CMilitaryManager", "string DescribeGroups(int) const", asMETHOD(CMilitaryManager, DescribeGroups), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "string DescribeUnitGroups(int) const", asMETHOD(CMilitaryManager, DescribeUnitGroups), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "string DescribeMonitorCodes() const", asMETHOD(CMilitaryManager, DescribeMonitorCodes), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "CCircuitDef@ BattleGroupAirRequest(CCircuitUnit@) const", asMETHOD(CMilitaryManager, BattleGroupAirRequest), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CMilitaryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueExternalControl(const string& in)", asMETHOD(CMilitaryManager, EnqueueExternalControl), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool TransferUnit(CCircuitUnit@, IUnitTask@)", asFUNCTION(CMilitaryManager_TransferUnit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

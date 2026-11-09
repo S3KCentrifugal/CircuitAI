@@ -6,6 +6,7 @@
  */
 
 #include "module/MilitaryManager.h"
+#include "control/group/GroupMonitor.h"
 #include "terrain/BattleAnalysis.h"
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
@@ -34,7 +35,13 @@
 #include "task/fighter/AttackTask.h"
 #include "task/fighter/BombTask.h"
 #include "task/fighter/ArtilleryTask.h"
+#include "task/fighter/EngagementTask.h"
 #include "task/fighter/RangedWorld.h"
+#include "control/core/LeaseTask.h"
+#include "control/unit/skirmisher/SkirmisherController.h"
+#include "control/unit/support/SupportController.h"
+#include "control/unit/escort/EscortController.h"
+#include "control/group/BattleGroupController.h"
 #include "task/fighter/AntiAirTask.h"
 #include "task/fighter/AntiHeavyTask.h"
 #include "task/fighter/SupportTask.h"
@@ -1019,6 +1026,9 @@ IFighterTask* CMilitaryManager::Enqueue(const TaskF::SFightTask& ti)
 		} break;
 		case IFighterTask::FightType::ARTY: {
 			task = new CArtilleryTask(this);
+		} break;
+		case IFighterTask::FightType::ENGAGE: {
+			task = new CEngagementTask(this);
 		} break;
 		case IFighterTask::FightType::AA: {
 			const float mod = (float)rand() / RAND_MAX * attackMod.len + attackMod.min;
@@ -2121,7 +2131,7 @@ void CMilitaryManager::UpdateCommanderSnipe()
 		}
 		CCircuitDef* cdef = unit->GetCircuitDef();
 		const AIFloat3& pos = unit->GetPos(frame);
-		const bool flatGun = cdef->IsAttrRanged() && cdef->GetRangedPolicy().lowTrajectory;
+		const bool flatGun = cdef->HasEngagementPolicy() && cdef->GetRangedPolicy().lowTrajectory;
 		// One terrain walk (distance/32 samples) per weapon, only for a flat
 		// gun and only for a commander already inside reach.
 		const auto clearShot = [&](const AIFloat3& target) {
@@ -2457,6 +2467,27 @@ std::shared_ptr<CRangedWorld> CMilitaryManager::GetRangedWorld()
 	return rangedWorld;
 }
 
+std::string CMilitaryManager::DescribeGroups(int minTaskMembers) const
+{
+	return monitor::DescribeGroups(circuit, minTaskMembers);
+}
+
+std::string CMilitaryManager::DescribeUnitGroups(int unitId) const
+{
+	return monitor::DescribeUnit(circuit, unitId);
+}
+
+std::string CMilitaryManager::DescribeMonitorCodes() const
+{
+	return monitor::Dictionary();
+}
+
+CCircuitDef* CMilitaryManager::BattleGroupAirRequest(CCircuitUnit* factory) const
+{
+	const CBattleGroupController* groups = circuit->GetBattleGroupController();
+	return (groups != nullptr && factory != nullptr) ? groups->AirRequest(factory->GetCircuitDef()) : nullptr;
+}
+
 bool CMilitaryManager::HasRangedUnits() const
 {
 	return rangedWorld && rangedWorld->HasMembers();
@@ -2466,11 +2497,27 @@ IUnitTask* CMilitaryManager::TryMakeRangedTask(CCircuitUnit* unit)
 {
 	if (unit == nullptr) return nullptr;
 	CCircuitDef* def = unit->GetCircuitDef();
+	// D-509: a type bound to an escort preset (the T1 anti-air bots) rides
+	// with a battle group under the escort controller's lease. Here, not in
+	// DefaultMakeTask, because script asks this before any role's policy.
+	if (CEscortController* escort = circuit->GetEscortController(); escort != nullptr
+			&& def->IsMobile() && !def->IsAbleToFly()) {
+		if (IUnitTask* lease = escort->MakeLease(unit)) return lease;
+	}
 	// Ordinary assignment only: specialist missions and player control keep
 	// their owner. No polling loop steals already assigned units.
-	if (!def->IsAttrRanged() || !def->IsMobile() || !def->IsLander()
+	if (!def->HasEngagementPolicy() || !def->IsMobile() || !def->IsLander()
 			|| def->IsAbleToFly() || def->IsRoleTrans()) return nullptr;
-	return Enqueue(TaskF::Common(IFighterTask::FightType::ARTY));
+	// D-430, D-432: a type bound to a skirmisher or backline preset holds
+	// that controller's lease instead of an engagement task; the engagement is
+	// the same.
+	if (CSkirmisherController* controller = circuit->GetSkirmisherController()) {
+		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
+	}
+	if (CSupportController* controller = circuit->GetSupportController()) {
+		if (IUnitTask* lease = controller->MakeLease(unit)) return lease;
+	}
+	return Enqueue(TaskF::Common(IFighterTask::FightType::ENGAGE));
 }
 
 IUnitTask* CMilitaryManager::MakeTask(CCircuitUnit* unit)
@@ -2502,6 +2549,14 @@ void CMilitaryManager::UpdateExternalControl()
         auto* external=EnqueueExternalControl(externalOwnerRule);
         AssignTask(unit,external); // external AssignTo/Start never alter gadget commands
     }
+}
+
+CLeaseTask* CMilitaryManager::EnqueueLease(IUnitController* controller, IUnitTask* previous)
+{
+	auto* task = new CLeaseTask(this, controller, previous);
+	updateTasks.push_back(task);
+	TaskAdded(task);
+	return task;
 }
 
 IUnitTask* CMilitaryManager::DefaultMakeTask(CCircuitUnit* unit)

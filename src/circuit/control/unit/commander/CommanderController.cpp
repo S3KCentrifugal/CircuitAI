@@ -5,7 +5,7 @@
 #include "module/EconomyManager.h"
 #include "module/FactoryManager.h"
 #include "module/MilitaryManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/Ownership.h"
 #include "task/RetreatTask.h"
 #include "task/fighter/RangedWorld.h"
@@ -351,7 +351,7 @@ void CCommanderController::WeaponFired(int id,int weapon) {
         || unit->GetCircuitDef()->GetDGunDef()->GetDef()->GetWeaponDefId()!=weapon) return;
     auto& s=*found; s.fired=ai->GetLastFrame(); s.pending=-1; s.immediatePending=false; s.next=0;
     // Shot event confirms dispatch, not a kill. Every repeat uses fresh HP.
-    if(dynamic_cast<CControlledTask*>(unit->GetTask()))
+    if(dynamic_cast<CLeaseTask*>(unit->GetTask()))
         Transition(unit,s,Mode::ESCAPE,s.fired);
     ai->LOG("[Commander] unit=%i shot_confirmed frame=%i target=%i",id,s.fired,s.target);
 }
@@ -744,7 +744,7 @@ void CCommanderController::Update() {
         Bind bound(this,s.preset);
         if(!Handles(unit)) {
             ai->GetAllyTeam()->GetCommanderShots().Release(ai->GetTeamId(),id);
-            if(auto* task=dynamic_cast<CControlledTask*>(unit->GetTask())) task->Resume(unit);
+            if(auto* task=dynamic_cast<CLeaseTask*>(unit->GetTask())) task->Resume(unit);
             s.budget=0; s.fundingBudget=0; s.pending=-1; s.mode=Mode::SUPPORT; continue;
         }
         // Fixed three-frame active/idle observation cadence independent of the
@@ -756,7 +756,7 @@ void CCommanderController::Update() {
 }
 void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     auto* current=unit->GetTask();
-    auto* task=dynamic_cast<CControlledTask*>(current);
+    auto* task=dynamic_cast<CLeaseTask*>(current);
     const bool trace=commanderTrace && frame%30<3;
     if(trace) ai->LOG("[CommanderTrace] unit=%i task=%i morph=%i stun=%i disarm=%i build=%i external=%i reclaim=%i transported=%.0f retry=%i",unit->GetId(),current?int(current->GetType()):-1,unit->IsMorphing(),unit->GetUnit()->IsParalyzed(),unit->IsDisarmed(frame),unit->GetUnit()->IsBeingBuilt(),current?current->IsExternalControlled():0,current?current->IsEnemyReclaim():0,unit->GetUnit()->GetRulesParamFloat("circuit_comm_transported",0),s.retry);
     if(s.invalidated) {
@@ -925,10 +925,10 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     if(frame<s.conceal.unseenUntil && seeds.empty() && threats.empty() && current->GetType()!=IUnitTask::Type::RETREAT) {
         auto* def=unit->GetCircuitDef();
         const auto& capU=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(def);
-        auto* t=dynamic_cast<CControlledTask*>(current);
+        auto* t=dynamic_cast<CLeaseTask*>(current);
         if(capU.cloak && ai->GetEconomyManager()->GetEnergyCur()>=def->GetDGunDef()->GetCostE()+capU.cloakMoving*cfg->combat.escapeSeconds) {
             if(!t) {
-                t=ai->GetBuilderManager()->EnqueueControlled(this,current);
+                t=ai->GetBuilderManager()->EnqueueLease(this,current);
                 ai->GetBuilderManager()->AssignTask(unit,t);
                 if(unit->GetTask()!=t) { ai->GetBuilderManager()->AbortTask(t); t=nullptr; }
                 else { s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation; TRY_UNIT(ai,unit,unit->CmdStop();) }
@@ -951,10 +951,10 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
     if(submergedContact && !s.fallback.active && current->GetType()!=IUnitTask::Type::RETREAT) {
         auto* def=unit->GetCircuitDef();
         const auto& capW=ai->GetMilitaryManager()->GetRangedWorld()->CapabilitiesFor(def);
-        auto* t=dynamic_cast<CControlledTask*>(current);
+        auto* t=dynamic_cast<CLeaseTask*>(current);
         if(capW.cloak && ai->GetEconomyManager()->GetEnergyCur()>=def->GetDGunDef()->GetCostE()+capW.cloakCost*cfg->combat.escapeSeconds) {
             if(!t) {
-                t=ai->GetBuilderManager()->EnqueueControlled(this,current);
+                t=ai->GetBuilderManager()->EnqueueLease(this,current);
                 ai->GetBuilderManager()->AssignTask(unit,t);
                 if(unit->GetTask()!=t) { ai->GetBuilderManager()->AbortTask(t); t=nullptr; }
                 else { s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation; TRY_UNIT(ai,unit,unit->CmdStop();) }
@@ -1096,7 +1096,7 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
         if(!defend && !attack) { s.budget=0; Deploy(unit,s,frame); return; }
         // Enemy reclaim and explicit no-disrupt construction are protected.
         if(def->IsAttrNoDisrupt() && !defend) return;
-        task=ai->GetBuilderManager()->EnqueueControlled(this,current);
+        task=ai->GetBuilderManager()->EnqueueLease(this,current);
         ai->GetBuilderManager()->AssignTask(unit,task);
         if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); return; }
         s.started=frame; s.exit=safe; s.failed=0; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;
@@ -1184,7 +1184,7 @@ void CCommanderController::Tick(CCircuitUnit* unit,State& s,int frame) {
 
 bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
     performance::Scope measured(ai,performance::COMMANDER_DEPLOY);
-    auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
+    auto* task=dynamic_cast<CLeaseTask*>(unit->GetTask());
     if(FallbackActive(s,frame)) return false; // the porc line bounds exploration
     // D-474: a commander that was hit, or whose structure under construction
     // was destroyed, braces here: below every rule Tick ran before Deploy
@@ -1313,7 +1313,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
             }
         }
         // Arrival is admission, not a reason to create and immediately release
-        // a controlled task. Preserve the existing yield for the work scheduler.
+        // a lease task. Preserve the existing yield for the work scheduler.
         if(!commander::ShouldStartDeployment(pos.SqDistance2D(goal),cfg->front.radius*.5f)) {
             s.front.yield=frame+60; s.detourFails=0;
             if(s.front.arrived<0)s.front.arrived=frame;
@@ -1324,7 +1324,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
             return task!=nullptr;
         }
         if(!task) {
-            task=ai->GetBuilderManager()->EnqueueControlled(this,nullptr);
+            task=ai->GetBuilderManager()->EnqueueLease(this,nullptr);
             ai->GetBuilderManager()->AssignTask(unit,task);
             if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); return false; }
             s.started=frame; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;
@@ -1343,7 +1343,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
                     s.front.frame=-10000; s.route.clear();
                     ai->LOG("[CommanderFront] unit=%i stalled yield frame=%i",unit->GetId(),frame);
                     task->Resume(unit);
-                    if(dynamic_cast<CControlledTask*>(unit->GetTask()))
+                    if(dynamic_cast<CLeaseTask*>(unit->GetTask()))
                         ai->LOG("[INVARIANT] INV-219 commander deploy failed to release after stalled movement unit=%i",unit->GetId());
                     return true;
                 }
@@ -1450,7 +1450,7 @@ bool CCommanderController::Deploy(CCircuitUnit* unit,State& s,int frame) {
         // work can yield to supported front deployment after the opening gates.
         auto* build=dynamic_cast<IBuilderTask*>(old);
         if(build && build->GetBuildDef()!=nullptr) return false;
-        task=ai->GetBuilderManager()->EnqueueControlled(this,old);
+        task=ai->GetBuilderManager()->EnqueueLease(this,old);
         ai->GetBuilderManager()->AssignTask(unit,task);
         if(unit->GetTask()!=task) { ai->GetBuilderManager()->AbortTask(task); return false; }
         s.started=frame; s.failed=0; s.conceal.requested=unit->GetUnit()->IsCloaked(); ++operation;

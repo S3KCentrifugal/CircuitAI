@@ -29,6 +29,8 @@
 #include "manager/economy.as"
 #include "systems/construction/metal_economy.as"
 #include "systems/combat/commander_combat.as"
+#include "systems/combat/battle_group_size.as"  // D-501
+#include "systems/combat/battle_group_air.as"   // D-509
 
 namespace Factory {
 	CCircuitDef@ AiGetFactoryToBuild(const AIFloat3& in pos, bool isStart, bool isReset) {
