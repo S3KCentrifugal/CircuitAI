@@ -101,7 +101,7 @@ namespace Main {
         Global::RoleSettings::Front::ReclaimT1EnergyAfterFusion = false; // owner 2026-11-08: FRONT eco scaling is smrt-test's as it is (ours off)
         Global::RoleSettings::Front::EcoLadder = false;          // owner 2026-11-08: our FRONT eco ladder off, smrt-test's eco scaling
         Global::RoleSettings::Front::MexUpgradeFirst = false;    // owner 2026-11-08: our FRONT mex-upgrade pull off
-        Global::RoleSettings::Front::DirectGantry = false;       // owner 2026-11-08: native gantry at MetalIncomeForGantry, as smrt-test
+        Global::RoleSettings::Front::DirectGantry = true;        // owner 2026-11-09: T2 constructors order the gantry at 125 M / 5000 E for 10 s (native picker never chose one on smrt-test's eco)
         Global::RoleSettings::Front::EcoLadderGantryMetalIncome = 225.0f;   // owner, 2026-10-25 (175 from 2026-10-18)
         Global::RoleSettings::Front::EcoLadderGantryAfterAdvFusions = 1;
         Global::RoleSettings::Front::EcoLadderLaterAdvFusionAtStart = true;

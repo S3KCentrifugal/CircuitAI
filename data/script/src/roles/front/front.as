@@ -686,6 +686,10 @@ namespace RoleFront {
     IUnitTask@ Front_BuilderAiMakeTask(CCircuitUnit@ builder) {
         GenericHelpers::LogUtil("[Front_BuilderAiMakeTask] called for builder", 3);
         if (builder is null) return null; // Defensive check
+        // Owner 2026-11-09: native re-asks a busy builder and swaps it onto whatever a rung returns; the gantry
+        // order's constructor was swapped off within 0.1-30 s and the order died unframed (front-gantry125-runs g2)
+        if (g_frontLadderGantryTask !is null && !g_frontLadderGantryTask.IsDead() && builder.task is g_frontLadderGantryTask)
+            return g_frontLadderGantryTask;
 
         if(UnitHelpers::IsCommander(builder.circuitDef)) {
             IUnitTask@ startFactory=Front_StartFactoryTakeover(builder);
@@ -950,6 +954,7 @@ namespace RoleFront {
         FrontAgitator::TaskRemoved(task, done);
         FrontTactical::TaskRemoved(task, done);
         FrontOverflow::TaskRemoved(task, done);
+        Front_GantryTaskRemoved(task);
     }
 
     /******************************************************************************
@@ -1056,6 +1061,13 @@ namespace RoleFront {
     // site", then a native gantry order that never framed held it silently for 10 minutes; every hold
     // is logged now, and another order without a frame is waited on for 90 s only.
     IUnitTask@ g_frontLadderGantryTask = null;
+    bool g_frontGantryCorridorOff = false;
+    void Front_GantryTaskRemoved(IUnitTask@ task) {
+        if (!g_frontGantryCorridorOff || task !is g_frontLadderGantryTask) return;
+        g_frontGantryCorridorOff = false;
+        aiTerrainMgr.SetFactoryCorridorPolicy(LayoutHelpers::CorridorsForRole(Global::AISettings::Role), Global::AISettings::Role == AiRole::FRONT);
+        GenericHelpers::LogUtil("[FRONT][Eco] gantry order ended (" + (task.GetUnits().length() > 0 ? "staffed" : "no builder") + "); factory corridors restored", 1);
+    }
     int g_frontLadderGantryRetry = -1;
     int g_frontLadderGantryLog = -100000;
     int g_frontStaleGantrySince = -1;   // first frame Builder counted a land gantry order with no frame of it
@@ -1157,8 +1169,10 @@ namespace RoleFront {
         } else g_frontStaleGantrySince = -1;
         if (ai.frame < g_frontLadderGantryRetry) return null;
         const float mi = Economy::GetMinMetalIncomeLast10s();
-        if (mi < Front_GantryMetalIncome())
+        const float ei = Economy::GetMinEnergyIncomeLast10s();   // owner 2026-11-09: energy held for 10 s too
+        if (mi < Front_GantryMetalIncome() || ei < Global::RoleSettings::Front::EnergyIncomeForGantry)
             return Front_LadderGantryHeld("metal income +" + int(mi) + " of " + int(Front_GantryMetalIncome())
+                + ", energy income +" + int(ei) + " of " + int(Global::RoleSettings::Front::EnergyIncomeForGantry) + " (10 s min)"
                 + " | advanced fusions " + FrontEcoLadder::AdvFusions() + "/" + FrontEcoLadder::AdvFusionsTotal());
         if (g_frontGantryAllowance < 1) g_frontGantryAllowance = 1;
         UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetAllGantries(), g_frontGantryAllowance);
@@ -1180,10 +1194,20 @@ namespace RoleFront {
             GenericHelpers::LogUtil("[FRONT][Eco] gantry could not be ordered at " + int(site.x) + "," + int(site.z) + (sited ? "" : " (engine-sited, try " + g_frontLadderGantryTry + ")") + "; retry in 60 s", 1);
             return null;
         }
+        // Owner 2026-11-09: native's unlogged auto-aborts (Reevaluate's income-drop abort of a >1000-metal build
+        // with the bank empty, the safe-reach check on the walk) killed every order 0.1-3 s after it was given
+        // (headless front-gantry125-runs, Carrot Mountains); the order's 600 s timeout still ends it
+        IBuilderTask@ gbt = cast<IBuilderTask>(t);
+        if (gbt !is null) gbt.canAutoAbort = false;
+        // Owner 2026-11-09: every unframed death was native "CBFactoryTask: no site for <gantry> at all" (radius
+        // 1600, canBuildHere=1) after [FactoryCorridor] probes (front-gantry125-runs g2/g3: 9 of 11 orders); the
+        // factory corridor is lifted while our gantry order is open and restored when the order ends
+        aiTerrainMgr.SetFactoryCorridorPolicy(false, true);
+        g_frontGantryCorridorOff = true;
         Builder::MarkGantryEnqueued();
         @g_frontLadderGantryTask = t; g_frontLadderGantrySite = site;
         GenericHelpers::LogUtil("[FRONT][Eco] gantry " + gantry.GetName() + " ordered at " + int(site.x) + "," + int(site.z) + (sited ? " (reserved site)" : " (engine-sited, try " + g_frontLadderGantryTry + ")")
-            + " | M +" + int(mi) + " bank " + int(aiEconomyMgr.metal.current) + " by " + u.circuitDef.GetName() + " " + u.id, 1);
+            + " | M +" + int(mi) + " E +" + int(ei) + " bank " + int(aiEconomyMgr.metal.current) + " by " + u.circuitDef.GetName() + " " + u.id, 1);
         return t;
     }
 
