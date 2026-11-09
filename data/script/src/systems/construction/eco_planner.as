@@ -122,17 +122,23 @@ namespace EcoPlanner {
                 aiEconomyMgr.metal.current, def.costM);
     }
     ConversionReason TechConversionAdmission(CCircuitDef@ def, CCircuitUnit@ worker) {
-        if (TechBuild::MetalFullLong() || aiEconomyMgr.isMetalFull) return METAL_FULL;
         if (def is null) return UNAVAILABLE;
+        const bool advanced = def.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side);
+        // D-489 (owner, 2026-11-07): metal is worth more than energy and spare metal goes
+        // to the team, so the converter seat fills every free advanced-converter slot
+        // while energy is in excess: no metal-full refusal, no capacity, parallel or
+        // income test for it. Availability, buildability and placement still apply.
+        const bool seat = advanced && TechSurplusSeats::ConverterSeatWaived(worker);
+        if ((TechBuild::MetalFullLong() || aiEconomyMgr.isMetalFull) && !seat) return METAL_FULL;
         const int pending = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), def)
             + aiBuilderMgr.GetUnfinishedCount(def);
-        const int parallel = TechChain::EnergyBankFloats() ? Global::RoleSettings::Tech::ConverterParallel : 1;
+        int parallel = TechChain::EnergyBankFloats() ? Global::RoleSettings::Tech::ConverterParallel : 1;
+        if (seat) parallel = AiMax(parallel, pending + 1);
         const float income = Economy::GetMinMetalIncomeLast10s();
-        const bool advanced = def.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side);
         const ConversionReason reason = DecideConversion(false, true, pending, parallel,
-            ConversionSupply() >= aiEconomyMgr.GetEnergyUse(def), def.IsAvailable(ai.frame),
+            seat || ConversionSupply() >= aiEconomyMgr.GetEnergyUse(def), def.IsAvailable(ai.frame),
             worker is null || (worker.circuitDef !is null && worker.circuitDef.CanBuild(def)),
-            advanced ? (income >= Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter || FundedConverterRecovery(def, pending))
+            advanced ? (seat || income >= Global::RoleSettings::Tech::MinimumMetalIncomeForAdvConverter || FundedConverterRecovery(def, pending))
                 : income < Global::RoleSettings::Tech::BuildT1ConvertersUntilMetalIncome,
             conversionDecision !is null && conversionDecision.placementRejected
                 && conversionDecision.placementRejectedDef == def.id);
@@ -158,6 +164,9 @@ namespace EcoPlanner {
     dictionary conversionReasons;
     void TraceConversion(CCircuitUnit@ worker, ConversionReason reason) {
         if (worker is null) return;
+        // INV-261 (D-489): the converter seat is never refused for a full metal bank or capacity while energy is in excess
+        if ((reason == METAL_FULL || reason == CAPACITY) && TechSurplusSeats::ConverterSeatWaived(worker))
+            Invariants::Violation("INV-261", "" + worker.id, "converter seat " + worker.id + " refused as " + ConversionReasonName(reason) + " while energy is in excess (D-489)");
         const string key = "" + worker.id;
         const string signature = "" + int(reason) + ":" + TechPlan::phase;
         string previous;
@@ -244,6 +253,7 @@ namespace EcoPlanner {
         bool turretSlot;            // a planned turret slot is left (Layout::CanPlaceTurret)
         bool builderIsCommander;
         float buildPowerNear;       // static assist build power around the base (turrets), workertime units
+        float arrivingBuildPower = 0.0f;
         bool builderIsT2;
         const CCircuitDef@ builderDef;    // the asking constructor: only its build options are offered (CR-006)
         bool energyBuilding;        // an energy structure of ours is ordered or under construction
@@ -375,6 +385,19 @@ namespace EcoPlanner {
         {
             CCircuitDef@ nanoDef = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(side));
             s.nanosBuilding = (nanoDef is null) ? 0 : aiBuilderMgr.GetUnfinishedCount(nanoDef);
+            // Existing lifecycle counts include unstarted orders. Conservative
+            // across this AI's sites; mandatory local layout support is separate.
+            if (!air && Global::AISettings::Role == AiRole::TECH && nanoDef !is null)
+                s.arrivingBuildPower = float(s.nanosQueued + s.nanosBuilding) * nanoDef.GetBuildSpeed();
+            if (!air && Global::AISettings::Role == AiRole::TECH) {
+                CCircuitDef@ naval = ai.GetCircuitDef(UnitHelpers::GetT1NavalNanoNameForSide(side));
+                if (naval !is null) {
+                    const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::NANO),naval);
+                    const int building = aiBuilderMgr.GetUnfinishedCount(naval);
+                    s.nanosQueued += queued; s.nanosBuilding += building;
+                    s.arrivingBuildPower += float(queued + building) * naval.GetBuildSpeed();
+                }
+            }
         }
         s.builderIsCommander = (u !is null) && UnitHelpers::IsCommander(u.circuitDef);
         s.turretSlot = air ? AirEconomy::t1 + AirEconomy::t2 > 0 : Layout::CanPlaceTurret();
@@ -518,11 +541,14 @@ namespace EcoPlanner {
     string PickEnergy(const State@ s, string &out why, const string &in reason)
     {
         array<Option@>@ opts = EnergyOptions(s); // this owned list is filtered below
-        // D-100 (owner: the fusion comes sooner once the mexes near it are
-        // upgraded; played: energy.short ordered the fusion with 3 of 8 upgraded,
-        // the upgrades' own drain making energy short): while upgrades are
-        // pending the rows answer with the other energy, the chain orders the fusion
-        const bool mohos = s.air ? !AirEconomy::MexesReady() : TechChain::MohosPending();
+        // D-429: mex-first is a preference, not an energy-starvation loop.
+        // Affordable reactor relief is shared with the chain and INV-021;
+        // AIR and the dedicated nuke recipe retain their own prerequisites.
+        const bool energyShort = s.ePull > s.eIncome || s.eIncome < TargetEnergy(s.mIncome);
+        const bool mohos = s.air ? !AirEconomy::MexesReady()
+            : TechEconomyMath::MexesBlockReactor(TechChain::MohosPending(), TechChain::NukeRush(), energyShort,
+                s.mIncome, Global::RoleSettings::Tech::MinimumMetalIncomeForFUS,
+                s.eIncome, Global::RoleSettings::Tech::EcoFusionEnergyIncome);
         const string rsn = mohos ? (reason + "; mex upgrades pending, no fusion") : reason;
         if (mohos) {
             for (int i = int(opts.length()) - 1; i >= 0; --i)
@@ -643,7 +669,9 @@ namespace EcoPlanner {
         if (s.mIncome < Global::RoleSettings::Tech::EcoTurretMinMetalIncome) return "";
         if (s.mCur < nano.costM * Global::RoleSettings::Tech::EcoTurretBankFraction) return "";
         const float target = TargetBuildPower(s.mIncome, floatingM);
-        if (s.buildPowerNear >= target) return "";
+        const bool tech = !s.air && Global::AISettings::Role == AiRole::TECH;
+        if (!tech ? s.buildPowerNear >= target : !TechEconomyMath::CapacityNeeded(target,
+            s.buildPowerNear, s.arrivingBuildPower, aiEconomyMgr.isEnergyStalling)) return "";
         why = "build power " + int(s.buildPowerNear) + " under " + int(target) + " for +" + int(s.mIncome) + " metal; turret";
         if (floatingM) why = "metal floating at " + int(s.mCur) + ", " + why;
         return "nano";
@@ -790,15 +818,14 @@ namespace EcoPlanner {
         if (key == "mexup") {
             if (MetalEconomy::Active()) return aiEconomyMgr.EnqueueFieldUpgrade(u, Global::Map::StartPos, MetalEconomy::HomeRadius);
             CCircuitDef@ t2mex = ai.GetCircuitDef(UnitHelpers::GetT2MexNameForSide(Global::AISettings::Side));
-            AIFloat3 at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                Global::RoleSettings::MexUpgradeRadius, u, t2mex);
-            if (t2mex is null || at.x < 0.0f) return null;
-            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, t2mex, at, -1));
+            CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, t2mex,
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
         }
         if (key == "t2lab") {
             // The site is the layout's call (D-069): the pair's slot or the
             // footprint the most static build power reaches.
-            return Layout::T2LabTask(300 * SECOND);
+            return Layout::T2LabTask(300 * SECOND,u);
         }
         if (key == "assistenergy") {
             return Builder::EnqueueAssistEnergy(Task::Priority::HIGH, 60 * SECOND, Global::RoleSettings::Tech::EnergyFocusMaxAssists);

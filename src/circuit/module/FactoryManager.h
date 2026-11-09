@@ -174,6 +174,18 @@ public:
 	const std::vector<CRecruitTask*>& GetTasks() const { return factoryTasks; }
     int GetPendingRecruitCount(const CCircuitDef* def) const;
     void RefreshPendingRecruit(CRecruitTask* task);
+	// Owner, 2026-10-26: T3 gantry lag fallback. A lag-repeat factory with no
+	// recruit task (its last task done, the AI's next order not yet in) keeps
+	// building its last product on engine repeat; that unfinished unit is the
+	// factory's "stray", which the next recruit of the same def adopts.
+	CCircuitUnit* TakeLagStray(CCircuitUnit* factory);
+	void AdoptUnfinished(CCircuitUnit* unit, CRecruitTask* task) { unfinishedUnits[unit] = task; }
+	// D-477 (KI-762): drop unit's mapping only if it still names this task; a
+	// recruit task retargeted to another frame must not leave the old one mapped.
+	void ForgetUnfinished(CAllyUnit* unit, const IBuilderTask* task) {
+		const auto it = unfinishedUnits.find(unit);
+		if ((it != unfinishedUnits.end()) && (it->second == task)) unfinishedUnits.erase(it);
+	}
 	bool IsAssistRequired() const { return isAssistRequired; }
 	void ApplySwitchFrame();
 	bool IsSwitchTime();
@@ -231,6 +243,12 @@ private:
 	IUnitTask* CreateAssistTask(CCircuitUnit* unit);
 
 	void Watchdog();
+	// D-472: zero-factory recovery (factory_recovery_seconds; INV-256).
+	bool ReplaceLostFactory(const int frame);
+	void RecoverFactory();
+	float factoryRecoverySeconds = 0.f;
+	bool factoryLost = false;
+	int factoryRecoveryLogNext = 0;
 	void UpdateEnemyReclaim();
 	bool enemyReclaimEnabled = true;
 	int enemyReclaimMisses = 0;
@@ -243,6 +261,7 @@ private:
 
 	std::map<CAllyUnit*, IBuilderTask*> unfinishedUnits;
 	std::vector<CRecruitTask*> factoryTasks;  // order matters
+	std::unordered_map<CCircuitUnit::Id, CCircuitUnit::Id> lagStrays;  // factory -> its repeat-built unit
     DefinitionCounts<CRecruitTask*> pendingRecruits;
 	float metalRequire;
 	float energyRequire;
@@ -261,6 +280,12 @@ private:
 	std::map<CCircuitUnit*, SAssistToFactory> assists;  // nano 1:n factory
 	std::vector<springai::AIFloat3> havens;  // position behind factory
 	std::map<ICoreUnit::Id, CSRepairTask*> repairUnits;
+	// D-477 (KI-762): every unfinishedUnits/repairUnits entry naming task goes,
+	// not only its current target's; logs INV-258 for each stale one found.
+	void EraseTaskMappings(const IUnitTask* task);
+	// D-477: a mapping that names a task already dequeued (dead, not yet freed)
+	// is dropped instead of dequeued again; logs INV-258. True when dropped.
+	template<class Map, class Iter> bool DropDeadMapping(Map& map, Iter it, const char* which);
 
 	CFactoryData* factoryData;
 	struct SAssistant {

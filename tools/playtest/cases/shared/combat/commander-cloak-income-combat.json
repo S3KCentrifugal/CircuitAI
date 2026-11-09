@@ -1,0 +1,88 @@
+{
+  "name": "commander-cloak-income-combat",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "Rich FRONT commander cloaks before contact, reveals for a favourable brawl, and retains D-gun efficacy.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      4000
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    4000,
+    4190,
+    1000
+  ],
+  "photos": [
+    25,
+    35,
+    55
+  ],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "groups": [
+    {
+      "unit": "armcom",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4300,
+        4000
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armeyes",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4500,
+        4250
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armpw",
+      "team": 1,
+      "count": 6,
+      "columns": 2,
+      "spacing": 40,
+      "position": [
+        4300,
+        4260
+      ],
+      "after_seconds": 45
+    },
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 3,
+      "columns": 3,
+      "spacing": 180,
+      "position": [
+        3200,
+        4000
+      ],
+      "after_seconds": 12
+    }
+  ],
+  "assertions": {
+    "min_shooters": 1,
+    "min_kills": 4,
+    "max_losses": 0,
+    "min_damage": 800,
+    "max_first_shot_seconds": 75
+  },
+  "checks": "commander-cloak-income-combat",
+  "storage_scenario": "cmd-cloak-income-combat",
+  "lane_front_probe": true
+}

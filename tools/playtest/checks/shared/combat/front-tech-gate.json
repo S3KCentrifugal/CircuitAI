@@ -1,0 +1,17 @@
+{
+  "stop_minute": 2,
+  "complete_on": {"key":"complete", "pattern":"\\[FrontTechGate\\] complete", "scope":"any"},
+  "completion_grace_seconds": 5,
+  "expect": [
+    {"key":"default", "pattern":"PASS no_plan_default", "scope":"any", "by_minute":1},
+    {"key":"request", "pattern":"PASS request_sent", "scope":"any", "by_minute":1},
+    {"key":"ack", "pattern":"PASS acknowledged_plan_blocks", "scope":"any", "by_minute":1},
+    {"key":"bot", "pattern":"PASS bot_fast_track_blocked", "scope":"any", "by_minute":1},
+    {"key":"vehicle", "pattern":"PASS vehicle_fast_track_blocked", "scope":"any", "by_minute":1},
+    {"key":"switch", "pattern":"PASS native_switch_blocked", "scope":"any", "by_minute":1},
+    {"key":"boundary", "pattern":"PASS exact_40_admitted", "scope":"any", "by_minute":1},
+    {"key":"persistent", "pattern":"PASS permanent_after_sent_and_reload", "scope":"any", "by_minute":1},
+    {"key":"other role", "pattern":"PASS other_role_unchanged", "scope":"any", "by_minute":1}
+  ],
+  "forbid": [{"key":"errors", "pattern":"\\[FrontTechGate\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:", "scope":"any"}]
+}

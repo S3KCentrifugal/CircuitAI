@@ -1,6 +1,7 @@
 #include "module/EconomyManager.h"
 #include "module/BuilderManager.h"
 #include "resource/MetalField.h"
+#include "resource/MetalManager.h"
 #include "setup/SetupManager.h"
 #include "spring/SpringMap.h"
 #include "task/builder/MexTask.h"
@@ -247,6 +248,34 @@ IBuilderTask* CEconomyManager::EnqueueFieldMex(CCircuitUnit* builder, const AIFl
             circuit->GetTeamId(), available, outside, occupied, territory, footprint, unreachable, center.x, center.z);
     }
     return nullptr; // bounded search pending; never a declaration of map exhaustion
+}
+
+IBuilderTask* CEconomyManager::EnqueueMexUpgrade(CCircuitUnit* builder, CCircuitUnit* target)
+{
+    if (!builder || !target || circuit->GetTeamUnit(builder->GetId()) != builder
+        || circuit->GetTeamUnit(target->GetId()) != target
+        || !target->IsFinished() || target->GetCircuitDef()->GetExtractsM() <= 0) return nullptr;
+    auto* mgr = circuit->GetBuilderManager();
+    if (!mgr->CanEnqueueTask(16) || mgr->GetTasks(IBuilderTask::BuildType::MEXUP).size() >= numMexUp) return nullptr;
+    auto pos = target->GetPos(circuit->GetLastFrame());
+    const int spot = metalMap ? metal_field::SiteTagV1 : circuit->GetMetalManager()->FindNearestSpot(pos);
+    if (metalMap) {
+        if (!SyncFieldUnits() || !circuit->GetAllyTeam()->GetMetalClaims().TargetAvailable(target->GetId())) return nullptr;
+    } else {
+        if (spot < 0 || IsUpgradingMexSpot(spot)) return nullptr;
+        const auto site=circuit->GetMetalManager()->GetSpots()[spot].position;
+        if(site.SqDistance2D(pos)>SQUARE(target->GetCircuitDef()->GetExtrRangeM())) return nullptr;
+        pos=site;
+    }
+    for (auto* def : metalDefs.GetBuildDefs(builder->GetCircuitDef())) {
+        if (def->GetExtractsM() <= target->GetCircuitDef()->GetExtractsM()
+            || !def->IsAvailable(circuit->GetLastFrame()) || !CanReachMex(builder,pos)
+            || (!metalMap && !circuit->GetTerrainManager()->CanBeBuiltAt(def,pos))) continue;
+        // Keep the existing claim/replacement task lifecycle on both map types.
+        return mgr->Enqueue(TaskB::Spot(IBuilderTask::BuildType::MEXUP,
+            IBuilderTask::Priority::HIGH,def,pos,spot));
+    }
+    return nullptr;
 }
 
 IBuilderTask* CEconomyManager::EnqueueFieldUpgrade(CCircuitUnit* builder, const AIFloat3& center, float radius)

@@ -9,6 +9,8 @@
 #include "geo_release.as"
 #include "commander_energy.as"
 #include "../world/coverage_lanes.as"
+#include "lolcannon_recon.as"
+#include "engineering_lanes.as"
 
 namespace Team {
     // Return true if the def represents a T2 constructor (land or air)
@@ -49,7 +51,9 @@ namespace Team {
             return;
         }
         if (SeaTech::Handle(msg, fromTeamId)) return;
+        if (LolCannonRecon::Handle(msg, fromTeamId)) return;
         if (Roster::HandleMessage(msg, fromTeamId)) return;
+        if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim
         if (CommanderEnergy::HandleMessage(msg, fromTeamId)) return;
         if (GeoRelease::HandleMessage(msg, fromTeamId)) return;

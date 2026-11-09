@@ -157,6 +157,17 @@ inline Result Resolve(const Inputs& in) {
         if (in.lane >= 0 && in.forward) { out.rule = Rule::FORWARD; out.owner = -1; return out; }
         if (in.lane >= 0) {
             int member = nearest(ground, [&](const Entrant& e) { return e.lane == in.lane && e.laneSpots; });
+            // D-478 (the owner's rule): a lane with no FRONT or SUPPORT seat (the
+            // lane traced from an AIR or TECH start) goes to the nearest FRONT or
+            // SUPPORT seat by walk, not to that seat's AIR/TECH start (played,
+            // Clyde Cells 2026-11-06: lane 8 from the AIR corner was AIR's for
+            // the window and its edge mexes waited); only with no such seat at
+            // all, its own members. A lane no start joined at all keeps the walking
+            // rule below (played, lanes-b17: mid-map corridors with no start became
+            // FRONT territory and commanders chased them).
+            const bool seated = std::any_of(in.entrants.begin(), in.entrants.end(),
+                [&](const Entrant& e) { return e.lane == in.lane; });
+            if (member < 0 && seated) member = nearest(ground, [](const Entrant& e) { return e.laneSpots; });
             if (member < 0) member = nearest(ground, [&](const Entrant& e) { return e.lane == in.lane; });
             if (member >= 0) { out.rule = Rule::LANE; out.owner = member; return out; }
         }

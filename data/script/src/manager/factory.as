@@ -7,6 +7,7 @@
 #include "../helpers/units/unit_helpers.as"
 #include "builder.as"
 #include "../systems/team/ferry.as"
+#include "../systems/production/gantry_fallback.as"
 
 namespace Factory {
 
@@ -129,9 +130,19 @@ namespace Factory {
 		// constructor donations/recovery and spam. Checking only in the TECH
 		// delegate allowed these earlier providers to restart a retired lab.
 		if (Lifecycle::IsRetiring(u)) return null;
+		GantryFallback::Arm(u);   // owner, 2026-10-26: T3 gantries repeat and rally to their edge lane
+        if(Global::AISettings::Role==AiRole::TECH && FrontlineEngineering::active
+            && EngineeringReplacements::BaseEmergency()) return RoleTech::Tech_FactoryAiMakeTask(u);
+        if(Global::AISettings::Role==AiRole::TECH) {
+            IUnitTask@ replacement=EngineeringReplacements::Recruit(u);
+            if(replacement !is null) return replacement;
+        }
         if(Global::AISettings::Role==AiRole::FRONT) {
+            IUnitTask@ support=FrontFactorySupport::Assist(u,true);
+            if(support !is null) return support;
             IUnitTask@ front=CommanderGroup::Recruit(u);
             if(front !is null) return front;
+            if(FrontConstructors::OpeningPending(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
         }
 		IUnitTask@ recovery = Team::Recovery::FactoryMakeTask(u);
 		if (recovery !is null) return recovery;
@@ -144,6 +155,8 @@ namespace Factory {
         IUnitTask@ t = Team::HeavyTransport::FactoryTask(u);
         if (t !is null) return t;
         @t = TechFlank::Produce(u);
+		if (t !is null) return t;
+		@t = LolCannonScouts::Produce(u);   // TECH with no AIR: its lolcannon scout package (owner 2026-10-27)
 		if (t !is null) return t;
 		// Emergency AIR production must reach its role before optional spam.
 		if (AirBaseResponse::Emergency() && (UnitHelpers::IsT1AircraftPlant(u.circuitDef.GetName())
@@ -395,6 +408,7 @@ namespace Factory {
             return;
 		GenericHelpers::LogUtil("Enter FactoryAiUnitRemoved", 4);
 		Spam::OnFactoryRemoved(unit);   // drop the factory spam route
+		GantryFallback::Forget(unit);
 		// Clear lab references when a lab dies
 		if (Factory::primaryT1BotLab is unit){ @Factory::primaryT1BotLab = null; }
 		if (Factory::primaryT2BotLab is unit){ @Factory::primaryT2BotLab = null; }
@@ -618,7 +632,7 @@ namespace Factory {
 	}
 
 	// Choose a factory that still needs nanos by priority: Gantry > T2 > T1
-	CCircuitUnit@ SelectFactoryNeedingNano()
+	CCircuitUnit@ SelectFactoryNeedingNano(int excludeFirst = -1, int excludeSecond = -1)
 	{
 		CCircuitUnit@ best = null;
 		int bestCount = NanoSelectionInitHigh;
@@ -630,6 +644,7 @@ namespace Factory {
 		// Pass 1: Gantries
 		for (uint i = 0; i < keys.length(); ++i) {
 			CCircuitUnit@ f = null; if (!allFactories.get(keys[i], @f) || f is null) continue;
+			if (f.id == excludeFirst || f.id == excludeSecond) continue;
 			const CCircuitDef@ d = f.circuitDef; if (d is null) continue;
 			string n = d.GetName();
 			bool isGantry = UnitHelpers::IsLandGantry(n) || UnitHelpers::IsWaterGantry(n);
@@ -643,6 +658,7 @@ namespace Factory {
 		// Pass 2: T2
 		for (uint i = 0; i < keys.length(); ++i) {
 			CCircuitUnit@ f = null; if (!allFactories.get(keys[i], @f) || f is null) continue;
+			if (f.id == excludeFirst || f.id == excludeSecond) continue;
 			const CCircuitDef@ d = f.circuitDef; if (d is null) continue;
 			string n = d.GetName();
 			bool isT2 = (UnitHelpers::IsT2BotLab(n) || UnitHelpers::IsT2VehicleLab(n) || UnitHelpers::IsT2AircraftPlant(n) || UnitHelpers::IsT2Shipyard(n) || UnitHelpers::IsSeaplanePlatform(n));
@@ -656,6 +672,7 @@ namespace Factory {
 		// Pass 3: T1 and others
 		for (uint i = 0; i < keys.length(); ++i) {
 			CCircuitUnit@ f = null; if (!allFactories.get(keys[i], @f) || f is null) continue;
+			if (f.id == excludeFirst || f.id == excludeSecond) continue;
 			const CCircuitDef@ d = f.circuitDef; if (d is null) continue;
 			int cap = _GetNanoCapacityForFactoryDef(d);
 			int cur = _GetNanoCount(f);

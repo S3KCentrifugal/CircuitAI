@@ -1,0 +1,66 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].*loaded",
+      "scope": "any",
+      "by_minute": 0.5
+    },
+    {
+      "key": "no cloak energy",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=0 still=0 moving=0 energy=0 ",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "visible after income",
+      "pattern": "unit id=\\d+ unit=armcom .*cloak=false",
+      "scope": "any",
+      "after_minute": 0.9,
+      "by_minute": 1.5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "peaceful cloak",
+      "pattern": "unit id=\\d+ unit=armcom .*cloak=true",
+      "scope": "any"
+    },
+    {
+      "key": "peaceful posture cloak",
+      "pattern": "\\[CommanderPosture\\].* cloak=1 ",
+      "scope": "any"
+    },
+    {
+      "key": "peaceful energy retreat",
+      "pattern": "cloak_energy_retreat",
+      "scope": "any"
+    },
+    {
+      "key": "cloak flapping",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=\\d+ .*toggles=([6-9]|\\d\\d)",
+      "scope": "any"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "stop_minute": 2,
+  "complete_on": {"key":"complete", "pattern":"\\[FrontEnergyTest\\] complete", "scope":"any"},
+  "completion_grace_seconds": 5,
+  "expect": [
+    {"key":"energy", "pattern":"PASS all_factions_energy_blocked", "scope":"any", "by_minute":1},
+    {"key":"script", "pattern":"PASS script_afus_blocked", "scope":"any", "by_minute":1},
+    {"key":"metal", "pattern":"PASS metal_blocked", "scope":"any", "by_minute":1},
+    {"key":"fusion", "pattern":"PASS normal_fusion_admitted", "scope":"any", "by_minute":1},
+    {"key":"boundary", "pattern":"PASS both_boundaries_restore_cap", "scope":"any", "by_minute":1},
+    {"key":"drop", "pattern":"PASS income_drop_reblocks", "scope":"any", "by_minute":1},
+    {"key":"map", "pattern":"PASS map_ban_preserved", "scope":"any", "by_minute":1},
+    {"key":"role", "pattern":"PASS role_exit_restores_caps", "scope":"any", "by_minute":1}
+  ],
+  "forbid": [{"key":"errors", "pattern":"\\[FrontEnergyTest\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:", "scope":"any"}]
+}

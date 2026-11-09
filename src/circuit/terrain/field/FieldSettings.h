@@ -17,6 +17,8 @@ namespace Json { class Value; }
 
 namespace circuit::field {
 
+void ReadTerrainSettings(const Json::Value& root, SSettings& settings);
+
 // `root` is the merged profile config (the object that holds "field").
 // Absent keys keep the SMarkSettings defaults; factory ids and the "second"
 // texts have no default in C++ (policy lives in JSON).

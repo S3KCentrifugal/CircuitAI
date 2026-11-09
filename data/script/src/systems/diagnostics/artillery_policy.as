@@ -3,18 +3,31 @@
 namespace ArtilleryPolicy {
     const array<string> ForbiddenT1 = {"armguard", "corpun", "legcluster"};
     const array<string> SuperCannons = {"armvulc", "corbuzz", "legstarfall"};
+    const string INVARIANT = "INV-069";
     dictionary celebrated;
     int lastCheckWarning = -100000;
 
-    void Check()
+    // INV-069: the profile veto stays on every T1 static artillery definition
+    // (D-142); D-495: only the FRONT commander group's gated tactical queue goes
+    // past it, so a non-FRONT AI never frames one, and FRONT frames one at a time.
+    // front: this AI plays FRONT (the legacy profiles have no roles: false).
+    void Check(bool front = false)
     {
+        if (ai.frame - lastCheckWarning < 60 * SECOND) return;
+        int framed = 0;
         for (uint i = 0; i < ForbiddenT1.length(); ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(ForbiddenT1[i]);
-            if (d !is null && d.IsBuildAllowed() && ai.frame - lastCheckWarning >= 60 * SECOND) {
+            if (d is null) continue;
+            if (d.IsBuildAllowed()) {
                 lastCheckWarning = ai.frame;
-                const string invariant = "INV-069";
-                AiLog("[INVARIANT] " + invariant + " T1 static artillery construction veto missing: " + ForbiddenT1[i]);
+                AiLog("[INVARIANT] " + INVARIANT + " T1 static artillery construction veto missing: " + ForbiddenT1[i]);
             }
+            framed += aiBuilderMgr.GetUnfinishedCount(d);
+        }
+        if (framed > (front ? 1 : 0)) {
+            lastCheckWarning = ai.frame;
+            AiLog("[INVARIANT] " + INVARIANT + " " + framed + " T1 static artillery frames for a "
+                + (front ? "FRONT AI (one tactical job at a time)" : "non-FRONT AI (D-495)"));
         }
     }
 

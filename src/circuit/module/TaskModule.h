@@ -11,6 +11,7 @@
 #include "module/Module.h"
 
 #include <vector>
+#include "AIFloat3.h"
 
 namespace circuit {
 
@@ -43,7 +44,11 @@ public:
 	// else. No-op unless the module tracks that (CBuilderManager does).
 	virtual void DiscardUnusedTask(IUnitTask* task) {}
 	void AbortTask(IUnitTask* task);
-	void DoneTask(IUnitTask* task) { DequeueTask(task, true); }
+    IUnitTask* EnqueueGroupFollow(int target,float radius,bool guard,const springai::AIFloat3& goal);
+	// D-477: both route to the task's own manager, whose DequeueTask keeps its
+	// bookkeeping (a factory task finished through the builder manager left
+	// the factory's maps naming it after it was freed: KI-762).
+	void DoneTask(IUnitTask* task);
 
 public:
 	// script hooks

@@ -37,6 +37,8 @@
 #include "Feature.h"
 #include "Log.h"
 
+#include <algorithm>
+
 namespace circuit {
 namespace {
 constexpr float POKE_MIN_IN_RANGE = 0.f;
@@ -50,6 +52,8 @@ constexpr float POKE_MIN_HEALTH = 0.f;
 constexpr float POKE_MAX_HEALTH = 1.f;
 constexpr float POKE_MIN_PAUSE_SECONDS = 0.f;
 constexpr float POKE_MAX_PAUSE_SECONDS = 60.f;
+// D-472: at most one INV-256 line every 30 s.
+constexpr int FACTORY_INVARIANT_LOG_FRAMES = 30 * FRAMES_PER_SEC;
 }
 
 using namespace springai;
@@ -385,6 +389,8 @@ void CFactoryManager::ReadConfig()
 {
 	const Json::Value& root = circuit->GetSetupManager()->GetConfig();
 	enemyReclaimEnabled = root["economy"].get("turret_enemy_reclaim", true).asBool();
+	// D-472: seconds between replacement asks while every factory is gone (0: off).
+	factoryRecoverySeconds = std::clamp(root["economy"].get("factory_recovery_seconds", 0.f).asFloat(), 0.f, 600.f);
 	const std::string& cfgName = circuit->GetSetupManager()->GetConfigName();
 
 	CMaskHandler& sideMasker = circuit->GetGameAttribute()->GetSideMasker();
@@ -530,11 +536,25 @@ void CFactoryManager::ReadConfig()
 			boolean("prefer_screen", policy.preferScreen);
 			boolean("allow_radar", policy.allowRadar);
 			boolean("advance_unknown_radar", policy.advanceUnknownRadar);
+			boolean("low_trajectory", policy.lowTrajectory);
 			boolean("hold_fireline", policy.holdFireline);
 			boolean("stage_when_blocked", policy.stageWhenBlocked);
 			boolean("fire_at_will", policy.fireAtWill);
             boolean("fire_in_range", policy.fireInRange);
             boolean("commander_focus", policy.commanderFocus);
+			number("spam_max_cost", policy.spamMaxCost, 0.f, 2000.f);
+			{
+				// Owner 2026-10-27: an explicit spam roster. A name this game
+				// does not have is logged and skipped, not a malformed policy.
+				const auto& spam = settings["spam_units"];
+				if (!spam.isNull() && !spam.isArray()) valid = false;
+				else for (const auto& name : spam) {
+					if (!name.isString()) { valid = false; continue; }
+					CCircuitDef* spamDef = circuit->GetCircuitDef(name.asCString());
+					if (spamDef == nullptr) circuit->LOG("CONFIG %s: %s spam_units has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
+					else policy.spamDefs.insert(spamDef->GetId());
+				}
+			}
             number("commander_priority", policy.commanderPriority, 1.f, 100.f);
 			boolean("coordinated", policy.coordinated);
             // Fireline holding is an individual forward-arc doctrine. Reject
@@ -650,6 +670,12 @@ void CFactoryManager::ReadConfig()
             if (targetCost.isNumeric() && std::isfinite(targetCost.asFloat()) && targetCost.asFloat() >= 0.f)
                 cdef->SetTargetMinCost(targetCost.asFloat());
             else circuit->LOG("CONFIG %s: %s invalid target_min_cost", cfgName.c_str(), defName.c_str());
+        }
+        const auto& prioTech = behaviour["priority_min_tech"];
+        if (!prioTech.isNull()) {
+            if (prioTech.isNumeric() && std::isfinite(prioTech.asFloat()) && prioTech.asFloat() >= 0.f && prioTech.asFloat() <= 3.f)
+                cdef->SetPriorityMinTech(prioTech.asFloat());
+            else circuit->LOG("CONFIG %s: %s invalid priority_min_tech", cfgName.c_str(), defName.c_str());
         }
 
 		const Json::Value& reload = behaviour["reload"];
@@ -949,6 +975,11 @@ void CFactoryManager::InitFactory()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::UpdateEnemyReclaim, this),
 				FRAMES_PER_SEC / 2, circuit->GetSkirmishAIId() % (FRAMES_PER_SEC / 2));
 
+		if (factoryRecoverySeconds > 0.f) {  // D-472
+			const int recovery = std::max(1, int(factoryRecoverySeconds * FRAMES_PER_SEC));
+			scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::RecoverFactory, this),
+					recovery, circuit->GetSkirmishAIId() % recovery);
+		}
 		scheduler->RunJobEvery(CScheduler::GameJob(&CFactoryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
 								circuit->GetSkirmishAIId() * WATCHDOG_COUNT + 11);
@@ -983,6 +1014,11 @@ int CFactoryManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 
 	IUnitTask* task = builder->GetTask();
 	if ((task == nullptr) || (task->GetType() != IUnitTask::Type::FACTORY)) {
+		// Owner, 2026-10-26: the gantry's engine repeat started its last product again
+		// before the AI's next order arrived; the next recruit may adopt it
+		if (builder->IsLagRepeat() && unit->GetUnit()->IsBeingBuilt()) {
+			lagStrays[builder->GetId()] = unit->GetId();
+		}
 		return 0; //signaling: OK
 	}
 
@@ -991,6 +1027,11 @@ int CFactoryManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 		if (taskR->GetTarget() == nullptr) {
 			taskR->SetTarget(unit);
 			unfinishedUnits[unit] = taskR;
+			// Lag fallback: from now the engine repeats this product until the AI's next order
+			if (builder->IsLagRepeat() && !taskR->IsRepeat()) {
+				lagStrays.erase(builder->GetId());
+				TRY_UNIT(circuit, builder, builder->GetUnit()->SetRepeat(true);)
+			}
 		}
 	}
 
@@ -1000,6 +1041,9 @@ int CFactoryManager::UnitCreated(CCircuitUnit* unit, CCircuitUnit* builder)
 int CFactoryManager::UnitFinished(CCircuitUnit* unit)
 {
 	auto iter = unfinishedUnits.find(unit);
+	if ((iter != unfinishedUnits.end()) && DropDeadMapping(unfinishedUnits, iter, "recruit")) {
+		iter = unfinishedUnits.end();
+	}
 	if (iter != unfinishedUnits.end()) {
 		CRecruitTask* task = static_cast<CRecruitTask*>(iter->second);
 		if (task->IsRepeat()) {
@@ -1037,7 +1081,7 @@ int CFactoryManager::UnitFinished(CCircuitUnit* unit)
 		}
 	}
 	auto itre = repairUnits.find(unit->GetId());
-	if (itre != repairUnits.end()) {
+	if ((itre != repairUnits.end()) && !DropDeadMapping(repairUnits, itre, "repair")) {
 		DoneTask(itre->second);
 	}
 
@@ -1084,12 +1128,13 @@ int CFactoryManager::UnitIdle(CCircuitUnit* unit)
 
 int CFactoryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	lagStrays.erase(unit->GetId());
 	auto iter = unfinishedUnits.find(unit);
-	if (iter != unfinishedUnits.end()) {
+	if ((iter != unfinishedUnits.end()) && !DropDeadMapping(unfinishedUnits, iter, "recruit")) {
 		AbortTask(iter->second);
 	}
 	auto itre = repairUnits.find(unit->GetId());
-	if (itre != repairUnits.end()) {
+	if ((itre != repairUnits.end()) && !DropDeadMapping(repairUnits, itre, "repair")) {
 		AbortTask(itre->second);
 	}
 
@@ -1112,6 +1157,20 @@ int CFactoryManager::GetPendingRecruitCount(const CCircuitDef* def) const
         if (count != indexed) circuit->LOG("[INVARIANT] INV-175 recruit index=%i scan=%i", indexed, count);
     }
     return indexed;
+}
+
+CCircuitUnit* CFactoryManager::TakeLagStray(CCircuitUnit* factory)
+{
+	auto it = lagStrays.find(factory->GetId());
+	if (it == lagStrays.end()) return nullptr;
+	const CCircuitUnit::Id id = it->second;
+	lagStrays.erase(it);
+	CCircuitUnit* stray = circuit->GetTeamUnit(id);
+	// ids are reused: the unit must still be this factory's unfinished product
+	if (stray == nullptr || stray->IsDead() || stray->IsFinished()
+		|| stray->GetProducerId() != factory->GetId()) return nullptr;
+	if (unfinishedUnits.find(stray) != unfinishedUnits.end()) return nullptr;
+	return stray;
 }
 
 void CFactoryManager::RefreshPendingRecruit(CRecruitTask* task)
@@ -1176,9 +1235,11 @@ void CFactoryManager::DequeueTask(IUnitTask* task, bool done)
 						factoryTasks.erase(it);
 					}
 					unfinishedUnits.erase(static_cast<CRecruitTask*>(task)->GetTarget());
+					EraseTaskMappings(task);  // D-477: and every other entry naming it
 				} break;
 				case IBuilderTask::BuildType::REPAIR: {
 					repairUnits.erase(static_cast<CSRepairTask*>(task)->GetTargetId());
+					EraseTaskMappings(task);  // D-477
 				} break;
 				default: break;  // RECLAIM
 			}
@@ -1186,6 +1247,47 @@ void CFactoryManager::DequeueTask(IUnitTask* task, bool done)
 		default: break;
 	}  // WAIT
 	ITaskModule::DequeueTask(task, done);
+}
+
+/*
+ * D-477 (KI-762, the owner's game on queues-b11): UnitFinished dequeued a
+ * factory task that had already been freed. unfinishedUnits and repairUnits
+ * were erased by the task's current target only, so a task retargeted while
+ * mapped left its old entry naming it after it was freed. Every entry that
+ * names a dequeued task is erased here, as D-108 does for CBuilderManager.
+ * O(entries) at dequeue only (tens of entries); no per-frame work.
+ */
+void CFactoryManager::EraseTaskMappings(const IUnitTask* task)
+{
+	for (auto it = unfinishedUnits.begin(); it != unfinishedUnits.end();) {
+		if (it->second == task) {
+			// The key is not dereferenced: a stale entry's unit may be gone too.
+			circuit->LOG("[INVARIANT] INV-258 factory task still mapped to a unit other than its target (recruit)");
+			it = unfinishedUnits.erase(it);
+		} else {
+			++it;
+		}
+	}
+	for (auto it = repairUnits.begin(); it != repairUnits.end();) {
+		if (it->second == task) {
+			circuit->LOG("[INVARIANT] INV-258 factory task still mapped to a unit other than its target (repair) unit=%i",
+					it->first);
+			it = repairUnits.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+template<class Map, class Iter>
+bool CFactoryManager::DropDeadMapping(Map& map, Iter it, const char* which)
+{
+	if (!it->second->IsDead()) {
+		return false;
+	}
+	circuit->LOG("[INVARIANT] INV-258 factory %s mapping names a dequeued task; dropped", which);
+	map.erase(it);
+	return true;
 }
 
 void CFactoryManager::ApplySwitchFrame()
@@ -1613,6 +1715,7 @@ void CFactoryManager::EnableFactory(CCircuitUnit* unit)
 		circuit->GetSetupManager()->SetBasePos(pos);
 		circuit->GetMilitaryManager()->MakeBaseDefence(pos);
 	}
+	factoryLost = false;  // D-472
 
 	auto it = factoryDefs.find(unit->GetCircuitDef()->GetId());
 	if (it != factoryDefs.end()) {
@@ -1644,53 +1747,9 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 		AbortTask(task);
 	}
 
-	auto checkBuilderFactory = [this](const int frame) {
-		CBuilderManager* builderMgr = this->circuit->GetBuilderManager();
-		// check if any factory with builders left
-		bool hasBuilder = false;
-		for (SFactory& fac : factories) {
-			if ((fac.builder != nullptr) && fac.builder->IsAvailable(frame)) {
-				hasBuilder = true;
-				break;
-			}
-		}
-		if (!hasBuilder) {
-			// check queued factories
-			std::set<IBuilderTask*> tasks = builderMgr->GetTasks(IBuilderTask::BuildType::FACTORY);
-			for (IBuilderTask* task : tasks) {
-				auto it = factoryDefs.find(task->GetBuildDef()->GetId());
-				if (it != factoryDefs.end()) {
-					const SFactoryDef& facDef = it->second;
-					CCircuitDef* bdef = GetFacRoleDef(ROLE_TYPE(BUILDER), facDef);
-					hasBuilder = ((bdef != nullptr) && bdef->IsAvailable(frame));
-					if (hasBuilder) {
-						break;
-					} else if (task->GetTarget() == nullptr) {
-						builderMgr->AbortTask(task);
-					}
-				}
-			}
-			if (!hasBuilder) {
-				// queue new factory with builder
-				CCircuitDef* facDef = GetFactoryToBuild(-RgtVector, true, true);
-				if (facDef != nullptr) {
-					// D-101: the role reserved the site (the layout, while a turret stands):
-					// the task goes there, pinned (played: unpinned, native's own search
-					// reserved a footprint beside the old lab and built there)
-					CTerrainManager* terrainMgr = circuit->GetTerrainManager();
-					const int slot = terrainMgr->TakeResetFactorySlot();
-					const AIFloat3 at = (slot >= 0) ? terrainMgr->GetReservationPos(slot) : -RgtVector;
-					IBuilderTask* task = builderMgr->Enqueue(TaskB::Factory(IBuilderTask::Priority::NOW, facDef, at, GetRepresenter(facDef)));
-					if ((slot >= 0) && (task != nullptr) && !task->PinReservation(slot)) {
-						circuit->LOG("RESERVE: replacement %s could not be pinned to slot %i", facDef->GetDef()->GetName(), slot);
-					}
-				}
-			}
-		}
-	};
 
 	if (unit->GetTask()->GetType() == IUnitTask::Type::NIL) {
-		checkBuilderFactory(circuit->GetLastFrame());
+		ReplaceLostFactory(circuit->GetLastFrame());
 		return;
 	}
 
@@ -1751,7 +1810,81 @@ void CFactoryManager::DisableFactory(CCircuitUnit* unit)
 		validAir.erase(unit);
 	}
 
-	checkBuilderFactory(circuit->GetLastFrame());
+	ReplaceLostFactory(circuit->GetLastFrame());
+	factoryLost = factories.empty();  // D-472: RecoverFactory asks again
+}
+
+// When no factory with a builder stands and none is queued, ask the role for
+// a replacement (isReset) and queue it at NOW priority. Returns true when the
+// role named a factory but no task could be queued (INV-256).
+bool CFactoryManager::ReplaceLostFactory(const int frame)
+{
+	bool named = false;
+	IBuilderTask* queued = nullptr;
+	CBuilderManager* builderMgr = this->circuit->GetBuilderManager();
+	// check if any factory with builders left
+	bool hasBuilder = false;
+	for (SFactory& fac : factories) {
+		if ((fac.builder != nullptr) && fac.builder->IsAvailable(frame)) {
+			hasBuilder = true;
+			break;
+		}
+	}
+	if (!hasBuilder) {
+		// check queued factories
+		std::set<IBuilderTask*> tasks = builderMgr->GetTasks(IBuilderTask::BuildType::FACTORY);
+		for (IBuilderTask* task : tasks) {
+			auto it = factoryDefs.find(task->GetBuildDef()->GetId());
+			if (it != factoryDefs.end()) {
+				const SFactoryDef& facDef = it->second;
+				CCircuitDef* bdef = GetFacRoleDef(ROLE_TYPE(BUILDER), facDef);
+				hasBuilder = ((bdef != nullptr) && bdef->IsAvailable(frame));
+				if (hasBuilder) {
+					break;
+				} else if (task->GetTarget() == nullptr) {
+					builderMgr->AbortTask(task);
+				}
+			}
+		}
+		if (!hasBuilder) {
+			// queue new factory with builder
+			CCircuitDef* facDef = GetFactoryToBuild(-RgtVector, true, true);
+			if (facDef != nullptr) {
+				named = true;
+				// D-101: the role reserved the site (the layout, while a turret stands):
+				// the task goes there, pinned (played: unpinned, native's own search
+				// reserved a footprint beside the old lab and built there)
+				CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+				const int slot = terrainMgr->TakeResetFactorySlot();
+				const AIFloat3 at = (slot >= 0) ? terrainMgr->GetReservationPos(slot) : -RgtVector;
+				queued = builderMgr->Enqueue(TaskB::Factory(IBuilderTask::Priority::NOW, facDef, at, GetRepresenter(facDef)));
+				if ((slot >= 0) && (queued != nullptr) && !queued->PinReservation(slot)) {
+					circuit->LOG("RESERVE: replacement %s could not be pinned to slot %i", facDef->GetDef()->GetName(), slot);
+				}
+			}
+		}
+	}
+	return named && (queued == nullptr);
+}
+
+// D-472: DisableFactory queued one replacement when the last factory died and
+// nothing asked again; the task expires after its assign timeout (300 s) or
+// aborts on a threatened site, and experimental-build roles have no native
+// factory job (EconomyManager::StartFactoryJob). Played: a base was destroyed
+// and the AI never rebuilt it. While every factory is gone this job asks the
+// role again every factory_recovery_seconds; the role still chooses (or says
+// "none"). Cost: one factory scan and one FACTORY task-set lookup per run, a
+// script call only when nothing is queued; nothing while a factory stands.
+void CFactoryManager::RecoverFactory()
+{
+	if (!factoryLost || !factories.empty()) {
+		return;
+	}
+	const int frame = circuit->GetLastFrame();
+	if (ReplaceLostFactory(frame) && (frame >= factoryRecoveryLogNext)) {
+		factoryRecoveryLogNext = frame + FACTORY_INVARIANT_LOG_FRAMES;
+		circuit->LOG("[INVARIANT] INV-256 no factory stands and the role names one, but no factory task could be queued");
+	}
 }
 
 IUnitTask* CFactoryManager::DefaultMakeTask(CCircuitUnit* unit)

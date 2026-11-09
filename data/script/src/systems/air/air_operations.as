@@ -34,7 +34,7 @@ namespace AirOperations {
     }
     bool CanEscort(CCircuitUnit@ u) {
         return u !is null && u.GetBuildProgress() >= 1.0f && AirScreen::IsFighter(u.circuitDef)
-            && !Committed(u.id) && (u.task is null || (u.task.GetType() != int(Task::Type::PLAYER)
+            && !Committed(u.id) && !AirScoutSweep::Flying(u.id) && (u.task is null || (u.task.GetType() != int(Task::Type::PLAYER)
                 && u.task.GetType() != int(Task::Type::RETREAT) && !u.task.IsExternalControlled()));
     }
     float AvailableFighters(bool value = false) {

@@ -4,6 +4,40 @@
 // D-296: non-spam land scouts raid the enemy backline (systems/combat/scout_raid.as).
 // Read once per AI by ScoutRaid::Active(); absent or false keeps native scouting.
 "scout_raid": {"enabled": true},
+// D-388 / D-389: unit controllers (unit-controller-architecture.md). A preset names
+// its controller "type" and that controller's levers; "extends" inherits another
+// preset. "roles" gives every type of a role a default preset; a unit's own
+// "controller" key below wins. Script SetCommanderCombatOption values (commander.json
+// combat block) still override these per AI. Lever table: CommanderController.cpp.
+"controllers": {
+	"presets": {
+		"commander": {
+			"type": "commander",
+			// D-389 cloak posture (commander-cloak-policy.md section 4)
+			"cloak_posture": 1, "threat_radius": 1500, "threat_horizon": 4,
+			"outrange_margin": 50, "outrange_dps": 120, "artillery_dps": 60, "artillery_range": 600,
+			"withdraw_seconds": 6, "escape_cloak_seconds": 3, "brawl_margin": 1.5, "dgun_kills": 2,
+			"ambush_seconds": 20, "withdraw_cloak_seconds": 10,
+			"threat_memory_seconds": 60, "threat_memory_cap": 600,
+			"front_cloak_income": 2000, "cloak_budget": 0.15, "cloak_still_seconds": 10, "posture_period": 30, "cloak_log": 1,
+			"blip_dps": 60, "blip_range": 450
+		},
+		// D-493: static artillery fire control (control/unit/artillery/). Every gun aims,
+		// once per aim_period, at an enemy construction turret or resurrection bot in range,
+		// then a heavy unit (heavy role or heavy_cost metal) within heavy_share of its range,
+		// then the known enemy structure with the longest range until it is dead; else the
+		// engine targets. Pop-up guns are armoured only while closed: under fire they cannot
+		// answer they drop a structure aim and close for close_seconds.
+		"artillery_battery": {
+			"type": "artillery",
+			"aim_period": 1, "reissue_seconds": 15, "order_seconds": 60,
+			"heavy_cost": 600, "heavy_share": 0.5, "close_under_fire": 0, "log": 1
+		},
+		"artillery_popup": {"extends": "artillery_battery", "close_under_fire": 1, "close_seconds": 6, "hit_seconds": 2},
+		"artillery_fortified": {"extends": "artillery_battery"}
+	},
+	"roles": {"commander": "commander"}
+},
 		// Native base-layout mechanism is permitted for this profile; TECH must
 		// also opt its own AI instance in. Other roles retain normal placement.
 		"layout": {
@@ -151,6 +185,116 @@
 			"top_candidates": 3,    // aim at the nearest of the N most valuable uncovered squads
 			"rebalance": true       // release the surplus when two escorted squads merge
 		},
+		// D-352 commander snipe. A scouted enemy commander (in LOS, or its radar
+		// dot once cloaked) inside weapon range becomes the unit's Set Target, so
+		// it is shot before it can close to D-gun range. The unit keeps its move
+		// and other orders; only the weapon target changes. "units" always take
+		// part; "min_tech" adds every armed mobile def at that BAR techlevel.
+		"commander_snipe": {
+			"enabled": true,
+			"units": ["armfboy", "corsumo", "leginc", "corgol", "legaheattank"],  // Fatboy, Mammoth, Incinerator, Tzar, Prometheus
+			"min_tech": 3,          // every T3 (0: listed units only)
+			"air": false,           // T3 aircraft keep their own targeting
+			"interval": 15,         // frames between scans
+			"acquire_margin": 64,   // lock when within weapon range + this
+			"release_margin": 200   // keep the lock while within weapon range + this
+		},
+		// Owner 2026-11-01: rocket artillery shoots parked enemy commanders. These units
+		// only ever ordered structures, so a human's commander standing still in range
+		// was ignored. An enemy commander inside weapon range moving at most max_speed
+		// (elmos/s; a walking commander is ~37) is now their first target, ahead of
+		// buildings; once it walks off they go back to structures.
+		"artillery_commander": {
+			"enabled": true,
+			"units": ["armmerl", "corvroc", "legavroc",   // Ambassador, Negotiator, Boreas
+				"corhrk", "leghrk",                       // Arbiter, Thanatos (T2 rocket bots)
+				"armmship", "cormship",                   // Longbow, Messenger (rocket ships)
+				"cortrem"],                               // Tremor (owner 2026-11-07: Ambassador rules)
+			"max_speed": 12,
+			// Owner 2026-11-01: next after a slow commander (and before any building), these
+			// heavy units in range when moving at most heavy_speed_fraction of their own top
+			// speed: Incinerator, Fatboy, Tzar, Starlight, Razorback, Mammoth, Demon, Prometheus
+			// (the heat-ray tank; leghack, the combat engineer, shares the name).
+			// Owner 2026-11-03: + Tremor (cortrem). Since then these priorities also hold in FRONT squad routes and
+			// during an artillery snipe (DLL ArtyPriorityStep), not only in the native artillery task.
+			"heavy_units": ["leginc", "armfboy", "corgol", "armmanni",
+				"armraz", "corsumo", "cordemon", "legaheattank", "cortrem"],
+			"heavy_speed_fraction": 0.25,
+			"heavy_max_speed": 12,   // owner 2026-11-01: no heavy-unit limit above 12 elmos/s
+			// Owner 2026-11-02: these fire on a ghost image (last-seen, out of radar and LOS) of enemy porc, building
+			// radars/jammers or shields already in weapon range when nothing else is to shoot and they have not fired
+			// for ghost_idle_seconds. They never move toward a ghost.
+			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
+			"ghost_idle_seconds": 20,   // owner 2026-11-04: 20 s idle
+			// Owner 2026-11-04 16:58Z: target lock. A unit keeps the identified (LOS or radar) enemy it shoots until it
+			// dies; within weapon range + lock_margin (radar error) it holds and re-attacks, a structure farther out only
+			// gets a step in to range - lock_step_in (no forward path, no route resume). Only commander / heavy priority
+			// breaks a lock, which resumes after. lock_mobiles false: structures, commanders and heavies only.
+			"lock": true,
+			"lock_mobiles": false,
+			"lock_margin": 150,
+			"lock_step_in": 100,
+			// Owner 2026-11-04 20:03Z: after the normal pick and before the idle ghost volley, an unidentified radar dot
+			// (type unknown) in weapon range is fired on until dead ("better safe than sorry"): nearest first, attacked by
+			// its unit handle, dropped when it dies, is identified (normal rules then), leaves radar or leaves range +
+			// lock_margin. Never walked toward; airborne dots and (for non-water weapons) underwater dots are skipped.
+			"radar_dots": true
+		},
+		// Owner 2026-11-03: Thanatos, Arbiter, Boreas, Negotiator and Ambassador were being lost to Persecutors,
+		// Rattlesnakes and Eviscerators (reach 1380-1390, theirs 1200-1310). Before going into the reach of one of
+		// these "threats" (seen, radar dot or ghost image), the unit 1) attacks seen / radar "porc" near it that can be
+		// hit from outside every threat's reach (+threat_margin), from 99% range until dead, 2) fires
+		// `volleys` at ghost images of that porc, same rule, 3) closes to snipe_range_fraction of its own range and
+		// fires `volleys` at the threat, 4) if it is live (radar/LOS now), until dead; ghost again: `volleys` more. Then its ordinary
+		// controller has it back, and that threat is left alone by this unit for repeat_seconds.
+		// Owner 01:43Z: seen porc is shot until dead, unless a slow commander or slow heavy unit (artillery_commander
+		// rules) is in current weapon range: that comes first, and the sequence waits.
+		// "direct_threats" (owner 01:36Z: Pulsar, Bulwark, Bastion) skip steps 1-2: attacked from
+		// snipe_range_fraction before going into their reach, seen ones until dead, ghosts as in 3-4. DLL feature.
+		"artillery_snipe": {
+			"enabled": true,
+			"units": ["leghrk", "corhrk", "legavroc", "corvroc", "armmerl"],   // Thanatos, Arbiter, Boreas, Negotiator, Ambassador
+			// Test 2026-11-03: Pulsar (1400) outranges all five, so as a direct threat they walked into it one by one;
+			// it gets the Persecutor treatment (prep porc, gather, go in together, from 99% range).
+			// Order matters: a threat whose snipe spot is outside every other threat's reach goes first, else the earliest here.
+			"threats": ["cortoast", "armamb", "legacluster", "armanni"],        // Persecutor, Rattlesnake, Eviscerator, Pulsar
+			"direct_threats": ["cordoom", "legbastion"],                        // Bulwark, Bastion
+			"porc": ["armanni", "cordoom", "legbastion",          // Pulsar, Bulwark, Bastion
+				"armhlt", "corhlt", "corhllt", "armbeamer", "legmg",   // Overwatch, Warden, Twin Guard, Beamer, Cacophony
+				"armflak", "corflak", "legflak",                   // Arbalest, Birdshot, Pluto (T2 flak)
+				"legrhapsis", "leglupara", "armcir", "corerad", "armferret", "cormadsam",  // Rhapsis, Lupara, Chainsaw, Eradicator, Ferret, SAM
+				"legdtr", "armclaw", "cormaw",                     // Dragon's Jaw, Claw, Maw
+				"legapopupdef", "armpb", "corvipe",                // Chimera, Pit Bull, Scorpion
+				"armguard", "corpun", "legcluster",                // Gauntlet, Agitator, Amputator
+				"legbombard", "leghive", "cormexp",                // Bombardier, Hive, Advanced Exploiter
+				"armkraken", "corfdoom", "armfhlt", "corfhlt"],    // naval: Gorgon, Devastator, Manta, Coral
+			"avoid_other_porc": true,     // prep firing spots also outside other armed porc's reach (the target excepted)
+			"threat_margin": 100,         // elmos past a structure's weapon range that still counts as inside (250 left 1200-range units no prep spot)
+			"trigger_distance": 0,        // owner 2026-11-04: trigger at reach (weapon range + threat_margin) only; was 700
+			"porc_radius": 1600,          // prep porc within this of the threat
+			"prep_range_fraction": 0.99,  // prep firing spots at this fraction of own range
+			"snipe_range_fraction": 0.99,
+			"ghost_volleys_other": 1,     // owner 2026-11-04: blind volleys per unit at a ghost that is not a heavy (heavies: volleys)
+			// 2026-11-06: Ambassador / Negotiator / Boreas hit by spam (T1/T2 mobiles that are not heavy units, or unknown
+			// attackers) back off spam_retreat_distance (lowest-threat of away / +-45 / toward base); normal steps resume
+			// once at the point with spam_retreat_quiet_seconds without damage.
+			"spam_retreat": true,
+			"spam_retreat_distance": 500,
+			"spam_retreat_quiet_seconds": 4,
+			"volleys": 3,
+			"visible_max_volleys": 0,     // owner 01:43Z: seen porc until dead (0 = no cap)
+			"confirm_delay_seconds": 3,   // after the 3rd volley, before checking radar/LOS
+			"repeat_seconds": 60,
+			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
+			"group_wait_seconds": 240,    // ... and go in together when all on that threat are there (settled 10 s); past this,
+			"min_group": 3,               // with min_group gathered; fewer: the threat is given up for repeat_seconds
+			"recruit_radius": 1200,       // owner 2026-11-04 15:23Z: from the first trigger on (and at the go-in), Boreas/Negotiator/Ambassador this close to the gather point (or a gathered member) join, FRONT squads included
+			"double_heavy_overlap": 0.5,   // owner 2026-11-03: weapon-range half-discs of the aimed heavy and another (facing the hold point) sharing more than this of the smaller: go in only with 3+ gathered, together
+			"close_in_min_range": 1290,   // owner option 2026-11-03: below this range (Thanatos 1200, Arbiter 1210) prep porc
+			                              // only, no close-in on a threat that outranges the snipe spot
+			"group_settle_seconds": 10,
+			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
+		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
 		// base radius: ai checks if is withing base_rad. if there is enemy it checks if it is withing comm radius which is variable and depend on distance from base
 		// if there is, then ai checks speed, direction and threat on enemys position. if all conditions positive => com attacks
@@ -182,9 +326,11 @@
 //########################################################################################################################
 
 		"behaviour": {
+			"armdecom": {"role": ["builder"], "attribute": ["commander"], "controller": "commander"},
 	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 			"armcom": {
 				"role": ["builder"],
+				"controller": "commander",
 				"attribute": ["commander"],
 				"build_speed": 5.0,
 				"retreat": 0.6,
@@ -192,6 +338,7 @@
 			},
 			"corcom": {
 				"role": ["builder"],
+				"controller": "commander",
 				"attribute": ["commander"],
 				"build_speed": 5.0,
 				"retreat": 0.6,
@@ -643,6 +790,7 @@
 				"power": 1.0
 			},
 			"armguard": {
+				"controller": "artillery_battery",
 				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
@@ -703,6 +851,7 @@
 				"power": 1.0
 			},
 			"armamb": {
+				"controller": "artillery_popup",
 				"role": ["static", "anti_nuke"],
 				"on": false,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -849,6 +998,7 @@
 				"power": 1.0
 			},
 			"corpun": {
+				"controller": "artillery_battery",
 				"build": false, // never construct T1 static artillery
 				"role": ["static"],
 				"on": false,
@@ -905,6 +1055,7 @@
 				"power": 1.0
 			},
 			"cortoast": {
+				"controller": "artillery_popup",
 				"role": ["static"],
 				"on": false,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -916,6 +1067,7 @@
 				"power": 1.0
 			},
 			"corbhmth" : {
+				"controller": "artillery_fortified",
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1408,9 +1560,10 @@
 			// t1 botlab
 	
 			"armpw": {
-				"role": ["raider", "spam", "anti_spam"],
-				"attribute": ["scout", "rare", "spam"],
-				"ignore": true,
+				"role": ["raider", "skirmish", "spam", "anti_spam"],
+				"attribute": ["rare", "spam"],
+				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
+				"power": 1.0,
 				"retreat": 0
 			},
 			"armrectr": {
@@ -1541,7 +1694,7 @@
 			"armsnipe": {
 				"role": ["anti_heavy"],
 				"attribute": ["ranged", "ret_hold"],
-				"ranged": {"target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true},
+				"ranged": {"commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true},
 				"retreat": 0.95,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1580,6 +1733,7 @@
 				"power": 1.0
 			},
 			"armvang": { //vanguard
+				"priority_min_tech": 2,   // owner 2026-11-07: structures, commanders and T2/T3 units before any T1 unit
 				"role": ["artillery", "heavy"],
 				"attribute": ["siege"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
@@ -1671,7 +1825,7 @@
 			"armmanni": {
 				"role": ["anti_heavy", "assault"],
 				"attribute": ["artillery", "siege", "ranged"],
-				"ranged": {"hold_fireline": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "assist_radius": 3500, "assist_margin": 150, "assist_screen": true},
+				"ranged": {"commander_priority": 100, "hold_fireline": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "assist_radius": 3500, "assist_margin": 150, "assist_screen": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}
 				},
@@ -2075,6 +2229,8 @@
 			},
 			"cordecom": {
 				"role": ["builder"],
+				"attribute": ["commander"],
+				"controller": "commander",
 				"limit": 2,
 				"build_speed": 10.0,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
@@ -2140,11 +2296,12 @@
 				"power": 1.0
 			},
 			"corcat": {
+				"priority_min_tech": 2,   // owner 2026-11-07: structures, commanders and T2/T3 units before any T1 unit
 				"role": ["artillery", "heavy"],
 				// Shared controller uses loaded rocket range/burst and bounded firing slots.
 			// Bombardment retains splash/static value; no precision-only heavy preference.
 			"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "bombardment", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"ranged": {"target_mode": "bombardment", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2257,18 +2414,20 @@
 				"power": 1.0
 			},
 			"corban": {
+				// owner 2026-10-27: a commander it can hit comes before every other target (x100 also
+				// breaks the 1 s target hold). Ranged hulls take this, not the commander_snipe lock.
 				"role":	["skirmish"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "commander_priority": 100},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}
 				},
 				"power": 1.0
 			},
 			"cortrem": {
+				// owner 2026-11-07: Ambassador rules in the artillery task (DLL, by name), not the ranged controller
 				"role": ["artillery", "heavy"],
-				"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "bombardment", "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"attribute": ["siege"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2495,5 +2654,3 @@
 			}
 		}
 	}
-	
-	

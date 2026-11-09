@@ -199,6 +199,7 @@ def main():
     parser.add_argument('--speed', type=int, default=8)
     parser.add_argument('--seed', type=int, default=2071)
     parser.add_argument('--headless', action='store_true')
+    parser.add_argument('--keep-going', action='store_true', help='Pass to ranged_arena: continue after a recorded failure')
     args = parser.parse_args()
     if args.summarize:
         print(json.dumps(summarize(args.summarize), indent=2))
@@ -211,6 +212,7 @@ def main():
                    '--minutes', str(args.minutes), '--speed', str(args.speed), '--seed', str(args.seed), '--game', args.game]
         print('BEGIN_CASE='+case, flush=True)
         if args.headless: command += ['--headless']
+        if args.keep_going: command += ['--keep-going']
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         directory = None
         for line in process.stdout:

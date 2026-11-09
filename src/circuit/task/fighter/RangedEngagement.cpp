@@ -27,6 +27,9 @@ namespace circuit {
 namespace {
 constexpr float POKE_DIRECTION_MIN_LENGTH_SQ = .5f;
 constexpr float PRESSED_STATIC_TARGET_MULTIPLIER = 2.f;
+// Owner 2026-11-07 (priority_min_tech): far above any value/HP score (those are
+// ~0.01-1000 even with commander_priority 100), so the tier always wins.
+constexpr float PRIORITY_TIER_OFFSET = 1.e6f;
 }
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
@@ -77,8 +80,7 @@ void CRangedEngagement::Release(CCircuitUnit* unit,bool commands)
     if(!commands || !unit || unit->IsDead()) return;
     if(target>=0) {
         TRY_UNIT(ai,unit,
-            float params[]={float(target)};
-            SendCustomCommand(ai->GetSkirmishAIId(),id,CMD_UNIT_CANCEL_TARGET,params);
+            unit->CancelTaskTarget(target);
         )
     }
     unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
@@ -119,14 +121,9 @@ void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,
     }
     if(selected!=target || weapon!=weaponIndex) world.ReleaseShot(id);
     TRY_UNIT(ai,unit,
-        if(target>=0 && target!=selected) {
-            float params[]={float(target)};
-            SendCustomCommand(ai->GetSkirmishAIId(),id,CMD_UNIT_CANCEL_TARGET,params);
-        }
-        if(selected>=0) {
-            float params[]={float(selected)};
-            SendCustomCommand(ai->GetSkirmishAIId(),id,CMD_UNIT_SET_TARGET,params);
-        }
+        // Through the unit, so a D-352 commander lock keeps BAR's list.
+        if(target>=0 && target!=selected) unit->CancelTaskTarget(target);
+        if(selected>=0) unit->SendTaskTarget(selected);
     )
     if(weapon!=weaponIndex) {
         liveWeapon.reset(weapon>=0 ? unit->GetUnit()->GetWeapon(caps.weapons[weapon].mount.get()) : nullptr);
@@ -134,6 +131,20 @@ void CRangedEngagement::SelectTarget(CCircuitUnit* unit,int selected,int weapon,
     }
     target=selected; weaponIndex=weapon; targetFrame=frame; reservedDamage=damage;
     if(selected>=0) world.ReserveShot(id,selected,damage,frame+90);
+}
+bool CRangedEngagement::Spam(const RangedPolicy& p,const CRangedWorld::Contact& c)
+{
+    return c.def && c.mobile && ((p.spamMaxCost>0.f && c.cost<=p.spamMaxCost) || p.spamDefs.count(c.def->GetId()))
+        && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
+}
+void CRangedEngagement::UpdateFireState(CCircuitUnit* unit,bool open)
+{
+    // Holding is immediate; reopening waits a second after the last change.
+    const int frame=ai->GetLastFrame();
+    if(open==fireOpen || (open && frame<fireStateFrame+30)) return;
+    fireOpen=open; fireStateFrame=frame;
+    unit->TrySetFireState(open?CCircuitDef::FireType::OPEN:CCircuitDef::HOLD);
+    if(trace) ai->LOG("RANGED: fire unit=%d open=%d",id,int(open));
 }
 void CRangedEngagement::Hold(CCircuitUnit* unit,bool unsafe)
 {
@@ -453,6 +464,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if(c.id==target) s*=policy.targetHysteresis;
             if(world.Reserved(c.id,id)>=c.health) s*=.2f;
             if(c.def->IsEnemyRoleAny(CCircuitDef::COMM)) s*=policy.commanderPriority;
+            if(def->IsPriorityTarget(c.def)) s+=PRIORITY_TIER_OFFSET;  // owner 2026-11-07, see Update
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
             // Commander focus is a tier, not a multiplier defeated by low HP
             // repairers or existing shot reservations. Geometry still vetoes.
@@ -771,8 +783,23 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         withdrawalUntil=0;
     }
     int best=-1,bestWeapon=-1; float bestScore=-1.f,bestDamage=0.f;
+    bool spamInRange=false, otherInRange=false; // individual fire_at_will
     for(int i:nearby) {
         const auto& c=contacts[i];
+        if(policy.fireAtWill && c.def && c.pos.y>=-20.f && !c.def->IsAbleToFly()) {
+            // Engine reach includes the target's radius. Spam is held 200 elmos
+            // early: a volley fired just before it walks in still lands on it.
+            const bool spam=Spam(policy,c);
+            const float reach=maxRange+c.radius+(spam?200.f:64.f);
+            // Owner 2026-10-27: a low_trajectory hull's non-spam contact opens
+            // fire only if its shell clears the terrain; an unreachable commander
+            // behind a ridge otherwise opened fire and engine autofire took spam.
+            // One terrain walk (distance/32 samples) per such contact in reach.
+            if(pos.SqDistance2D(c.pos)<=reach*reach && (spam || !policy.lowTrajectory
+                || std::any_of(caps.weapons.begin(),caps.weapons.end(),[&](const auto& w){return world.Trajectory(w,pos,c.pos);})))
+                (spam?spamInRange:otherInRange)=true;
+        }
+        if(Spam(policy,c)) continue; // owner 2026-10-19: never a priority target
         if(!c.los && !policy.allowRadar) continue;
         if((c.mobile && !policy.allowMobile)||(!c.mobile && !policy.allowStatic)) continue;
         // D-294 (owner correction): artillery and radar are a pairing, so a
@@ -818,12 +845,19 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // Owner 2026-10-19: the tower shooting at a pressing hull comes first.
             if(CRangedWorld::Pressed(c,policy.pressStatic)) value*=PRESSED_STATIC_TARGET_MULTIPLIER;
             if(c.def && c.def->IsEnemyRoleAny(CCircuitDef::COMM)) value*=policy.commanderPriority;
+            // Owner 2026-11-07: priority_min_tech. A tier, not a weight: the offset
+            // puts every structure / commander / T2+ contact above any T1 mobile
+            // or dot, and lets SelectTarget's switch ratio leave a held T1 at once.
+            if(def->IsPriorityTarget(c.def)) value+=PRIORITY_TIER_OFFSET;
             if(c.id==target && (heldScoreFrame!=frame || value>heldScore)) { heldScore=value; heldScoreFrame=frame; }
             if(value>bestScore || (value==bestScore && (best<0 || c.id<contacts[best].id))) {
                 best=i; bestWeapon=int(wi); bestScore=value; bestDamage=damage;
             }
         }
     }
+    // A priority target still fires on HOLD, so spam in reach always holds:
+    // an unreachable priority target would otherwise hand the volley to spam.
+    if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && (best>=0 || otherInRange));
     if(best>=0) {
         const auto& c=contacts[best];
         SelectTarget(unit,c.id,bestWeapon,bestDamage,bestScore);

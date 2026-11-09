@@ -1,0 +1,143 @@
+{
+  "stop_minute": 8,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "front T2",
+      "pattern": "\\[CommanderGroup\\] admitted seat=0 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "mobile radar",
+      "pattern": "\\[CommanderGroup\\] admitted seat=3 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "mobile jammer",
+      "pattern": "\\[CommanderGroup\\] admitted seat=4 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "advanced project",
+      "pattern": "\\[CommanderGroup\\] job_start def=(?:armamb|armarad|armveil) nano=0",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "defense completed",
+      "pattern": "\\[CommanderGroup\\] job_end done=1 nano=0",
+      "scope": "any",
+      "by_minute": 3,
+      "after_key": "advanced project"
+    },
+    {
+      "key": "following nano",
+      "pattern": "\\[CommanderGroup\\] job_start def=armnanotc nano=1",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "defense completed"
+    },
+    {
+      "key": "nano completed",
+      "pattern": "\\[CommanderGroup\\] job_end done=1 nano=1",
+      "scope": "any",
+      "by_minute": 3,
+      "after_key": "following nano"
+    },
+    {
+      "key": "commander removed",
+      "pattern": "group_loss step=1 count=1",
+      "scope": "any",
+      "by_minute": 3.1
+    },
+    {
+      "key": "fallback anchor",
+      "pattern": "\\[CommanderGroup\\] anchor=\\d+ def=arm(?:ack|ck|cv)",
+      "scope": "any",
+      "by_minute": 3.4,
+      "after_key": "commander removed"
+    },
+    {
+      "key": "decoy anchor",
+      "pattern": "\\[CommanderGroup\\] anchor=\\d+ def=armdecom",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "group wipe",
+      "pattern": "group_loss step=2 count=[1-9]\\d*",
+      "scope": "any",
+      "by_minute": 5.1
+    },
+    {
+      "key": "replacement T2",
+      "pattern": "\\[CommanderGroup\\] admitted seat=0 unit=\\d+",
+      "scope": "any",
+      "by_minute": 8,
+      "after_key": "group wipe",
+      "after_minute": 5
+    },
+    {
+      "key": "replacement decoy",
+      "pattern": "\\[CommanderGroup\\] anchor=\\d+ def=armdecom",
+      "scope": "any",
+      "by_minute": 8,
+      "after_key": "group wipe",
+      "after_minute": 5
+    },
+    {
+      "key": "replacement radar",
+      "pattern": "\\[CommanderGroup\\] admitted seat=3 unit=\\d+",
+      "scope": "any",
+      "by_minute": 8,
+      "after_minute": 5,
+      "after_key": "group wipe"
+    },
+    {
+      "key": "replacement jammer",
+      "pattern": "\\[CommanderGroup\\] admitted seat=4 unit=\\d+",
+      "scope": "any",
+      "by_minute": 8,
+      "after_minute": 5,
+      "after_key": "group wipe"
+    },
+    {
+      "key": "replacement factory order",
+      "pattern": "\\[CommanderGroup\\] recruit seat=0 def=armack",
+      "scope": "any",
+      "by_minute": 8,
+      "after_minute": 5,
+      "after_key": "group wipe"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

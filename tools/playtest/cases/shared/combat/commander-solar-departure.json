@@ -1,0 +1,83 @@
+{
+  "name": "commander-solar-departure",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      6000,
+      6500
+    ]
+  ],
+  "camera": [
+    3000,
+    3000,
+    1800
+  ],
+  "photos": [
+    30,
+    120,
+    240
+  ],
+  "groups": [
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2600,
+        2700
+      ],
+      "after_seconds": 45
+    },
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2900,
+        2900
+      ],
+      "after_seconds": 60
+    },
+    {
+      "unit": "armnanotc",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2750,
+        2900
+      ],
+      "after_seconds": 90
+    }
+  ],
+  "commander_observation": true,
+  "commander_front_work": true,
+  "commander_initial": true,
+  "start_energy": 50,
+  "start_energy_storage": 10000,
+  "start_metal": 100000,
+  "checks": "commander-solar-departure",
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "description": "Complete emergency solar before factory support is ready, then leave opening assistance and advance. Task-address reuse is covered deterministically by commander_group_work_test.",
+  "storage_scenario": "comm-solar-departure",
+  "commander_trace": true,
+  "coverage_probe": true,
+  "coverage_min_advance": 600,
+  "coverage_loss_teams": [
+    0
+  ],
+  "enemy_commander_home": true,
+  "observe_factory_assist": true
+}

@@ -1,0 +1,72 @@
+{
+  "stop_minute": 7.2,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[EngineeringProbe\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "\\[EngineeringProbe\\] PASS fixture",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "least_progress",
+      "pattern": "\\[EngineeringProbe\\] PASS least_progress",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "physical_travel",
+      "pattern": "\\[EngineeringProbe\\] PASS physical_travel",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "no_early_switch",
+      "pattern": "\\[EngineeringProbe\\] PASS no_early_switch",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "unsafe_route_rejected",
+      "pattern": "\\[EngineeringProbe\\] PASS unsafe_route_rejected",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "five_minute_switch",
+      "pattern": "\\[EngineeringProbe\\] PASS five_minute_switch",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "t2_defense_built",
+      "pattern": "\\[EngineeringProbe\\] PASS t2_defense_built",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "no_t1_defense",
+      "pattern": "\\[EngineeringProbe\\] PASS no_t1_defense",
+      "scope": "any",
+      "by_minute": 6
+    },
+    {
+      "key": "relocation_arrived",
+      "pattern": "\\[EngineeringProbe\\] PASS relocation_arrived",
+      "scope": "any",
+      "by_minute": 7
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[EngineeringProbe\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

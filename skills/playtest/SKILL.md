@@ -99,7 +99,10 @@ methods; the actual embedded VM load remains mandatory.
 
 For ranged-query changes, run `tools/run_ranged_performance_tests.sh`, then
 rendered fixtures with `CIRCUIT_VERIFY_RANGED_QUERIES=1` and
-`CIRCUIT_VERIFY_RANGED_SNAPSHOT=1`. Both variables must be absent for timing;
+`CIRCUIT_VERIFY_RANGED_SHARED=1` (D-462: shared contacts, lazily loaded friend
+cells and the contact history against private legacy builds, INV-247 to
+INV-249; `run_full_match_performance.py` accepts it only with
+`--verify-indexes`). Both variables must be absent for timing;
 the oracles intentionally repeat expensive legacy work. The ranged runner
 records their presence in its pins. Compare the inclusive ranged-snapshot
 parent after D-221's child phases were added; `full-match-summary-v2.json`

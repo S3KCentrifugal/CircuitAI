@@ -1,3 +1,4 @@
+#include "task/builder/CommanderGroupFollowTask.h"
 /*
  * TaskModule.cpp
  *
@@ -119,7 +120,28 @@ void ITaskModule::AbortTask(IUnitTask* task)
 	// idle task, orphaning every other idle factory until a new event re-added
 	// it. Idempotence also protects persistent recruits during reassignment.
 	if (task == nullptr || task == idleTask || task == nilTask || task == playerTask || task->IsDead()) return;
+	// D-477 (KI-762): a task owned by another manager is dequeued by it, so its
+	// manager-specific maps (factory recruit/repair, builder unfinished/repair)
+	// are erased. Played (owner's game, queues-b11): the script aborted a
+	// factory repair through the builder manager, the factory freed the dead
+	// task, and UnitFinished dequeued it again from repairUnits.
+	ITaskModule* owner = task->GetManager();
+	if ((owner != nullptr) && (owner != this)) {
+		owner->AbortTask(task);
+		return;
+	}
 	DequeueTask(task, false);
+}
+
+void ITaskModule::DoneTask(IUnitTask* task)
+{
+	if (task == nullptr) return;
+	ITaskModule* owner = task->GetManager();
+	if ((owner != nullptr) && (owner != this)) {
+		owner->DoneTask(task);
+		return;
+	}
+	DequeueTask(task, true);
 }
 
 IUnitTask* ITaskModule::MakeTask(CCircuitUnit* unit)
@@ -207,3 +229,10 @@ void ITaskModule::Update()
 }
 
 } // namespace circuit
+
+namespace circuit {
+IUnitTask* ITaskModule::EnqueueGroupFollow(int target,float radius,bool guard,const springai::AIFloat3& goal) {
+    auto* task=new CCommanderGroupFollowTask(this,target,radius,guard,goal);
+    updateTasks.push_back(task);TaskAdded(task);return task;
+}
+}

@@ -1,0 +1,41 @@
+{
+  "stop_minute": 12,
+  "expect": [
+    {
+      "key": "front lane published",
+      "pattern": "\\[CoverageLane\\] front assigned",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "connected ground factory",
+      "pattern": "\\[FactoryCorridor\\] def=(arm|cor|leg)(lab|vp|hp) lane=[0-9]+ segments=[1-9]",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "connected T2 factory",
+      "pattern": "\\[FactoryCorridor\\] def=(arm|cor|leg)(alab|avp) lane=[0-9]+ segments=[1-9]",
+      "scope": "any",
+      "by_minute": 12
+    },
+    {
+      "key": "TECH T2 factory completed",
+      "pattern": "\\[Playtest\\] finished (arm|cor|leg)alab team 0",
+      "scope": "any",
+      "by_minute": 12
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

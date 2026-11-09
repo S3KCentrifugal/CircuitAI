@@ -147,7 +147,7 @@ namespace UnitDefHelpers {
     // Sums the total count across an array of unit def names.
     // Trims inputs and attempts lowercase fallback for lookups.
     // Missing defs contribute 0 to the sum.
-    int SumUnitDefCounts(const array<string>@ unitDefNames)
+    int SumUnitDefCounts(const array<string>@ unitDefNames, bool includePending = false)
     {
         if (unitDefNames is null) return 0;
         int total = 0;
@@ -164,6 +164,9 @@ namespace UnitDefHelpers {
                 continue;
             }
             total += def.count;
+            // The lifecycle index excludes physical nanoframes already in count.
+            // O(1) per definition, no recruit-task scan (D-417).
+            if (includePending) total += aiFactoryMgr.GetPendingRecruitCount(def);
         }
         GenericHelpers::LogUtil("SumUnitDefCounts: names=" + unitDefNames.length() + " total=" + total, 3);
         return total;

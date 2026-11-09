@@ -6,29 +6,30 @@ namespace TundraContinents {
 	// NOTE: This map file intentionally holds only static data (start spots & MapConfig).
 	// Role determination and factory selection now occur in Main::AiMain using shared helpers.
 
-	// landLocked heuristic (initial): none flagged yet on this map; future pass may mark
-	// isolated peninsulas requiring hover/amph first. Pass false for all for now.
+	// landLocked (owner, 2026-10-26): every spot - the two continents have no land
+	// crossing, so no land army reaches the enemy (moated: TECH heavies Titan,
+	// Juggernaut, Sol Invictus only).
 	// Start spots for Eight Horses map (converted from YAML, roles matched to AiRole enum)
 	StartSpot@[] spots = {
-		StartSpot(AIFloat3(  300, 0,  460), AiRole::TACTICAL, true),       
-		StartSpot(AIFloat3(  1700, 0, 2300), AiRole::TACTICAL, false),       
-		StartSpot(AIFloat3(  2800, 0, 800), AiRole::TECH, true),        
-		StartSpot(AIFloat3(  4100, 0, 2100), AiRole::SEA, false),
+		StartSpot(AIFloat3(  300, 0,  460), AiRole::TACTICAL, true),
+		StartSpot(AIFloat3(  1700, 0, 2300), AiRole::TACTICAL, true),
+		StartSpot(AIFloat3(  2800, 0, 800), AiRole::TECH, true),
+		StartSpot(AIFloat3(  4100, 0, 2100), AiRole::SEA, true),
 
-		StartSpot(AIFloat3(  5400, 0, 800), AiRole::SEA, false),     
-		StartSpot(AIFloat3(  6400, 0, 800), AiRole::SEA, false),      
-		StartSpot(AIFloat3(  7800, 0, 1500), AiRole::SEA, false), 
-		StartSpot(AIFloat3(  9200, 0, 1500), AiRole::TACTICAL, false),
+		StartSpot(AIFloat3(  5400, 0, 800), AiRole::SEA, true),
+		StartSpot(AIFloat3(  6400, 0, 800), AiRole::SEA, true),
+		StartSpot(AIFloat3(  7800, 0, 1500), AiRole::SEA, true),
+		StartSpot(AIFloat3(  9200, 0, 1500), AiRole::TACTICAL, true),
 
-		StartSpot(AIFloat3(  1504, 0,  12000), AiRole::SEA, false),       
-		StartSpot(AIFloat3(  1610, 0, 10300), AiRole::SEA, false),       
-		StartSpot(AIFloat3(  2800, 0, 11400), AiRole::TACTICAL, false),        
+		StartSpot(AIFloat3(  1504, 0,  12000), AiRole::SEA, true),
+		StartSpot(AIFloat3(  1610, 0, 10300), AiRole::SEA, true),
+		StartSpot(AIFloat3(  2800, 0, 11400), AiRole::TACTICAL, true),
 		StartSpot(AIFloat3(  4600, 0, 11400), AiRole::AIR, true),
 
-		StartSpot(AIFloat3(  6000, 0, 11400), AiRole::TECH, true),     
-		StartSpot(AIFloat3(  6700, 0, 10600), AiRole::SEA, false),      
-		StartSpot(AIFloat3(  8200, 0, 10900), AiRole::SEA, false), 
-		StartSpot(AIFloat3(  9000, 0, 11400), AiRole::SEA, false)        
+		StartSpot(AIFloat3(  6000, 0, 11400), AiRole::TECH, true),
+		StartSpot(AIFloat3(  6700, 0, 10600), AiRole::SEA, true),
+		StartSpot(AIFloat3(  8200, 0, 10900), AiRole::SEA, true),
+		StartSpot(AIFloat3(  9000, 0, 11400), AiRole::SEA, true)
 	};
 
 	// Role-specific unit limit overlays: for HOVER_SEA, disallow vehicle labs
@@ -64,16 +65,16 @@ namespace TundraContinents {
 		root.set("FRONT", @frontRole);
 
 		// AIR role
-		dictionary airArm; airArm.set("armap",3); 
-		dictionary airCor; airCor.set("corap",3); 
+		dictionary airArm; airArm.set("armap",3);
+		dictionary airCor; airCor.set("corap",3);
 		dictionary airLeg; airLeg.set("legap",3);
 
 		dictionary airRole; airRole.set("armada", @airArm); airRole.set("cortex", @airCor); airRole.set("legion", @airLeg);
 		root.set("AIR", @airRole);
 
 		// SEA role
-		dictionary seaArm; seaArm.set("armsy",4); 
-		dictionary seaCor; seaCor.set("corsy",4); 
+		dictionary seaArm; seaArm.set("armsy",4);
+		dictionary seaCor; seaCor.set("corsy",4);
 		dictionary seaLeg; seaLeg.set("legsy",4);
 
 		dictionary seaRole; seaRole.set("armada", @seaArm); seaRole.set("cortex", @seaCor); seaRole.set("legion", @seaLeg);
@@ -93,8 +94,8 @@ namespace TundraContinents {
 		dictionary techLeg; techLeg.set("leglab",4);
 
 		dictionary techRole; techRole.set("armada", @techArm); techRole.set("cortex", @techCor); techRole.set("legion", @techLeg);
-		
-		root.set("TECH", @techRole); 
+
+		root.set("TECH", @techRole);
 
 		// SUPPORT role
 		dictionary frontTechHybridArm; frontTechHybridArm.set("armlab",4);
@@ -108,4 +109,4 @@ namespace TundraContinents {
 		return root;
 	}
 
-} 
+}

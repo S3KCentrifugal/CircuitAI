@@ -72,6 +72,7 @@ protected:
 	IBuilderTask(ITaskModule* mgr, Type type, BuildType buildType);  // Load
 public:
 	virtual ~IBuilderTask();
+	virtual void ClearRelease() override;
 
 	virtual bool CanAssignTo(CCircuitUnit* unit) const override;
 	virtual void AssignTo(CCircuitUnit* unit) override;
@@ -126,6 +127,7 @@ public:
 	float GetCostE() const { return cost.energy; }
 
 	virtual void SetBuildPos(const springai::AIFloat3& pos);
+    void ReserveDefenseIntent();
 	const springai::AIFloat3& GetBuildPos() const { return buildPos; }
 	const springai::AIFloat3& GetPosition() const { return geom::is_valid(buildPos) ? buildPos : position; }
 
@@ -153,6 +155,8 @@ protected:
 	// timeout (none in the mode); engage when inside the range, or inside the
 	// direct range on safe ground, cancelling the AI path.
 	bool IsExperimental() const;
+	// The engine's own build range, unscaled (D-467: where a wait may apply).
+	float EngineBuildRange(CCircuitUnit* unit);
 	float EngageRange(CCircuitUnit* unit);
 	int CmdTimeout(int frame) const;
 	bool TryEngage(CCircuitUnit* unit);
@@ -188,15 +192,20 @@ protected:
 	bool pinRequired;
 	bool pinFailed;
 	bool layoutOwned;
+	float siteRadius;  // > 0: the site search stays this close to position, and an empty search aborts the task
 	void TakeReservation(CTerrainManager* terrainMgr);  // after a FindBuildSite that may have served one
 public:
 	bool PinReservation(int id);
 	void RequireReservation() { pinRequired = true; pinnedReservation = -1; layoutOwned = true; }
 	bool IsLayoutOwned() const { return layoutOwned; }
 	int GetReservationId() const { return reservationId; }
+    void RefreshBuildSiteClaim();
 	// Called by the existing watchdog, only for script-opted-in roles.
 	void RecoverConstruction(CCircuitUnit* unit, int retryFrames, int releaseFrames);
 protected:
+    int buildSiteClaim = 0; // transient, reconstructed after load; not a planned slot
+    int defenseClaim = 0; // allied capability/budget claim; released at manager ownership boundary
+    bool BuildAtSite(CCircuitUnit* unit, int options, int timeout);
 	bool AdoptStandingFrame(CCircuitUnit* unit);
 	bool TryBuildCachedSite(CCircuitUnit* unit);
 	std::map<CCircuitUnit*, construction::Observation> constructionHealth;

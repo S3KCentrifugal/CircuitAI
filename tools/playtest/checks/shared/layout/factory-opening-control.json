@@ -1,0 +1,23 @@
+{
+  "stop_minute": 3,
+  "expect": [
+    {
+      "key": "TECH opening factory finished",
+      "pattern": "\\[Playtest\\] finished (arm|cor|leg)lab team 0",
+      "scope": "any",
+      "by_minute": 3
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception|has crashed|Access violation",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}

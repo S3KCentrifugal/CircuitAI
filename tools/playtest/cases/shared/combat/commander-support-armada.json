@@ -3,9 +3,10 @@
   "unit": "armcom",
   "side": "armada",
   "role": "FRONT",
-  "description": "Three supplied T1 land constructors establish base, expansion and Commander Group seats; verify Armada's forward support package and commander assistance.",
+  "description": "T1-only lane-combat construction: stable group seat, completed defensive utility followed by completed nano, with legal placement and surviving commander.",
   "commander_overrides": {
-    "front_push_screen": 0
+    "front_push_screen": 0,
+    "commander_group_jammer_income": 0
   },
   "map": "Proving Grounds v1.0",
   "map_key": "proving",
@@ -65,6 +66,82 @@
         4050
       ],
       "after_seconds": 24
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4000,
+        5000
+      ],
+      "after_seconds": 65,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          350,
+          150
+        ],
+        "max_distance": 500
+      }
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4000,
+        5000
+      ],
+      "after_seconds": 120,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          350,
+          150
+        ],
+        "max_distance": 500
+      }
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4000,
+        5000
+      ],
+      "after_seconds": 180,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          350,
+          150
+        ],
+        "max_distance": 500
+      }
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4000,
+        5000
+      ],
+      "after_seconds": 240,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          350,
+          150
+        ],
+        "max_distance": 500
+      }
     }
   ],
   "assertions": {
@@ -93,5 +170,14 @@
     "multiplier_metalextraction": 10
   },
   "front_spacing_observation": true,
-  "commander_radar_package_check": true
+  "commander_radar_package_check": false,
+  "commander_policy": {
+    "commander_group_income": 0,
+    "commander_group_t2_metal": 100000,
+    "commander_group_t2_energy": 100000,
+    "commander_group_second_t2_metal": 100000,
+    "commander_group_second_t2_energy": 100000,
+    "commander_group_third_t2_metal": 100000,
+    "commander_group_third_t2_energy": 100000
+  }
 }

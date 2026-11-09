@@ -594,6 +594,153 @@ void CMilitaryManager::ReadConfig()
 			cfgName.c_str(), sensorInfo.isEnabled ? "enabled" : "disabled",
 			sensorInfo.maxPerSquad, sensorInfo.topCandidates, int(sensorInfo.rebalance));
 
+	/*
+	 * D-352 commander snipe: see SCommSnipeInfo. "units" are def names that
+	 * always take part; "min_tech" adds every armed, mobile, non-builder def
+	 * at that BAR techlevel or above (0 adds none). Aircraft only with "air".
+	 */
+	const Json::Value& snipeCfg = root["commander_snipe"];
+	commSnipeInfo.isEnabled = false;
+	commSnipeInfo.defs.clear();
+	if (!snipeCfg.isNull() && snipeCfg.get("enabled", true).asBool()) {
+		const float minTech = snipeCfg.get("min_tech", 3.f).asFloat();
+		const bool withAir = snipeCfg.get("air", false).asBool();
+		std::set<std::string> names;
+		for (const auto& name : snipeCfg["units"]) names.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (names.count(d.GetDef()->GetName()) > 0) {
+				commSnipeInfo.defs.insert(d.GetId());
+				continue;
+			}
+			if (minTech <= 0.f || !d.IsMobile() || d.IsRoleComm() || d.IsBuilder()
+				|| !(d.HasSurfToLand() || d.HasSubToLand()) || (d.IsAbleToFly() && !withAir)) continue;
+			const auto& cp = d.GetDef()->GetCustomParams();
+			const auto level = cp.find("techlevel");
+			if (level != cp.end() && std::atof(level->second.c_str()) >= minTech) commSnipeInfo.defs.insert(d.GetId());
+		}
+		commSnipeInfo.interval = std::max(1, snipeCfg.get("interval", 15).asInt());
+		commSnipeInfo.acquireMargin = snipeCfg.get("acquire_margin", 64.f).asFloat();
+		commSnipeInfo.releaseMargin = std::max(commSnipeInfo.acquireMargin, snipeCfg.get("release_margin", 200.f).asFloat());
+		commSnipeInfo.isEnabled = !commSnipeInfo.defs.empty();
+	}
+	circuit->LOG("CONFIG %s: commander snipe %s | defs=%u interval=%i acquire=+%.0f release=+%.0f",
+			cfgName.c_str(), commSnipeInfo.isEnabled ? "enabled" : "disabled", unsigned(commSnipeInfo.defs.size()),
+			commSnipeInfo.interval, commSnipeInfo.acquireMargin, commSnipeInfo.releaseMargin);
+
+	/*
+	 * Artillery commander targets: see SArtyCommInfo. "units" are def names;
+	 * "max_speed" is in elmos per second (a walking commander is ~37).
+	 */
+	const Json::Value& artyCommCfg = root["artillery_commander"];
+	artyCommInfo.isEnabled = false;
+	artyCommInfo.defs.clear();
+	artyCommInfo.heavyMaxSqSpeed.clear();
+	artyCommInfo.ghostDefs.clear();
+	if (!artyCommCfg.isNull() && artyCommCfg.get("enabled", true).asBool()) {
+		std::set<std::string> names;
+		for (const auto& name : artyCommCfg["units"]) names.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (names.count(d.GetDef()->GetName()) > 0) artyCommInfo.defs.insert(d.GetId());
+		}
+		const float maxSpeed = std::max(0.f, artyCommCfg.get("max_speed", 12.f).asFloat()) / FRAMES_PER_SEC;
+		artyCommInfo.maxSqSpeed = SQUARE(maxSpeed);
+		// "heavy_units": enemy defs shot after commanders and before structures,
+		// when moving at most "heavy_speed_fraction" of their own top speed.
+		std::set<std::string> heavyNames;
+		for (const auto& name : artyCommCfg["heavy_units"]) heavyNames.insert(name.asString());
+		const float heavyFrac = utils::clamp(artyCommCfg.get("heavy_speed_fraction", 0.25f).asFloat(), 0.f, 1.f);
+		// "heavy_min_speed" / "heavy_max_speed" (elmos/s) clamp each unit's limit;
+		// max 0 means no cap.
+		const float heavyMin = std::max(0.f, artyCommCfg.get("heavy_min_speed", 0.f).asFloat());
+		const float heavyMax = std::max(0.f, artyCommCfg.get("heavy_max_speed", 0.f).asFloat());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (heavyNames.count(d.GetDef()->GetName()) > 0) {
+				float limit = std::max(heavyMin, d.GetSpeed() * heavyFrac);
+				if (heavyMax > 0.f) limit = std::min(limit, heavyMax);
+				artyCommInfo.heavyMaxSqSpeed[d.GetId()] = SQUARE(limit / FRAMES_PER_SEC);
+			}
+		}
+		std::set<std::string> ghostNames;
+		for (const auto& name : artyCommCfg["ghost_units"]) ghostNames.insert(name.asString());
+		for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+			if (ghostNames.count(d.GetDef()->GetName()) > 0) artyCommInfo.ghostDefs.insert(d.GetId());
+		}
+		artyCommInfo.ghostIdleFrames = int(std::max(0.f, artyCommCfg.get("ghost_idle_seconds", 10.f).asFloat()) * FRAMES_PER_SEC);
+		artyCommInfo.lockEnabled = artyCommCfg.get("lock", true).asBool();
+		artyCommInfo.lockMobiles = artyCommCfg.get("lock_mobiles", false).asBool();
+		artyCommInfo.lockMargin = std::max(0.f, artyCommCfg.get("lock_margin", 150.f).asFloat());
+		artyCommInfo.lockStepIn = std::max(0.f, artyCommCfg.get("lock_step_in", 100.f).asFloat());
+		artyCommInfo.radarDots = artyCommCfg.get("radar_dots", true).asBool();
+		artyCommInfo.isEnabled = !artyCommInfo.defs.empty() || !artyCommInfo.ghostDefs.empty();
+	}
+	circuit->LOG("CONFIG %s: artillery commander %s | defs=%u max_speed=%.1f heavy=%u ghost=%u idle=%i lock=%i mobiles=%i margin=%.0f step_in=%.0f radar_dots=%i",
+			cfgName.c_str(), artyCommInfo.isEnabled ? "enabled" : "disabled", unsigned(artyCommInfo.defs.size()),
+			std::sqrt(artyCommInfo.maxSqSpeed) * FRAMES_PER_SEC, unsigned(artyCommInfo.heavyMaxSqSpeed.size()),
+			unsigned(artyCommInfo.ghostDefs.size()), artyCommInfo.ghostIdleFrames, int(artyCommInfo.lockEnabled),
+			int(artyCommInfo.lockMobiles), artyCommInfo.lockMargin, artyCommInfo.lockStepIn, int(artyCommInfo.radarDots));
+
+	/*
+	 * Artillery snipe: see SArtySnipeInfo. Def names; distances in elmos,
+	 * times in seconds.
+	 */
+	const Json::Value& snipeArtyCfg = root["artillery_snipe"];
+	artySnipeInfo = SArtySnipeInfo();
+	if (!snipeArtyCfg.isNull() && snipeArtyCfg.get("enabled", true).asBool()) {
+		auto readDefs = [&](const char* key, std::unordered_set<CCircuitDef::Id>& out) {
+			std::set<std::string> names;
+			for (const auto& name : snipeArtyCfg[key]) names.insert(name.asString());
+			for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+				if (names.count(d.GetDef()->GetName()) > 0) out.insert(d.GetId());
+			}
+		};
+		readDefs("units", artySnipeInfo.defs);
+		readDefs("threats", artySnipeInfo.threats);
+		{
+			int rank = 0;
+			for (const auto& name : snipeArtyCfg["threats"]) {
+				CCircuitDef* d = circuit->GetCircuitDef(name.asCString());
+				if ((d != nullptr) && (artySnipeInfo.threatRank.count(d->GetId()) == 0)) {
+					artySnipeInfo.threatRank[d->GetId()] = rank;
+				}
+				++rank;
+			}
+		}
+		readDefs("direct_threats", artySnipeInfo.directThreats);
+		readDefs("porc", artySnipeInfo.porc);
+		artySnipeInfo.avoidOtherPorc = snipeArtyCfg.get("avoid_other_porc", true).asBool();
+		artySnipeInfo.threatMargin = std::max(0.f, snipeArtyCfg.get("threat_margin", 100.f).asFloat());
+		artySnipeInfo.triggerDistance = std::max(0.f, snipeArtyCfg.get("trigger_distance", 700.f).asFloat());
+		artySnipeInfo.porcRadius = std::max(0.f, snipeArtyCfg.get("porc_radius", 1600.f).asFloat());
+		artySnipeInfo.prepFraction = utils::clamp(snipeArtyCfg.get("prep_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
+		artySnipeInfo.snipeFraction = utils::clamp(snipeArtyCfg.get("snipe_range_fraction", 0.99f).asFloat(), 0.5f, 1.f);
+		artySnipeInfo.volleys = std::max(1, snipeArtyCfg.get("volleys", 3).asInt());
+		artySnipeInfo.ghostVolleysOther = std::max(1, snipeArtyCfg.get("ghost_volleys_other", 1).asInt());
+		artySnipeInfo.spamRetreat = snipeArtyCfg.get("spam_retreat", true).asBool();
+		artySnipeInfo.spamRetreatDistance = std::max(100.f, snipeArtyCfg.get("spam_retreat_distance", 500.f).asFloat());
+		artySnipeInfo.spamRetreatQuietFrames = int(std::max(1.f, snipeArtyCfg.get("spam_retreat_quiet_seconds", 4.f).asFloat()) * FRAMES_PER_SEC);
+		artySnipeInfo.visibleMaxVolleys = std::max(0, snipeArtyCfg.get("visible_max_volleys", 0).asInt());
+		auto seconds = [&](const char* key, float def) {
+			return int(std::max(0.f, snipeArtyCfg.get(key, def).asFloat()) * FRAMES_PER_SEC);
+		};
+		artySnipeInfo.confirmFrames = seconds("confirm_delay_seconds", 3.f);
+		artySnipeInfo.repeatFrames = seconds("repeat_seconds", 60.f);
+		artySnipeInfo.stageFrames = std::max(FRAMES_PER_SEC * 10, seconds("stage_max_seconds", 60.f));
+		artySnipeInfo.holdMargin = std::max(0.f, snipeArtyCfg.get("hold_margin", 150.f).asFloat());
+		artySnipeInfo.groupWaitFrames = seconds("group_wait_seconds", 240.f);
+		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 3).asInt());
+		artySnipeInfo.closeMinRange = std::max(0.f, snipeArtyCfg.get("close_in_min_range", 1290.f).asFloat());
+		artySnipeInfo.groupSettleFrames = seconds("group_settle_seconds", 10.f);
+		artySnipeInfo.doubleHeavyOverlap = utils::clamp(snipeArtyCfg.get("double_heavy_overlap", 0.5f).asFloat(), 0.f, 1.f);
+		artySnipeInfo.recruitRadius = std::max(0.f, snipeArtyCfg.get("recruit_radius", 500.f).asFloat());
+		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()
+				&& (!artySnipeInfo.threats.empty() || !artySnipeInfo.directThreats.empty());
+	}
+	circuit->LOG("CONFIG %s: artillery snipe %s | defs=%u threats=%u direct=%u porc=%u margin=%.0f trigger=%.0f volleys=%i",
+			cfgName.c_str(), artySnipeInfo.isEnabled ? "enabled" : "disabled", unsigned(artySnipeInfo.defs.size()),
+			unsigned(artySnipeInfo.threats.size()), unsigned(artySnipeInfo.directThreats.size()),
+			unsigned(artySnipeInfo.porc.size()),
+			artySnipeInfo.threatMargin, artySnipeInfo.triggerDistance, artySnipeInfo.volleys);
+
 	const Json::Value& porc = root["porcupine"];
 	preventCount = porc.get("prevent", 1).asUInt();
 	const Json::Value& amount = porc["amount"];
@@ -753,6 +900,10 @@ void CMilitaryManager::InitMilitary()
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Update, this), 1/*interval / 2*/, offset + 1);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateDefenceTasks, this), FRAMES_PER_SEC * 5, offset + 2);
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateSensorGuards, this), FRAMES_PER_SEC * 5, offset + 3);
+		if (commSnipeInfo.isEnabled) {
+			scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateCommanderSnipe, this),
+					commSnipeInfo.interval, offset + 2);
+		}
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -1396,9 +1547,12 @@ void CMilitaryManager::FillFrontPos(CCircuitUnit* unit, F3Vec& outPositions, boo
 	outPositions.clear();
     // D-354/D-356: on a published corridor the lane goal is the front for
     // attack leaders; the advance and the defend opt-in come from coverage.json.
-    const auto* battle=circuit->GetBattle();
+    auto* battle=circuit->GetBattle();
     if(!unit->GetCircuitDef()->IsAbleToFly() && battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f && (!defend || battle->FrontLaneDefendFollows())) {
-        const auto goal=battle->GetFrontLaneGoal(unit->GetPos(circuit->GetLastFrame()),battle->GetFrontLaneAdvance());
+        const auto pos=unit->GetPos(circuit->GetLastFrame());
+        const float from=battle->GetFrontLaneProgress(pos);
+        const float goalProgress=battle->LimitLaneAdvance(from,from+battle->GetFrontLaneAdvance());
+        const auto goal=battle->GetFrontLaneGoal(pos,goalProgress-from);
         if(circuit->GetTerrainManager()->CanReachAt(unit,goal,64)) {outPositions.push_back(goal);return;}
     }
 
@@ -1933,6 +2087,72 @@ float CMilitaryManager::GetSquadValue(const IFighterTask* task) const
  * back to no task, and MakeTask gives each a fresh CSupportTask that re-picks
  * an uncovered squad on its next update.
  */
+void CMilitaryManager::UpdateCommanderSnipe()
+{
+	struct SComm { int id; AIFloat3 pos; };
+	std::vector<SComm> comms;
+	for (const auto& kv : circuit->GetEnemyInfos()) {
+		const CEnemyInfo* e = kv.second;
+		// Scouted: identified once in LOS. A cloaked commander keeps its
+		// def and is tracked by its radar dot; BAR keeps radar targets.
+		if (e->IsHidden() || !e->IsInRadarOrLOS()) continue;
+		const CCircuitDef* edef = e->GetCircuitDef();
+		if (edef == nullptr || !edef->IsRoleComm()) continue;
+		comms.push_back({e->GetId(), e->GetPos()});
+	}
+
+	const int frame = circuit->GetLastFrame();
+	for (const auto& kv : circuit->GetTeamUnits()) {
+		CCircuitUnit* unit = kv.second;
+		if (commSnipeInfo.defs.count(unit->GetCircuitDef()->GetId()) == 0) continue;
+		const int locked = unit->GetCommanderTarget();
+		IUnitTask* task = unit->GetTask();
+		// Owner 2026-11-04: every listed unit and every T3 locks a commander in
+		// range, `ranged` hulls included (Fatboy, Catapult, Myrmidon). Only a
+		// flat gun (ranged + low_trajectory: Astraeus, Daedalus) must also pass
+		// the ranged controller's terrain test to the commander; a blocked shot
+		// is no lock, so its controller keeps shooting what it can hit.
+		// (2026-10-27 skipped every `ranged` hull, which cost Fatboys the lock.)
+		if (unit->IsDead() || task == nullptr || task->GetType() == IUnitTask::Type::NIL
+			|| task->GetType() == IUnitTask::Type::PLAYER || task->IsExternalControlled())
+		{
+			if (locked >= 0) unit->SetCommanderTarget(-1, frame);
+			continue;
+		}
+		CCircuitDef* cdef = unit->GetCircuitDef();
+		const AIFloat3& pos = unit->GetPos(frame);
+		const bool flatGun = cdef->IsAttrRanged() && cdef->GetRangedPolicy().lowTrajectory;
+		// One terrain walk (distance/32 samples) per weapon, only for a flat
+		// gun and only for a commander already inside reach.
+		const auto clearShot = [&](const AIFloat3& target) {
+			const auto& weapons = GetRangedWorld()->CapabilitiesFor(cdef).weapons;
+			return std::any_of(weapons.begin(), weapons.end(), [&](const auto& w) {
+				return rangedWorld->Trajectory(w, pos, target);
+			});
+		};
+		int best = -1;
+		float bestSq = std::numeric_limits<float>::max();
+		for (const SComm& c : comms) {
+			const bool submerged = c.pos.y < -8.f;
+			const float range = cdef->GetMaxRange(submerged ? CCircuitDef::RangeType::WATER : CCircuitDef::RangeType::LAND);
+			if (range <= 0.f) continue;
+			const float reach = range + (c.id == locked ? commSnipeInfo.releaseMargin : commSnipeInfo.acquireMargin);
+			const float sq = pos.SqDistance2D(c.pos);
+			if (sq > SQUARE(reach)) continue;
+			if (flatGun && !clearShot(c.pos)) continue;
+			// Hysteresis: the current lock wins while it stays in reach.
+			if (c.id == locked) { best = locked; break; }
+			if (sq < bestSq) { bestSq = sq; best = c.id; }
+		}
+		if (best != locked) {
+			circuit->LOG("SNIPE: unit=%d (%s) commander %d -> %d", unit->GetId(), cdef->GetDef()->GetName(), locked, best);
+		}
+		TRY_UNIT(circuit, unit,
+			unit->SetCommanderTarget(best, frame);
+		)
+	}
+}
+
 void CMilitaryManager::UpdateSensorGuards()
 {
 	if (!sensorInfo.isEnabled || !sensorInfo.rebalance) {
@@ -2319,8 +2539,8 @@ IUnitTask* CMilitaryManager::DefaultMakeTask(CCircuitUnit* unit)
 	 */
 	if (cdef->IsRoleTrans()) {
 		task = Enqueue(TaskF::Common(IFighterTask::FightType::FERRY));
-	} else if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {
-		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));
+	} else if (cdef->IsRoleScout() && (GetTasks(IFighterTask::FightType::SCOUT).size() < maxScouts)) {
+		task = Enqueue(TaskF::Common(IFighterTask::FightType::SCOUT));
 	} else if (cdef->IsRoleSupport()) {
 		if (!HasRangedUnits() && /*cdef->IsAttacker() && */GetTasks(IFighterTask::FightType::ATTACK).empty() && GetTasks(IFighterTask::FightType::DEFEND).empty()) {
 			task = Enqueue(TaskF::Defend(IFighterTask::FightType::ATTACK, IFighterTask::FightType::SUPPORT, minAttackers));
@@ -2506,6 +2726,23 @@ CDefenceData::SDefPoint* CMilitaryManager::FindClosestDefPoint(int cluster, cons
 		}
 	}
 	return closestPoint;
+}
+
+CMilitaryManager::SArtySnipeState& CMilitaryManager::GetArtySnipeState(int unitId, int frame)
+{
+	// O(states) once every 30 s: forget units not seen by the snipe step for a minute.
+	if (frame >= artySnipePrune) {
+		artySnipePrune = frame + FRAMES_PER_SEC * 30;
+		for (auto it = artySnipeStates.begin(); it != artySnipeStates.end();) {
+			if (frame - it->second.lastCall > FRAMES_PER_SEC * 60) it = artySnipeStates.erase(it);
+			else ++it;
+		}
+		for (auto it = artySnipeOverlaps.begin(); it != artySnipeOverlaps.end();) {
+			if (frame - it->second.second > FRAMES_PER_SEC * 30) it = artySnipeOverlaps.erase(it);
+			else ++it;
+		}
+	}
+	return artySnipeStates[unitId];
 }
 
 } // namespace circuit

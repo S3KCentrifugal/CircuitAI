@@ -8,11 +8,14 @@
 #ifndef SRC_CIRCUIT_SETUP_ALLYTEAM_H_
 #define SRC_CIRCUIT_SETUP_ALLYTEAM_H_
 
+#include <unordered_map>
 #include "unit/enemy/EnemyManager.h"
 #include "util/math/QuadField.h"
 #include "util/math/Region.h"
 #include "terrain/AlliedReservations.h"
-#include "terrain/CommanderCombat.h"
+#include "control/kernel/CommanderCombat.h"
+#include "control/service/CombatSnapshot.h"
+#include "control/kernel/DefenseClaims.h"
 #include "resource/MetalField.h"
 #include "task/static/StrategicTargeting.h"
 
@@ -40,6 +43,7 @@ class CEnergyGrid;
 class CDefenceData;
 class CPathFinder;
 class CFactoryData;
+class CRangedObservation;
 
 class CAllyTeam final {
 public:
@@ -76,9 +80,15 @@ public:
 	void UpdateFriendlyUnits();
 	CAllyUnit* GetFriendlyUnit(ICoreUnit::Id unitId) const;
 	const AllyUnits& GetFriendlyUnits() const { return friendlyUnits; }
+	// D-493: finished allied units of one definition (ours included). The
+	// per-definition counts are rebuilt once per friendly-unit refresh, on the
+	// first ask: O(F) then, O(1) per ask until the next refresh.
+	int FinishedCount(int defId);
+	using AllyStructures=std::vector<std::pair<int,CAllyUnit*>>;
+	const AllyStructures& GetFriendlyStructures();
 
 	const std::set<CEnemyUnit*>& GetDyingEnemies() const { return enemyManager->GetDyingEnemies(); }
-	void DyingEnemy(CEnemyUnit* enemy, int frame) { enemyManager->DyingEnemy(enemy, frame); }
+	void DyingEnemy(CEnemyUnit* enemy, int frame) { enemyManager->DyingEnemy(enemy, frame); ++enemyRevision; }
 	bool EnemyInLOS(CEnemyUnit* data, CCircuitAI* ai);
 	std::pair<CEnemyUnit*, bool> RegisterEnemyUnit(ICoreUnit::Id unitId, bool isInLOS, CCircuitAI* ai);
 	CEnemyUnit* RegisterEnemyUnit(springai::Unit* e, CCircuitAI* ai);
@@ -109,6 +119,13 @@ public:
 	const std::shared_ptr<CDefenceData>&   GetDefenceData()   const { return defence; }
 	const std::shared_ptr<CPathFinder>&    GetPathfinder()    const { return pathfinder; }
 	const std::shared_ptr<CFactoryData>&   GetFactoryData()   const { return factoryData; }
+	// D-462: the ranged combat picture shared by this ally team's AIs, created
+	// on first use. The revision counts every mutation of the shared enemy
+	// records (events, the authority's update, dying, fakes, decoys and an
+	// authority change) so a shared contact view rebuilds within a frame
+	// exactly when a private snapshot taken at that moment would differ.
+	const std::shared_ptr<CRangedObservation>& GetRangedObservation(CCircuitAI* reader);
+	unsigned GetEnemyRevision() const { return enemyRevision; }
 
 	void OccupyCluster(int clusterId, int teamId);
 	SClusterTeam GetClusterTeam(int clusterId);
@@ -134,9 +151,17 @@ public:
 	metal_field::Claims& GetMetalClaims() { return metalClaims; }
 	strategic::Ledger& GetPulseClaims() { return pulseClaims; }
     commander::ShotClaims& GetCommanderShots() { return commanderShots; }
+    // D-389: the side's enemy picture, seen and remembered, rebuilt once a second by the owner AI.
+    const CCombatSnapshot& GetCombatSnapshot() const { return combatSnapshot; }
+    defense::Claims& GetDefenseClaims() { return defenseClaims; }
+    void NuclearWarning(int frame) { nuclearWarning=std::max(nuclearWarning,frame); }
+    int LastNuclearWarning() const { return nuclearWarning; }
 	strategic::Ledger& GetNuclearHistory() { return nuclearHistory; }
 private:
     commander::ShotClaims commanderShots;
+    CCombatSnapshot combatSnapshot;
+    defense::Claims defenseClaims;
+    int nuclearWarning=-1000000;
 public:
 private:
 	strategic::Ledger pulseClaims, nuclearHistory;
@@ -154,6 +179,10 @@ private:
 	int resignSize;
 	int lastUpdate;
 	AllyUnits friendlyUnits;  // owner
+	std::unordered_map<int, int> finishedCounts;  // D-493: def id -> finished allied units
+	int finishedCountsFrame = -1;                 // the refresh they were counted at
+	AllyStructures friendlyStructures; // borrowed ordered subset, storage reused
+	bool friendlyStructuresReady=false;
 	CQuadField quadField;
 	std::map<ICoreUnit::Id, int> reclaimMarks;  // unitId: number of AIs reclaiming it
 
@@ -170,6 +199,8 @@ private:
 	std::shared_ptr<CFactoryData> factoryData;
 
 	std::shared_ptr<CEnemyManager> enemyManager;
+	std::shared_ptr<CRangedObservation> rangedObservation;
+	unsigned enemyRevision = 0;
 
 	int uEnemyMark;
 };

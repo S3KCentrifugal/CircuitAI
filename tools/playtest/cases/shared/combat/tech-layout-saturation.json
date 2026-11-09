@@ -1,0 +1,84 @@
+{
+  "name": "tech-layout-saturation",
+  "unit": "corcom",
+  "side": "cortex",
+  "role": "TECH",
+  "enemy_role": "FRONT",
+  "description": "Primary ring before secondary interior; home aircraft complete support and start an AFUS while distant engineering is bound.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      4000,
+      3000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "ally_spots": "1,2",
+  "commander_initial": false,
+  "groups": [
+    {"unit":"corack","team":0,"count":1,"position":[7000,1500],"after_seconds":10},
+    {
+      "unit": "coraca",
+      "team": 0,
+      "count": 1,
+      "position": [
+        5000,
+        1500
+      ],
+      "after_seconds": 10
+    },
+    {
+      "unit": "corfus",
+      "team": 0,
+      "count": 4,
+      "position": [
+        2500,
+        2500
+      ],
+      "spacing": 160,
+      "columns": 2,
+      "after_seconds": 10
+    },
+    {
+      "unit": "corca",
+      "team": 0,
+      "count": 1,
+      "position": [
+        5000,
+        1700
+      ],
+      "after_seconds": 10
+    }
+  ],
+  "camera": [5000,1500,2200],
+  "photos": [135],
+  "start_metal": 100000,
+  "start_energy": 1000000,
+  "modoptions": {
+    "multiplier_builddistance": 1,
+    "multiplier_buildpower": 1,
+    "multiplier_resourceincome": 1,
+    "ai_incomemultiplier": 1,
+    "multiplier_turnrate": 1
+  },
+  "checks": "tech-layout-saturation",
+  "assertions": {
+    "min_kills": 0,
+    "min_shooters": 0,
+    "max_losses": 0
+  },
+  "hold_all": true,
+  "hold_teams": [
+    1,
+    2
+  ],
+  "enemy_team": 2
+}

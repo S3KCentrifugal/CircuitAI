@@ -1,0 +1,61 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "retreat",
+      "pattern": "\\[Commander\\].*cloak_energy_retreat",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "factory destroyed",
+      "pattern": "fixture_units_removed unit=armlab count=1",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "raiders removed",
+      "pattern": "group_loss step=1 count=\\d+",
+      "scope": "any",
+      "by_minute": 1.2
+    },
+    {
+      "key": "retreat released",
+      "pattern": "\\[Commander\\] unit=\\d+ cloak_energy_release",
+      "scope": "any",
+      "after_key": "factory destroyed",
+      "by_minute": 3
+    },
+    {
+      "key": "factory taken",
+      "pattern": "\\[FRONT\\] commander \\d+ takes the queued start factory",
+      "scope": "any",
+      "after_key": "retreat released",
+      "by_minute": 3.5
+    },
+    {
+      "key": "factory frame",
+      "pattern": "child id=\\d+ parent=\\d+ unit=arm(lab|vp)",
+      "scope": "any",
+      "after_key": "factory taken",
+      "by_minute": 4
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

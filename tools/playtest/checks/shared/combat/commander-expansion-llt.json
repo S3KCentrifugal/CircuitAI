@@ -1,0 +1,62 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "expansion offered",
+      "pattern": "\\[CommanderFront\\] unit=(?P<unit>\\d+) expansion_mex=\\d+ income=\\d+\\.\\d base_distance=\\d+",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "commander LLT frame",
+      "pattern": "\\[RangedArena\\].*child id=(?P<turret>\\d+) parent=(?P<unit>\\d+) unit=armllt",
+      "scope": "any",
+      "after_key": "expansion offered",
+      "same_as": "expansion offered",
+      "by_minute": 5.5
+    },
+    {
+      "key": "LLT finished",
+      "pattern": "\\[RangedArena\\].*expansion_llt_finished turret=(?P<turret>\\d+) builder=(?P<unit>\\d+)",
+      "scope": "any",
+      "after_key": "commander LLT frame",
+      "by_minute": 6,
+      "same_as": "commander LLT frame"
+    },
+    {
+      "key": "covered expansion",
+      "pattern": "\\[RangedArena\\].*expansion_covered=[1-9]",
+      "scope": "any",
+      "after_key": "expansion offered",
+      "by_minute": 6
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

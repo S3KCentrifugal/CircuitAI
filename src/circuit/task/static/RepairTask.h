@@ -10,6 +10,8 @@
 
 #include "task/common/RepairTask.h"
 
+#include <vector>
+
 namespace circuit {
 
 class CSRepairTask final: public IRepairTask {
@@ -26,6 +28,11 @@ protected:
 
 	virtual void OnUnitIdle(CCircuitUnit* unit) override;
 	virtual void OnUnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker) override;
+
+private:
+	// D-468: releases assignees the target has left; true when the task ended.
+	bool ReleaseOutOfReach();
+	std::vector<CCircuitUnit*> outOfReach;  // reused scratch, assignees only
 };
 
 } // namespace circuit

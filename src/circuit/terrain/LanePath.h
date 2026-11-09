@@ -11,8 +11,18 @@ public:
     struct Projection { float progress=0, distance=std::numeric_limits<float>::max(); };
     void Set(std::vector<Point> value) {
         points=std::move(value);lengths.assign(points.size(),0.f);
+        lower={};upper={};
+        if(!points.empty()) {
+            lower=upper=points.front();
+            for(const auto& p:points) {
+                lower.x=std::min(lower.x,p.x);lower.z=std::min(lower.z,p.z);
+                upper.x=std::max(upper.x,p.x);upper.z=std::max(upper.z,p.z);
+            }
+        }
         for(std::size_t i=1;i<points.size();++i)lengths[i]=lengths[i-1]+points[i-1].distance2D(points[i]);
     }
+    Point Lower() const {return lower;}
+    Point Upper() const {return upper;}
     float Length() const {return lengths.empty()?0.f:lengths.back();}
     Projection Project(Point p) const {
         Projection best;
@@ -33,6 +43,7 @@ public:
         const auto a=points[i-1],b=points[i];return {a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f,a.z+(b.z-a.z)*f};
     }
 private:
+    Point lower{},upper{};
     std::vector<Point> points;
     std::vector<float> lengths;
 };

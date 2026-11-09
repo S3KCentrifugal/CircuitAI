@@ -287,7 +287,7 @@ namespace TechWeapons {
             case AIR: return Global::RoleSettings::Tech::WeaponMaxAir;
             case ARTY: return Global::RoleSettings::Tech::WeaponMaxArty;
             case LRPC: return Global::RoleSettings::Tech::WeaponMaxLrpc;
-            case SUPER: return Global::RoleSettings::Tech::WeaponMaxSuper;
+            case SUPER: return LolCannon::Enabled() ? 0 : Global::RoleSettings::Tech::WeaponMaxSuper;   // the lolcannon program owns it
             case COAST: return Global::RoleSettings::Tech::WeaponMaxCoast;
         }
         return 0;
@@ -1074,6 +1074,7 @@ namespace TechWeapons {
     {
         if (TypeOf(s.role) == Task::BuildType::NANO && Layout::TurretsCapped()) return null;
         if (!TechForward::Buildable(u, d) || !WallHelpers::Allowed(d, at)) return null;
+        if ((s.role=="shield" || s.role=="antinuke") && aiBuilderMgr.PendingProtection(d,at)) return null;
         const int slot = aiTerrainMgr.ReserveBuilding(d, at, 0);
         if (slot < 0) return null;
         if (aiBattle.IsFriendlyLane(aiTerrainMgr.GetReservationPos(slot)) || !WallHelpers::Allowed(d, aiTerrainMgr.GetReservationPos(slot))) {

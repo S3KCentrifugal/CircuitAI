@@ -1,0 +1,80 @@
+{
+  "name": "tech-workforce",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "TECH",
+  "enemy_role": "FRONT",
+  "description": "Supplied home workforce exercises real TECH factory and donation callbacks, pending-order counts and native cap headroom.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      4000,
+      3000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "ally_spots": "1,2",
+  "commander_initial": false,
+  "groups": [
+    {
+      "unit": "armalab",
+      "team": 0,
+      "count": 2,
+      "position": [
+        5000,
+        2000
+      ],
+      "spacing": 500,
+      "columns": 2,
+      "after_seconds": 5
+    },
+    {
+      "unit": "armack",
+      "team": 0,
+      "count": 3,
+      "position": [
+        5000,
+        1650
+      ],
+      "spacing": 80,
+      "columns": 3,
+      "after_seconds": 10
+    },
+    {
+      "unit": "armfark",
+      "team": 0,
+      "count": 4,
+      "position": [
+        5100,
+        1500
+      ],
+      "spacing": 70,
+      "columns": 4,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armnanotc",
+      "team": 0,
+      "count": 2,
+      "position": [
+        5000,
+        1840
+      ],
+      "spacing": 500,
+      "columns": 2,
+      "after_seconds": 6
+    }
+  ],
+  "photos": [],
+  "start_metal": 100000,
+  "start_energy": 1000000,
+  "checks": "tech-workforce"
+}

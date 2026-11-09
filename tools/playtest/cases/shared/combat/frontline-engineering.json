@@ -1,0 +1,106 @@
+{
+  "name": "frontline-engineering",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "TECH",
+  "enemy_role": "FRONT",
+  "description": "Supplied lane summaries: released T2 bots travel, build advanced defense and reassign after five minutes.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      4000,
+      3000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "ally_spots": "1,2",
+  "commander_initial": false,
+  "groups": [
+    {
+      "unit": "armack",
+      "team": 0,
+      "count": 3,
+      "position": [
+        4000,
+        1600
+      ],
+      "spacing": 100,
+      "columns": 3,
+      "after_seconds": 10
+    },
+    {
+      "unit": "armaca",
+      "team": 0,
+      "count": 2,
+      "position": [
+        3000,
+        3000
+      ],
+      "spacing": 120,
+      "columns": 2,
+      "after_seconds": 12
+    },
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 4,
+      "position": [
+        2500,
+        2500
+      ],
+      "spacing": 160,
+      "columns": 2,
+      "after_seconds": 10
+    },
+    {
+      "unit": "armstump",
+      "team": 2,
+      "count": 1,
+      "position": [
+        6500,
+        5500
+      ],
+      "after_seconds": 10
+    },
+    {
+      "unit": "armrad",
+      "team": 0,
+      "count": 1,
+      "position": [
+        5700,
+        5500
+      ],
+      "after_seconds": 12
+    }
+  ],
+  "photos": [],
+  "start_metal": 100000,
+  "start_energy": 1000000,
+  "checks": "frontline-engineering",
+  "units": [
+    "armack",
+    "armaca",
+    "armfus",
+    "armstump",
+    "armrad"
+  ],
+  "assertions": {
+    "min_kills": 0,
+    "min_shooters": 0,
+    "max_losses": 0
+  },
+  "hold_all": true,
+  "enemy_team": 2,
+  "hold_teams": [
+    1,
+    2
+  ]
+}

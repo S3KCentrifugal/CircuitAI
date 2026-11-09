@@ -10,7 +10,9 @@
 
 #include "terrain/BlockingMap.h"
 #include "terrain/LocalReservations.h"
+#include "terrain/AlliedReservations.h"
 #include "terrain/BaseLayoutGeometry.h"
+#include "terrain/FactoryCorridors.h"
 #include "terrain/LayoutRanking.h"
 #include "unit/CoreUnit.h"
 #include "unit/CircuitDef.h"
@@ -24,6 +26,7 @@
 #include <functional>
 #include <tuple>
 #include <cstdint>
+#include <cmath>
 
 namespace terrain {
 	struct SArea;
@@ -44,6 +47,7 @@ class CPathInfo;
 class CCircuitUnit;
 
 class CTerrainManager final {  // <=> RAI's cBuilderPlacement
+	friend class CFactoryCorridors;  // D-451: owns the corridor state, reads layout internals
 public:
 	using TerrainPredicate = std::function<bool (const springai::AIFloat3& p)>;
 
@@ -169,6 +173,13 @@ public:
 	int ReserveNanoBlock(CCircuitUnit* factory, CCircuitDef* nanoDef, int cols, int rows, int gap);
 	// Dry run of ReserveBuilding: would it be accepted? No marks, no log.
 	bool CanReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+    bool IsAlliedSpaceFree(const CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
+    bool StrictReservationAllowed(int id) const;
+    int NextSupportSlot(CCircuitUnit* builder, const CCircuitDef* def, int group, const springai::AIFloat3& seed, int budget);
+    int PackReachable(CCircuitUnit* builder, const CCircuitDef* def, int zone, int supportGroup,
+        int facing, const springai::AIFloat3& seed, int budget);
+    int ReserveCoastalSupport(CCircuitUnit* builder, const CCircuitDef* support, int zone, int group,
+        const springai::AIFloat3& anchor, float radius, int budget, int maximum);
 	// Fraction of a rectangle - centred at `centre`, halfAcross to each side of
 	// `facing`, halfAlong forward and back - on which cdef could be placed now:
 	// in the map, not blocked or reserved, terrain-typed for it and accepted
@@ -179,6 +190,9 @@ public:
 	void ReleaseGroup(int group);
 	bool IsReserved(const springai::AIFloat3& pos) const;
 	int GetReservationCount(CCircuitDef* cdef) const;  // unconsumed
+    // Callback-local view, invalidated by reservation mutation. Script copies
+    // IDs and rechecks live state; no iterator may escape the callback.
+    const std::set<int>& GetScopedReservationIds(int zone, int group, const CCircuitDef* def) const;
 	// Handshake with IBuilderTask: a FindBuildSite that served a reserved site
 	// leaves the reservation's id and facing here for the caller to take.
 	int TakeReservedId() { const int id = lastReservedId; lastReservedId = -1; return id; }
@@ -208,6 +222,25 @@ public:
 	bool SetLayoutEnabled(bool enabled);
 	bool IsLayoutEnabled() const { return layoutEnabled; }
 	bool IsLayoutConfigured() const { return layoutConfigured; }
+    // Ordinary-placement participation, independent of planned-layout policy.
+    void SetBuildSiteReservations(bool enabled);
+    bool ReserveBuildSite(int& claim, CCircuitDef* def, const springai::AIFloat3& pos, int facing);
+    void ReleaseBuildSite(int& claim);
+    void ObserveBuildStructure(CCircuitUnit* unit);
+    void ForgetBuildStructure(int unitId);
+    bool buildSiteReservations = false;
+	// Script policy: own FRONT lane, otherwise nearest reachable published FRONT lane.
+	// The mechanism lives in CFactoryCorridors (D-451); these forward to it.
+	void SetFactoryCorridorPolicy(bool enabled, bool ownLane) { factoryCorridors.SetPolicy(enabled, ownLane); }
+	void SetFactoryCorridorExempt(int def) { factoryCorridors.SetExemptDef(def); }
+	void SetFactoryCorridorOptions(int liveProbes, int backgroundProbes, int visits,
+			float goalStart, float goalEnd, float laneWaitSeconds) {
+		factoryCorridors.SetOptions({liveProbes, backgroundProbes, visits, goalStart, goalEnd, laneWaitSeconds});
+	}
+	void SetFactoryLane(int team, const std::vector<springai::AIFloat3>& points) { factoryCorridors.SetLane(team, points); }
+	bool EnsureFactoryCorridor(CCircuitDef* def, const springai::AIFloat3& pos, int facing, bool planning = false) {
+		return factoryCorridors.Ensure(def, pos, facing, planning);
+	}
 	struct SZone {
 		int id;
 		int2 c1, c2;   // cell rectangle [c1, c2)
@@ -218,6 +251,11 @@ public:
 	// halfAlong forward and back. Free cells are marked, blocked ones are
 	// holes. Returns the zone id, 0 when nothing could be marked.
 	int ReserveZone(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong, bool corridor);
+    void SetLayoutPriority(int priority);
+    bool PlanEconomySpine(const std::string& name, CCircuitDef* nano, CCircuitDef* reactor,
+        CCircuitDef* converter, const springai::AIFloat3& origin, int facing,
+        int maximumRows, int serviceDepth, int candidateLimit, float searchRadius, float neighbourClearance, int reactorLimit,
+        const std::vector<springai::AIFloat3>& preferences, float preferenceRadius);
 	// D-343 (SEA): as ReserveZone, but a rectangle touching a teammate's
 	// reservation is shrunk until it touches none instead of being refused.
 	// The zone never covers allied ground (INV-088).
@@ -282,9 +320,45 @@ public:
 		pinnedReservationRequired = required;
 		reservationFacingFilter = facingFilter;
 	}
+	// D-459: the walking budget is a district-planning test only
+	// (PlanFactoryDistrict's travelSeconds); serving a reserved slot does not walk-test.
+	bool WithinBuildTravel(CCircuitUnit* builder, const springai::AIFloat3& site, float seconds);
+	// C3 (D-453): the three factory placement paths a role may turn off.
+	// Activation: a lander factory task takes a layout reservation up front.
+	void SetFactoryReservationOnActivate(bool value) { SetLayoutPolicy(kFactoryActivateKey, factoryReservationOnActivate, value); }
+	// Flush packing: a factory stands flush against the construction turrets.
+	void SetFactoryFlushPacking(bool value) { SetLayoutPolicy(kFactoryFlushKey, factoryFlushPacking, value); }
+	// Direct site: an explicit request position is used as-is when buildable.
+	void SetFactoryDirectSite(bool value) { SetLayoutPolicy(kFactoryDirectKey, factoryDirectSite, value); }
+	bool IsFactoryReservationOnActivate() const { return factoryReservationOnActivate; }
+	bool IsFactoryFlushPacking() const { return factoryFlushPacking; }
+	bool IsFactoryDirectSite() const { return factoryDirectSite; }
+	// D-460 (KI-743): the point a FRONT or TACTICAL factory faces toward (its
+	// lane, or the nearest enemy start before the lane exists). An invalid
+	// point (x < 0) leaves the native facing search unchanged for other roles.
+	void SetFactoryFacingGoal(const springai::AIFloat3& goal);
+	const springai::AIFloat3& GetFactoryFacingGoal() const { return factoryFacingGoal; }
+	// D-460: serve a planned slot for this def with its own facing, before a
+	// facing-filtered search can pass it over. Sets the reserved id/facing.
+	springai::AIFloat3 FindPlannedSite(CCircuitDef* cdef, const springai::AIFloat3& pos, TerrainPredicate& predicate);
+	// D-460 (KI-744): metal and geothermal ground kept clear of roads: the
+	// extractor footprint plus a margin, marked once in Init.
+	bool IsResourceKeepOut(int x, int z) const {
+		return !resourceKeepOut.empty() && resourceKeepOut[std::size_t(z) * blockingMap.columns + x] != 0;
+	}
+	// D-460 (KI-744): the FRONT seat's lane road (empty clears it).
+	void SetFactoryLaneRoad(const std::vector<springai::AIFloat3>& points, CCircuitDef* widthDef) {
+		factoryCorridors.SetRoad(points, widthDef);
+	}
 	bool PlanFactoryPair(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* secondFactory,
 			CCircuitDef* nanoDef, const springai::AIFloat3& base, int facing, int sideOffsetCells, int forwardOffsetCells);
 	int AcquireFactoryReservation(CCircuitDef* factoryDef);
+	// Returns 0 on failure, 1 for a T1 core, 2 for a reserved T1/T2 district.
+	// B6: tries support rows maxRows..1 internally; the chosen count is saved
+	// as <name>.rows. Exit and travel are tested once per site.
+	int PlanFactoryDistrict(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* secondFactory,
+			CCircuitDef* nanoDef, const springai::AIFloat3& rear, int facing,
+			int maxRows, bool allowCompact, CCircuitUnit* builder, float travelSeconds);
 	bool PlanAirFactoryCluster(const std::string& name, CCircuitDef* firstFactory, CCircuitDef* repeatedFactory,
 			CCircuitDef* nanoDef, const springai::AIFloat3& origin, int facing, int count, int columns, int firstNanos,
 			bool centerFirst = false, bool centerRepeated = false);
@@ -293,6 +367,13 @@ public:
 	int GetFactoryNanoAvailable() const;
 	int GetFactoryNanoActive() const;
 	bool HasLayoutGroup(const std::string& name) const;
+    int GetNamedLayoutGroup(const std::string& name) const { return GetLayoutGroupId(name); }
+    float GetBuildingBlastRadius(const CCircuitDef* def) const;
+    int ReserveIsolatedBuilding(const std::string& name, CCircuitDef* def,
+            const springai::AIFloat3& pos, int facing, const std::string& protectedPrefix, float margin);
+    bool ReleaseUnusedLayout(const std::string& name);
+    int PlanFactoryCluster(const std::string& name, CCircuitDef* factory, CCircuitDef* nano,
+        const springai::AIFloat3& centre, int facing, int columns, int rows);
 	int GetLayoutGroupTotal(const std::string& name) const;
 	int GetLayoutGroupBuilt(const std::string& name) const;
 	int GetLayoutGroupStarted(const std::string& name) const;
@@ -425,6 +506,28 @@ private:
 	mutable uint64_t localOracleMismatches = 0;
 	void IndexLocalSlot(int id);
 	std::map<std::string, int> layoutGroups;
+	std::vector<layout_rank::CellRect> coreRects;  // D-493: the TECH core's footprints
+	struct ExitMovementFacts { int mobile; float halfWidth, slope, depth; bool hover; };
+	// Immutable definition facts only. Ownership is this terrain manager;
+	// terrain connectivity/height/slope are always read from current buffers.
+	std::unordered_map<int, std::vector<ExitMovementFacts>> factoryExitFacts;
+	const std::vector<ExitMovementFacts>& FactoryMovementFacts(CCircuitDef* factory);
+	bool FactoryExitTerrainUsable(const std::vector<ExitMovementFacts>& facts, const springai::AIFloat3& from, const springai::AIFloat3& to);
+	CFactoryCorridors factoryCorridors{*this};  // D-451: stores only this reference at construction
+	bool FactoryCorridorBlocked(const int2& a, const int2& b) const { return factoryCorridors.Blocked(a, b); }
+	mutable std::unordered_map<int, float> buildingBlastRadii;
+	bool FactoryExitUsable(const base_layout::FactoryCluster& cluster, CCircuitDef* factory);
+	static constexpr const char* kFactoryActivateKey = "policy.layout.factory_activate";
+	static constexpr const char* kFactoryFlushKey = "policy.layout.factory_flush";
+	static constexpr const char* kFactoryDirectKey = "policy.layout.factory_direct";
+	static constexpr const char* kFacingGoalXKey = "policy.layout.facing_goal_x";
+	static constexpr const char* kFacingGoalZKey = "policy.layout.facing_goal_z";
+	springai::AIFloat3 factoryFacingGoal{-1.f, 0.f, -1.f};  // x < 0: none
+	std::vector<std::uint8_t> resourceKeepOut;  // blocking cells, 1 = keep roads off
+	void MarkResourceKeepOut(const springai::AIFloat3& centre, int xSquares, int zSquares);
+	void SetLayoutPolicy(const char* key, bool& field, bool value) { field = value; layoutInts[key] = value ? 1 : 0; }
+	void SavePlacementPolicy();  // after the named-state map is cleared
+	void LoadPlacementPolicy();  // after load; reads the PR #51 keys as aliases
 	std::map<std::string, int> layoutZones;
 	std::map<std::string, int> layoutInts;
 	int nextReservationId = 1;
@@ -444,6 +547,8 @@ private:
 	bool pinnedReservationRequired = false;
 	bool reservationSearch = false;   // set by BeginReservedSearch, consumed by the next FindBuildSite
 	int reservationFacingFilter = -1; // one-shot; opening SEA search must test the actual exit facing
+	bool factoryReservationOnActivate = true, factoryFlushPacking = true, factoryDirectSite = true;
+	std::vector<std::pair<float, SReservation*>> reservedCandidates;  // FindReservedSite scratch
 	bool layoutRefusalLogged = false;
 	bool layoutConfigured = false;
 	bool factoryLineReady = false;
@@ -509,6 +614,24 @@ public:
 	// factory facing the front (else a side, never away), exit clear; an air
 	// factory any facing, no exit test. -1 when no turret stands or no site
 	int PackFactoryFlush(CCircuitDef* cdef, const springai::AIFloat3& anchor);
+	// D-491 / D-493: the TECH core, a list of footprints (definition, position,
+	// facing) captured when each member is placed. It does not depend on the
+	// reservations: the advanced lab's footprint stays after the lab is
+	// reclaimed (D-078). Script persists it as named layout ints and re-adds it
+	// after a load. Any number of members; a few in practice.
+	void AddCoreFootprint(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+	int CoreCount() const { return int(coreRects.size()); }
+	// The smallest edge gap (cells) from cdef at pos/facing to the other core
+	// members (footprints it overlaps, itself, are skipped); facing -1 takes the
+	// smaller of the two orientations. -1 when no other member exists.
+	int CoreEdgeGap(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
+	// cdef inside a turret's reach of nanoGroup (zone and its ring), touching
+	// the core when the ground allows, else the smallest edge gap up to
+	// maxGapCells (layout_rank::CoreBefore). A ground factory keeps its exit
+	// clear; an air factory takes any facing (anyFacing). Exit lanes and pockets
+	// are refused as by PackNearGroup. -1 when the core is empty or nothing fits.
+	int PackBesideCore(int zone, CCircuitDef* cdef, int nanoGroup, int facing, bool anyFacing,
+			int maxGapCells, float minNanoDist);
 	static bool MakesAircraft(CCircuitAI* circuit, CCircuitDef* cdef);
 	// D-101: the next unserved slot of cdef in a set, nearest its turret first; -1
 	int NextSetSlot(CCircuitDef* cdef) const;
@@ -526,6 +649,8 @@ private:
     void ClearLostReservation(int id);
     void IndexReservation(int id);
     void EraseReservation(int id);
+    bool CanActivateZone(int id) const;
+    std::set<int> activeLayoutZones; // derived from named ints on load; no strings on slot queries
 public:
 	// D-101: the unserved slots of cdef's sets released; how many
 	int ReleaseSetSlots(CCircuitDef* cdef);
@@ -587,6 +712,7 @@ public:
 	std::pair<terrain::SArea*, bool> GetCurrentMapArea(CCircuitDef* cdef, const int indexSector);
 	int GetSectorIndex(const springai::AIFloat3& position) const { return terrainData->GetSectorIndex(position); }
 	bool CanMoveToPos(terrain::SArea* area, const springai::AIFloat3& destination);
+	bool IsMovementDestinationFree(CCircuitDef* def, const springai::AIFloat3& destination) const;
 	springai::AIFloat3 GetBuildPosition(CCircuitDef* cdef, const springai::AIFloat3& position);
 	springai::AIFloat3 GetMovePosition(terrain::SArea* sourceArea, const springai::AIFloat3& position);
 	springai::AIFloat3 ShiftPos(CCircuitDef* cdef, const springai::AIFloat3& position, float range, bool isOrtho = false);

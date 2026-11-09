@@ -36,7 +36,7 @@ import benchmark_store  # noqa: E402
 KEEP_EXT = {'.json', '.jsonl', '.md', '.csv', '.tsv'}
 KEEP_NAMES = {'script.txt'}
 # Engine working trees inside a game write dir: never evidence.
-DROP_DIRS = {'AI', 'cache', 'fontcache', 'music', 'temp', 'LuaUI', 'screenshots', 'demos', 'symbols'}
+DROP_DIRS = {'AI', 'cache', 'fontcache', 'music', 'temp', 'LuaUI', 'screenshots', 'demos', 'symbols', 'source'}
 REPARSE = 0x400
 
 
@@ -89,6 +89,11 @@ def walk(top, keep):
             if e.is_symlink() or (getattr(st, 'st_file_attributes', 0) & REPARSE):
                 continue
             p = Path(e.path)
+            # --keep accepts files as well as directories. Checking only the
+            # stack's directories silently deleted explicitly retained DLLs
+            # and symbol archives. Match before yielding any file to deletion.
+            if any(p == k or k in p.parents for k in keep):
+                continue
             if e.is_dir(follow_symlinks=False):
                 stack.append(p)
             else:

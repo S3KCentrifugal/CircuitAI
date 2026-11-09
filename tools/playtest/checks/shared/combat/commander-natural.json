@@ -1,0 +1,44 @@
+{
+  "stop_minute": 15,
+  "expect": [
+    {
+      "key": "cloak accounting",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=\\d+ still=",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "late accounting",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=1[0-4] still=",
+      "scope": "any",
+      "by_minute": 15
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "config",
+      "pattern": "CONFIG controllers:",
+      "scope": "any"
+    },
+    {
+      "key": "cloak flapping",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=\\d+ .*toggles=([6-9]|\\d\\d)",
+      "scope": "any"
+    }
+  ]
+}

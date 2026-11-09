@@ -1,0 +1,52 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "front T2",
+      "pattern": "\\[CommanderGroup\\] admitted seat=0 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "upgrade offered",
+      "pattern": "\\[CommanderGroup\\] mex_upgrade unit=\\d+",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "upgrade finished",
+      "pattern": "\\[CommanderGroup\\] mex_upgrade_done target=\\d+",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "upgrade offered"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "front-tech-gate",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "enemy_role": "TECH",
+  "description": "Two AI instances exchange a constructor request and acknowledgment; supplied income checks FRONT T2 admission.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [[3000,3000],[4000,3000],[6000,5000]],
+  "ally_spots": "1,2",
+  "commander_observation": true,
+  "commander_initial": false,
+  "groups": [],
+  "photos": [],
+  "camera": [3000,3000,1800],
+  "checks": "front-tech-gate"
+}

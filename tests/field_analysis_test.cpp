@@ -347,7 +347,7 @@ static void TestNoBoxes()
 // field.json "dump_input": true) and print the summary and timings; with a
 // second argument, also write the widget file. The map's real analysis can
 // then be tuned without a game.
-static int Replay(const char* dumpPath, const char* outPath, bool predict, const char* configPath)
+static int Replay(const char* dumpPath, const char* outPath, bool predict, const char* configPath, const std::vector<SPoint>& laneStarts)
 {
 	std::FILE* f = std::fopen(dumpPath, "rb");
 	if (f == nullptr) { std::cerr << "cannot open " << dumpPath << "\n"; return 2; }
@@ -398,6 +398,7 @@ static int Replay(const char* dumpPath, const char* outPath, bool predict, const
 		Json::Value root;
 		Json::Reader reader;
 		if (!cfg || !reader.parse(cfg, root)) { std::cerr << "cannot read " << configPath << "\n"; return 2; }
+		ReadTerrainSettings(root, st);
 		st.marks = SMarkSettings();
 		ReadMarkSettings(root, st.marks);
 	}
@@ -415,6 +416,16 @@ static int Replay(const char* dumpPath, const char* outPath, bool predict, const
 	for (const SChoke& c : m->chokes) std::printf("choke %d %d-%d at (%.0f,%.0f) width=%.0f\n", c.id, c.a, c.b, c.pos.x, c.pos.z, c.width);
 	for (const SAvenue& a : m->avenues) std::printf("avenue %d %s length=%.0f regions=%zu\n", a.id, a.name.c_str(), a.length, a.regions.size());
 	for (const SCorridor& c : m->corridors) std::printf("corridor %d cls=%d %s length=%.0f narrowest=%.0f at (%.0f,%.0f) mean=%.0f routes=%d specialist=%d vertices=%zu\n", c.id, c.cls, c.name.c_str(), c.length, c.narrowest, c.choke.x, c.choke.z, c.meanWidth, c.routes, c.specialist ? 1 : 0, c.centre.size());
+	// Optional real-map route probes, consumed by check_map_lanes.py. Exercise
+	// the production join mechanism, not a second Python pathfinder.
+	for (std::size_t i = 0; i < laneStarts.size(); ++i) for (const SCorridor& c : m->corridors) {
+		if (c.specialist || (c.cls != C_VEH && c.cls != C_BOT)) continue;
+		int vertex = -1;
+		const auto leg = RouteToCentre(*m, c.cls, laneStarts[i], c, &vertex);
+		std::printf("laneleg|%zu|%d|%d|%d|", i, c.cls, c.id, vertex);
+		for (const auto& p : leg) std::printf("%.0f,%.0f;", p.x, p.z);
+		std::printf("\n");
+	}
 	std::printf("corridors: %zu, obstacles: %zu, corridors_ms=%.1f\n", m->corridors.size(), m->obstacles.size(), m->timings.corridorsMs);
 	for (const SLanding& l : m->landings) {
 		if (l.rank <= 3) std::printf("landing %d kind=%d side=%d rank=%d width=%.0f inland=%.0f at (%.0f,%.0f)\n", l.id, l.kind, l.side, l.rank, l.width, l.inland, l.mid.x, l.mid.z);
@@ -627,6 +638,10 @@ static void TestCorridors()
 		}
 		SSettings one = st; one.laneMax = 1;
 		Require(CorridorCount(*Analyse(in, one, nullptr), C_BOT) == 1, "lane_max 1 keeps one lane per passage");
+		SSettings specialist = one; specialist.footprintWidth = 100000.f;
+		auto narrow = Analyse(in, specialist, nullptr);
+		Require(CorridorCount(*narrow, C_BOT) > 0, "without a formation-width connection, specialist topology remains available");
+		for (const auto& c : narrow->corridors) Require(c.specialist, "fallback does not pretend a narrow corridor meets the formation width");
 	}
 	// the obstacle field: three bot corridors at the default wall share, ordered north to south on a west-east axis
 	{
@@ -682,12 +697,18 @@ int main(int argc, char** argv)
 		bool predict = false;
 		const char* out = nullptr;
 		const char* config = nullptr;
+		std::vector<SPoint> laneStarts;
 		for (int i = 2; i < argc; ++i) {
 			if (std::strcmp(argv[i], "--predict") == 0) predict = true;
 			else if (std::strcmp(argv[i], "--config") == 0 && i + 1 < argc) config = argv[++i];
+			else if (std::strcmp(argv[i], "--lane-start") == 0 && i + 1 < argc) {
+				SPoint p;
+				if (std::sscanf(argv[++i], "%f,%f", &p.x, &p.z) != 2) return 2;
+				laneStarts.push_back(p);
+			}
 			else out = argv[i];
 		}
-		return Replay(argv[1], out, predict, config);
+		return Replay(argv[1], out, predict, config, laneStarts);
 	}
 	try {
 		TestStructure();

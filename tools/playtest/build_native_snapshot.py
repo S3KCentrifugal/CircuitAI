@@ -38,11 +38,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session', required=True)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--source', type=Path, help='Read src/data/CMakeLists.txt/VERSION from a preserved source snapshot instead of the working checkout')
     parser.add_argument('--stage-only', action='store_true', help='Pin sources and build command without starting the compiler')
     parser.add_argument('--reuse', type=Path, help='Copy an earlier immutable object cache; ninja still validates source/header timestamps and commands')
     args = parser.parse_args()
     require_checkout()
     repo = Path(__file__).resolve().parents[2]
+    inputs = args.source.resolve() if args.source else repo
     engine = repo.parent / 'bar-RecoilEngine'
     reference = engine / 'build-amd64-windows'
     destination = (VALIDATION_ROOT / args.session).resolve()
@@ -51,9 +53,9 @@ def main():
     destination.mkdir(parents=True, exist_ok=False)
     source = destination / 'source'
     for name in ('src', 'data'):
-        shutil.copytree(repo / name, source / name)
+        shutil.copytree(inputs / name, source / name)
     for name in ('CMakeLists.txt', 'VERSION'):
-        shutil.copy2(repo / name, source / name)
+        shutil.copy2(inputs / name, source / name)
     ninja = (reference / 'build.ninja').read_text()
     blocks = re.findall(r'^build ([^\n]+): CXX_COMPILER__BARb_unscanned_RELWITHDEBINFO ([^\n]+)\n((?:  [^\n]*\n)+)', ninja, re.M)
     if not blocks:
@@ -70,11 +72,16 @@ def main():
     objects = []
     compiled_sources = set()
     native_variables = None
+    barb_prefix = '/build/src/AI/Skirmish/BARb/'
     for object_path, inputs, variables in blocks:
         source_path = inputs.split(' || ')[0]
         compiled_sources.add(source_path)
         if '/AI/Skirmish/BARb/src/circuit/' in source_path:
             native_variables = variables
+        # A CircuitAI file the reference compiled may since have moved or been
+        # deleted (D-388 moved module/Commander*.cpp); compile what exists.
+        if source_path.startswith(barb_prefix) and not (source / source_path[len(barb_prefix):]).is_file():
+            continue
         local = f'objects/{len(objects):03d}.obj'
         objects.append(local)
         output.append(f'build {local}: cxx {source_path}')

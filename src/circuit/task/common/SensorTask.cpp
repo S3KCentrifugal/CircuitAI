@@ -8,6 +8,7 @@
 #include "task/common/SensorTask.h"
 #include "module/FactoryManager.h"
 #include "CircuitAI.h"
+#include "control/unit/commander/CommanderController.h"
 
 #include "spring/SpringCallback.h"
 
@@ -49,6 +50,10 @@ void ISensorTask::Update()
 	}
 
 	CCircuitAI* circuit = manager->GetCircuit();
+	// The group already admitted this project against forward coverage. A
+	// nearby short/mobile radar is not proof that its forward goal is covered.
+	// Borrowed task identity expires in BuilderManager::DequeueTask; O(1).
+	if (circuit->GetCommanderController()->OwnsGroupProject(this)) return;
 	bool isBuilt = false;
 	COOAICallback* clb = circuit->GetCallback();
 	auto& friendlies = clb->GetFriendlyUnitIdsIn(GetPosition(), 500.f);

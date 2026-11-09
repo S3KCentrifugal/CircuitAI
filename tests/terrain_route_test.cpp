@@ -172,6 +172,12 @@ static void ScoutCoverage() {
     std::cout<<"scout hard-coverage and soft-escape contracts passed\n";
 }
 int main() {
+    Check(SegmentOutsideBox(0,0,10,0,4,2,6,4),"parallel connector clears footprint");
+    Check(!SegmentOutsideBox(0,3,10,3,4,2,6,4),"connector cannot cross footprint");
+    Check(!SegmentOutsideBox(0,2,10,2,4,2,6,4),"grazing expanded footprint rejected");
+    Check(!SegmentOutsideBox(5,3,5,3,4,2,6,4),"blocked stationary connector rejected");
+    Check(SegmentOutsideBox(0,0,0,0,4,2,6,4),"clear stationary connector allowed");
+
     // D-312: air routing must treat known AA as an obstacle even over dry
     // ground, and retained solver scratch must observe a newly closed gap.
     {

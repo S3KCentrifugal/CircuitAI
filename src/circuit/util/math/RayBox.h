@@ -27,8 +27,8 @@ public:
 
 class CRayFront final {
 public:
-	CRayFront(const springai::AIFloat3& orig, const springai::AIFloat3& dir) : orig(orig) {
-		invdir = springai::AIFloat3(1, 1, 1) / dir;
+	CRayFront(const springai::AIFloat3& orig, const springai::AIFloat3& dir)
+		: orig(orig), invdir(springai::AIFloat3(1, 1, 1) / dir) {
 		sign[0] = (invdir.x < 0);
 		sign[1] = (invdir.y < 0);
 		sign[2] = (invdir.z < 0);

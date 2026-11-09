@@ -13,7 +13,7 @@ namespace Main {
 		float Tech_Spam_Rush = 0.85f;   // 85% chance
 		float Tech_T3_RUSH = 0.35f;   // 35% chance
 		float Tech_NUKE_RUSH = 0.25f; // 25% chance
-		float Tech_T2_RUSH = 0.25f; // Independent finite heavy-delivery rush
+		float Tech_T2_RUSH = 0.25f; // Independent finite heavy rush; TECH keeps the heavies (D-449)
 	}
 
 	// Decide a boolean from a probability using AiDice with two weights: off vs on.
@@ -67,12 +67,11 @@ namespace Main {
         Global::Commander::FrontRecovery = true;
         Global::Commander::FrontMexSeconds = 1.f;
         Global::RoleSettings::Tech::EcoFlakEnabled = true;
+        Global::LolCannon::Enabled = true; // Ragnarok/Calamity/Starfall only via the gated FRONT/TECH program (owner 2026-10-21)
 		GenericHelpers::LogUtil("Running AiMain()", 1);
 
         // The opening Tick must search for gaps and raid just like later scouts.
         Global::ScoutRaid::KeepNativeScouts = 0;
-        Global::RoleSettings::Tech::HeavyDeliveryFrontEnabled = true;
-        Global::RoleSettings::Tech::HeavyDeliveryBlockedSeconds = 5.0f;
 
 		// Air-factory gate. Native CEnemyManager::IsAirValid() tests
 		//     GetEnemyThreat(AA) <= maxAAThreat
@@ -113,6 +112,7 @@ namespace Main {
     void AiSuperWeaponFired(CCircuitUnit@ unit, const AIFloat3& in aim)
     {
         ArtilleryPolicy::Fired(unit, aim);
+        LolCannon::Fired(unit, aim);   // owner 2026-10-27: the first strike's area is scouted
     }
     void AiUnitDestroyed(CCircuitUnit@ unit)
     {
@@ -121,7 +121,7 @@ namespace Main {
 
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId
 	{
-		ArtilleryPolicy::Check();
+		ArtilleryPolicy::Check(Global::AISettings::Role == AiRole::FRONT);  // D-495
         Lanes::Poll(); // complete async surveys for every role before consumers run
         AmphibiousOps::Tick();
         ScoutRaid::Tick(); // D-296: no-op unless the profile JSON enables scout raids
@@ -160,7 +160,26 @@ namespace Main {
 	void ApplyProfileSettings()
 	{
         Global::RoleSettings::Tech::EarlyGantryEnabled = true;
+        // Gantry turrets (owner, 2026-10-26; tested 2026-10-27 in 69 headless 8v8 games): every builder and
+        // turret builds the gantry block's turret frames first, the block opens at 80% of the gantry's income gate, and
+        // the T1 air plant keeps 4 more T1 air constructors for it (src/settings/roles/tech.as GantryNano*, off there)
+        Global::RoleSettings::Tech::GantryNanoFirst = true;
+        Global::RoleSettings::Tech::GantryNanoPrebuildShare = 0.8f;
+        Global::RoleSettings::Tech::GantryNanoExtraAirCons = 4;
+        Global::RoleSettings::Tech::HeavyAlternate = true; // owner 2026-10-22: late heavy batches alternate Thor / Titan (land and amphibious)
+        // owner 2026-10-26: after the t3rush units, every TECH gantry alternates these pairs, first unit first, on every map
+        Global::RoleSettings::Tech::HeavyPairArmada = array<string> = {"armbanth", "armthor"};         // Titan, Thor
+        Global::RoleSettings::Tech::HeavyPairCortex = array<string> = {"corkorg", "corcat"};           // Juggernaut, Catapult
+        Global::RoleSettings::Tech::HeavyPairLegion = array<string> = {"legeheatraymech", "legelrpcmech"}; // Sol Invictus, Astraeus
+        // TECH t3rush gantry turrets (owner, 2026-10-18): a random 14-20 construction turrets while the gantry goes up,
+        // then a slower climb to 40 over the 5 minutes after it stands (src/settings/roles/tech.as T3RushTurrets*, off there)
+        Global::RoleSettings::Tech::T3RushTurretsMin = 14;
+        Global::RoleSettings::Tech::T3RushTurretsMax = 20;
+        Global::RoleSettings::Tech::T3RushTurretsRampSeconds = 300;
+        Global::RoleSettings::Tech::T3RushTurretsRampTo = 40;
         Global::RoleSettings::Front::VehicleTankOpenerChance = 0.0f;
+        // D-471 (owner, 2026-11-04): Cortex vehicles open Rascal scout, then ten Incisors.
+        Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = 1.0f;
 		// FRONT (owner, 2026-10-17): two FRONTs each build a spam lab for an edge lane, left and right
 		// (src/settings/shared/spam.as EdgeLanesEnabled, off there; systems/combat/edge_lanes.as)
 		Global::Spam::EdgeLanesEnabled = true;

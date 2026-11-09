@@ -6,6 +6,7 @@
  */
 
 #include "unit/ally/AllyTeam.h"
+#include "task/fighter/RangedObservation.h"
 #include "unit/FactoryData.h"
 #include "map/MapManager.h"
 #include "map/ThreatMap.h"
@@ -120,6 +121,7 @@ void CAllyTeam::InitThreatRanges(CCircuitAI* ai)
 void CAllyTeam::Release()
 {
 	resignSize++;
+	if (rangedObservation) rangedObservation->Invalidate();  // D-462: reader and definitions may be gone
 	if (--initCount > 0) {
 		return;
 	}
@@ -128,6 +130,8 @@ void CAllyTeam::Release()
 		delete kv.second;
 	}
 	friendlyUnits.clear();
+	friendlyStructures.clear();
+	friendlyStructuresReady=false;
 
 	mapManager = nullptr;
 	metalManager = nullptr;
@@ -154,6 +158,21 @@ void CAllyTeam::ForceUpdateFriendlyUnits()
 	UpdateFriendlyUnits();
 }
 
+int CAllyTeam::FinishedCount(int defId)
+{
+	if (finishedCountsFrame != lastUpdate) {
+		finishedCounts.clear();
+		for (const auto& kv : friendlyUnits) {
+			const CAllyUnit* unit = kv.second;
+			if ((unit == nullptr) || (unit->GetCircuitDef() == nullptr) || unit->GetUnit()->IsBeingBuilt()) continue;
+			++finishedCounts[unit->GetCircuitDef()->GetId()];
+		}
+		finishedCountsFrame = lastUpdate;
+	}
+	const auto it = finishedCounts.find(defId);
+	return (it == finishedCounts.end()) ? 0 : it->second;
+}
+
 void CAllyTeam::UpdateFriendlyUnits()
 {
 	// FIXME: Works bad because of circuit->GetCircuitDef(unitDefId) inside allyTeam:
@@ -169,6 +188,8 @@ void CAllyTeam::UpdateFriendlyUnits()
 		delete kv.second;
 	}
 	friendlyUnits.clear();
+	friendlyStructures.clear();
+	friendlyStructuresReady=false;
 	COOAICallback* clb = circuit->GetCallback();
 	const std::vector<Unit*>& units = clb->GetFriendlyUnits();
 	if (!reclaimMarks.empty()) {
@@ -195,6 +216,18 @@ void CAllyTeam::UpdateFriendlyUnits()
 	nuclearHistory.Prune(lastUpdate, alive);
 }
 
+const CAllyTeam::AllyStructures& CAllyTeam::GetFriendlyStructures()
+{
+    // One ordered filter per existing publication, shared by all allied layout
+    // readers. No extra refresh, callback or per-structure tree allocation.
+    if (!friendlyStructuresReady) {
+        for (const auto& entry : friendlyUnits)
+            if (!entry.second->GetCircuitDef()->IsMobile()) friendlyStructures.push_back(entry);
+        friendlyStructuresReady=true;
+    }
+    return friendlyStructures;
+}
+
 CAllyUnit* CAllyTeam::GetFriendlyUnit(ICoreUnit::Id unitId) const
 {
 	decltype(friendlyUnits)::const_iterator it = friendlyUnits.find(unitId);
@@ -207,6 +240,7 @@ bool CAllyTeam::EnemyInLOS(CEnemyUnit* data, CCircuitAI* ai)
 		return !data->IsIgnore();
 	}
 
+	++enemyRevision;
 	return enemyManager->UnitInLOS(data);
 }
 
@@ -216,6 +250,7 @@ std::pair<CEnemyUnit*, bool> CAllyTeam::RegisterEnemyUnit(ICoreUnit::Id unitId, 
 		return std::make_pair(enemyManager->GetEnemyUnit(unitId), true);
 	}
 
+	++enemyRevision;
 	return enemyManager->RegisterEnemyUnit(unitId, isInLOS);
 }
 
@@ -227,6 +262,7 @@ CEnemyUnit* CAllyTeam::RegisterEnemyUnit(Unit* e, CCircuitAI* ai)
 		return enemyManager->GetEnemyUnit(unitId);
 	}
 
+	++enemyRevision;
 	return enemyManager->RegisterEnemyUnit(e);
 }
 
@@ -237,10 +273,12 @@ void CAllyTeam::UnregisterEnemyUnit(CEnemyUnit* data, CCircuitAI* ai)
 	}
 
 	enemyManager->UnregisterEnemyUnit(data);
+	++enemyRevision;
 }
 
 void CAllyTeam::RegisterEnemyFake(CCircuitDef::Id unitDefId, const AIFloat3& pos, int timeout)
 {
+	++enemyRevision;
 	CEnemyFake* data = enemyManager->RegisterEnemyFake(unitDefId, pos, timeout);
 	mapManager->AddFakeEnemy(data);
 	quadField.MovedEnemyFake(data);
@@ -251,6 +289,7 @@ void CAllyTeam::UnregisterEnemyFake(CEnemyFake* data)
 	quadField.RemoveEnemyFake(data);
 	mapManager->DelFakeEnemy(data);
 	enemyManager->UnregisterEnemyFake(data);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyEnterLOS(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -262,6 +301,7 @@ void CAllyTeam::EnemyEnterLOS(CEnemyUnit* enemy, CCircuitAI* ai)
 	if (mapManager->EnemyEnterLOS(enemy)) {
 		enemyManager->AddEnemyCost(enemy);
 	}
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyLeaveLOS(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -271,6 +311,7 @@ void CAllyTeam::EnemyLeaveLOS(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	mapManager->EnemyLeaveLOS(enemy);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyEnterRadar(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -280,6 +321,7 @@ void CAllyTeam::EnemyEnterRadar(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	mapManager->EnemyEnterRadar(enemy);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyLeaveRadar(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -289,6 +331,7 @@ void CAllyTeam::EnemyLeaveRadar(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	mapManager->EnemyLeaveRadar(enemy);
+	++enemyRevision;
 }
 
 void CAllyTeam::EnemyDestroyed(CEnemyUnit* enemy, CCircuitAI* ai)
@@ -302,6 +345,13 @@ void CAllyTeam::EnemyDestroyed(CEnemyUnit* enemy, CCircuitAI* ai)
 	}
 
 	quadField.RemoveEnemyUnit(enemy);
+	++enemyRevision;
+}
+
+const std::shared_ptr<CRangedObservation>& CAllyTeam::GetRangedObservation(CCircuitAI* reader)
+{
+	if (!rangedObservation) rangedObservation = std::make_shared<CRangedObservation>(this, reader);
+	return rangedObservation;
 }
 
 void CAllyTeam::UpdateInLOS(CEnemyUnit* data, CCircuitDef::Id unitDefId)
@@ -310,6 +360,7 @@ void CAllyTeam::UpdateInLOS(CEnemyUnit* data, CCircuitDef::Id unitDefId)
 	enemyManager->UnitInLOS(data, unitDefId);
 	mapManager->EnemyEnterLOS(data);
 	enemyManager->AddEnemyCost(data);
+	++enemyRevision;
 }
 
 void CAllyTeam::Update(CCircuitAI* ai)
@@ -318,11 +369,15 @@ void CAllyTeam::Update(CCircuitAI* ai)
 		return;
 	}
 
+	if (combatSnapshot.Due(circuit->GetLastFrame())) {
+		combatSnapshot.Rebuild(circuit, circuit->GetLastFrame());  // D-389
+	}
 	if (circuit->GetLastFrame() % THREAT_UPDATE_RATE == uEnemyMark) {
 		EnqueueUpdate();
 	} else {
 		enemyManager->UpdateEnemyDatas(quadField);
 	}
+	++enemyRevision;  // D-462: enemy records (and hidden flags) changed this frame
 }
 
 void CAllyTeam::EnqueueUpdate()
@@ -458,6 +513,8 @@ void CAllyTeam::DelegateAuthority()
 void CAllyTeam::ApplyAuthority(CCircuitAI* newOwner)
 {
 	this->circuit = newOwner;
+	++enemyRevision;
+	if (rangedObservation) rangedObservation->Invalidate();  // D-462: definitions belong to the authority
 	mapManager->SetAuthority(newOwner);
 	metalManager->SetAuthority(newOwner);
 	energyManager->SetAuthority(newOwner);

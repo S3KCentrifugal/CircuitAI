@@ -1,0 +1,64 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "rules",
+      "pattern": "\\[DefenseFixture\\] applied",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "heavy",
+      "pattern": "\\[DefensePlanner\\] choice=armanni band=[24]",
+      "scope": "any",
+      "by_minute": 4
+    },
+    {
+      "key": "finished",
+      "pattern": "\\[Playtest\\] finished armanni team 0",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "heavy"
+    },
+    {
+      "key": "nano",
+      "pattern": "\\[CommanderGroup\\] job_start def=armnanotc nano=1",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "finished"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "rule rejected",
+      "pattern": "\\[DefenseFixture\\] ERROR",
+      "scope": "any"
+    }
+  ]
+}

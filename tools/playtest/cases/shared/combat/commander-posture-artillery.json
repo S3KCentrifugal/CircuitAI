@@ -1,0 +1,70 @@
+{
+  "name": "commander-posture-artillery",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "D-389: two Wolverines (710 range artillery) advance on a commander it cannot answer at range: the posture is withdraw (artillery) and the commander survives.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4300,
+      4000
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    4300,
+    4300,
+    1400
+  ],
+  "photos": [
+    25,
+    40,
+    60
+  ],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "commander_initial": true,
+  "enemy_commander_home": true,
+  "enemy_destination": [
+    4300,
+    4450
+  ],
+  "groups": [
+    {
+      "unit": "armeyes",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4300,
+        4500
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "corwolv",
+      "team": 1,
+      "count": 2,
+      "columns": 2,
+      "spacing": 60,
+      "position": [
+        4300,
+        4900
+      ],
+      "after_seconds": 20
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_kills": 0,
+    "max_losses": 0,
+    "min_damage": 0
+  },
+  "checks": "commander-posture-artillery",
+  "storage_scenario": "cmd-posture-arty"
+}

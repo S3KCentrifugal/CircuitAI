@@ -2,6 +2,12 @@
   "stop_minute": 2,
   "expect": [
     {
+      "key": "no_lane",
+      "pattern": "\\[FallbackCoverProbe\\] lane disabled",
+      "scope": "any",
+      "by_minute": 0.2
+    },
+    {
       "key": "loaded",
       "pattern": "\\[RangedArena\\].* loaded",
       "scope": "any",

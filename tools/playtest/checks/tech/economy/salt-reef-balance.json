@@ -1,0 +1,15 @@
+{
+  "_doc": "Salt Reef Legion TECH at P13, isolated nuke opening, experimental_balanced. Requires air constructors to reach bounded power admission and physical conversion after the opening. INV-063 alone is excluded because this fixture deliberately has no enemy. This is a functional observation, not a rush-deadline or performance clearance.",
+  "stop_minute": 25,
+  "expect": [
+    {"key": "observer", "pattern": "\\[Playtest\\] widget loaded", "by_minute": 1, "scope": "any"},
+    {"key": "opening", "pattern": "\\[TECH\\]\\[Chain\\] objective nuke", "by_minute": 1, "scope": "tech"},
+    {"key": "air builder adds power", "pattern": "\\[Rule\\] power.t1 for legca ", "by_minute": 25, "scope": "tech"},
+    {"key": "converter completed", "pattern": "\\[Playtest\\] finished legadveconv team 0", "by_minute": 25, "scope": "any"},
+    {"key": "turret completed", "pattern": "\\[Playtest\\] finished legnanotc team 0", "by_minute": 25, "scope": "any"}
+  ],
+  "forbid": [
+    {"key": "invariant", "pattern": "\\[INVARIANT\\] (?!INV-063\\b)", "scope": "tech"},
+    {"key": "runtime failure", "pattern": ": ERR\\s+:|: WARN\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed", "scope": "any"}
+  ]
+}

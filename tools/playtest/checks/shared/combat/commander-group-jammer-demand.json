@@ -1,0 +1,36 @@
+{
+  "stop_minute": 4,
+  "complete_on": {
+    "key": "completed",
+    "pattern": "\\[RangedArena\\].*finished id=\\d+ team=0 unit=armveil",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "planned",
+      "pattern": "\\[CommanderJammerPlan\\] unit=\\d+ def=armveil gain=",
+      "scope": "any",
+      "by_minute": 4
+    },
+    {
+      "key": "built",
+      "pattern": "\\[RangedArena\\].*finished id=\\d+ team=0 unit=armveil",
+      "scope": "any",
+      "by_minute": 4
+    },
+    {
+      "key": "T2 member",
+      "pattern": "\\[CommanderGroup\\] admitted seat=0 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    }
+  ],
+  "forbid": [
+    {
+      "key": "runtime",
+      "pattern": "\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:|\\[RangedArena\\].*ERROR",
+      "scope": "any"
+    }
+  ]
+}

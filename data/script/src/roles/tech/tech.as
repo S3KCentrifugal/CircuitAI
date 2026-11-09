@@ -28,6 +28,7 @@
 #include "tech_chain.as"
 #include "tech_plan.as"
 #include "tech_heavy_rush.as"
+#include "../../systems/production/tech_air_foundry.as"
 #include "tech_transport.as"
 
 namespace RoleTech
@@ -207,6 +208,7 @@ namespace RoleTech
 	{
         aiBuilderMgr.recoverConstruction = true;
         TechFortifications::Reset();
+        TechAirFoundry::Configure();
         TechReclaim::ProtectEnergyStorage();   // D-290 (owner): TECH never reclaims an energy storage, on any path
 
 		// Apply TECH role settings
@@ -297,6 +299,62 @@ namespace RoleTech
 			+ " assist nanos " + (Global::RoleSettings::Tech::AssistNanoEnabled ? "on" : "off")
 			+ " solar limit " + (solar is null ? -1 : aiEconomyMgr.GetEnergyLimit(solar))
 			+ " adv solar limit " + (adv is null ? -1 : aiEconomyMgr.GetEnergyLimit(adv)), 1);
+	}
+
+	// T3 rush opening (owner, 2026-10-14; ported 2026-10-22; forced 2026-10-25): on the
+	// t3rush plan the gantries build the side's T3RushArmada / T3RushCortex /
+	// T3RushLegion pair (Razorback + Vanguard, Shiva + Catapult, Daedalus + Myrmidon)
+	// in turn, T3RushUnitCount in all split evenly (5 of each) before anything else.
+	// The D-287 late latch does not cut the opening short (played: income 400 latched
+	// it after 2 Shivas and the gantry made 8 Catapults). A unit this gantry can never
+	// build gives its share to the other. While the opening is owed and a unit is only
+	// briefly unavailable, the gantry waits rather than starting other production.
+	int g_t3RushNext = 0;
+	int g_t3RushOrdered = 0;          // rush units ordered so far, every gantry together
+	array<int> g_t3RushEach = {0, 0}; // ordered per unit of the pair
+	IUnitTask@ Tech_T3RushProduce(CCircuitUnit@ gantry, const string &in side)
+	{
+		if (TechPlan::plan != "t3rush" || gantry is null || gantry.circuitDef is null) return null;
+		const int total = Global::RoleSettings::Tech::T3RushUnitCount;
+		if (total <= 0 || g_t3RushOrdered >= total) return null;   // released
+		array<string> pair;
+		if (side == "armada") pair = Global::RoleSettings::Tech::T3RushArmada;
+		else if (side == "cortex") pair = Global::RoleSettings::Tech::T3RushCortex;
+		else pair = Global::RoleSettings::Tech::T3RushLegion;
+		if (pair.length() == 0) return null;
+		if (g_t3RushEach.length() < pair.length()) g_t3RushEach.resize(pair.length());
+		// the units this gantry can build at all, the next in turn first; their shares of `total`
+		array<uint> order;
+		for (uint m = 0; m < pair.length(); ++m) {
+			const uint k = (uint(g_t3RushNext) + m) % pair.length();
+			CCircuitDef@ d = ai.GetCircuitDef(pair[k]);
+			if (d !is null && gantry.circuitDef.CanBuild(d)) order.insertLast(k);
+		}
+		if (order.length() == 0) return null;   // a water gantry: ordinary production
+		const int share = (total + int(order.length()) - 1) / int(order.length());
+		bool owed = false;
+		for (uint n = 0; n < order.length(); ++n)
+		{
+			const uint i = order[n];
+			if (g_t3RushEach[i] >= share) continue;
+			owed = true;
+			CCircuitDef@ d = ai.GetCircuitDef(pair[i]);
+			if (d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;   // TECH's start caps may hold combat units at 0
+			if (!d.IsAvailable(ai.frame)) continue;
+			IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, d, gantry.GetPos(ai.frame), 64.f));
+			if (t is null) continue;
+			g_t3RushNext = int((i + 1) % pair.length());
+			++g_t3RushEach[i];
+			if (TechHeavyChoice::IsMarauderClass(pair[i])) TechHeavyChoice::rushAdmitUntil = ai.frame + 180 * SECOND;   // INV-198: the opening's own
+			++g_t3RushOrdered;
+			GenericHelpers::LogUtil("[TECH][T3Rush] " + gantry.circuitDef.GetName() + " builds " + pair[i] + " (" + g_t3RushOrdered
+				+ " of " + total + "; " + g_t3RushEach[i] + " of " + share + " " + pair[i] + ")", 1);
+			if (g_t3RushOrdered >= total)
+				GenericHelpers::LogUtil("[TECH][T3Rush] " + g_t3RushOrdered + " ordered: gantry production released to ordinary weighting", 1);
+			return t;
+		}
+		if (!owed) { g_t3RushOrdered = total; return null; }   // every share filled
+		return aiFactoryMgr.Enqueue(TaskS::Wait(false, 2 * SECOND));   // owed but unavailable this moment: nothing else first
 	}
 
 	// D-068: the one income under which TECH's labs make no combat unit while the
@@ -553,6 +611,7 @@ namespace RoleTech
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
 		Invariants::OnUnitAdded(unit);   // D-076: INV-001
+        if (FrontlineEngineering::IsFiendProduct(unit)) return; // local combat support, not factory donation quota
         if (TechHeavyRush::OnFinished(unit)) return;
         // D-158: keep the amphibious wave together; constructor donations are separate.
         if (!AmphibiousOps::Active() || unit is null || AmphibiousOps::Kind(unit.circuitDef)<0)
@@ -606,6 +665,7 @@ namespace RoleTech
 
 		Opening::Tick();
 		TechBuild::Tick();
+		TechPinpointers::Tick();   // D-492: Pinpointers while the team has artillery and none
 		TechChain::Tick();
         TechHeavyRush::Tick();
         TechGantry::SampleIncome();
@@ -622,6 +682,8 @@ namespace RoleTech
 		// state and the optional overlay.
 		Layout::Update(metalIncome, hasT2Lab, t2ConstructionBotCount);
         EcoFlak::Tick();
+        EconomyCluster::Tick();
+        RushBootstrap::Tick();
 
 		// --- Unlock advanced storages when economy is strong enough ---
 		if (!hasUnlockedAdvancedStorage && metalIncome >= 100.0f)
@@ -774,9 +836,15 @@ namespace RoleTech
 				/*metalIncomePerPlant*/ Global::RoleSettings::Tech::RequiredMetalIncomeForT2AircraftPlant,
 				/*energyIncomePerPlant*/ Global::RoleSettings::Tech::RequiredEnergyIncomeForT2AircraftPlant);
 
-			if (allowedT2Air > 0)
+			// D-489 (owner, 2026-11-07): the T1 aircraft lab follows the first
+			// advanced fusion, or an aircraft-lab step the chain has reached
+			// (the nuke plan's, after its silo). This block runs after
+			// TechChain::Tick, so before D-489 it put the chain's lifted cap
+			// back to 0 until the T2 aircraft-lab income held. One lab is enough.
+			if (allowedT2Air > 0 || aiTerrainMgr.GetLayoutInt("tech.heavy.afus-completed", 0) > 0
+				|| TechChain::WantsStep("ap"))
 			{
-				allowedT1Air = 1; // We don't really need more than 1 t1 lab
+				allowedT1Air = 1;
 			}
 
 			GenericHelpers::LogUtil(
@@ -967,7 +1035,10 @@ namespace RoleTech
             array<string> names = advanced ? UnitHelpers::GetT2BotConstructors(conSide) : UnitHelpers::GetT1BotConstructors(conSide);
             if (names.length() > 0) {
                 CCircuitDef@ conDef = ai.GetCircuitDef(names[0]);
-                const int wanted = advanced ? TechChain::wantAck : TechChain::wantCk;
+                const int wanted = advanced
+                    ? TechEconomyMath::ConstructorOpeningTarget(TechChain::wantAck,
+                        Global::RoleSettings::Tech::DonationKeepT2Constructors, int(Team::Donation::pendingRequests.length()))
+                    : TechChain::wantCk;
                 if (conDef !is null && conDef.count + aiFactoryMgr.GetPendingRecruitCount(conDef) < wanted) {
                     if (conDef.maxThisUnit < wanted) conDef.maxThisUnit = wanted;
                     return aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, conDef, u.GetPos(ai.frame), 64.f));
@@ -1000,6 +1071,21 @@ namespace RoleTech
 		string side = UnitHelpers::GetSideForUnitName(facDef.GetName());
 		const AIFloat3 pos = u.GetPos(ai.frame);
 		float metalIncome = Economy::GetMinMetalIncomeLast10s();
+        if(FrontlineEngineering::active && EngineeringReplacements::BaseEmergency()
+            && UnitHelpers::IsT2BotLab(facDef.GetName())) {
+            // Preserve the native combat selector, but close released workforce
+            // production while base defense owns the budget. Base air roles keep
+            // their ordinary priority in their own plant below.
+            array<string> workers=UnitHelpers::GetT2BotConstructors(side);
+            array<string> helpers=UnitHelpers::GetFastAssistBots(side);
+            for(uint i=0;i<workers.length();++i) {
+                CCircuitDef@ def=ai.GetCircuitDef(workers[i]);if(def !is null) def.maxThisUnit=def.count;
+            }
+            for(uint i=0;i<helpers.length();++i) {
+                CCircuitDef@ def=ai.GetCircuitDef(helpers[i]);if(def !is null) def.maxThisUnit=def.count;
+            }
+            return aiFactoryMgr.DefaultMakeTask(u);
+        }
 		GenericHelpers::LogUtil("[TECH][Factory] MakeTask called for factory '" + facDef.GetName() + "' (side=" + side + ")", 4);
 		// Debug: log current primary factory ids vs this unit
 		{
@@ -1028,15 +1114,27 @@ namespace RoleTech
             IUnitTask@ pending = aiFactoryMgr.GetPendingFactoryTask(u);
             if (pending !is null) return pending;
 			GenericHelpers::LogUtil("[TECH][Factory] Gantry detected ('" + facDef.GetName() + "')", 3);
+			// T3 rush opening (owner): the side's two units in turn, T3RushUnitCount in all
+			IUnitTask@ t3rush = Tech_T3RushProduce(u, side);
+			if (t3rush !is null) return t3rush;
             IUnitTask@ amphib = AmphibiousOps::Produce(u, botLabGate);
             if (amphib !is null) return amphib;
+			// owner, 2026-10-26: with a HeavyPair<Side> set the pair alternates from the
+			// gantry's first unit (after the t3rush units on that plan), whatever the income;
+			// one unit per ask (owner, 2026-10-27), so it goes Sol, Astraeus, Sol ... not five of each
+			if (TechHeavyChoice::HasPair(side))
+			{
+				IUnitTask @tPair = TechHeavyChoice::LateBatch(u, side, /*count*/ 1);
+				if (tPair !is null)
+					return tPair;
+			}
 			// If economy is very strong, queue a batch of signature experimentals.
 			// D-287: after the late latch the batch is the terrain's heavy (land:
 			// Thor-class, amphibious: Titan-class), the other heavy as fallback.
 			if (metalIncome > 200.0f)
 			{
 				IUnitTask @tSig = TechHeavyChoice::Late()
-					? TechHeavyChoice::LateBatch(u, side, /*count*/ 5)
+					? TechHeavyChoice::LateBatch(u, side, /*count*/ 1)   // owner, 2026-10-27: every pair batch is one unit
 					: Factory::EnqueueGantrySignatureBatch(u, side, /*count*/ 5, Task::Priority::HIGH);
 				if (tSig !is null)
 					return tSig;
@@ -1071,7 +1169,7 @@ namespace RoleTech
 		// D-109 (owner's rule): and keeps T1AirConstructorTarget of them: more than
 		// T1AirReleaseAbove carry the base so the T1 land constructors go forward
 		if (facDef.GetName() == UnitHelpers::GetT1AirPlantForSide(side)
-			&& (TechChain::AirConstructors() == 0 || TechForward::T1AirCons() < Global::RoleSettings::Tech::T1AirConstructorTarget))
+			&& (TechChain::AirConstructors() == 0 || TechForward::T1AirCons() < Global::RoleSettings::Tech::T1AirConstructorTarget + TechGantry::ExtraAirCons()))
 		{
 			CCircuitDef @airCon = ai.GetCircuitDef(UnitHelpers::GetT1AirConstructorNameForSide(side));
 			if (airCon !is null && airCon.IsAvailable(ai.frame))
@@ -1104,7 +1202,7 @@ namespace RoleTech
 			// D-119 (owner): T2 construction bots at most T2BotConstructorCap; the
 			// T2 air constructors (the dedicated roles, D-107) keep T2ConstructorCap
 			const bool botLab = UnitHelpers::IsT2BotLab(facDef.GetName());
-			const int t2Cons = botLab ? UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors())
+			const int t2Cons = botLab ? UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors(), true)
 				: UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2AirConstructors());
 			const int t2Cap = botLab ? Global::RoleSettings::Tech::T2BotConstructorCap : Global::RoleSettings::Tech::T2ConstructorCap;
 			const float stor = aiEconomyMgr.metal.storage;
@@ -1130,7 +1228,7 @@ namespace RoleTech
 		// Check T2 constructor threshold
 		if (UnitHelpers::IsT2BotLab(facDef.GetName()))
 		{
-			int t2CtorCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
+			int t2CtorCount = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors(), true);
 			if (t2CtorCount < Global::RoleSettings::Tech::MinimumT2ConstructorBots)
 			{
 				// Recruit only bot constructors from a bot lab
@@ -1154,7 +1252,7 @@ namespace RoleTech
 			if (Factory::primaryT2BotLab !is null && u.id == Factory::primaryT2BotLab.id)
 			{
 				array<string> fastAssist = UnitHelpers::GetFastAssistBots(side);
-				int haveAssist = UnitDefHelpers::SumUnitDefCounts(fastAssist);
+				int haveAssist = UnitDefHelpers::SumUnitDefCounts(fastAssist, true);
 				float metalCurrent = aiEconomyMgr.metal.current;
 				const float assistReserve = CompactEco::Active()
 					? Global::RoleSettings::Tech::CompactFastAssistMetalReserve
@@ -1408,13 +1506,17 @@ namespace RoleTech
 				// D-101 (owner's rule): while a construction turret stands the new one is
 				// placed by the layout (played: the rebuilt T1 lab went back into its old footprint)
 				if (isReset && fac != "") aiTerrainMgr.SetResetFactorySlot(Layout::ReserveFactorySite(ai.GetCircuitDef(fac)));
+				// D-451/C1: the disposable opening lab needs no protected road.
+				if (!isReset) LayoutHelpers::ExemptStartFactory(fac);
 				return fac;
 			}
 			else
 			{
 				GenericHelpers::LogUtil("[Tech_SelectFactoryHandler] nearestMapPosition is null", 2);
 				// Even if nearest start is unavailable, attempt a safe fallback
-				return FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				const string fallback = FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+				if (!isReset) LayoutHelpers::ExemptStartFactory(fallback);
+				return fallback;
 			}
 		}
 
@@ -1647,6 +1749,7 @@ namespace RoleTech
 		bool isT1BotCtor = (UnitHelpers::GetAllT1BotConstructors().find(name) >= 0);
 		bool isT2BotCtor = UnitHelpers::IsT2BotConstructor(name);
 		bool isFastAssist = (UnitHelpers::GetAllFastAssistBots().find(name) >= 0);
+        if(isFastAssist) EngineeringReplacements::Claim(unit);
 
 		if (isT1BotCtor || isT2BotCtor || isFastAssist)
 		{
@@ -1655,6 +1758,8 @@ namespace RoleTech
 		}
 
 		Team::Donation::OnConstructorBuilt(unit);   // a requested constructor goes to its requester; the rest are ours
+        TechAirFoundry::Added(unit);
+        FrontlineEngineering::Added(unit);
 		if (Team::IsT2Constructor(d))
 		{
 			aiFactoryMgr.isAssistRequired = false;
@@ -1663,6 +1768,8 @@ namespace RoleTech
 
 	void Tech_BuilderAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{ /* other bookkeeping moved to Builder::AiUnitRemoved */
+        TechAirFoundry::Removed(unit);
+        FrontlineEngineering::Removed(unit);
         if (unit !is null) {
             EcoPlanner::conversionReasons.delete("" + unit.id);
             floatAssistReasons.delete("" + unit.id);
@@ -1894,6 +2001,9 @@ namespace RoleTech
             if (done && bt == Task::BuildType::ENERGY && builderTask.buildDef !is null
                 && builderTask.buildDef.GetName() == TechChain::DefFor("afus"))
                 aiTerrainMgr.SetLayoutInt("tech.heavy.afus-completed", 1);
+            // D-491: INV-264, the first fusion and aircraft lab stand in the core
+            if (done && (bt == Task::BuildType::ENERGY || bt == Task::BuildType::FACTORY) && builderTask.target !is null)
+                Layout::CheckCore(builderTask.target);
 
 			// MexTracker bookkeeping is done role-independently in Builder::AiTaskRemoved.
 			if (bt == Task::BuildType::MEXUP)
@@ -1952,12 +2062,16 @@ namespace RoleTech
 			/*maxCap*/ Global::RoleSettings::Tech::MaxT2Builders);
 
 		UnitHelpers::BatchApplyUnitCaps(UnitHelpers::GetT2LandBuilders(side), t2BuilderCap);
-		// D-119: the T2 construction bots' hard cap, whatever raised it
+		// D-417: retained workforce cap plus explicit donation headroom.
 		{
 			array<string> t2Bots = UnitHelpers::GetAllT2BotConstructors();
 			for (uint i = 0; i < t2Bots.length(); ++i) {
 				CCircuitDef@ d = ai.GetCircuitDef(t2Bots[i]);
-				if (d !is null && d.maxThisUnit > Global::RoleSettings::Tech::T2BotConstructorCap) d.maxThisUnit = Global::RoleSettings::Tech::T2BotConstructorCap;
+				if (d !is null && d.maxThisUnit > 0)
+				{
+					const int limit = Team::Donation::ConstructorUnitLimit(d.count);
+					if (d.maxThisUnit != limit) d.maxThisUnit = limit;
+				}
 			}
 		}
 
@@ -2046,6 +2160,8 @@ namespace RoleTech
 	IUnitTask @Tech_TurretAssist(CCircuitUnit @u, bool factorySide = false)
 	{
 		if (u is null || u.circuitDef is null) return null;
+		IUnitTask@ economy=EconomyCluster::Assist(u,factorySide);
+		if(economy !is null) return economy;
 		const bool nukeRush = TechChain::NukeRush();
 		// step 1: a reclaim of ours in reach (D-290: only one the gate allows now)
 		if (!factorySide) {
@@ -2070,6 +2186,11 @@ namespace RoleTech
 		// step 2: nothing under construction within build distance + the largest
 		// frame radius means no ordered scan below can find one
 		if (Tech_TurretNearFrame(u) is null) return null;
+		// GantryNanoFirst (owner, 2026-10-26): a gantry block short of its turrets: a turret frame in reach first
+		if (!nukeRush && TechGantry::ShortCluster() !is null) {
+			CCircuitUnit@ nanoFrame = aiBuilderMgr.FindUnfinishedFor(u, TechFactories::Nano());
+			if (nanoFrame !is null) return Tech_TurretRepair(nanoFrame, factorySide, Task::Priority::HIGH);
+		}
 		if (nukeRush) {
 			// A silo is not in TECH's ordinary economic assist list. Native
 			// fallback can refuse a large frame while metal is low, leaving

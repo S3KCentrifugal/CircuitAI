@@ -13,6 +13,7 @@
 #include "spring/SpringUnit.h"
 #include "spring/SpringCallback.h"
 #include "util/Performance.h"
+#include "unit/ally/AllyTeam.h"
 #include "Damage.h"
 #include "WeaponMount.h"
 #include <algorithm>
@@ -23,6 +24,8 @@ namespace circuit {
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
 static const bool verifyRangedQueries=std::getenv("CIRCUIT_VERIFY_RANGED_QUERIES")!=nullptr;
+// A contact unseen for longer than this leaves the stall history (frames).
+static constexpr int HISTORY_FRAMES = 1800;
 bool CRangedWorld::PeerSeesCommander(const Contact& contact,CCircuitDef* def,const AIFloat3& shooter,float peerRadius) const
 {
     if(!contact.los || !contact.def || !contact.def->IsEnemyRoleAny(CCircuitDef::COMM)) return false;
@@ -41,39 +44,22 @@ bool CRangedWorld::PeerSeesCommander(const Contact& contact,CCircuitDef* def,con
     });
     return seen;
 }
-CRangedWorld::CRangedWorld(CCircuitAI* circuit): circuit(circuit), friendlyOrder(MAX_UNITS)
+CRangedWorld::CRangedWorld(CCircuitAI* circuit)
+    : circuit(circuit), observation(circuit->GetAllyTeam()->GetRangedObservation(circuit)),
+      contacts(observation->Contacts()), objectives(observation->Objectives()),
+      enemies(observation->Enemies()), staticHazards(observation->StaticHazards()),
+      clusterValues(observation->ClusterValues()), friends(observation->Friends()),
+      allies(observation->AlliesIndex()), history(MAX_UNITS,HISTORY_FRAMES)
 {
     const float width=float(circuit->GetMap()->GetWidth()*SQUARE_SIZE);
     const float height=float(circuit->GetMap()->GetHeight()*SQUARE_SIZE);
-    enemies.Configure(width,height); staticHazards.Configure(width,height);
-    allies.Configure(width,height); formations.Configure(width,height);
-    clusterValues.Configure(int(width/128.f)+1,int(height/128.f)+1);
+    formations.Configure(width,height);
 }
 CRangedWorld::Weapon::Weapon() = default;
 CRangedWorld::Weapon::~Weapon() = default;
 CRangedWorld::Weapon::Weapon(Weapon&&) noexcept = default;
 CRangedWorld::Weapon& CRangedWorld::Weapon::operator=(Weapon&&) noexcept = default;
 CRangedWorld::~CRangedWorld() = default;
-
-const CRangedWorld::Metadata& CRangedWorld::MetadataFor(CCircuitDef* def)
-{
-    auto [it, fresh] = metadata.try_emplace(def->GetId());
-    if (fresh) {
-        auto* ud = def->GetDef();
-        it->second = {float(ud->GetRadarRadius()), float(ud->GetJammerRadius()), def->GetLosRadius(), ud->GetArmorType()};
-        const auto& params = ud->GetCustomParams();
-        const auto level = params.find("techlevel");
-        if (level != params.end()) it->second.tech = float(std::atof(level->second.c_str()));
-        const std::unique_ptr<springai::WeaponDef> explosion(ud->GetDeathExplosion());
-        if(explosion) {
-            const std::unique_ptr<springai::Damage> damage(explosion->GetDamage());
-            const auto types=damage ? damage->GetTypes() : std::vector<float>{};
-            if(std::any_of(types.begin(),types.end(),[](float value){return value>0.f;}))
-                it->second.explosionRadius=explosion->GetAreaOfEffect();
-        }
-    }
-    return it->second;
-}
 
 const CRangedWorld::Capabilities& CRangedWorld::CapabilitiesFor(CCircuitDef* def)
 {
@@ -116,7 +102,9 @@ const CRangedWorld::Capabilities& CRangedWorld::CapabilitiesFor(CCircuitDef* def
             w.beamTargetBorder=std::max(0.f,wd->GetTargetBorder());
         }
         w.guided=wd->IsTracks();
-        w.high=w.def && w.def->IsHighTrajectory();
+        // highTrajectory 2 = switchable, fired low unless toggled (RangedPolicy::lowTrajectory).
+        w.high=w.def && w.def->IsHighTrajectory()
+            && !(def->GetRangedPolicy().lowTrajectory && w.ballistic && wd->GetHighTrajectory()==2);
         w.speed=wd->GetProjectileSpeed();
         w.gravity=wd->GetMyGravity()>0.f ? wd->GetMyGravity() : -circuit->GetMap()->GetGravity();
         c.weapons.push_back(std::move(w));
@@ -129,170 +117,19 @@ void CRangedWorld::Refresh()
     const int now=circuit->GetLastFrame();
     if (frame==now) return;
     performance::Scope measured(circuit,performance::RANGED_SNAPSHOT);
-    frame=now; contacts.clear(); friends.clear(); objectives.clear();
-    clusterValues.Clear();
-    enemies.Clear(); staticHazards.Clear(); formations.Clear();
-    alliesDirty = true;
-    largestRange=largestStaticRange=0.f; nonnegativeHazardCosts=finiteStaticHazards=true;
-    largestCohortHazard=0.f;
-    largestSpacing=0.f; largestFriendRadius=0.f; largestScreenRange=0.f;
-    // Profile threat suppression must not erase an actual weapon's coverage.
-    // Respect true fog, neutral/dying contacts and BAR's explicit ignoredByAI.
-    {
-    performance::Scope enemyPhase(circuit,performance::RANGED_ENEMIES);
-    for (const auto& [id,e]:circuit->GetEnemyManager()->GetEnemyUnits()) {
-        if (!e || !e->IsInRadarOrLOS()) continue;
-        const auto& data=e->GetData();
-        if (data.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
-        if (e->IsIgnore() && (!e->GetCircuitDef() || !e->GetCircuitDef()->IsIgnore()
-            || e->GetUnit()->GetRulesParamFloat("ignoredByAI",0.f)>0.f)) continue;
-        Contact c; c.id=id; c.def=e->GetCircuitDef(); c.pos=e->GetPos();
-        if(!c.def) {
-            // Unidentified radar contacts can support low-priority blind fire,
-            // but never invented precision identities, HP or threat estimates.
-            c.pos.y=circuit->GetTerrainManager()->GetAreaData()->GetElevationAt(c.pos.x,c.pos.z);
-            c.mobile=true;
-            // D-294: the engine reports a radar dot's velocity (UpdateInRadarData);
-            // a shooter uses it to tell a slow or stationary dot (blind shot
-            // allowed) from one too fast for its shell. Zero until sampled.
-            c.velocity=e->GetVel()*30.f;
-            enemies.Add(P(c.pos),int(contacts.size())); objectives.push_back(int(contacts.size()));
-            contacts.push_back(c); continue;
-        }
-        c.velocity=e->GetVel()*30.f; c.health=std::max(1.f,e->GetHealth());
-        c.radius=e->GetRadius(); c.cost=e->GetCost(); c.los=e->IsInLOS();
-        c.mobile=c.def->IsMobile();
-        c.armed=c.def->HasSurfToLand() && !e->IsBeingBuilt() && !e->IsDisarmed() && !e->IsParalyzed();
-        if(e->IsIgnore()) {
-            // The legacy enemy cache intentionally stops health/velocity
-            // updates for profile-ignored contacts. Refresh only observable
-            // fields here, without changing the global cache or other roles.
-            c.velocity=e->GetUnit()->GetVel()*30.f;
-            if(c.los) {
-                c.health=std::max(1.f,e->GetUnit()->GetHealth());
-                c.armed=c.def->HasSurfToLand() && !e->GetUnit()->IsBeingBuilt()
-                    && !e->GetUnit()->IsParalyzed() && e->GetUnit()->GetRulesParamFloat("disarmed",0.f)<=0.f;
-            }
-        }
-        c.groundRange=c.armed ? c.def->GetMaxRange(CCircuitDef::RangeType::LAND) : 0.f;
-        // Definition facts are immutable for this AI/game load. Resolve once
-        // per type, not once per candidate mount in every shooter's hot loop.
-        const auto& meta=MetadataFor(c.def);
-        c.armor=meta.armor; c.explosionRadius=meta.explosionRadius; c.tech=meta.tech;
-        c.hazardRadius=std::max(c.armed ? c.groundRange+c.radius : 0.f,c.explosionRadius);
-        largestRange=std::max(largestRange,c.hazardRadius);
-        // Reclaimers can be unarmed and exceed 600 elmos (including the
-        // advanced Legion construction turret). Keep this separate from the
-        // legacy weapon bound so existing ranged-query semantics stay exact.
-        largestCohortHazard=std::max(largestCohortHazard,std::max(c.hazardRadius,
-            c.def->IsAbleToReclaim()?c.def->GetBuildDistance()+c.radius:0.f));
-        if(!(c.hazardRadius<=0.f)) {
-            nonnegativeHazardCosts=nonnegativeHazardCosts && std::isfinite(c.cost) && c.cost>=0.f;
-            if(!c.mobile) {
-                staticHazards.Add(P(c.pos),int(contacts.size()));
-                largestStaticRange=std::max(largestStaticRange,c.hazardRadius);
-                finiteStaticHazards=finiteStaticHazards && std::isfinite(c.hazardRadius);
-            }
-        }
-        enemies.Add(P(c.pos),int(contacts.size()));
-        if (!c.def->IsAbleToFly()) objectives.push_back(int(contacts.size()));
-        contacts.push_back(c);
-        clusterValues.Get(int(c.pos.x/128.f),int(c.pos.z/128.f))+=c.cost;
-        auto& h=history[id];
-        if (c.los) {
-            if (now-h.frame>=300) {
-                // A repaired target remains legal, but repeated negligible net
-                // progress makes another useful shot preferable. Unknown repair
-                // income and hidden repairers are never inspected.
-                h.stalled=(h.frame>0 && h.engaged>=h.frame && h.health-c.health< std::max(20.f,h.health*.03f)) ? std::min(4,h.stalled+1) : 0;
-                h.health=c.health; h.frame=now;
-            }
-            h.seen=now;
-        }
-    }
-    // A small shared strategic shortlist bounds distant selection per shooter.
-    // Local contacts are never truncated; nearby emergencies retain response.
-    const auto order = [this](int a,int b) {
-        const auto& x=contacts[a]; const auto& y=contacts[b];
-        const float vx=x.cost*(x.mobile?1.f:2.f), vy=y.cost*(y.mobile?1.f:2.f);
-        return vx==vy ? x.id<y.id : vx>vy;
-    };
-    // Fixed shortlist: O(E log 16), rather than sorting every enemy per frame.
-    std::partial_sort(objectives.begin(),objectives.begin()+std::min(size_t(16),objectives.size()),objectives.end(),order);
-    if (objectives.size()>16) objectives.resize(16);
-    }
-    // UpdateFriendlyUnits rebuilds CAllyUnit + engine wrappers + map nodes for
-    // every ally. Calling it every ranged frame dominated measured snapshot
-    // cost. Read the same legal IDs/defs/positions into owned reusable storage.
-    // Order fresh IDs with reusable bits to retain old std::map traversal/ties.
-    // Every definition/position is still read at this observation instant: a
-    // unit ID can be reused between asks, even within one simulation frame.
-    // No borrowed
-    // wrapper survives and no global ally cache is invalidated by this reader.
-    {
-    performance::Scope friendlyPhase(circuit,performance::RANGED_FRIENDS);
-    auto* api=circuit->GetUnitAPI();
-    const int friendCount=api->GetFriendlyUnitIds(friendlyIds);
-    friendlyOrder.Sort(friendlyIds,friendCount);
-    auto* authority=circuit->GetAllyTeam()->GetAuthority();
-    const size_t definitionCount=authority->GetDefCount()+1;
-    if(friendlyDefinitions.size()!=definitionCount) {
-        friendlyDefinitions.resize(definitionCount);
-        friendlyDefinitionFrames.assign(definitionCount,-1);
-    }
-    for (int i=0;i<friendCount;++i) {
-        const int id=friendlyIds[i];
-        const int definitionId=circuit->GetCallback()->Unit_GetDefId(id);
-        if(definitionId<=0 || size_t(definitionId)>=definitionCount) continue;
-        auto& prototype=friendlyDefinitions[definitionId];
-        if(friendlyDefinitionFrames[definitionId]!=now) {
-            friendlyDefinitionFrames[definitionId]=now;
-            auto* definition=authority->GetCircuitDef(definitionId);
-            prototype.def=definition->IsAbleToFly() ? nullptr : definition;
-            if(prototype.def) {
-                const auto& metadata=MetadataFor(definition);
-                prototype.radius=definition->GetRadius();
-                prototype.screen=definition->IsAttacker() && (!definition->IsAttrRanged() || definition->GetRangedPolicy().coordinated);
-                prototype.radar=metadata.radar; prototype.jammer=metadata.jammer; prototype.los=metadata.los;
-                // D-295: O(D) per frame with the existing prototype; never per unit.
-                prototype.range=prototype.screen ? definition->GetMaxRange(CCircuitDef::RangeType::LAND) : 0.f;
-                prototype.assist=definition->IsAttrRanged() && definition->GetRangedPolicy().assistRadius>0.f;
-            }
-        }
-        if(!prototype.def) continue;
-        float raw[3]; api->GetPosition(id,raw);
-        AIFloat3 position(raw[0],raw[1],raw[2]); terrain::CTerrainData::CorrectPosition(position);
-        // Coordinated frontline bots retain their old screening role for
-        // precision artillery. Opting Thugs into ranged movement must not
-        // make allied Starlights/Sharpshooters stop recognizing their screen.
-        // O(N) live identity/position reads, O(D) definition interpretation for
-        // D represented types. No stale static-position assumptions or shared
-        // cross-AI authority. INV-148 compares every resulting field in tests.
-        Friend f=prototype; f.id=id; f.pos=position;
-        largestFriendRadius=std::max(largestFriendRadius,f.radius);
-        if(f.screen && !f.assist) largestScreenRange=std::max(largestScreenRange,f.range);
-        friends.push_back(f);
-    }
-    static const bool verify=std::getenv("CIRCUIT_VERIFY_RANGED_SNAPSHOT")!=nullptr;
-    if(verify) {
-        // Slow, opt-in differential oracle. Never enable in timing runs.
-        circuit->UpdateFriendlyUnits();
-        size_t index=0;
-        bool equal=true;
-        for(const auto& [id,u]:circuit->GetFriendlyUnits()) {
-            auto* d=u->GetCircuitDef(); if(!d || d->IsAbleToFly()) continue;
-            const auto p=u->GetPos(now);
-            if(index>=friends.size() || friends[index].id!=id || friends[index].pos!=p
-                || friends[index].radius!=d->GetRadius()
-                || friends[index].screen!=(d->IsAttacker() && (!d->IsAttrRanged() || d->GetRangedPolicy().coordinated))
-                || friends[index].radar!=MetadataFor(d).radar
-                || friends[index].jammer!=MetadataFor(d).jammer
-                || friends[index].los!=MetadataFor(d).los) equal=false;
-            ++index;
-        }
-        if(!equal || index!=friends.size()) circuit->LOG("[INVARIANT] INV-148 ranged friendly snapshot differs from legacy view");
-    }
-    }
+    frame=now; formations.Clear();
+    largestSpacing=0.f;
+    // D-462: the ally team's shared contacts for this frame and enemy revision
+    // (built here if this AI is the first reader since they changed), and this
+    // AI bound as the reader of the shared friend cells for its turn.
+    observation->AcquireContacts(circuit);
+    const auto& bounds=observation->Bounds();
+    largestRange=bounds.largestRange; largestStaticRange=bounds.largestStaticRange;
+    largestCohortHazard=bounds.largestCohortHazard;
+    nonnegativeHazardCosts=bounds.nonnegativeHazardCosts; finiteStaticHazards=bounds.finiteStaticHazards;
+    observation->BindFriends(circuit);
+    largestFriendRadius=0.f; // slots only; friends' radius comes from the observation per query
+    ObserveHistory(now);
     performance::Scope statePhase(circuit,performance::RANGED_STATE);
     for (auto it=slots.begin();it!=slots.end();) {
         auto* u=circuit->GetTeamUnit(it->first);
@@ -317,9 +154,6 @@ void CRangedWorld::Refresh()
             it=shots.erase(it);
         } else ++it;
     }
-    for (auto it=history.begin();it!=history.end();) {
-        if (now-it->second.seen>1800) it=history.erase(it); else ++it;
-    }
     for (auto it=escorts.begin();it!=escorts.end();) {
         if (!circuit->GetTeamUnit(it->first) || !slots.count(it->second.anchor)) it=escorts.erase(it); else ++it;
     }
@@ -341,18 +175,57 @@ void CRangedWorld::InvalidateCohortPlans(CohortPlan& group)
     if(partner!=cohorts.end()) partner->second.frame=partner->second.formationFrame=-1;
 }
 
+void CRangedWorld::ObserveHistory(int now)
+{
+    // Per-AI repair/stall tracking over the shared contacts, in contact order:
+    // the writes the pre-D-462 enemy pass made, then its 60-second expiry.
+    // O(E identified contacts) array writes; the expiry costs O(1) (INV-249).
+    performance::Scope measured(circuit,performance::RANGED_HISTORY);
+    const bool verify=CRangedObservation::verify;
+    for (const auto& c:contacts) {
+        if (!c.def) continue;
+        auto& entry=history.Touch(c.id); auto& h=entry.value;
+        if (c.los) {
+            if (now-h.frame>=300) {
+                // A repaired target remains legal, but repeated negligible net
+                // progress makes another useful shot preferable. Unknown repair
+                // income and hidden repairers are never inspected.
+                h.stalled=(h.frame>0 && h.engaged>=h.frame && h.health-c.health< std::max(20.f,h.health*.03f)) ? std::min(4,h.stalled+1) : 0;
+                h.health=c.health; h.frame=now;
+            }
+            entry.seen=now;
+        }
+        if (verify) {
+            auto& l=legacyHistory[c.id];
+            if (c.los) {
+                if (now-l.frame>=300) {
+                    l.stalled=(l.frame>0 && l.engaged>=l.frame && l.health-c.health< std::max(20.f,l.health*.03f)) ? std::min(4,l.stalled+1) : 0;
+                    l.health=c.health; l.frame=now;
+                }
+                l.seen=now;
+            }
+        }
+    }
+    history.Prune(now);
+    if (!verify) return;
+    for (auto it=legacyHistory.begin();it!=legacyHistory.end();) {
+        if (now-it->second.seen>HISTORY_FRAMES) it=legacyHistory.erase(it); else ++it;
+    }
+    bool equal=true;
+    for (const auto& c:contacts) {
+        const auto* e=history.Find(c.id); const auto l=legacyHistory.find(c.id);
+        if ((e==nullptr)!=(l==legacyHistory.end())) { equal=false; break; }
+        if (e && (e->seen!=l->second.seen || e->value.stalled!=l->second.stalled || e->value.frame!=l->second.frame
+                  || e->value.engaged!=l->second.engaged || e->value.health!=l->second.health)) { equal=false; break; }
+    }
+    if (!equal) circuit->LOG("[INVARIANT] INV-249 ranged contact history differs from the erasing map (team %d frame %d)",circuit->GetTeamId(),now);
+}
+
 void CRangedWorld::EnsureAllies() const
 {
-    if (!alliesDirty) return;
-    // Capture still occurs at Refresh's original observation instant, including
-    // fresh IDs, definitions and positions. Only derived indexing is lazy:
-    // enemy-only safety/withdrawal queries need no friendly buckets. Building
-    // once on first use preserves z/x/ascending-ID query order exactly. O(F+C)
-    // on demand, O(1) thereafter; no stale cross-frame/shared-AI observations.
-    performance::Scope measured(circuit,performance::RANGED_FRIENDS);
-    allies.Clear();
-    for (size_t index=0; index<friends.size(); ++index) allies.Add(P(friends[index].pos),int(index));
-    alliesDirty = false;
+    // D-462: friend cells load from the engine on first touch this frame, with
+    // this AI's callbacks; the data is what a full read at Refresh would hold.
+    observation->BindFriends(circuit);
 }
 void CRangedWorld::Leave(int id) {
     rushes.Leave(id);
@@ -397,7 +270,8 @@ bool CRangedWorld::FreeSlot(int id,const AIFloat3& pos,float spacing) const
 {
     const auto own=slots.find(id);
     const float radius=own==slots.end()?0.f:own->second.radius;
-    return !formations.Any(P(pos),std::max({spacing,largestSpacing,radius+largestFriendRadius}),[&](int other) {
+    const float friendRadius=std::max(largestFriendRadius,observation->FriendRadius());
+    return !formations.Any(P(pos),std::max({spacing,largestSpacing,radius+friendRadius}),[&](int other) {
         const auto it=slots.find(other); if(other==id || it==slots.end()) return false;
         // D-228: Thug screen reservations must not exclude the entire narrow
         // firing band of a Starlight behind them. Other artillery pairs retain
@@ -479,7 +353,7 @@ bool CRangedWorld::FriendlySplash(int id,const AIFloat3& target,float radius) co
 {
     if(radius<=16.f) return false;
     EnsureAllies();
-    return allies.Any(P(target),radius+largestFriendRadius,[&](int i) {
+    return allies.Any(P(target),radius+observation->FriendRadius(),[&](int i) {
         const auto& f=friends[i];
         return f.id!=id && target.SqDistance2D(f.pos)<std::pow(radius+f.radius,2.f);
     });
@@ -501,9 +375,9 @@ bool CRangedWorld::Engaged(int contact,float margin,int* ally) const
     // Only identified, currently visible ground contacts can be an allied
     // engagement; a radar dot or aircraft never pulls a precision gun forward.
     if(!c.def || !c.los || c.def->IsAbleToFly() || c.pos.y< -20.f) return false;
-    if(engagedFrame!=frame || engagedMargin!=margin) {
+    if(engagedFrame!=frame || engagedMargin!=margin || engagedGeneration!=observation->ContactGeneration()) {
         engagedMemo.assign(contacts.size(),-1); // reuses capacity
-        engagedFrame=frame; engagedMargin=margin;
+        engagedFrame=frame; engagedMargin=margin; engagedGeneration=observation->ContactGeneration();
     }
     int& memo=engagedMemo[contact];
     if(memo<0) {
@@ -511,9 +385,13 @@ bool CRangedWorld::Engaged(int contact,float margin,int* ally) const
         // Other assisters are excluded so assisting guns never bootstrap
         // each other forward. Allied teams' units are included because the
         // snapshot is GetFriendlyUnitIds (engine: same allyteam, not neutral).
+        // The broad phase is sized by the largest screen range of ALL allies,
+        // so this query needs the complete friend picture: one full read per
+        // side per frame, shared by every assister of the ally team.
         EnsureAllies();
+        observation->LoadAllFriends();
         int found=-1;
-        allies.Any(P(c.pos),largestScreenRange+margin+c.radius,[&](int k) {
+        allies.Any(P(c.pos),observation->ScreenRange()+margin+c.radius,[&](int k) {
             const auto& f=friends[k];
             if(!f.screen || f.assist || f.range<=0.f) return false;
             const float reach=f.range+margin+c.radius;
@@ -542,7 +420,7 @@ bool CRangedWorld::FriendlyLine(const Weapon& w,int id,const AIFloat3& from,cons
     // including their splash padding. Direct beams retain the height test.
     // The Medusa fixture requires zero allied damage as well as target kills.
     const float padding=w.guided ? std::max(8.f,w.splash) : 8.f;
-    return allies.Any(P((from+target)*.5f),std::sqrt(length)*.5f+largestFriendRadius+padding,[&](int i) {
+    return allies.Any(P((from+target)*.5f),std::sqrt(length)*.5f+observation->FriendRadius()+padding,[&](int i) {
         const auto& f=friends[i];
         if(f.id==id) return false;
         const float t=((f.pos.x-from.x)*delta.x+(f.pos.z-from.z)*delta.z)/length;
@@ -595,7 +473,8 @@ void CRangedWorld::ReleaseShot(int owner)
 void CRangedWorld::ReserveShot(int owner,int target,float damage,int until)
 {
     ReleaseShot(owner); shots[owner]={target,until,damage}; reserved[target]+=damage;
-    history[target].engaged=circuit->GetLastFrame();
+    history.Touch(target).value.engaged=circuit->GetLastFrame();
+    if(CRangedObservation::verify) legacyHistory[target].engaged=circuit->GetLastFrame();
 }
 float CRangedWorld::Reserved(int target,int owner) const
 {
@@ -604,7 +483,14 @@ float CRangedWorld::Reserved(int target,int owner) const
 }
 float CRangedWorld::Progress(int target,float penalty) const
 {
-    const auto it=history.find(target); return it==history.end()?1.f:std::max(.05f,std::pow(penalty,float(it->second.stalled)));
+    const auto* entry=history.Find(target);
+    const float progress=entry==nullptr?1.f:std::max(.05f,std::pow(penalty,float(entry->value.stalled)));
+    if(CRangedObservation::verify) {
+        const auto it=legacyHistory.find(target);
+        const float legacy=it==legacyHistory.end()?1.f:std::max(.05f,std::pow(penalty,float(it->second.stalled)));
+        if(legacy!=progress) circuit->LOG("[INVARIANT] INV-249 ranged progress differs from the erasing map (target %d)",target);
+    }
+    return progress;
 }
 float CRangedWorld::ClusterValue(const AIFloat3& target,float radius) const
 {

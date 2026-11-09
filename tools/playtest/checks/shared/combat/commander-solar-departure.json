@@ -1,0 +1,79 @@
+{
+  "stop_minute": 5,
+  "expect": [
+    {
+      "key": "solar offered",
+      "pattern": "\\[CommanderWork\\] unit=(?P<unit>\\d+) work=22 solar=armsolar",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "solar frame",
+      "pattern": "child id=(?P<solar>\\d+) parent=(?P<unit>\\d+) unit=armsolar",
+      "scope": "any",
+      "after_key": "solar offered",
+      "by_minute": 2,
+      "same_as": "solar offered"
+    },
+    {
+      "key": "solar completed",
+      "pattern": "construction_completed unit=(?P<unit>\\d+) target=(?P<solar>\\d+) team=0 def=armsolar",
+      "scope": "any",
+      "after_key": "solar frame",
+      "by_minute": 2,
+      "same_as": "solar frame"
+    },
+    {
+      "key": "factory assistance",
+      "pattern": "factory_assist unit=(?P<unit>\\d+) target=\\d+",
+      "scope": "any",
+      "by_minute": 2,
+      "after_key": "solar completed",
+      "same_as": "solar offered"
+    },
+    {
+      "key": "ready after solar",
+      "pattern": "\\[CommanderFront\\] ready=1",
+      "scope": "any",
+      "by_minute": 2,
+      "after_key": "solar completed"
+    },
+    {
+      "key": "leaves base",
+      "pattern": "\\[CoverageProbe\\] advanced_in_lane team=0(?:\\D|$)",
+      "scope": "any",
+      "by_minute": 5,
+      "after_key": "ready after solar"
+    },
+    {
+      "key": "assist yields to deployment",
+      "pattern": "\\[CommanderFront\\] unit=(?P<unit>\\d+) deploy ",
+      "scope": "any",
+      "by_minute": 3,
+      "after_key": "ready after solar",
+      "same_as": "factory assistance"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    }
+  ]
+}

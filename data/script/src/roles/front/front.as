@@ -13,6 +13,8 @@
 #include "../../systems/production/front_opener.as"
 #include "../../systems/combat/land_siege.as"
 #include "../../systems/construction/front_geothermal.as"
+#include "../../systems/construction/front_layout.as"
+#include "../../systems/production/front_factory_support.as"
 #include "../../systems/construction/commander_front.as"
 // Builder state and helpers for enqueueing structures like nanos
 #include "../../manager/builder.as"
@@ -52,6 +54,7 @@ namespace RoleFront {
         g_frontVehicleThresholdsApplied = false;
 
         Front_ApplyStartLimits();
+        FrontEnergy::Update();
 
         // Log all strategic objectives with distance from start
         ObjectiveHelpers::LogAllObjectivesFromStart(AiRole::FRONT, "FRONT");
@@ -189,6 +192,7 @@ namespace RoleFront {
     const int FRONT_DYNAMIC_QUOTA_DELAY_FRAMES = Global::RoleSettings::Front::DynamicQuotaDelaySeconds * SECOND;
 
     void Front_MainUpdate() {
+        FrontConstructors::Watch();   // D-465: stale geothermal orders of the energy seat, every second
         // Delay dynamic quota adjustments until 5 minutes into the game to avoid
         // early-game oscillations while armies and caches are still forming.
         if (ai.frame < FRONT_DYNAMIC_QUOTA_DELAY_FRAMES) {
@@ -209,6 +213,7 @@ namespace RoleFront {
         float metalIncome = Economy::GetMinMetalIncomeLast10s();
         float energyIncome = Economy::GetMinEnergyIncomeLast10s();
         Front_IncomeLimits(metalIncome, energyIncome);
+        FrontLayout::CheckFirstFactory();   // D-494: INV-267
 
         // One-time switch for T1 combat units to 'raider' role when metal income > 250
         if (!g_frontT1CombatRoleSwitchDone && metalIncome > 250.0f) {
@@ -451,10 +456,14 @@ namespace RoleFront {
     string Front_SelectFactoryHandler(const AIFloat3& in pos, bool isStart, bool isReset) {
         if(isStart) {
             if(Global::Map::NearestMapStartPosition !is null) {
-                return FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                const string selected=FactoryHelpers::SelectStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                FrontLayout::Plan(selected,Global::AISettings::Side);
+                return selected;
             } else {
                 GenericHelpers::LogUtil("[Front_SelectFactoryHandler] nearestMapPosition is null", 2);
-                return FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                const string selected=FactoryHelpers::GetFallbackStartFactoryForRole(Global::AISettings::Role, Global::AISettings::Side);
+                FrontLayout::Plan(selected,Global::AISettings::Side);
+                return selected;
             }
         }
    
@@ -464,6 +473,7 @@ namespace RoleFront {
     // Factory unit lifecycle hooks (Front role)
     void Front_FactoryAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
     {
+        FrontFactorySupport::Added(unit);
         if (unit is null) {
             GenericHelpers::LogUtil("[FRONT] FactoryAiUnitAdded: unit=<null>", 2);
             return;
@@ -471,6 +481,8 @@ namespace RoleFront {
 
         if (usage != Unit::UseAs::FACTORY)
 		return;
+
+        FrontLayout::Adopt(unit);
 
         const CCircuitDef@ facDef = unit.circuitDef;
         string factoryName = (facDef is null ? "" : facDef.GetName());
@@ -497,6 +509,7 @@ namespace RoleFront {
 
     void Front_FactoryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
     {
+        FrontFactorySupport::Removed(unit);
         //GenericHelpers::LogUtil("[FRONT] FactoryAiUnitRemoved id=" + (unit is null ? -1 : unit.id) + " usage=" + usage, 3);
         FrontOpener::FactoryRemoved(unit);
     }
@@ -507,6 +520,11 @@ namespace RoleFront {
     }
 
     bool Front_AiIsSwitchAllowed(const CCircuitDef@ facDef, float armyCost, int factoryCount, float metalCurrent, bool &out assistRequired) {
+        if (facDef !is null && (Factory::userData[facDef.id].attr & Factory::Attr::T2) != 0
+            && !Team::Donation::FrontFactoryAllowed()) {
+            assistRequired = false;
+            return false;
+        }
         const bool isOK = (armyCost > Global::RoleSettings::Front::SwitchFactoryCostMultiplier * facDef.costM * float(factoryCount)) || (metalCurrent > facDef.costM);
         assistRequired = !isOK;
         return isOK;
@@ -558,6 +576,8 @@ namespace RoleFront {
         if (builder is null) return null; // Defensive check
 
         if(UnitHelpers::IsCommander(builder.circuitDef)) {
+            IUnitTask@ startFactory=Front_StartFactoryTakeover(builder);
+            if(startFactory !is null) return startFactory;
             IUnitTask@ frontWork=CommanderFront::Work(builder);
             if(frontWork !is null) return frontWork;
         }
@@ -576,6 +596,13 @@ namespace RoleFront {
         IBuilderTask@ defaultBuilderTask = cast<IBuilderTask>(defaultTask);
         if (defaultBuilderTask !is null) {
             Task::BuildType dbt = Task::BuildType(defaultBuilderTask.GetBuildType());
+            // D-494: before its first factory the commander does not walk to a mex
+            // farther than StartFactoryMexRadius from the start: it builds the
+            // factory (queued, else the planned one) instead.
+            if (UnitHelpers::IsCommander(udef) && (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP)) {
+                IUnitTask@ factory = Front_StartFactoryBeforeFarMex(builder, defaultBuilderTask);
+                if (factory !is null) { aiBuilderMgr.AbortTask(defaultTask); return factory; }
+            }
             if (dbt == Task::BuildType::MEX || dbt == Task::BuildType::MEXUP ||
                 dbt == Task::BuildType::GEO || dbt == Task::BuildType::GEOUP ||
                 dbt == Task::BuildType::ENERGY) {
@@ -642,6 +669,52 @@ namespace RoleFront {
         return defaultTask;
     }
 
+    // D-461: native creates the start factory only once energy income covers
+    // it; short of that it queues an energy task and holds the factory until
+    // an energy task finishes. The commander, the only builder, kept taking
+    // CommanderFront mex work, so nobody built the energy and no factory was
+    // queued for six minutes (played: Tartar Steppe team 3, Glitters team 7,
+    // Smolders teams 3 and 12). After StartFactoryTakeoverSeconds with no
+    // factory standing, the commander takes the queued start factory, else the
+    // queued energy that gates it. FindQueuedTask keeps native's safe-reach
+    // test. O(factory + energy tasks), only until the first factory stands.
+    string g_frontStartFactoryTakeoverLogged = "";
+
+    // D-494: the commander's next mex lies beyond StartFactoryMexRadius of the
+    // start and no factory stands: the start factory comes first. O(1) plus one
+    // queued-task lookup, only until the first factory stands.
+    IUnitTask@ Front_StartFactoryBeforeFarMex(CCircuitUnit@ comm, IBuilderTask@ mex)
+    {
+        const float radius = Global::RoleSettings::Front::StartFactoryMexRadius;
+        if (radius <= 0.f || comm is null || mex is null || aiFactoryMgr.GetFactoryCount() > 0) return null;
+        if (MapHelpers::SqDist(mex.GetBuildPos(), Global::Map::StartPos) <= radius * radius) return null;
+        IUnitTask@ task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::FACTORY));
+        if (task is null) @task = FrontLayout::OrderFirstFactory();
+        if (task !is null)
+            GenericHelpers::LogUtil("[FRONT] commander " + comm.id + " builds the start factory before a mex "
+                + int(sqrt(MapHelpers::SqDist(mex.GetBuildPos(), Global::Map::StartPos))) + " from the start (D-494)", 1);
+        return task;
+    }
+    IUnitTask@ Front_StartFactoryTakeover(CCircuitUnit@ comm)
+    {
+        const float after = Global::RoleSettings::Front::StartFactoryTakeoverSeconds;
+        if (after <= 0.f || ai.frame < int(after * SECOND) || aiFactoryMgr.GetFactoryCount() > 0) return null;
+        string what = "start factory";
+        IUnitTask@ task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::FACTORY));
+        // D-494: native has not queued it (its metal gate holds): order the planned one.
+        if (task is null) { what = "planned start factory"; @task = FrontLayout::OrderFirstFactory(); }
+        if (task is null) {
+            what = "energy holding the start factory";
+            @task = aiBuilderMgr.FindQueuedTask(comm, int(Task::BuildType::ENERGY));
+        }
+        if (task is null) return null;
+        if (g_frontStartFactoryTakeoverLogged != what) {
+            g_frontStartFactoryTakeoverLogged = what;
+            GenericHelpers::LogUtil("[FRONT] commander " + comm.id + " takes the queued " + what + " after " + int(after) + " s with no factory standing", 1);
+        }
+        return task;
+    }
+
     /******************************************************************************
 
     BUILDER LOGIC (COMMANDER)
@@ -691,6 +764,7 @@ namespace RoleFront {
 
     void Front_BuilderAiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        FrontFactorySupport::Added(unit);
 		//LogUtil("BUILDER::AiUnitAdded:" + unit.circuitDef, 2);
 		const CCircuitDef@ cdef = unit.circuitDef;
 		if (usage != Unit::UseAs::BUILDER || cdef.IsRoleAny(Unit::Role::COMM.mask))
@@ -715,6 +789,7 @@ namespace RoleFront {
 
     void Front_BuilderAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        FrontFactorySupport::Removed(unit);
 		if (energizer1 is unit)
 			@energizer1 = null;
 		else if (energizer2 is unit)
@@ -747,6 +822,7 @@ namespace RoleFront {
         //Always apply map limits, regardless of how eco changes labs limits
         dictionary mapLimits = Global::Map::Config.UnitLimits;
         UnitHelpers::ApplyUnitLimits(mapLimits);
+        FrontEnergy::Update(true); // map caps must not reopen an unaffordable AFUS
     }
 
     void Front_IncomeLabLimits(float metalIncome) {
@@ -800,6 +876,10 @@ namespace RoleFront {
         if (energyIncome > Global::RoleSettings::Front::NanoEnergyIncomeThresholdForMax) {
             nanoCap = Global::RoleSettings::Front::NanoMaxCount;
         }
+        // D-486: while metal floats, fill mode may add FillWorkers turrets past
+        // the energy cap (played: the cap, energy income / 150, held a FRONT AI
+        // at +58 metal/s to its turrets, and every fill ask was refused).
+        nanoCap = AiMax(nanoCap, FrontFactorySupport::FillCapFloor());
         array<string> nanos = UnitHelpers::GetT1NanoUnitNames();
         UnitHelpers::BatchApplyUnitCaps(nanos, nanoCap);
     }
@@ -831,10 +911,16 @@ namespace RoleFront {
         bool allowFirstNanoByIncome = (metalIncome > Global::RoleSettings::Front::NanoMinIncomeForFirst && existingNanos < 1);
 
         if (allowByReserves || allowFirstNanoByIncome) {
-            CCircuitUnit@ targetFactory = Factory::SelectFactoryNeedingNano();
+            CCircuitUnit@ targetFactory = FrontFactorySupport::Active()
+                ? FrontFactorySupport::FactoryNeedingSupport() : Factory::SelectFactoryNeedingNano();
             if (targetFactory !is null && (!baseOnly || MapHelpers::SqDist(targetFactory.GetPos(ai.frame), Global::Map::StartPos)
                 <= Global::RoleSettings::Front::BaseSupportRadius * Global::RoleSettings::Front::BaseSupportRadius)) {
-                IUnitTask@ tNano = Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::HIGH);
+                // FRONT uses completed reachable power and live queued tasks,
+                // not the legacy lifetime enqueue counter (which survives loss).
+                IUnitTask@ tNano = FrontFactorySupport::Active() && FrontFactorySupport::OwnsFactory(targetFactory)
+                    ? Builder::EnqueueT1Nano(UnitHelpers::GetSideForUnitName(targetFactory.circuitDef.GetName()),
+                        targetFactory.GetPos(ai.frame),SQUARE_SIZE*24,300*SECOND,Task::Priority::HIGH)
+                    : Factory::EnqueueNanoForFactory(targetFactory, Task::Priority::HIGH);
                 if (tNano !is null) return tNano;
             }
         }
@@ -963,9 +1049,8 @@ namespace RoleFront {
     }
 
     IUnitTask@ Front_T2Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask, bool isEnergyFull, float metalIncome, float energyIncome, float metalCurrent, bool isEnergyLessThan90Percent) {
-        // Copy of TECH T2 constructor logic with Front-specific gating:
-        // - Before 20 minutes of game time, force eco: only build energy converter/AFUS/FUS (skip gantry/nuke/anti-nuke)
-        // - After 20 minutes, allow full TECH-style sequence (gantry, nuke, anti-nuke, etc.)
+        // Normal fusion stays eligible until both FRONT AFUS income floors clear.
+        // Native default energy selection observes the same availability gate.
 
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
 
@@ -975,22 +1060,19 @@ namespace RoleFront {
         }
 
         const bool isPrimary = (u is Builder::primaryT2BotConstructor || u is Builder::primaryT2VehConstructor);
-        const bool isSecondary = (u is Builder::secondaryT2BotConstructor);
 
         AIFloat3 anchor = Global::Map::StartPos;
 
-        // Eco gating: force economy builds for the first 20 minutes
-        const bool forceEco = (ai.frame < (Global::RoleSettings::Front::TimeTriggerForT2EcoGatingSeconds * SECOND));
-
         if (isPrimary) {
             // Fusion Reactor
-            if (EconomyHelpers::ShouldBuildFusionReactor(
+            if (FrontEnergyMath::NormalAllowed(
                 /*mi*/ metalIncome,
                 /*ei*/ energyIncome,
                 /*energy<90%*/ isEnergyLessThan90Percent,
                 /*reqMi*/ Global::RoleSettings::Front::MinimumMetalIncomeForFUS,
                 /*reqEi*/ Global::RoleSettings::Front::MinimumEnergyIncomeForFUS,
-                /*maxEi*/ Global::RoleSettings::Front::MaxEnergyIncomeForFUS
+                /*maxEi*/ Global::RoleSettings::Front::MaxEnergyIncomeForFUS,
+                /*advancedAllowed*/ FrontEnergy::AdvancedAllowed(metalIncome, energyIncome)
             )) {
                 IUnitTask@ tFus2 = Builder::EnqueueFUS(unitSide, anchor, SQUARE_SIZE * 32, SECOND * 300);
                 if (tFus2 !is null) return tFus2;

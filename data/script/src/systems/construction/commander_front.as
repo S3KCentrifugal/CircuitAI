@@ -1,4 +1,5 @@
 #include "commander_group.as"
+#include "../team/engineering_lanes.as"
 // FRONT duty is offered before default economy can enqueue a base job.
 // Only task offers mutate native structure ownership; combat can preempt them.
 namespace CommanderFront {
@@ -7,6 +8,7 @@ namespace CommanderFront {
     bool Ready() {
         if(Global::AISettings::Role!=AiRole::FRONT) return false;
         if(wasReady && aiSetupMgr.ConfigFloat("commander/combat/front_persistent",0.f)>0.f) return true;
+        if(FrontConstructors::OpeningFactory() !is null) return FrontConstructors::OpeningComplete();
         if(aiFactoryMgr.GetFactoryCount()<1) return false;
         for(uint i=0;i<nanos.length();++i) {
             CCircuitDef@ def=ai.GetCircuitDef(nanos[i]);
@@ -15,6 +17,7 @@ namespace CommanderFront {
         return false;
     }
     void Update() {
+        EngineeringLanes::Publish();
         CommanderGroup::Update();
         const bool ready=Ready();
         aiBuilderMgr.SetCommanderCombatOption("front_ready",ready?1.f:0.f);

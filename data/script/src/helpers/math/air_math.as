@@ -203,8 +203,17 @@ namespace AirMath {
     bool MassBombersReady(int completedAdvancedFusions, int required) { return required <= Zero || completedAdvancedFusions >= required; }
     bool EnergyEraAllows(bool basicEnergy, bool advancedSolar, bool fusionUp, bool advancedFusionStarted) {
         if (basicEnergy) return !fusionUp && !advancedFusionStarted;
-        if (advancedSolar) return !advancedFusionStarted;
+        if (advancedSolar) return !fusionUp && !advancedFusionStarted;
         return true;
+    }
+    // Retire one generator, accounting for other admitted refunds/output.
+    bool EnergyRetirementFits(float income, float pull, float output, float pendingOutput,
+        float margin, float bank, float storage, float refund, float pendingRefund) {
+        return Valid(income) && Valid(pull) && Valid(output) && Valid(pendingOutput)
+            && Valid(margin) && margin >= 1.0f && Valid(bank) && Valid(storage)
+            && Valid(refund) && Valid(pendingRefund)
+            && income - pendingOutput - output >= pull * margin
+            && storage - bank >= pendingRefund + refund;
     }
     int OpeningWave(int low, int high, int roll) {
         if (low < One) low = One;

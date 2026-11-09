@@ -1,0 +1,66 @@
+{
+  "stop_minute": 1.5,
+  "complete_on": {
+    "key": "complete",
+    "pattern": "\\[TechWorkforce\\] complete",
+    "scope": "any"
+  },
+  "completion_grace_seconds": 8,
+  "expect": [
+    {
+      "key": "fixture",
+      "pattern": "\\[TechWorkforce\\] PASS fixture",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "assist_replaces_surplus_constructor",
+      "pattern": "\\[TechWorkforce\\] PASS assist_replaces_surplus_constructor",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "queued_assist_counts",
+      "pattern": "\\[TechWorkforce\\] PASS queued_assist_counts",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "second_lab_no_constructor",
+      "pattern": "\\[TechWorkforce\\] PASS second_lab_no_constructor",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "donation_admitted_at_home_cap",
+      "pattern": "\\[TechWorkforce\\] PASS donation_admitted_at_home_cap",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "donation_queue_counted",
+      "pattern": "\\[TechWorkforce\\] PASS donation_queue_counted",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "economy_preserves_delivery_headroom",
+      "pattern": "\\[TechWorkforce\\] PASS economy_preserves_delivery_headroom",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "headroom_released",
+      "pattern": "\\[TechWorkforce\\] PASS headroom_released",
+      "scope": "any",
+      "by_minute": 1
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[TechWorkforce\\] FAIL|\\[INVARIANT\\]|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

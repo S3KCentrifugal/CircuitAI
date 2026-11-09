@@ -1,0 +1,86 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "subject",
+      "pattern": "\\[RangedArena\\].*spawn id=(?P<unit>\\d+) team=0 unit=armcom",
+      "scope": "any",
+      "by_minute": 0.4
+    },
+    {
+      "key": "income cloak before battle",
+      "pattern": "\\[CommanderPosture\\] unit=(?P<unit>\\d+).*cloak=1 reason=front economy cloak",
+      "scope": "any",
+      "by_minute": 0.7,
+      "same_as": "subject"
+    },
+    {
+      "key": "brawl",
+      "pattern": "\\[CommanderPosture\\] unit=(?P<unit>\\d+) posture=brawl cloak=0 .*dps=[1-9]\\d*",
+      "scope": "any",
+      "by_minute": 1.2,
+      "after_key": "income cloak before battle",
+      "same_as": "subject"
+    },
+    {
+      "key": "shot",
+      "pattern": "\\[Commander\\] unit=(?P<unit>\\d+).*shot_confirmed",
+      "scope": "any",
+      "by_minute": 1.5,
+      "same_as": "subject",
+      "after_key": "brawl"
+    },
+    {
+      "key": "lane enemy reach",
+      "pattern": "\\[LaneFrontProbe\\].*\\|[0-9.]+,[0-9.]+,[24](?:\\||$)",
+      "scope": "any",
+      "by_minute": 1.5
+    },
+    {
+      "key": "lane active combat",
+      "pattern": "\\[LaneFrontProbe\\].*\\|[0-9.]+,[0-9.]+,3(?:\\||$)",
+      "scope": "any",
+      "by_minute": 1.5
+    },
+    {
+      "key": "lane bounded advance",
+      "pattern": "\\[LaneFrontBound\\] 0(?:\\.0+)?$",
+      "scope": "any",
+      "after_minute": 0.4,
+      "by_minute": 1.5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "cloak flapping",
+      "pattern": "\\[CommanderCloak\\] unit=\\d+ minute=\\d+ .*toggles=([6-9]|\\d\\d)",
+      "scope": "any"
+    }
+  ]
+}

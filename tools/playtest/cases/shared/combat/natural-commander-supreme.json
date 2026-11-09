@@ -1,0 +1,26 @@
+{
+  "name": "commander-natural-supreme",
+  "description": "D-388/D-389: natural 8v8 Supreme Isthmus, experimental_balanced: every faction commander runs on the commander controller; no invariant, script error, preset problem or posture flapping; per-minute cloak energy is logged for every commander.",
+  "runner": "tools/playtest/playtest.py",
+  "arguments": [
+    "run",
+    "--map",
+    "Supreme Isthmus v1.7",
+    "--roles",
+    "all",
+    "--side",
+    "armada",
+    "--ai-option",
+    "profile=experimental_balanced",
+    "--ai-option",
+    "random_seed=3870",
+    "--mode",
+    "fast",
+    "--speed",
+    "20",
+    "--headless",
+    "--minutes",
+    "15"
+  ],
+  "checks": "shared/combat/commander-natural.json"
+}

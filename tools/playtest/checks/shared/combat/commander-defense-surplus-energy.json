@@ -1,0 +1,55 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "rules",
+      "pattern": "\\[DefenseFixture\\] applied",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "T2 admitted",
+      "pattern": "\\[CommanderGroup\\] admitted seat=0 unit=\\d+",
+      "scope": "any",
+      "by_minute": 2
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "rule rejected",
+      "pattern": "\\[DefenseFixture\\] ERROR",
+      "scope": "any"
+    },
+    {
+      "key": "unfunded surplus",
+      "pattern": "\\[DefensePlanner\\] choice=.*surplus=1",
+      "scope": "any"
+    }
+  ]
+}

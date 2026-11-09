@@ -6,6 +6,7 @@
 #include "../../helpers/common/generic_helpers.as"
 #include "../../helpers/units/unit_helpers.as"
 #include "../../helpers/spatial/map_helpers.as"
+#include "../../helpers/math/ferry_math.as"
 #include "roster.as"
 #include "heavy_transport.as"
 #include "../presentation/widget_link.as"
@@ -111,12 +112,12 @@ namespace Ferry {
     int  runStart = -1;            // D-110: the frame the run in flight began (INV-042)
     // D-110 (owner's rule): the cargo of a run is not interrupted until the drop-off
     bool IsCargo(int id) { return cargoId >= 0 && id == cargoId; }
-    // D-112 (owner: a T2 constructor built for a teammate is allowed no action and
-    // given no order, so the pickup cannot go wrong): a gift is the one in flight
-    // or one queued behind it; from the moment it is a gift it is out of TECH's
-    // builder pool, parked behind the base on open ground, clear of the factory
-    // lanes and of TECH's own builders
+    // Gifts remain outside TECH's builder pool. Queued gifts may walk toward
+    // their recipient; once selected, native cargo hold owns pickup and flight.
     bool IsGift(int id) { return IsCargo(id) || queuedCargo.find(id) >= 0; }
+    // Stable IDs only. Set when logistics installs a wait, erased on removal.
+    // An unrelated pre-existing WAIT must not suppress the first walking order.
+    dictionary waitingOrders;
 
     // Caller has established IsGift. Resolve exclusive logistics ownership
     // before shared builder providers, tracking gates and idle-work fallbacks.
@@ -126,9 +127,63 @@ namespace Ferry {
         IUnitTask@ current = unit.task;
         IBuilderTask@ builderTask = cast<IBuilderTask>(current);
         if (IsCargo(unit.id) && current !is null && !current.IsDead() && builderTask is null) return current;
-        if (current !is null && !current.IsDead() && current.GetType() == Task::Type::WAIT)
+        if (current !is null && !current.IsDead() && current.GetType() == Task::Type::WAIT
+            && waitingOrders.exists("" + unit.id))
             return current;
-        return Park(unit, false);
+        return WaitForDelivery(unit, false);
+    }
+    // Same recipient anchor for walking and pickup admission. Air landing may
+    // still pull back/search nearby to avoid occupied ground.
+    bool DeliveryDestination(int id, int recipient, AIFloat3& out destination)
+    {
+        if (dropOverrides.get("" + id, destination)) return true;
+        Team::Roster::Entry@ ally = Team::Roster::Get(recipient);
+        if (ally is null) return false;
+        destination = ally.firstMex.x >= 0.0f ? ally.firstMex : ally.startPos;
+        return destination.x >= 0.0f && destination.z >= 0.0f;
+    }
+    bool NearDestination(CCircuitUnit@ unit, const AIFloat3& in destination)
+    {
+        return FerryMath::Arrived(MapHelpers::SqDist(unit.GetPos(ai.frame), destination),
+            Global::Ferry::WalkArrivalRadius);
+    }
+    IUnitTask@ WaitForDelivery(CCircuitUnit@ unit, bool assign = true)
+    {
+        const int slot = queuedCargo.find(unit.id);
+        AIFloat3 destination;
+        // Query connected movement areas only on assignment, never every tick.
+        // Engine pathing resolves the actual walk. No new route cache or scan.
+        if (slot < 0 || !DeliveryDestination(unit.id, queuedRecipient[slot], destination)
+            || !aiTerrainMgr.CanReachAt(unit, destination, 0.0f)) return Park(unit, assign);
+        IUnitTask@ wait = aiBuilderMgr.Enqueue(TaskB::Wait(Global::Ferry::ParkWaitSeconds * SECOND));
+        if (wait is null) return null;
+        waitingOrders.set("" + unit.id, true);
+        if (assign) aiBuilderMgr.AssignTask(unit, wait);
+        if (!NearDestination(unit, destination)) unit.CmdMoveTo(destination);
+        GenericHelpers::LogUtil("[Ferry] TECH: gift " + unit.id + " walking while awaiting pickup", 1);
+        return wait;
+    }
+    void GiveQueuedArrivals()
+    {
+        // O(Q) scan at the existing 1 Hz tick, Q = queued donated constructors.
+        // Each actual arrival shifts at most Q FIFO entries; idle ticks allocate
+        // no tasks and issue no movement. See ferry-walk and ferry_math_tests.
+        // Remove before GiveUnits: transfer callbacks can mutate this queue.
+        for (int i = int(queuedCargo.length()) - 1; i >= 0; --i) {
+            const int id = queuedCargo[i], recipient = queuedRecipient[i];
+            CCircuitUnit@ unit = ai.GetTeamUnit(id);
+            AIFloat3 destination;
+            if (unit is null || !DeliveryDestination(id, recipient, destination)
+                || !NearDestination(unit, destination)) continue;
+            queuedCargo.removeAt(i);
+            queuedRecipient.removeAt(i);
+            dropOverrides.delete("" + id);
+            runAttempts.delete("" + id);
+            waitingOrders.delete("" + id);
+            array<CCircuitUnit@> give = {unit};
+            ai.GiveUnits(give, recipient);
+            GenericHelpers::LogUtil("[Ferry] TECH: walking arrival " + id + " given to team " + recipient, 1);
+        }
     }
     AIFloat3 runDrop;              // D-112: where the run in flight drops
     dictionary runAttempts;        // D-112: unit id -> flown runs tried
@@ -159,6 +214,7 @@ namespace Ferry {
         const AIFloat3 spot = ParkSpot(slot);
         IUnitTask@ w = aiBuilderMgr.Enqueue(TaskB::Wait(Global::Ferry::ParkWaitSeconds * SECOND));
         if (w is null) return null;
+        waitingOrders.set("" + u.id, true);
         if (assign) aiBuilderMgr.AssignTask(u, w);
         if (MapHelpers::SqDist(u.GetPos(ai.frame), spot) > 64.0f * 64.0f) u.CmdMoveTo(spot);
         GenericHelpers::LogUtil("[Ferry] TECH: gift " + u.circuitDef.GetName() + " " + u.id + " parked at (" + int(spot.x) + ", " + int(spot.z)
@@ -429,6 +485,8 @@ namespace Ferry {
     void OnUnitRemoved(CCircuitUnit@ unit)
     {
         if (unit is null) return;
+        waitingOrders.delete("" + unit.id);
+        runAttempts.delete("" + unit.id);
         dropOverrides.delete("" + unit.id);
         if (unit.id == buildingId) {
             buildingId = -1;
@@ -520,6 +578,9 @@ namespace Ferry {
         if (!IsEnabled()) return _Refuse("ferry disabled");
         if (cargo is null || recipient < 0) return _Refuse("no cargo or no recipient");
         if (useProvidedDrop) dropOverrides.set("" + cargo.id, dropPos);
+        AIFloat3 destination;
+        if (DeliveryDestination(cargo.id, recipient, destination) && NearDestination(cargo, destination))
+            return _Refuse("already within walking arrival radius");
         CCircuitUnit@ t = Transport();
         if (t !is null && !IsLightTransport(t)) {
             Invariants::Violation("INV-195",""+t.id,"constructor ferry claimed a non-light transport");
@@ -540,13 +601,12 @@ namespace Ferry {
             return true; // ferry.cargo owns the gift while AIR fulfills the request
         }
         if (cargoId >= 0 || HeavyTransport::Busy(task)) {
-            // A run is in flight: queue behind it rather than walk. "If an air
-            // transport is available always deliver it" - it is, just busy.
+            // Keep the delivery reserved while the gift walks where reachable.
             if (queuedCargo.find(cargo.id) < 0) {
                 queuedCargo.insertLast(cargo.id);
                 queuedRecipient.insertLast(recipient);
             }
-            // D-112: parked by the ferry.cargo rule at its next ask (a new gift is idle
+            // Assigned by the ferry.cargo rule at its next ask (a new gift is idle
             // and asks at once). Not assigned here: this runs inside the unit-added
             // hook, and native assigns the unit to its idle task right after it returns
             // (an assignment here would leave the unit listed by two tasks)
@@ -617,7 +677,7 @@ namespace Ferry {
                 queuedCargo.insertAt(0, cargoId);
                 queuedRecipient.insertAt(0, cargoRecipient);
                 cargoId = -1;
-                Park(cargo);
+                WaitForDelivery(cargo);
                 cargoRecipient = -1;
                 runStart = -1;
                 CFerryTask@ rt = TaskOf(Transport());
@@ -694,6 +754,7 @@ namespace Ferry {
             }
         }
 
+        GiveQueuedArrivals();
         // A new gift may precede the income-triggered transport request. Keep it
         // for the arriving carrier, with a bounded fallback if AIR cannot help.
         if (cargoId < 0 && queuedCargo.length() > 0) {

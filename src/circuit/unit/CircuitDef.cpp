@@ -1,3 +1,4 @@
+#include "control/service/CombatSnapshot.h"
 /*
  * CircuitDef.cpp
  *
@@ -261,6 +262,10 @@ CCircuitDef::CCircuitDef(CCircuitAI* circuit, UnitDef* def, std::unordered_set<I
 		category |= circuit->GetBadCategory();
 		costM *= 0.1f;  // avoid threat metal
 	}
+
+	// Artillery T1 exemption / priority_min_tech: BAR customparams.techlevel, 1 when absent.
+	it = customParams.find("techlevel");
+	techLevel = (it != customParams.end()) ? utils::string_to_float(it->second) : 1.f;
 
 //	if (customParams.find("boost_speed_mult") != customParams.end()) {
 //		AddAttribute(ATTR_TYPE(BOOST));
@@ -763,6 +768,7 @@ void CCircuitDef::RemDGun()
 
 void CCircuitDef::SetRange(float range)
 {
+    CCombatSnapshot::InvalidateRangeBounds();
 	// TODO: Asserts >= 0?
 	minRange = range;
 	maxRangeType = RangeType::AIR;
@@ -773,6 +779,7 @@ void CCircuitDef::SetRange(float range)
 
 void CCircuitDef::SetRange(RangeType type, float range)
 {
+    CCombatSnapshot::InvalidateRangeBounds();
 	// TODO: Asserts >= 0?
 	minRange = std::min(minRange, range);
 	maxRange[static_cast<RangeT>(type)] = range;

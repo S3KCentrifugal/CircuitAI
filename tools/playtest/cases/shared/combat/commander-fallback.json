@@ -28,6 +28,7 @@
   "min_spawn_spacing": 38,
   "command_breakdown": true,
   "commander_observation": true,
+  "disable_lane_assignment": true,
   "enemy_destination": [
     4000,
     4800

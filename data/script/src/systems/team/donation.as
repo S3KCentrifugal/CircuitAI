@@ -1,3 +1,4 @@
+#include "../../helpers/math/tech_economy_math.as"
 // TECH's hand-outs to its allies: T2 combat bots by plan, T2 constructors on request.
 #include "../../define.as"
 #include "../../global.as"
@@ -10,6 +11,7 @@
 #include "../presentation/widget_link.as"
 #include "ferry.as"
 #include "../../manager/economy.as"
+#include "../../helpers/math/front_tech_math.as"
 
 /******************************************************************************
 
@@ -82,6 +84,23 @@ namespace Donation {
     // ---- requester side
     int requestsSent = 0;
     int lastRequestFrame = -1;
+    bool planLoaded = false;
+    bool constructorPlanned = false;
+
+    bool HasConstructorPlan() {
+        // One persistent read per AI lifetime, not per factory/builder ask.
+        if (!planLoaded) {
+            constructorPlanned = aiTerrainMgr.GetLayoutInt("donation.constructor.planned", 0) != 0;
+            planLoaded = true;
+        }
+        return constructorPlanned;
+    }
+
+    bool FrontFactoryAllowed() {
+        if (Global::AISettings::Role != AiRole::FRONT) return true;
+        return FrontTechMath::FactoryAllowed(true, HasConstructorPlan(),
+            Economy::GetMinMetalIncomeLast10s(), Global::RoleSettings::Front::DeliveredConstructorT2FactoryIncome);
+    }
 
     bool IsEnabled() { return Global::ConstructorRequest::Enabled; }
 
@@ -264,6 +283,7 @@ namespace Donation {
         // behind our land base; it must not consume a pending bot order.
         if (UnitHelpers::GetAllT2BotConstructors().find(unit.circuitDef.GetName())<0) return;
         if (ordered > 0) --ordered;
+        if(EngineeringReplacements::Claim(unit)) return;
         if (_OwnT2Constructors() <= Global::RoleSettings::Tech::DonationKeepT2Constructors) {
             GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
                 + unit.id + ") is ours: TECH keeps its first " + Global::RoleSettings::Tech::DonationKeepT2Constructors, 1);
@@ -282,6 +302,11 @@ namespace Donation {
         }
     }
 
+    int ConstructorUnitLimit(int physical) {
+        return TechEconomyMath::ConstructorUnitLimit(Global::RoleSettings::Tech::T2BotConstructorCap,
+            physical, int(pendingRequests.length()));
+    }
+
     // Factory::AiMakeTask asks here before the role handler, as it asks the
     // ferry. Returns a constructor order for TECH's advanced bot lab while
     // requests outnumber what is already ordered; null otherwise.
@@ -289,6 +314,7 @@ namespace Donation {
     {
         if (!IsEnabled() || Global::AISettings::Role != AiRole::TECH) return null;
         if (factory is null || factory.circuitDef is null) return null;
+        if(FrontlineEngineering::active && EngineeringReplacements::BaseEmergency()) return null;
         // An order that produced nothing within the timeout (lab died, def
         // capped) is forgotten so the next lab poll re-orders. Checked before
         // the count gate: with one request and one dead order the gate used to
@@ -310,7 +336,10 @@ namespace Donation {
         array<string> ctors = UnitHelpers::GetT2BotConstructors(Global::AISettings::Side);
         if (ctors.length() == 0) return null;
         CCircuitDef@ d = ai.GetCircuitDef(ctors[0]);
-        if (d is null || !d.IsAvailable(ai.frame)) return null;
+        if (d is null || d.maxThisUnit <= 0) return null;
+        const int deliveryLimit = ConstructorUnitLimit(d.count);
+        if (d.maxThisUnit < deliveryLimit) d.maxThisUnit = deliveryLimit;
+        if (!d.IsAvailable(ai.frame)) return null;
         IUnitTask@ order = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH,
                 d, factory.GetPos(ai.frame), 64.f));
         if (order is null) return null;   // nothing ordered, nothing counted (CR-014)
@@ -396,6 +425,13 @@ namespace Donation {
             return true;
         }
         if (p[1] == "ack") {
+            Team::Roster::Entry@ donor = Team::Roster::Get(fromTeamId);
+            const bool planned = FrontTechMath::RememberPlan(HasConstructorPlan(), requestsSent > 0,
+                donor !is null && donor.role == AiRole::TECH && fromTeamId != ai.teamId);
+            if (planned && !constructorPlanned) {
+                constructorPlanned = true;
+                aiTerrainMgr.SetLayoutInt("donation.constructor.planned", 1);
+            }
             GenericHelpers::LogUtil("[Team][Donation] team " + fromTeamId + " (TECH) is building our constructor", 1);
             return true;
         }

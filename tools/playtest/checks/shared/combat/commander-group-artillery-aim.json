@@ -1,0 +1,85 @@
+{
+  "stop_minute": 11,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "block",
+      "pattern": "\\[CommanderGroup\\] tactical_block group=\\d+ slots=[5-9] def=armamb",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "artillery job",
+      "pattern": "\\[CommanderGroup\\] job_start queue=tactical def=armamb slot=\\d+",
+      "scope": "any",
+      "by_minute": 5,
+      "after_key": "block"
+    },
+    {
+      "key": "expansion job",
+      "pattern": "\\[CommanderGroup\\] job_start def=\\w+ nano=[01]",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "artillery finished",
+      "pattern": "\\[RangedArena\\].*finished id=\\d+ team=0 unit=armamb",
+      "scope": "any",
+      "by_minute": 8,
+      "after_key": "artillery job"
+    },
+    {
+      "key": "crowded",
+      "pattern": "artillery_crowded def=armamb",
+      "scope": "any",
+      "by_minute": 10
+    },
+    {
+      "key": "aim support",
+      "pattern": "\\[Artillery\\] aim unit=\\d+ target=\\d+ def=cornanotc kind=support",
+      "scope": "any",
+      "by_minute": 10,
+      "after_key": "artillery finished"
+    },
+    {
+      "key": "aim static",
+      "pattern": "\\[Artillery\\] aim unit=\\d+ target=\\d+ def=corpun kind=static",
+      "scope": "any",
+      "by_minute": 11,
+      "after_key": "aim support"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\] INV-(?!254 )",
+      "scope": "any",
+      "note": "INV-254 (the commander waiting on a seat-only defence) fires on the pre-branch build in commander-group-t2-defence as well: KI-757."
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "no launcher",
+      "pattern": "job_start queue=tactical def=armemp",
+      "scope": "any"
+    }
+  ]
+}

@@ -68,8 +68,22 @@ namespace TechChain
     int pendingStep = -1;      // an order for this step went out ...
     int pendingFrame = 0;      // ... at this frame; invisible to the queued and unfinished counts until its frame exists
     int pendingHave = -1;      // ... when the step's count was this; a higher count means it stood (played: a met order blocked the next for 120 s)
+    array<int> staleSince;     // D-461: per step, since when a queued order nobody can take has held its count ...
+    array<int> staleHave;      // ... at this count
 
     bool Active() { return active && !done; }
+    // D-489: the active chain holds a step with this key that is not yet met
+    // or skipped. O(steps), a dozen; called once per economy update.
+    bool WantsStep(const string &in key)
+    {
+        if (!Active()) return false;
+        for (uint i = 0; i < steps.length(); ++i) {
+            if (steps[i].key != key || (i < skipped.length() && skipped[i])) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(steps[i].defName);
+            if (d !is null && d.count - aiBuilderMgr.GetUnfinishedCount(d) < steps[i].target) return true;
+        }
+        return false;
+    }
     // D-289: the def of the chain's current dear step (the step Next last
     // worked on, stallStep), for the turret ladder; null when the chain is
     // inactive or the step is not dear. O(1): no scan, one def lookup.
@@ -321,6 +335,20 @@ namespace TechChain
         return float(ai.frame - dearPendingSince) / float(SECOND);
     }
 
+    // D-461: true once a step has had a queued order no asking builder could
+    // take, no frame and no count change for ChainStaleQueuedSeconds. O(1).
+    bool StaleQueue(int step, int have, int unfinished)
+    {
+        while (int(staleSince.length()) <= step) { staleSince.insertLast(-1); staleHave.insertLast(-1); }
+        if (unfinished > 0 || staleSince[step] < 0 || staleHave[step] != have) {
+            staleSince[step] = unfinished > 0 ? -1 : ai.frame;
+            staleHave[step] = have;
+            return false;
+        }
+        const float seconds = Global::RoleSettings::Tech::ChainStaleQueuedSeconds;
+        return seconds > 0.f && ai.frame - staleSince[step] > int(seconds * SECOND);
+    }
+
     string DefFor(const string &in key)
     {
         const string side = Global::AISettings::Side;
@@ -420,7 +448,7 @@ namespace TechChain
         CCircuitDef@ a2 = ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(side));
         if (a1 !is null) n += a1.count;
         if (a2 !is null) n += a2.count;
-        return n;
+        return AiMax(0, n - TechAirFoundry::Count());
     }
 
     void Add(const string &in key, int target, float radius = 0.0f)
@@ -484,7 +512,7 @@ namespace TechChain
         ReleaseStockpileBudget();
         powerSiteRetry = 0;
         if (MetalEconomy::Active()) return; // field growth has no finite mex/converter recipe
-        stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
+        stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1; staleSince.resize(0); staleHave.resize(0);
         objective = requestedObjective.length() > 0 ? requestedObjective : Global::RoleSettings::Tech::RushObjective;
         if (objective == "auto") objective = Choose();
         if ((requestedObjective.length() == 0 && !Global::RoleSettings::Tech::ExperimentalBuild) || objective == "eco" || objective.length() == 0) {
@@ -661,10 +689,16 @@ namespace TechChain
             // recipe's count at least
             if (!NukeRush() && steps[i].key == "moho" && Global::RoleSettings::Tech::ChainMohoRadius > 0.0f) {
                 const int near = Economy::MexTracker::GetOwnedMexCountInRange(Global::Map::StartPos, Global::RoleSettings::Tech::ChainMohoRadius);
-                const int want = (near > steps[i].base) ? near : steps[i].base;
+                // The tracker keeps a mex after it is destroyed, so cap the target
+                // at the extractors standing (played: Koom Valley, 6 tracked, 3
+                // standing, the step waited 120 s twice before its skip).
+                CCircuitDef@ t1Mex = ai.GetCircuitDef(DefFor("mex"));
+                CCircuitDef@ t2Mex = ai.GetCircuitDef(DefFor("moho"));
+                const int standing = (t1Mex is null ? 0 : t1Mex.count) + (t2Mex is null ? 0 : t2Mex.count);
+                const int want = AiMin((near > steps[i].base) ? near : steps[i].base, AiMax(1, standing));
                 if (want != steps[i].target) {
                     GenericHelpers::LogUtil("[TECH][Chain] moho step: " + want + " (every mex within " + int(Global::RoleSettings::Tech::ChainMohoRadius)
-                        + " of the start, " + near + " owned; the recipe's " + steps[i].base + " at least)", 1);
+                        + " of the start, " + near + " tracked, " + standing + " standing; the recipe's " + steps[i].base + " at least)", 1);
                     steps[i].target = want;
                 }
             }
@@ -791,7 +825,7 @@ namespace TechChain
                 if (geo !is null && geo.count == 0)
                     Invariants::Violation("INV-242", "support-geo", "SUPPORT ordered the advanced lab with no geothermal standing or framed and a vent within reach");
             }
-            return Layout::T2LabTask(300 * SECOND);
+            return Layout::T2LabTask(300 * SECOND,u);
         }
         if (key == "geo") {
             // D-367: native validates the vent and places on it; the engine's build-over
@@ -808,24 +842,16 @@ namespace TechChain
                     && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::MEXUP), d) == 0) s.exhausted = true;
                 return null;
             }
-            // Eligibility is separate from exhaustion: blocked mexes still
-            // count toward rush prerequisites and are reconsidered next ask.
-            at = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                Global::RoleSettings::MexUpgradeRadius, u, d);
-            if (at.x < 0.0f) return null;
-            return aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, d, at, -1));
+            CCircuitUnit@ target = OwnedEconomy::NearestUpgradeTarget(u, d,
+                Global::Map::StartPos, Global::RoleSettings::MexUpgradeRadius);
+            // Never manufacture a position-only task: native admission checks
+            // ownership, tier, live reachability and concurrent spot claims.
+            // Rejection must let the income ladder consider energy instead.
+            return target is null ? null : aiEconomyMgr.EnqueueMexUpgrade(u, target);
         }
         if (key == "nano") {
-            // A distant mex worker must not own a no-frame turret reservation
-            // while local workers wait for the completed bank. It can assist
-            // a real frame, but only local builders reserve new rush turrets.
-            if (NukeRush()) {
-                const AIFloat3 position = u.GetPos(ai.frame);
-                const bool local = CompactEco::Active() ? CompactEco::LocalWorker(position, 800.0f)
-                    : MapHelpers::SqDist(position, Layout::TurretSeed()) <= 800.0f * 800.0f;
-                if (!local) return null;
-            }
-            return Layout::NanoTask(u, Task::Priority::HIGH, NukeRush() ? 2 : -1);
+            if (NukeRush()) return RushBootstrap::Work(u);
+            return Layout::NanoTask(u, Task::Priority::HIGH);
         }
         if (NukeRush() && (key == "fusion" || key == "silo"))
             return SupportedProject(d, key == "silo" ? Task::BuildType::BIG_GUN : Task::BuildType::ENERGY);
@@ -1100,14 +1126,23 @@ namespace TechChain
             // An order of this step that lost its builder (played: the engine drops
             // a builder off a fresh order without any event) is taken over by the
             // next builder that can build it, before anything else is ordered.
+            bool staleQueue = false;
             if (queued > 0 && can) {
                 IUnitTask@ q = aiBuilderMgr.FindQueuedTask(u, int(TypeFor(s.key)));
                 IBuilderTask@ qb = (q is null) ? null : cast<IBuilderTask>(q);
                 if (qb !is null && qb.buildDef is d) { Trace("takes the queued order", int(i), s, have, u); return q; }
+                staleQueue = StaleQueue(int(i), have, unfinished);
+            } else if (queued == 0 && int(i) < int(staleSince.length())) {
+                staleSince[i] = -1;
             }
             // an order of ours that has no frame yet is invisible to both counts
             const bool pending = (pendingStep == int(i)) && (have == pendingHave) && (unfinished == 0) && (ai.frame - pendingFrame < 120 * SECOND);
-            const int inFlight = unfinished + queued + (pending ? 1 : 0);
+            // D-461: a queued order nobody can take (its pinned slot failed, or it
+            // is out of every builder's safe reach) stops counting after
+            // ChainStaleQueuedSeconds. Played: Bismuth nuke silo waited 4 min
+            // for one queued wind at 42 of 43 standing. pending bounds the
+            // replacements to one per pending window.
+            const int inFlight = unfinished + (staleQueue ? 0 : queued) + (pending ? 1 : 0);
             if (cheap) {
                 // one per builder, in parallel: a solar is not worth a walk to assist
                 if (!NukeRush() && !requiredFusion && can && have + inFlight < s.target && IsEnergyKey(s.key) && EnergyFloats() && !TechBuild::MetalFullLong()) {   // D-105: no converter hold with the metal bank full
@@ -1216,7 +1251,7 @@ namespace TechChain
             if (next !is null && next.length() > 0) {
                 steps = next;
                 skipped.resize(0); skipped.resize(steps.length());
-                stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1;
+                stallStep = -1; stallHave = -1; stallFrame = 0; pendingStep = -1; staleSince.resize(0); staleHave.resize(0);
                 done = false; startFrame = ai.frame;
                 objective = TechPlan::PhaseName();
                 string line = "";
@@ -1234,6 +1269,8 @@ namespace TechChain
         // T2 mex upgrades first: the cheapest metal there is
         CCircuitDef@ moho = ai.GetCircuitDef(DefFor("moho"));
         if (moho !is null && u.circuitDef.CanBuild(moho)) {
+            // Income steps are not concrete definitions in Tick's cap lift.
+            if (moho.maxThisUnit <= moho.count) moho.maxThisUnit = moho.count + 1;
             Step tmp("moho", DefFor("moho"), 99);
             IUnitTask@ t = Order(i, @tmp, moho, u);
             if (t !is null) { Trace("mex upgrade", i, s, have, u); return t; }
@@ -1242,12 +1279,11 @@ namespace TechChain
         CCircuitDef@ afus = ai.GetCircuitDef(DefFor("afus"));
         if (afus is null) return null;
         const int building = aiBuilderMgr.GetUnfinishedCount(afus);
-        // a full metal bank means the ladder is build-power and order bound, not
-        // metal bound: another advanced fusion in parallel, up to LadderParallelAfus
-        const bool another = TechBuild::MetalFullLong() && building < Global::RoleSettings::Tech::LadderParallelAfus && u.circuitDef.CanBuild(afus);
-        if (building > 0 && !another) {
+        // Complete one reactor before spending on another, even at full metal.
+        if (building > 0) {
             CCircuitUnit@ frame = aiBuilderMgr.FindUnfinishedNear(Layout::BaseCentre(), Global::RoleSettings::Tech::ChainAssistRadius, afus);
             if (frame !is null) { Trace("assist the advanced fusion", i, s, have, u); return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, 60 * SECOND)); }
+            return null;
         }
         if (!u.circuitDef.CanBuild(afus)) return null;
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::ENERGY), afus) > 0) { Trace("advanced fusion order out", i, s, have, u); return null; }

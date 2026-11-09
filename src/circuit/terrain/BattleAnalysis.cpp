@@ -522,6 +522,7 @@ float CBattleAnalysis::SumHeat(const Grid& g, const AIFloat3& pos, float radius)
 
 void CBattleAnalysis::OnOwnDamaged(const AIFloat3& pos)
 {
+	RecordLaneCombat(pos);
 	EnsureGrid();
 	AddHeat(combat, pos, 1.f);
 }

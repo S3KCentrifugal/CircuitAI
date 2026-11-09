@@ -7,6 +7,7 @@
 #include "../systems/team/ferry.as"
 #include "../systems/amphibious/amphibious_ops.as"
 #include "../systems/world/coverage_lanes.as"
+#include "../systems/construction/commander_group.as"
 
 namespace Military {
 
@@ -62,7 +63,8 @@ namespace Military {
         // CoverageLanes::Load, not per objective query.
         if(Global::AISettings::Role==AiRole::FRONT && aiBattle.ArmyFrontLanesEnabled() && aiBattle.GetFrontLaneLength()>0.f) {
             CoverageLanes::Load();
-            return aiBattle.GetFrontLaneGoal(pos,CoverageLanes::advance);
+            const float progress=aiBattle.GetFrontLaneProgress(pos);
+            return aiBattle.GetFrontLaneGoal(pos,aiBattle.LimitLaneAdvance(progress,progress+CoverageLanes::advance)-progress);
         }
         const int lane = Lanes::BestLane(Lanes::BOT);
         if (lane >= 0) {
@@ -89,6 +91,7 @@ namespace Military {
 
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
+        if(u !is null && CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
 		// A transport is never spam and never subject to a role's military
 		// policy: it exists to carry, and the only task that carries is the
 		// native CFerryTask that DefaultMakeTask hands a TRANS-role unit.
@@ -112,10 +115,14 @@ namespace Military {
 			&& u.circuitDef.IsRoleAny(Unit::Role::SUPER.mask)) {
 			GenericHelpers::LogUtil("[Military] super static " + u.circuitDef.GetName() + "(" + u.id
 				+ ") -> native CSuperTask", 1);
-			return aiMilitaryMgr.DefaultMakeTask(u);
+			IUnitTask@ st = aiMilitaryMgr.DefaultMakeTask(u);
+			LolCannon::FireControl(u, st);   // owner, 2026-10-26: a lolcannon fires at its tiered roster only
+			return st;
 		}
 
-		IUnitTask@ t = TechHeavyDelivery::MilitaryTask(u);
+		IUnitTask@ t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
+		if (t !is null) return t;
+		@t = TechHeavyRush::MilitaryTask(u);
         if (t !is null) return t;
         @t = AmphibiousOps::MilitaryTask(u);
         if (t !is null) return t;
@@ -162,6 +169,7 @@ namespace Military {
 
 	void AiUnitAdded(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        if(CommanderGroup::OnAdded(unit)) return;
 		Team::Ferry::OnUnitAdded(unit);   // claim a transport, ours or a gift
 
 		// Delegate to role-specific handler if registered
@@ -173,7 +181,8 @@ namespace Military {
 
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
-        TechHeavyDelivery::Removed(unit);
+        CommanderGroup::OnRemoved(unit);
+        TechHeavyRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		TechFlank::UnitRemoved(unit);
         AmphibiousOps::UnitRemoved(unit);

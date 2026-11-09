@@ -39,9 +39,9 @@ namespace AirGrowth {
         }
         s.energyGoal = AiMax(EcoPlanner::TargetEnergy(s.mIncome), AirEconomy::demandE * 1.3f);
         if (!AirEconomy::GrowthComplete()) s.energyGoal = AiMax(s.energyGoal, s.eIncome + 1.0f);
-        // AIR can retain small, local T1 energy orders while its flying crew
-        // scales reactors elsewhere. Generic ENERGY queues must not lock out
-        // this district; only real owned reactor commitments serialize it.
+        // Bootstrap orders already under construction may finish. Generic
+        // ENERGY queues must not lock out reactor scaling; new low-tier power
+        // is excluded by the shared chooser and final AIR placement guard.
         s.energyBuilding = AirBuild::ReactorPending() || reactor !is null;
         s.energyAssistable = reactor !is null;
         s.turretSlot = false;

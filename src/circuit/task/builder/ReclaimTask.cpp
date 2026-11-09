@@ -103,7 +103,7 @@ void CBReclaimTask::RemoveAssignee(CCircuitUnit* unit)
 
 bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 {
-	if (recoveryControlled) return true; // SEA selector owns target changes.
+	if (recoveryControlled) return true; // Local commander/SEA selector owns target changes.
 	if (!isMetal) {
 		return true;
 	}

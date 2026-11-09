@@ -1,0 +1,202 @@
+{
+  "name": "commander-group-t2-defence",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "Affordable Pit Bull transition and following construction turret",
+  "commander_overrides": {
+    "front_push_screen": 0,
+    "commander_group_jammer_income": 0,
+    "commander_group_combat_distance": 3000,
+    "commander_group_radar_priority": 0,
+    "commander_group_defence_metal": 50,
+    "commander_group_defence_energy": 1000
+  },
+  "map": "Proving Grounds v1.0",
+  "map_key": "proving",
+  "starts": [
+    [
+      2524,
+      4194
+    ],
+    [
+      11805,
+      10125
+    ]
+  ],
+  "camera": [
+    3600,
+    4800,
+    2900
+  ],
+  "photos": [],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "hold_friendly": false,
+  "groups": [
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2400,
+        4000
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armnanotc",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2200,
+        4000
+      ],
+      "after_seconds": 20
+    },
+    {
+      "unit": "armck",
+      "team": 0,
+      "count": 3,
+      "spacing": 70,
+      "columns": 3,
+      "position": [
+        2350,
+        4050
+      ],
+      "after_seconds": 24
+    },
+    {
+      "unit": "armalab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2800,
+        4000
+      ],
+      "after_seconds": 25
+    },
+    {
+      "unit": "armack",
+      "team": 0,
+      "count": 2,
+      "spacing": 100,
+      "columns": 2,
+      "position": [
+        2500,
+        4200
+      ],
+      "after_seconds": 30
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "spacing": 120,
+      "columns": 1,
+      "position": [
+        4000,
+        5000
+      ],
+      "after_seconds": 65,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          700,
+          450
+        ],
+        "max_distance": 1300
+      }
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "spacing": 120,
+      "columns": 1,
+      "position": [
+        4500,
+        5500
+      ],
+      "after_seconds": 120,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          700,
+          450
+        ],
+        "max_distance": 1300
+      }
+    },
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 2,
+      "position": [
+        2200,
+        4400
+      ],
+      "after_seconds": 28,
+      "spacing": 160,
+      "columns": 2
+    },
+    {
+      "unit": "corak",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4500,
+        5500
+      ],
+      "after_seconds": 180,
+      "relative_to": {
+        "unit": "armcom",
+        "team": 0,
+        "offset": [
+          700,
+          450
+        ],
+        "max_distance": 1300
+      }
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-group-t2-defence",
+  "commander_initial": true,
+  "start_metal": 100000,
+  "commander_trace": true,
+  "coverage_probe": false,
+  "coverage_min_advance": 1500,
+  "builders": true,
+  "production": true,
+  "start_energy": 1000000,
+  "storage_scenario": "group-t2-defence",
+  "commander_group_observation": {
+    "nano": "armnanotc",
+    "defence": "armpb",
+    "radar": "armarad",
+    "jammer": "armveil"
+  },
+  "modoptions": {
+    "multiplier_metalextraction": 10
+  },
+  "front_spacing_observation": false,
+  "commander_radar_package_check": false,
+  "commander_policy": {
+    "commander_group_income": 0,
+    "commander_group_t2_metal": 0,
+    "commander_group_t2_energy": 0,
+    "commander_group_second_t2_metal": 100000,
+    "commander_group_second_t2_energy": 100000,
+    "commander_group_third_t2_metal": 100000,
+    "commander_group_third_t2_energy": 100000
+  }
+}

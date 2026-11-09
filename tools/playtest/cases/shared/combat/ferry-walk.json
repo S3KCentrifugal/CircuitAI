@@ -1,0 +1,63 @@
+{
+  "name": "ferry-walk",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "TECH",
+  "enemy_role": "FRONT",
+  "description": "Queued constructors physically walk, transfer near destination and accept pickup en route.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      4000,
+      3000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "ally_spots": "1,2",
+  "commander_initial": false,
+  "groups": [
+    {
+      "unit": "armack",
+      "team": 0,
+      "count": 3,
+      "position": [
+        4000,
+        1600
+      ],
+      "spacing": 100,
+      "columns": 3,
+      "after_seconds": 10
+    },
+    {
+      "unit": "armatlas",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4600,
+        1400
+      ],
+      "after_seconds": 50
+    }
+  ],
+  "photos": [],
+  "start_metal": 100000,
+  "start_energy": 1000000,
+  "checks": "ferry-walk",
+  "units": [
+    "armack",
+    "armatlas"
+  ],
+  "assertions": {
+    "min_kills": 0,
+    "min_shooters": 0,
+    "max_losses": 0
+  }
+}

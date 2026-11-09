@@ -1,0 +1,78 @@
+{
+  "name": "commander-decoy-bait-cortex",
+  "storage_scenario": "decoy-bait",
+  "unit": "cordecom",
+  "side": "cortex",
+  "role": "FRONT",
+  "description": "A supplied decoy remains visible with the FRONT income cloak unlocked, then withdraws below 90% health.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4300,
+      4000
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "commander_initial": false,
+  "enemy_commander_home": true,
+  "enemy_destination": [
+    4700,
+    4000
+  ],
+  "commander_overrides": {
+    "decoys": 1,
+    "front_duty": 1,
+    "front_cloak_income": 1,
+    "cloak_energy_retreat": 0
+  },
+  "camera": [
+    4400,
+    4000,
+    1200
+  ],
+  "photos": [],
+  "min_spawn_spacing": 60,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "observation_frames": 3,
+  "groups": [
+    {
+      "unit": "cordecom",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4300,
+        4000
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armafus",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3600,
+        4000
+      ],
+      "after_seconds": 12
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_kills": 0,
+    "min_damage": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-decoy-bait",
+  "commander_health_fixture": {
+    "after_seconds": 30,
+    "percent": 88,
+    "retreat_percent": 90,
+    "visible_from": 20,
+    "visible_until": 30
+  }
+}

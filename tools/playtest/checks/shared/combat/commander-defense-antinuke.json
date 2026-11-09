@@ -1,0 +1,77 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "rules",
+      "pattern": "\\[DefenseFixture\\] applied",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "anti",
+      "pattern": "\\[DefensePlanner\\] choice=armamd band=3",
+      "scope": "any",
+      "by_minute": 4
+    },
+    {
+      "key": "finished",
+      "pattern": "\\[Playtest\\] finished armamd team 0",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "anti"
+    },
+    {
+      "key": "nano",
+      "pattern": "\\[CommanderGroup\\] job_start def=armnanotc nano=1",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "finished",
+      "after_minute": 2
+    },
+    {
+      "key": "armed",
+      "pattern": "\\[RangedArena\\].*defense_ready def=armamd count=1 stock=[1-9]",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "finished"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "rule rejected",
+      "pattern": "\\[DefenseFixture\\] ERROR",
+      "scope": "any"
+    },
+    {
+      "key": "duplicate interceptor",
+      "pattern": "defense_ready def=armamd count=[2-9]",
+      "scope": "any"
+    }
+  ]
+}

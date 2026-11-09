@@ -117,6 +117,10 @@ public:
 	int GetProductionFrame() const { return productionFrame; }
 	bool IsProductionEnabled() const { return productionEnabled; }
 	void SetProductionEnabled(bool value) { productionEnabled = value; }
+	// Owner, 2026-10-26: T3 gantry lag fallback; the engine repeat flag holds the
+	// last product while the AI's next order is delayed (RecruitTask::ExecuteLagRepeat)
+	bool IsLagRepeat() const { return lagRepeat; }
+	void SetLagRepeat(bool value) { lagRepeat = value; }
 	void SetProducerId(int value, int frame) { producerId = value; productionFrame = frame; }
 
 	void SetAllowedToJump(bool value) { isAllowedToJump = value; }
@@ -135,9 +139,13 @@ public:
 
 	void SetDamagedFrame(int frame) { damagedFrame = frame; }
 	int GetDamagedFrame() const { return damagedFrame; }
+	// Owner 2026-11-02: last EVENT_WEAPON_FIRED frame of any weapon, -1 none.
+	void SetFireFrame(int frame) { fireFrame = frame; }
+	int GetFireFrame() const { return fireFrame; }
 
 	bool HasDGun() const { return dgun != nullptr; }
 	bool HasWeapon() const { return weapon != nullptr; }
+	springai::Weapon* GetMainWeapon() const { return weapon; }
 	bool HasShield() const { return shield != nullptr; }
 	void ManualFire(CEnemyInfo* target, int timeout);
 	bool IsDGunHigh() const;
@@ -166,10 +174,21 @@ public:
 	void CmdFightTo(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
 	void CmdPatrolTo(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
 	void CmdAttackGround(const springai::AIFloat3& pos, short options = 0, int timeout = INT_MAX);
+    void CmdStationaryGroundTarget(const springai::AIFloat3& pos);
 	void CmdWantedSpeed(float speed = NO_SPEED_LIMIT);
 	void CmdStop(short options = 0, int timeout = INT_MAX);
 	void CmdSetTarget(CEnemyInfo* enemy);
 	void ClearPriorityTarget();
+	// BAR SET_TARGET on behalf of a task. Held back, but remembered, while a
+	// commander target owns the unit's priority list; restored on its release.
+	void SendTaskTarget(int targetId);
+	void CancelTaskTarget(int targetId);
+	// Commander snipe (D-352): a scouted enemy commander in range replaces the
+	// priority list; the unit keeps its move and other orders. -1 releases.
+	void SetCommanderTarget(int commId, int frame);
+	int GetCommanderTarget() const { return commanderTarget; }
+	// A task's ATTACK on anything but the locked commander is withheld.
+	bool IsCommanderLocked(const CEnemyInfo* enemy) const;
 	void CmdCloak(bool state);
 	void CmdFireAtRadar(bool state);
 	void CmdFindPad(int timeout = INT_MAX);
@@ -243,6 +262,7 @@ private:
 	int producerId = -1; // creation event only; persistent policy membership is script-owned
 	int productionFrame = -1; // unknown on adopted units; never infer it from completion
 	bool productionEnabled = true; // script-owned lifecycle admission; O(1) at command boundary
+	bool lagRepeat = false; // gantry lag fallback: engine repeat between AI orders
 	// NOTE: taskFrame assigned on task change and OnUnitIdle to workaround idle spam.
 	//       Proper fix: do not issue any commands OnUnitIdle, delay them until next frame?
 	int taskFrame;
@@ -257,6 +277,7 @@ private:
 	int moveFails;
 	int failFrame;
 	int damagedFrame;
+	int fireFrame;
 	int execFrame;  // TODO: Replace by CExecuteAction?
 	int disarmFrame;
 	int ammoFrame;
@@ -285,6 +306,9 @@ private:
 	CEnemyInfo* target;
 	int targetTile;
 	int priorityTarget = -1; // ID only: never retain a dead enemy wrapper.
+	int taskTarget = -1;      // last SET_TARGET a task asked for (any path)
+	int commanderTarget = -1; // D-352 commander lock; owns BAR's priority list
+	int commanderFrame = -1;  // frame the commander SET_TARGET was last sent
     bool destroying = false; // set before destruction callbacks; IsDead keeps its existing unregister semantics
     springai::AIFloat3 retreatWaypoint;
     int retreatAnchor = -1;

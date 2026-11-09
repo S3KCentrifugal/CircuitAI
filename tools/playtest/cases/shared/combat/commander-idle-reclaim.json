@@ -1,0 +1,70 @@
+{
+  "name": "commander-idle-reclaim",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "Stationary front commander reclaims supplied energy-only vegetation instead of cycling deploy/hold; no ordinary economy tasks.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      4300
+    ]
+  ],
+  "camera": [
+    4000,
+    1800,
+    1800
+  ],
+  "photos": [
+    90
+  ],
+  "commander_initial": true,
+  "commander_observation": true,
+  "commander_front_work": true,
+  "enemy_commander_home": true,
+  "hold_friendly": true,
+  "start_metal": 1000,
+  "start_energy": 1000,
+  "start_energy_storage": 100000,
+  "commander_overrides": {
+    "front_distance": 1,
+    "front_solar_income": 0,
+    "front_push_screen": 0
+  },
+  "groups": [
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3700,
+        1800
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armnanotc",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3700,
+        1600
+      ],
+      "after_seconds": 15
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-idle-reclaim",
+  "commander_idle_probe": true
+}

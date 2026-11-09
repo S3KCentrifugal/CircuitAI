@@ -65,8 +65,9 @@ changing a shared UnitDef to fix one role.
   Include sparse overflow and allocation bounds; never clamp coordinates to fit
   an optimization. State average and worst-case complexity separately.
 - Use `tools/run_ranged_performance_tests.sh` for D-221's ordered oracle.
-  Enable `CIRCUIT_VERIFY_RANGED_QUERIES` / `CIRCUIT_VERIFY_RANGED_SNAPSHOT` in
-  correctness games only, never timing games. See the maintenance guide for
+  Enable `CIRCUIT_VERIFY_RANGED_QUERIES` / `CIRCUIT_VERIFY_RANGED_SHARED` in
+  correctness games only, never timing games (D-462: the shared ally-team view
+  against a private build; the old `CIRCUIT_VERIFY_RANGED_SNAPSHOT` is inert). See the maintenance guide for
   measurement limits and results; speedup figures are not timeless guarantees.
 
 ## Point-route and lifecycle indexes (D-243)
