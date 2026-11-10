@@ -208,6 +208,7 @@ void CSkirmisherController::Tick(CCircuitUnit* unit, State& s, int frame)
 		return;
 	}
 	if (control::SuspensionOf(unit, frame) != control::Suspension::NONE) return;
+	if (repair_trip::Step(ai, unit, *s.engagement, s.trip, frame, "SKIRMISHER")) return;  // D-514
 	s.engagement->Update(unit);
 }
 void CSkirmisherController::Damaged(CCircuitUnit* unit)

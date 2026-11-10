@@ -59,9 +59,23 @@ const control::CConfigTable<BattleGroupConfig> kTable({
     F<&BattleGroupConfig::airMemorySeconds>("air_memory_seconds", 0.f, 300.f),
     F<&BattleGroupConfig::escortBehind>("escort_behind", 0.f, 1000.f),
     F<&BattleGroupConfig::escortSpacing>("escort_spacing", 16.f, 256.f),
+    // D-512: trade momentum (control/kernel/TradeMomentum.h)
+    F<&BattleGroupConfig::momentumPrior>("momentum_prior", 1.f, 10000.f),
+    F<&BattleGroupConfig::momentumHalfLife>("momentum_half_life", 1.f, 1200.f),
+    // D-514: the repair crew (control/kernel/RepairCrew.h)
+    F<&BattleGroupConfig::crewBehind>("crew_behind", 0.f, 1000.f),
+    F<&BattleGroupConfig::crewSpacing>("crew_spacing", 16.f, 256.f),
+    F<&BattleGroupConfig::tripHealth>("repair_trip_health", 0.f, 1.f),
+    F<&BattleGroupConfig::tripDone>("repair_trip_done", 0.f, 1.f),
+    F<&BattleGroupConfig::tripSeconds>("repair_trip_seconds", 1.f, 600.f),
 });
 // D-509: the template rank whose types are anti-air escorts.
 constexpr const char* AIR_RANK = "air";
+// D-514: the template rank whose types are the repair crew (resurrection bots).
+constexpr const char* REPAIR_RANK = "repair";
+constexpr float PER_UNITS_MAX = 100.f;
+// D-514: member health for the repair trip is read at most this often.
+constexpr int TRIP_CHECK_FRAMES = FRAMES_PER_SEC;
 // D-501: a template rank's max is bounded like the group size.
 constexpr int RANK_MAX = group_layout::MAX_GROUP_SIZE;
 constexpr float PER_SCREEN_MAX = 4.f;
@@ -70,7 +84,10 @@ constexpr int CLASSES_PER_TEMPLATE = 4;
 ranged::Point P(const springai::AIFloat3& p) { return {p.x, p.z}; }
 }
 
-CBattleGroupController::CBattleGroupController(CCircuitAI* ai) : ai(ai), trace(std::getenv("CIRCUIT_RANGED_TRACE") != nullptr), registry(ai) {}
+CBattleGroupController::CBattleGroupController(CCircuitAI* ai) : ai(ai), trace(std::getenv("CIRCUIT_RANGED_TRACE") != nullptr), registry(ai)
+{
+    registry.SetTrips(&tripOf);  // D-514: both members of this object; the map outlives every Tick
+}
 
 // D-501: "ranks": {"screen": {"roles": [...], "units": [...], "max": n, "per_screen": f}, "support": {...}}.
 // screen is the front cohort, support the rear (CGroupRegistry::RankName).
@@ -82,7 +99,7 @@ void CBattleGroupController::ParseRanks(Template& t, const Json::Value& ranks, s
     const auto& roleNames = CCircuitDef::GetRoleNames();
     for (const std::string& name : ranks.getMemberNames()) {
         const Json::Value& r = ranks[name];
-        if (name != "screen" && name != "support" && name != AIR_RANK) { problems.push_back(t.name + ".ranks." + name + ": unknown rank (screen, support, air)"); continue; }
+        if (name != "screen" && name != "support" && name != AIR_RANK && name != REPAIR_RANK) { problems.push_back(t.name + ".ranks." + name + ": unknown rank (screen, support, air, repair)"); continue; }
         if (!r.isObject()) { problems.push_back(t.name + ".ranks." + name + ": not an object"); continue; }
         group_composition::RankSpec spec;
         spec.name = name;
@@ -104,6 +121,8 @@ void CBattleGroupController::ParseRanks(Template& t, const Json::Value& ranks, s
                 spec.max = std::clamp(v.asInt(), 0, RANK_MAX);
             } else if (key == "per_screen" && v.isNumeric()) {
                 spec.perScreen = std::clamp(v.asFloat(), 0.f, PER_SCREEN_MAX);
+            } else if (key == "per_units" && v.isNumeric() && name == REPAIR_RANK) {
+                spec.perUnits = std::clamp(v.asFloat(), 0.f, PER_UNITS_MAX);
             } else problems.push_back(t.name + ".ranks." + name + "." + key + ": unknown or wrong type");
         }
         std::sort(spec.defs.begin(), spec.defs.end());
@@ -179,7 +198,15 @@ bool CBattleGroupController::Order(const std::string& name, const std::string& k
     ai->LOG("GROUP: script order template=%s kind=%s groups=%u", name.c_str(), kind.c_str(), unsigned(groups.size()));
     return true;
 }
-void CBattleGroupController::UnitRemoved(int unitId) { directives.erase(unitId); registry.UnitRemoved(unitId); escorts.erase(unitId); }
+void CBattleGroupController::UnitRemoved(int unitId)
+{
+    directives.erase(unitId); registry.UnitRemoved(unitId); escorts.erase(unitId); crewMembers.erase(unitId);
+    // D-514: a member that dies on its repair trip frees the trip at once.
+    if (const auto trip = tripOf.find(unitId); trip != tripOf.end()) {
+        if (const auto g = groups.find(trip->second); g != groups.end() && g->second.tripUnit == unitId) g->second.tripUnit = -1;
+        tripOf.erase(trip);
+    }
+}
 
 std::string CBattleGroupController::Describe(int groupKey) const
 {
@@ -209,6 +236,7 @@ std::vector<CBattleGroupController::GroupView> CBattleGroupController::Snapshot(
         v.screens = l.screens; v.rears = l.rears;
         v.orderFrame = l.orderFrame; v.seen = l.seen; v.why = l.why;
         v.airNeed = l.airNeed; v.airCap = l.airCap; v.escorts = l.escorts; v.airHeld = l.airHeld;
+        v.momentum = l.momentum; v.killed = l.trades.killed; v.lost = l.trades.lost;
         if (l.tmpl >= 0 && l.tmpl < int(templates.size()) && templates[l.tmpl].spec.Enabled()) {
             const auto& t = templates[l.tmpl];
             const auto* screen = group_composition::Find(t.ranks, "screen");
@@ -217,6 +245,8 @@ std::vector<CBattleGroupController::GroupView> CBattleGroupController::Snapshot(
         }
         v.composition = l.composition;
         for (const auto& [id, e] : escorts) if (e.group == l.key) v.escortIds.push_back(id);  // O(E), on request only
+        v.crewNeed = l.crewNeed; v.tripUnit = l.tripUnit;
+        for (const auto& [id, e] : crewMembers) if (e.group == l.key) v.crewIds.push_back(id);  // O(C), on request only
         out.push_back(std::move(v));
     }
     return out;
@@ -309,11 +339,179 @@ void CBattleGroupController::AssignEscorts(int frame)
     }
 }
 
+CBattleGroupController::Group* CBattleGroupController::GroupOf(int unitId)
+{
+    int key = -1;
+    if (const auto d = directives.find(unitId); d != directives.end()) key = d->second.group;
+    else if (const auto e = escorts.find(unitId); e != escorts.end()) key = e->second.group;
+    const auto g = key >= 0 ? groups.find(key) : groups.end();
+    return g == groups.end() ? nullptr : &g->second;
+}
+void CBattleGroupController::RecordKill(int attackerId, float metal, int frame)
+{
+    if (Group* l = GroupOf(attackerId))
+        trade::Kill(l->trades, metal, frame, int(templates[l->tmpl].config.momentumHalfLife * FRAMES_PER_SEC));
+}
+void CBattleGroupController::RecordLoss(int unitId, float metal, int frame)
+{
+    if (Group* l = GroupOf(unitId))
+        trade::Loss(l->trades, metal, frame, int(templates[l->tmpl].config.momentumHalfLife * FRAMES_PER_SEC));
+}
+
 bool CBattleGroupController::HasAirGroups() const
 {
     for (const auto& [key, l] : groups) if (l.airCap > 0) return true;
     return false;
 }
+// D-514: a join counts as unassigned at once, so a burst of idle bots between
+// two updates is not leased past the shortfall (WantsCrew).
+void CBattleGroupController::CrewJoin(int unitId)
+{
+    if (crewMembers.emplace(unitId, Escort{}).second) ++crewUnassigned;
+}
+void CBattleGroupController::CrewLeave(int unitId) { crewMembers.erase(unitId); }
+bool CBattleGroupController::CrewPoint(int unitId, springai::AIFloat3& station, int& group) const
+{
+    const auto it = crewMembers.find(unitId);
+    if (it == crewMembers.end() || it->second.group < 0) return false;
+    station = springai::AIFloat3(it->second.slot.x, 0.f, it->second.slot.z);
+    group = it->second.group;
+    return true;
+}
+const std::vector<CBattleGroupController::MemberHealth>* CBattleGroupController::CrewPatients(int group) const
+{
+    const auto g = groups.find(group);
+    return g == groups.end() ? nullptr : &g->second.patients;
+}
+bool CBattleGroupController::CrewUnderFire(int group) const
+{
+    const auto g = groups.find(group);
+    return g != groups.end() && g->second.composition.any;
+}
+int CBattleGroupController::CrewTrip(int group) const
+{
+    const auto g = groups.find(group);
+    return g == groups.end() ? -1 : g->second.tripUnit;
+}
+bool CBattleGroupController::RepairTrip(int unitId, springai::AIFloat3& point) const
+{
+    const auto trip = tripOf.find(unitId);
+    if (trip == tripOf.end()) return false;
+    const auto g = groups.find(trip->second);
+    if (g == groups.end() || g->second.tripUnit != unitId) return false;
+    point = g->second.station;
+    return true;
+}
+
+// D-514: every bot serves at most one group. A group whose need fell keeps
+// its bots up to the need; the rest, and bots with no group, take the nearest
+// group short of crew, else stay unassigned (the rezzer controller hands them
+// back to ordinary builder work after its release_seconds: no hoarding).
+// Stations are a row crew_behind elmos behind the screen's rear edge.
+// O(C x G) for C bots and G groups, once per update.
+void CBattleGroupController::AssignCrew(int frame)
+{
+    crewDeficit = 0; crewUnassigned = 0;
+    for (auto& [key, l] : groups) { l.crew = 0; l.crewIndex = 0; }
+    for (auto& [id, e] : crewMembers) {
+        const auto g = e.group >= 0 ? groups.find(e.group) : groups.end();
+        if (g == groups.end() || g->second.crew >= g->second.crewKeep) { e.group = -1; continue; }
+        ++g->second.crew;
+    }
+    for (auto& [id, e] : crewMembers) {
+        if (e.group >= 0) continue;
+        CCircuitUnit* unit = ai->GetTeamUnit(id);
+        if (unit == nullptr || unit->IsDead()) continue;
+        const ranged::Point pos = P(unit->GetPos(frame));
+        // The nearest group short of its need, else the nearest still allowed
+        // to keep one more (a leased bot is used before it is released).
+        int best = -1, kept = -1; float bestDistance = 0.f, keptDistance = 0.f;
+        for (const auto& [key, l] : groups) {
+            if (l.crew >= l.crewKeep) continue;
+            const float d = ranged::DistanceSq(pos, l.escortCenter);
+            if (l.crew < l.crewNeed && (best < 0 || d < bestDistance)) { best = key; bestDistance = d; }
+            if (kept < 0 || d < keptDistance) { kept = key; keptDistance = d; }
+        }
+        if (best < 0) best = kept;
+        e.group = best;
+        if (best >= 0) ++groups.at(best).crew;
+    }
+    for (const auto& [key, l] : groups) crewDeficit += std::max(0, l.crewNeed - l.crew);
+    for (auto& [id, e] : crewMembers) {
+        if (e.group < 0) { ++crewUnassigned; continue; }
+        Group& l = groups.at(e.group);
+        const BattleGroupConfig& c = templates[l.tmpl].config;
+        e.slot = air_defence::Slot(l.escortCenter, l.escortBack, l.rearDepth, c.crewBehind, l.crewIndex++, l.crew, c.crewSpacing);
+    }
+    for (auto& [key, l] : groups) {
+        const ranged::Point centre = air_defence::Slot(l.escortCenter, l.escortBack, l.rearDepth,
+            templates[l.tmpl].config.crewBehind, 0, 1, 0.f);
+        l.station = springai::AIFloat3(centre.x, 0.f, centre.z);
+        if (l.crew == 0 && l.tripUnit >= 0) EndTrip(l, "no_crew", frame);
+    }
+}
+
+void CBattleGroupController::EndTrip(Group& l, const char* why, int frame)
+{
+    if (l.tripUnit < 0) return;
+    if (templates[l.tmpl].config.log > 0.f)
+        ai->LOG("GROUP: repair trip end group=%i unit=%i why=%s seconds=%.0f frame=%i",
+            l.key, l.tripUnit, why, float(frame - l.tripFrame) / FRAMES_PER_SEC, frame);
+    tripOf.erase(l.tripUnit);
+    l.tripUnit = -1;
+}
+
+// D-514: one member at a time walks back to the crew for repair: the lowest
+// health under repair_trip_health, never while the cohort holds a rush (D-513)
+// and never the last screen. It rejoins at repair_trip_done, when it leaves
+// the group, or after repair_trip_seconds (then it may not go again for as
+// long). Health is read for the screen and support once a second: O(M).
+void CBattleGroupController::Rotate(Group& l, const Template& t, const std::vector<int>& screen, const std::vector<int>* rear, bool holding, int frame)
+{
+    const auto* rank = group_composition::Find(t.ranks, REPAIR_RANK);
+    if (rank == nullptr) { l.crewNeed = 0; l.crewKeep = 0; l.patients.clear(); EndTrip(l, "no_rank", frame); return; }
+    const int members = int(screen.size() + (rear ? rear->size() : 0));
+    l.crewNeed = repair_crew::Need(members, rank->perUnits, rank->max);
+    l.crewKeep = repair_crew::Keep(members, rank->perUnits, rank->max);
+    if (l.checkFrame >= 0 && frame - l.checkFrame < TRIP_CHECK_FRAMES) return;
+    l.checkFrame = frame;
+    l.patients.clear();
+    const auto read = [&](const std::vector<int>& ids) {
+        for (int id : ids) {
+            CCircuitUnit* u = ai->GetTeamUnit(id);
+            if (u != nullptr && !u->IsDead()) l.patients.push_back({id, u->GetHealthPercent()});
+        }
+    };
+    read(screen);
+    if (rear != nullptr) read(*rear);
+    const BattleGroupConfig& c = t.config;
+    if (l.tripUnit >= 0) {
+        const auto it = std::find_if(l.patients.begin(), l.patients.end(), [&](const MemberHealth& m) { return m.id == l.tripUnit; });
+        if (it == l.patients.end()) EndTrip(l, "left", frame);
+        else if (repair_crew::TripDone(it->health, c.tripDone)) EndTrip(l, "healed", frame);
+        else if (frame - l.tripFrame > int(c.tripSeconds * FRAMES_PER_SEC)) {
+            l.tripBlocked[l.tripUnit] = frame + int(c.tripSeconds * FRAMES_PER_SEC);
+            EndTrip(l, "timeout", frame);
+        }
+    }
+    for (auto it = l.tripBlocked.begin(); it != l.tripBlocked.end();) {
+        if (it->second <= frame) it = l.tripBlocked.erase(it); else ++it;
+    }
+    if (l.tripUnit >= 0 || l.crew == 0 || holding || screen.size() < 2) return;
+    std::vector<repair_crew::Candidate> candidates;
+    candidates.reserve(l.patients.size());
+    for (const MemberHealth& m : l.patients) if (!l.tripBlocked.count(m.id)) candidates.push_back({m.id, m.health});
+    const int chosen = repair_crew::ChooseTrip(candidates, c.tripHealth);
+    if (chosen < 0) return;
+    l.tripUnit = chosen; l.tripFrame = frame;
+    tripOf[chosen] = l.key;
+    if (c.log > 0.f) {
+        const auto it = std::find_if(l.patients.begin(), l.patients.end(), [&](const MemberHealth& m) { return m.id == chosen; });
+        ai->LOG("GROUP: repair trip start group=%i unit=%i health=%.2f crew=%i station=%.0f,%.0f frame=%i",
+            l.key, chosen, it != l.patients.end() ? it->health : 0.f, l.crew, l.station.x, l.station.z, frame);
+    }
+}
+
 void CBattleGroupController::EscortJoin(int unitId) { escorts.emplace(unitId, Escort{}); }
 void CBattleGroupController::EscortLeave(int unitId) { escorts.erase(unitId); }
 bool CBattleGroupController::EscortPoint(int unitId, springai::AIFloat3& point, int& group) const
@@ -327,22 +525,33 @@ bool CBattleGroupController::EscortPoint(int unitId, springai::AIFloat3& point, 
 
 CCircuitDef* CBattleGroupController::AirRequest(const CCircuitDef* factoryDef) const
 {
-    if (factoryDef == nullptr || airDeficit <= 0) return nullptr;
-    const auto escortType = [this](const CCircuitDef* def) {
+    return RankRequest(factoryDef, AIR_RANK, airDeficit, airUnassigned);
+}
+CCircuitDef* CBattleGroupController::CrewRequest(const CCircuitDef* factoryDef) const
+{
+    return RankRequest(factoryDef, REPAIR_RANK, crewDeficit, crewUnassigned);
+}
+
+// D-509, D-514: shared by the escort and crew requests. O(R + Q) for R rank
+// types and Q factory tasks, on a factory decision only.
+CCircuitDef* CBattleGroupController::RankRequest(const CCircuitDef* factoryDef, const char* rankName, int deficit, int unassigned) const
+{
+    if (factoryDef == nullptr || deficit <= 0) return nullptr;
+    const auto rankType = [this, rankName](const CCircuitDef* def) {
         if (def == nullptr) return false;
         for (const Template& t : templates) {
-            const auto* rank = group_composition::Find(t.ranks, AIR_RANK);
+            const auto* rank = group_composition::Find(t.ranks, rankName);
             if (rank && std::binary_search(rank->defs.begin(), rank->defs.end(), def->GetId())) return true;
         }
         return false;
     };
     int inProduction = 0;  // queued or being built
     for (const CRecruitTask* task : ai->GetFactoryManager()->GetTasks())
-        if (!task->IsDead() && escortType(task->GetBuildDef())) ++inProduction;
-    if (air_defence::Request(airDeficit, airUnassigned, inProduction) <= 0) return nullptr;
+        if (!task->IsDead() && rankType(task->GetBuildDef())) ++inProduction;
+    if (air_defence::Request(deficit, unassigned, inProduction) <= 0) return nullptr;
     const int frame = ai->GetLastFrame();
     for (const Template& t : templates) {
-        const auto* rank = group_composition::Find(t.ranks, AIR_RANK);
+        const auto* rank = group_composition::Find(t.ranks, rankName);
         if (rank == nullptr) continue;
         for (int id : rank->defs) {
             CCircuitDef* def = ai->GetCircuitDefSafe(id);
@@ -425,6 +634,13 @@ void CBattleGroupController::Observe(Group& l, CRangedWorld& world, int frame)
     }
     l.escortCenter = P(center); l.escortBack = back; l.rearDepth = rear;
     ObserveAir(l, t, world, center, frame);
+    // D-514: the crew need and the one-at-a-time repair trip. O(M) once a second.
+    Rotate(l, t, plan.members, l.partner >= 0 ? &cohorts.at(l.partner).members : nullptr, plan.holdFrame >= 0, frame);
+    // D-512: the trade momentum, to both cohorts' plans. O(1).
+    trade::Decay(l.trades, frame, int(t.config.momentumHalfLife * FRAMES_PER_SEC));
+    l.momentum = trade::Momentum(l.trades, t.config.momentumPrior);
+    world.SetCohortMomentum(l.key, l.momentum);
+    if (l.partner >= 0) world.SetCohortMomentum(l.partner, l.momentum);
     // The battle group's own order: the cohort's assessment.
     const battle_group::Order internal = battle_group::InternalOrder(int(plan.mode), plan.target >= 0, plan.committed);
     if (l.script != battle_group::Order::NONE && frame - l.scriptFrame > int(t.config.scriptOrderSeconds * 30.f)) l.script = battle_group::Order::NONE;
@@ -447,6 +663,7 @@ void CBattleGroupController::Observe(Group& l, CRangedWorld& world, int frame)
     if (wanted != l.effective) l.why |= why::Of(why::group::ORDER_HELD);
     if (l.standFirm) l.why |= why::Of(why::group::STAND_FIRM);
     if (l.airNeed > 0) l.why |= why::Of(why::group::AIR_THREAT);
+    if (l.tripUnit >= 0) l.why |= why::Of(why::group::REPAIR_TRIP);  // D-514
     Route(l, t, frame);
     Write(l, plan.members, battle_group::Slot::SCREEN, l.screenStance);
     if (l.partner >= 0) Write(l, cohorts.at(l.partner).members, battle_group::Slot::REAR, l.rearStance);
@@ -495,7 +712,20 @@ void CBattleGroupController::Update()
     const int frame = ai->GetLastFrame();
     if (frame < nextFrame) return;
     auto* military = ai->GetMilitaryManager();
-    if (military == nullptr || !military->HasRangedUnits()) { nextFrame = frame + 30; return; }
+    if (military == nullptr || !military->HasRangedUnits()) {
+        // No screen or support hull is left: every battle group is gone. Drop
+        // them (and their directives) now, and release the escorts, so the
+        // air request falls to zero and escorts return to their ordinary
+        // tasks. Returning before this kept the last groups: their air
+        // shortfall had every T1 bot lab build anti-air bots without end, and
+        // escorts stayed bound to dead slots (D-509 correction). O(G + E).
+        if (!groups.empty() || !directives.empty()) { groups.clear(); directives.clear(); }
+        tripOf.clear();
+        AssignEscorts(frame);
+        AssignCrew(frame);  // D-514: the crew goes unassigned and back to builder work
+        nextFrame = frame + 30;
+        return;
+    }
     performance::Scope measured(ai, performance::BATTLE_GROUP_DECISION);
     auto world = military->GetRangedWorld();
     world->Refresh();  // idempotent per frame
@@ -534,7 +764,12 @@ void CBattleGroupController::Update()
     for (auto it = directives.begin(); it != directives.end();) {
         if (it->second.generation != generation) it = directives.erase(it); else ++it;
     }
+    for (auto it = tripOf.begin(); it != tripOf.end();) {  // D-514: trips of groups that are gone
+        const auto g = groups.find(it->second);
+        if (g == groups.end() || g->second.tripUnit != it->first) it = tripOf.erase(it); else ++it;
+    }
     AssignEscorts(frame);
+    AssignCrew(frame);
     nextFrame = frame + std::max(1, period);
 }
 

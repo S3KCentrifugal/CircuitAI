@@ -23,6 +23,7 @@ struct RankSpec {
     std::vector<int> defs;         // units: admits these type ids (sorted; empty: no list)
     int max = 0;                   // members of this rank in one group (0: the template size_max)
     float perScreen = 0.f;         // per_screen: this rank's target as a share of the screen rank's (0: size_target)
+    float perUnits = 0.f;          // per_units (D-514, the repair rank): one per this many screen and support members
 };
 struct SizeSpec { int min = 1, target = 12, max = 24; };
 

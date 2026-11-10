@@ -13,6 +13,7 @@
 #include "control/core/UnitController.h"
 #include "control/kernel/SupportStation.h"
 #include "control/unit/DisengageRule.h"
+#include "control/unit/RepairTrip.h"
 #include "task/fighter/RangedWorld.h"
 #include "unit/RangedPolicy.h"
 
@@ -74,6 +75,7 @@ struct SupportState : control::ControlledState {
     ranged::Point lastStation{0.f, 0.f};
     bool noScreenActive = false;
     disengage_rule::Memory disengage;
+    repair_trip::Memory trip;          // D-514
 };
 
 class CSupportController final : public CUnitControllerBase<SupportConfig, SupportState> {

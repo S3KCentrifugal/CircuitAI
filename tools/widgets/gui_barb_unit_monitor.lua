@@ -57,10 +57,10 @@ end
 
 -- ---------------------------------------------------------------- constants
 
-local WIN_W, WIN_H = 360, 680          -- unscaled px
+local WIN_W, WIN_H = 360, 714          -- unscaled px
 local LAUNCHER = 26                    -- unscaled px, as the team link's
 local ROW_H = 20
-local DETAIL_H = 236
+local DETAIL_H = 270
 local UNIT_CARD_H = 100
 local POLL_SECONDS = 1.0
 local LEASE_RENEW_SECONDS = 15
@@ -251,6 +251,10 @@ local function parseGroups(payload)
 				-- D-509: anti-air escorts needed, the most it takes, the air HP planned for, the escorts
 				airNeed = tonumber(f[29]) or 0, airCap = tonumber(f[30]) or 0, airHeld = tonumber(f[31]) or 0,
 				escorts = members(f[32]),
+				-- D-512: trade momentum and the decayed metal killed and lost
+				momentum = tonumber(f[33]) or 0, killed = tonumber(f[34]) or 0, lost = tonumber(f[35]) or 0,
+				-- D-514: repair bots needed, the crew, the member on its repair trip (-1: none)
+				crewNeed = tonumber(f[36]) or 0, crew = members(f[37]), tripUnit = tonumber(f[38]) or -1,
 			}
 		elseif f[1] == "C" and #f >= 17 then
 			local c = {
@@ -293,6 +297,7 @@ local function buildGroups(s)
 		if front then for _, id in ipairs(front.members) do ids[#ids + 1] = id end end
 		if rear then for _, id in ipairs(rear.members) do ids[#ids + 1] = id end end
 		for _, id in ipairs(l.escorts or {}) do ids[#ids + 1] = id end   -- D-509: anti-air escorts
+		for _, id in ipairs(l.crew or {}) do ids[#ids + 1] = id end      -- D-514: repair crew
 		local g = { key = "G" .. l.key, kind = "group", data = l, members = ids,
 			label = "Battle group " .. l.key .. (l.template ~= "" and (" · " .. l.template) or ""),
 			badge = l.order ~= "none" and l.order or l.screenStance, screen = front, children = {} }
@@ -357,6 +362,8 @@ local PHRASE = {
 	rushed = "rushed by shorter-ranged raiders: kiting them", toward_help = "retreating toward allied help",
 	down_lane = "retreating back down the lane", to_base = "retreating toward the base",
 	stands = "raiders too fast to kite and help too far: stands and fires",
+	pressing = "trading well: pushes on", falling_back = "trading badly: falls back to heal",
+	rush_hold = "committed to the rush until half its health is lost",
 	escape = "inside an enemy's reach: stepping out", poke_in = "weapon ready: stepping in", poke_out = "reloading: stepping out",
 	hold_incoming = "letting a closing enemy into range", shooting = "has a shot: stays and fires", to_slot = "walking to its place in the rows",
 	siege_station = "on the siege station", siege_step = "last step into range of the tower", tuck = "enemy leaked: tucking behind the screen",
@@ -366,6 +373,7 @@ local PHRASE = {
 	script_order = "script order", order_held = "order held (changes wait a few seconds)", stand_firm = "standing firm against a push",
 	staggered = "screen and support move at different times",
 	air_threat = "enemy air near: anti-air escorts needed",
+	repair_trip = "one member is walking back to the repair crew",
 }
 local function parseCodes(payload)
 	local p = split(payload, ";")
@@ -650,6 +658,8 @@ local function drawUnitCard(left, right, top)
 		elseif f.mode then parts[#parts + 1] = "mode " .. f.mode .. (f.reason and (" (" .. f.reason .. ")") or "") end
 		if f.external == "1" then parts[#parts + 1] = "externally controlled" end
 		if f.escort then parts[#parts + 1] = "anti-air escort of battle group " .. f.escort end   -- D-509
+		if f.crew then parts[#parts + 1] = "repair crew of battle group " .. f.crew end           -- D-514
+		if f.trip == "1" then parts[#parts + 1] = "on a repair trip" end                          -- D-514
 		local line = table.concat(parts, " · ")
 		text(font, fitText(font, line, px(8.5), right - left), left, y - px(9), px(8.5), "o", C.onSurface)
 		register(left, y - px(12), right, y, "unitinfo", function() end, line)
@@ -732,9 +742,16 @@ local function detailRows(g)
 			{ "Support", d.rears },
 			{ "Spread", string.format("%.2fx", d.spread) }, { "Separation", string.format("%d", d.separation) },
 			{ "Stand firm", d.standFirm and "yes" or "no" },
+			-- D-512: trading well (green) or badly (warn)
+			{ "Trades", string.format("%+.2f (killed %d, lost %d)", d.momentum or 0, d.killed or 0, d.lost or 0),
+				(d.momentum or 0) < 0 and C.warn or ((d.momentum or 0) > 0 and C.ok or nil) },
 			-- D-509: escorts with it / needed (the most it takes)
 			{ "Anti-air", string.format("%d / %d (max %d)", #(d.escorts or {}), d.airNeed or 0, d.airCap or 0),
 				(#(d.escorts or {}) < (d.airNeed or 0)) and C.warn or nil },
+			-- D-514: repair bots with it / needed, and the member walking back
+			{ "Repair crew", string.format("%d / %d%s", #(d.crew or {}), d.crewNeed or 0,
+				(d.tripUnit or -1) >= 0 and (" · repairing #" .. d.tripUnit) or ""),
+				(#(d.crew or {}) < (d.crewNeed or 0)) and C.warn or nil },
 			{ "Order age", d.orderAge >= 0 and (d.orderAge .. " s") or "-" },
 			{ "Hostile metal", string.format("%d", d.hostileMetal) }, { "Template", d.template ~= "" and d.template or "-" },
 		}, mix

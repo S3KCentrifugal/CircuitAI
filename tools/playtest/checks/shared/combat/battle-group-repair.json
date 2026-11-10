@@ -1,0 +1,62 @@
+{
+  "stop_minute": 5,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "group",
+      "pattern": "GROUP: group=\\d+ order=",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "crew",
+      "pattern": "REZZER: unit=\\d+ group=\\d+ station=",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "crew_repair",
+      "pattern": "REZZER: (trip|member) unit=\\d+ target=",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "trip",
+      "pattern": "GROUP: repair trip start group=\\d+ unit=",
+      "scope": "any",
+      "by_minute": 5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena|Removed widget: Ranged combat arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "policy",
+      "pattern": "has invalid ranged policy|CONFIG controllers: preset|CONFIG formations:",
+      "scope": "any"
+    }
+  ]
+}

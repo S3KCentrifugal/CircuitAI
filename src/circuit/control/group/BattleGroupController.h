@@ -21,6 +21,8 @@
 #include "control/core/GroupController.h"
 #include "control/kernel/ActionWhy.h"
 #include "control/kernel/AirDefence.h"
+#include "control/kernel/RepairCrew.h"
+#include "control/kernel/TradeMomentum.h"
 #include "control/kernel/BattleGroup.h"
 #include "control/group/GroupRegistry.h"
 
@@ -60,6 +62,15 @@ struct BattleGroupConfig {
     // elmos behind the screen's rear edge, escort_spacing apart.
     float airRadius = 1600.f, airKillSeconds = 10.f, airMemorySeconds = 20.f;
     float escortBehind = 100.f, escortSpacing = 64.f;
+    // D-512 (control/kernel/TradeMomentum.h): the trade ledger's prior (metal
+    // a sign needs) and half-life (seconds).
+    float momentumPrior = 300.f, momentumHalfLife = 120.f;
+    // D-514 (control/kernel/RepairCrew.h): with a "repair" rank, the crew
+    // stands crew_behind elmos behind the screen's rear edge, crew_spacing
+    // apart; one member at a time under repair_trip_health walks back to it
+    // and rejoins at repair_trip_done, or after repair_trip_seconds.
+    float crewBehind = 200.f, crewSpacing = 96.f;
+    float tripHealth = .6f, tripDone = .95f, tripSeconds = 60.f;
 };
 
 class CBattleGroupController final : public IGroupController {
@@ -92,8 +103,34 @@ public:
     // the shortfall no assigned, spare, queued or building escort covers
     // (air_defence::Request). O(R + Q) for R rank types and Q factory tasks.
     CCircuitDef* AirRequest(const CCircuitDef* factoryDef) const;
+    // D-512: a kill by a member (the engine's enemy-destroyed attacker) and the
+    // loss of a member, booked to its group's trade ledger. O(1) expected.
+    void RecordKill(int attackerId, float metal, int frame);
+    void RecordLoss(int unitId, float metal, int frame);
     // A group with an air rank exists: an escort has somewhere to go. O(G).
     bool HasAirGroups() const;
+
+    // D-514: the repair crew (control/unit/rezzer/RezzerController.h). A bot
+    // joins on its lease and leaves on its end or death; which group it serves
+    // and its station are decided here each update. O(log C) each.
+    void CrewJoin(int unitId);
+    void CrewLeave(int unitId);
+    bool CrewPoint(int unitId, springai::AIFloat3& station, int& group) const;
+    // A group is short of crew no leased bot covers: lease one more. O(1).
+    bool WantsCrew() const { return crewDeficit > crewUnassigned; }
+    // The crew type a factory of `factoryDef` should start now, or null (as AirRequest).
+    CCircuitDef* CrewRequest(const CCircuitDef* factoryDef) const;
+    // A group's members (screen and support) with the health fractions read at
+    // its last rotation check, and its member on a repair trip (-1: none). O(log G).
+    struct MemberHealth { int id = -1; float health = 1.f; };
+    const std::vector<MemberHealth>* CrewPatients(int group) const;
+    int CrewTrip(int group) const;
+    // Armed enemies are within threat_radius of the group (its last update):
+    // the crew repairs but leaves wrecks alone. O(log G).
+    bool CrewUnderFire(int group) const;
+    // The member side: true while `unitId` is on its group's repair trip, with
+    // the crew station it walks to. O(1) expected.
+    bool RepairTrip(int unitId, springai::AIFloat3& point) const;
 
     // The unit monitor's read-only view of one battle group (control/group/GroupMonitor.h).
     // Copied on request only, O(L); nothing here runs per frame.
@@ -112,6 +149,9 @@ public:
         int airNeed = 0, airCap = 0, escorts = 0;  // D-509: escorts needed, the most it takes, assigned
         float airHeld = 0.f;                       // D-509: the air HP it plans for
         std::vector<int> escortIds;                // D-509: its escorts, id order
+        float momentum = 0.f, killed = 0.f, lost = 0.f;  // D-512: the trade ledger, decayed to the last update
+        int crewNeed = 0, tripUnit = -1;                 // D-514: bots needed, the member on its repair trip
+        std::vector<int> crewIds;                        // D-514: its repair crew, id order
     };
     std::vector<GroupView> Snapshot() const;
 
@@ -141,8 +181,23 @@ private:
         int airNeed = 0, airCap = 0, escorts = 0;
         ranged::Point escortCenter{0.f, 0.f}, escortBack{1.f, 0.f};
         int escortIndex = 0;  // the next slot index while slots are laid out (AssignEscorts)
+        trade::Ledger trades;  // D-512: metal killed and lost, decaying
+        float momentum = 0.f;  // D-512: from `trades`, set by Observe
+        // D-514: the repair crew and the one-at-a-time repair trip.
+        int crewNeed = 0, crewKeep = 0, crew = 0, crewIndex = 0;  // need: floor (new bots); keep: ceil (bots it has)
+        std::vector<MemberHealth> patients;     // screen and support, health at the last check
+        int tripUnit = -1, tripFrame = -1, checkFrame = -1;
+        springai::AIFloat3 station;             // the crew row's centre: where a trip walks to
+        std::map<int, int> tripBlocked;         // member id -> frame a timed-out trip may start again
     };
+    Group* GroupOf(int unitId);  // D-512: the group a member or escort is in, or null
     struct Escort { int group = -1; ranged::Point slot{0.f, 0.f}; };
+    void Rotate(Group& l, const Template& t, const std::vector<int>& screen, const std::vector<int>* rear, bool holding, int frame);
+    void EndTrip(Group& l, const char* why, int frame);
+    void AssignCrew(int frame);
+    // The first type of `rankName` the factory can build now, once the
+    // shortfall no assigned, spare, queued or building unit covers is positive.
+    CCircuitDef* RankRequest(const CCircuitDef* factoryDef, const char* rankName, int deficit, int unassigned) const;
     void ObserveAir(Group& l, const Template& t, CRangedWorld& world, const springai::AIFloat3& center, int frame);
     void AssignEscorts(int frame);
     float EscortDps(const Template& t) const;
@@ -164,6 +219,9 @@ private:
     std::map<int, Escort> escorts;    // D-509: escort unit id -> its group and slot (id order: deterministic)
     std::vector<int> airNearby;       // D-509: reused contact buffer
     int airDeficit = 0, airUnassigned = 0;  // D-509: from the last update, for AirRequest
+    std::map<int, Escort> crewMembers;      // D-514: repair bot id -> its group and station (id order)
+    std::unordered_map<int, int> tripOf;    // D-514: member on a repair trip -> its group
+    int crewDeficit = 0, crewUnassigned = 0; // D-514: from the last update (joins count at once)
     bool classesDirty = true;  // D-501: ranks changed since the world last got the cohort classes
 };
 

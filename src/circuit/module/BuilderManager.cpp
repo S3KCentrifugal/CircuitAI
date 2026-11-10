@@ -42,6 +42,7 @@
 #include "task/builder/RepairTask.h"
 #include "task/builder/ReclaimTask.h"
 #include "task/builder/ResurrectTask.h"
+#include "control/unit/rezzer/RezzerController.h"
 #include "task/builder/PatrolTask.h"
 #include "task/builder/GuardTask.h"
 #include "task/builder/CombatTask.h"
@@ -1890,6 +1891,11 @@ IUnitTask* CBuilderManager::MakeTask(CCircuitUnit* unit)
 {
 	freshDefaults.clear();
 	freshMade = nullptr;
+	// D-514: a battle group short of its repair crew leases a bound
+	// resurrection bot before any script policy; O(1) when none is short.
+	if (CRezzerController* crew = circuit->GetRezzerController()) {
+		if (IUnitTask* lease = crew->MakeLease(unit)) return lease;
+	}
 	IUnitTask* task = ITaskModule::MakeTask(unit);  // script policy, DefaultMakeTask inside
 	for (IUnitTask* def : freshDefaults) {
 		if (def == task) {

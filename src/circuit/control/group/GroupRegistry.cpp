@@ -90,6 +90,9 @@ bool CGroupRegistry::Cohesion(CRangedWorld& world, int key, const GroupSpec& spe
             if (group_cohesion::Stray(d, spec.strayRadius, since, frame, frames)) leaving.push_back(m.id);
         }
     }
+    // D-514: a member walking back to the repair crew stays in its group. O(S).
+    if (tripping != nullptr && !tripping->empty())
+        leaving.erase(std::remove_if(leaving.begin(), leaving.end(), [this](int id) { return tripping->count(id) != 0; }), leaving.end());
     if (leaving.empty() || leaving.size() >= live.size()) { splitSeen.erase(key); return false; }
     // D-502: the separation must still stand on the next check (a group
     // crossing a ridge or strung out on a road joins up again by itself).

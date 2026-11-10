@@ -84,6 +84,14 @@ const std::vector<NumericKey> kNumeric{
     {"help_cone", Field<&RangedPolicy::helpCone>, 0.f, 90.f},  // D-510
     {"help_lane_step", Field<&RangedPolicy::helpLaneStep>, 0.f, 4000.f},  // D-510
     {"escape_help_weight", Field<&RangedPolicy::escapeHelpWeight>, 0.f, 1.f},  // D-510
+    {"momentum_press", Field<&RangedPolicy::momentumPress>, 0.f, 1.f},  // D-512
+    {"momentum_caution", Field<&RangedPolicy::momentumCaution>, 0.f, 4.f},  // D-512
+    {"momentum_push", Field<&RangedPolicy::momentumPush>, 0.f, 1.f},  // D-512
+    {"momentum_fall_back", Field<&RangedPolicy::momentumFallBack>, 0.f, 1.f},  // D-512
+    {"push_step", Field<&RangedPolicy::pushStep>, 0.f, 4000.f},  // D-512
+    {"fall_back_distance", Field<&RangedPolicy::fallBackDistance>, 0.f, 3000.f},  // D-512
+    {"rush_hold_loss", Field<&RangedPolicy::rushHoldLoss>, 0.f, 1.f},  // D-513
+    {"rush_gather", Field<&RangedPolicy::rushGather>, 0.f, 2000.f},  // D-513
     {"intent_gain", Field<&RangedPolicy::intentGain>, 0.f, .5f},
     {"evasion_limit", Field<&RangedPolicy::evasionLimit>, 0.f, 10.f},
     {"poke_in", Field<&RangedPolicy::pokeIn>, POKE_MIN_IN_RANGE, POKE_MAX_IN_RANGE},

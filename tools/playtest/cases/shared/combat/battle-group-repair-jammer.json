@@ -1,0 +1,137 @@
+{
+  "name": "battle-group-repair-jammer",
+  "description": "D-514: a Cortex battle group (10 Thugs, 4 Aggravators) with a Graverobber crew and a Castro jammer beside the crew's station. At 70 s the jammer is destroyed the way a Juno deletes it (KillUnit, not self-destructed, not reclaimed: the wreck stays). With full metal and energy and no enemy near, the crew must resurrect it (REZZER: resurrect) and a Castro must finish again. A small Pawn wave at 150 s gives the group something to fight afterwards.",
+  "unit": "corthud",
+  "units": [
+    "corthud",
+    "corstorm",
+    "cornecro",
+    "corjamt"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "line-repair-jammer",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    4000,
+    3700,
+    1250
+  ],
+  "photos": [
+    60,
+    120,
+    180
+  ],
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3550,
+        4200
+      ]
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4450,
+        4200
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4350,
+        3350
+      ]
+    },
+    {
+      "unit": "corthud",
+      "count": 10,
+      "team": 0,
+      "position": [
+        3700,
+        3700
+      ],
+      "columns": 10,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3870,
+        3480
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 15
+    },
+    {
+      "unit": "cornecro",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3950,
+        3200
+      ],
+      "after_seconds": 25
+    },
+    {
+      "unit": "armpw",
+      "count": 4,
+      "team": 1,
+      "position": [
+        3700,
+        5200
+      ],
+      "columns": 4,
+      "spacing": 80,
+      "after_seconds": 150
+    }
+  ],
+  "waves": [
+    {
+      "name": "raiders",
+      "after_seconds": 150,
+      "units": [
+        "armpw"
+      ]
+    }
+  ],
+  "remove_units_after_seconds": 70,
+  "remove_unit_name": "corjamt",
+  "remove_unit_team": 0,
+  "remove_unit_position": [
+    4350,
+    3350
+  ],
+  "enemy_destination": [
+    3900,
+    3300
+  ],
+  "assertions": {
+    "min_kills": 3,
+    "max_losses": 6
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-repair-jammer"
+}

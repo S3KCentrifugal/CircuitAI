@@ -13,6 +13,10 @@ ranged_benchmark.py's assertions:
   battle-group-rush-help          D-510: 14 Pawns rush the group, Guardians 800 behind (too far): stand and fire
   battle-group-rush-lane          D-510: 16 Grunts rush the group, no help near: stand and fire
   battle-group-rush-near-help     D-510: 14 Pawns rush the group, Guardians 350 behind: kite to them
+  battle-group-siege-memory       D-511: Sentries seen once, then out of sight and radar: the rockets still kill them
+  battle-group-repair-crew        D-514: a Graverobber serves 14 members as repair crew through three waves
+  battle-group-repair-jammer      D-514: a Castro destroyed as a Juno would: the crew resurrects it
+  battle-group-repair-crew-legion D-514: the repair arena with a Legion AI and its legrezbot as crew
 
 Usage: python tools/playtest/run_battle_group_suite.py --dll <pin>/SkirmishAI.dll --data <pin>/data [--cases ...]
 Exit status is non-zero when any case fails. Prune the game folders afterwards
@@ -27,7 +31,10 @@ HERE = Path(__file__).resolve().parent
 CASES = ['battle-group-siege-sentries', 'battle-group-siege-depth', 'battle-group-outranged-push',
          'battle-group-outranged-costly', 'battle-group-outranged-retreat',
          'battle-group-jammer-control', 'battle-group-jammer-hold',
-         'battle-group-rush-help', 'battle-group-rush-lane', 'battle-group-rush-near-help']  # D-510
+         'battle-group-rush-help', 'battle-group-rush-lane', 'battle-group-rush-near-help',  # D-510
+         'battle-group-siege-memory',  # D-511
+         'battle-group-repair-crew', 'battle-group-repair-jammer',  # D-514
+         'battle-group-repair-crew-legion']
 
 
 def main():
