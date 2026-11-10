@@ -1,0 +1,174 @@
+{
+  "name": "battle-group-repair-crew-legion",
+  "description": "D-514: the repair arena with a Legion AI (behaviour_leg.json loaded): Legion binds no unit to the battle group, so the group is the same Cortex Thugs and Aggravators, spawned by the fixture, and the crew is the Legion resurrection bot (legrezbot), bound to t1_rezzer by the Legion fragment. Same waves and checks as battle-group-repair-crew.",
+  "unit": "corthud",
+  "units": [
+    "corthud",
+    "corstorm",
+    "legrezbot"
+  ],
+  "side": "legion",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "line-repair-crew-legion",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    4000,
+    3900,
+    1250
+  ],
+  "photos": [
+    90,
+    180,
+    270
+  ],
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3550,
+        4200
+      ]
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4450,
+        4200
+      ]
+    },
+    {
+      "unit": "corthud",
+      "count": 10,
+      "team": 0,
+      "position": [
+        3700,
+        3700
+      ],
+      "columns": 10,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3870,
+        3480
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 15
+    },
+    {
+      "unit": "legrezbot",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3950,
+        3200
+      ],
+      "after_seconds": 25
+    },
+    {
+      "unit": "armpw",
+      "count": 8,
+      "team": 1,
+      "position": [
+        3700,
+        5200
+      ],
+      "columns": 4,
+      "spacing": 80,
+      "after_seconds": 40
+    },
+    {
+      "unit": "armwar",
+      "count": 4,
+      "team": 1,
+      "position": [
+        3800,
+        5300
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 140
+    },
+    {
+      "unit": "armham",
+      "count": 4,
+      "team": 1,
+      "position": [
+        3800,
+        5300
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 240
+    },
+    {
+      "unit": "armrock",
+      "count": 2,
+      "team": 1,
+      "position": [
+        3850,
+        5520
+      ],
+      "columns": 2,
+      "spacing": 100,
+      "after_seconds": 240
+    }
+  ],
+  "waves": [
+    {
+      "name": "raiders",
+      "after_seconds": 40,
+      "units": [
+        "armpw"
+      ]
+    },
+    {
+      "name": "riot",
+      "after_seconds": 140,
+      "units": [
+        "armwar"
+      ]
+    },
+    {
+      "name": "peer-line",
+      "after_seconds": 240,
+      "units": [
+        "armham",
+        "armrock"
+      ]
+    }
+  ],
+  "enemy_destination": [
+    3900,
+    3300
+  ],
+  "assertions": {
+    "min_shooters": 4,
+    "min_types_assigned": 2,
+    "min_kills": 8,
+    "max_losses": 14,
+    "min_damage": 3000
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-repair"
+}

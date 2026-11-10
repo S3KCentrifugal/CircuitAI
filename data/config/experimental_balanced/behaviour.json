@@ -74,7 +74,11 @@
 			// nothing in sight (enemy jammer, fog) keeps advancing 800 down the lane. Losing does the opposite;
 			// at m <= -0.4 the group falls back 600 past the enemy's reach toward help and heals there
 			"momentum_press": 0.5, "momentum_caution": 0.5, "momentum_push": 0.3, "momentum_fall_back": 0.4,
-			"push_step": 800, "fall_back_distance": 600
+			"push_step": 800, "fall_back_distance": 600,
+			// D-513 (control/kernel/RushHold.h): a committed rush holds (no withdraw, no single Thug
+			// leaving to repair) until the Thugs it began with have lost half their health then;
+			// a rushing Thug more than 250 from its place around the target walks there to help
+			"rush_hold_loss": 0.5, "rush_gather": 250
 		},
 		"thug": {
 			"extends": "t1_skirmisher",
@@ -150,7 +154,15 @@
 		// bot rides with a battle group in the slot it gives it (the template's escort_behind
 		// behind the screen), fire at will; with no group for release_seconds it goes back
 		// to its ordinary anti-air tasks
-		"t1_aa": {"type": "escort", "arrival": 48, "move_seconds": 20, "fire_at_will": 1, "release_seconds": 15, "log": 1}
+		"t1_aa": {"type": "escort", "arrival": 48, "move_seconds": 20, "fire_at_will": 1, "release_seconds": 15, "log": 1},
+		// D-514: the repair crew (control/unit/rezzer/RezzerController.h): a resurrection bot serves a
+		// battle group from its station (the template's crew_behind behind the screen): the member on
+		// its repair trip, then members under member_health within member_radius, then other units
+		// under ally_health within ally_radius, then wrecks within recovery_radius: reclaim while metal
+		// is under rez_metal of storage, resurrect while it is over and energy is over rez_energy
+		"t1_rezzer": {"type": "rezzer", "arrival": 48, "move_seconds": 20, "order_seconds": 30, "release_seconds": 15,
+			"member_health": 0.98, "member_radius": 350, "ally_health": 0.9, "ally_radius": 500,
+			"recovery_radius": 600, "rez_metal": 0.5, "rez_energy": 0.3, "scan_seconds": 2, "log": 1}
 	},
 	"roles": {"commander": "commander"}
 },
@@ -189,6 +201,11 @@
 		// D-512: the trade ledger: a sign needs 300 metal of evidence, trades halve every 120 s
 		"momentum_prior": 300, "momentum_half_life": 120,
 		"escort_behind": 100, "escort_spacing": 64,
+		// D-514 (control/kernel/RepairCrew.h): the repair crew stands crew_behind elmos behind the
+		// screen; one member at a time under repair_trip_health walks back to it and rejoins at
+		// repair_trip_done (or after repair_trip_seconds)
+		"crew_behind": 200, "crew_spacing": 96,
+		"repair_trip_health": 0.6, "repair_trip_done": 0.95, "repair_trip_seconds": 60,
 		// a rank admits types by role (assault, riot, skirmish) or by "units"; types one rank
 		// admits share a cohort. support: half the screen target, at most 12.
 		"ranks": {
@@ -196,7 +213,10 @@
 			"support": {"roles": ["skirmish"], "per_screen": 0.5, "max": 12},
 			// D-509: the anti-air escorts the factories start for it: one per three screens at
 			// most, 6 at most (behaviour_leg.json adds Legion's)
-			"air": {"units": ["armjeth", "corcrash"], "per_screen": 0.34, "max": 6}
+			"air": {"units": ["armjeth", "corcrash"], "per_screen": 0.34, "max": 6},
+			// D-514: one resurrection bot per 12 screen and support members, 3 at most
+			// (behaviour_leg.json adds Legion's)
+			"repair": {"units": ["armrectr", "cornecro"], "per_units": 12, "max": 3}
 		}
 	},
 	"t1_bot_group": {"extends": "t1_cortex_group"}
@@ -1732,6 +1752,8 @@
 			"armrectr": {
 				"role": ["support", "spam"],
 				"attribute": ["rare"],
+				"controller": "t1_rezzer",  // D-514: repair crew of the battle group
+				"retreat": 0.4,  // D-514: was the builder default (0.8 to 0.89): a crew bot left the group at every hit
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2290,6 +2312,8 @@
 			"cornecro": {
 				"role": ["rezzer", "spam"],
 				"attribute": ["rare"],
+				"controller": "t1_rezzer",  // D-514: repair crew of the battle group
+				"retreat": 0.4,  // D-514: was the builder default (0.8 to 0.89)
 				"limit": 20,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0

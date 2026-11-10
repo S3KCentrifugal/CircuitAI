@@ -12,6 +12,7 @@
 #include "util/Utils.h"
 #include "Log.h"
 #include "control/kernel/TradeMomentum.h"
+#include "control/kernel/RushHold.h"
 #include <algorithm>
 #include <limits>
 #include <cstdlib>
@@ -31,6 +32,8 @@ static void Mark(CRangedWorld::CohortPlan& g,int bit) { g.why|=why::Of(bit); }
 static constexpr int HELP_REFRESH_FRAMES=2*FRAMES_PER_SEC;
 // D-512: a travel goal this close (squared elmos, as the travel branch's 128) is reached.
 static constexpr float PUSH_ARRIVAL_SQ=128.f*128.f;
+// D-513: how often a rush hold re-reads its members' health (half a second).
+static constexpr int HOLD_CHECK_FRAMES=FRAMES_PER_SEC/2;
 
 void CRangedWorld::JoinCohort(CCircuitUnit* unit)
 {
@@ -241,6 +244,7 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
         g.radius=0.f;
         g.assault.clear(); g.committed=false; g.reason=cohort::Reason::TRAVEL;
         g.rushed=false; g.backToHelp=false;  // D-510
+        g.holdFrame=-1;                      // D-513: no target, no hold
         // Keep formation orientation after arrival. Recomputing a direction
         // from its near-zero centroid error rotates every member's slot and
         // creates endless orders even though the battle has finished.
@@ -635,6 +639,16 @@ void CRangedWorld::FallBackToHelp(CCircuitUnit* unit,CohortPlan& g)
     Mark(g,wp::FALLING_BACK);
 }
 
+float CRangedWorld::HoldHealth(const CohortPlan& g) const
+{
+    float sum=0.f;
+    for(int id:g.holdMembers) {
+        auto* u=circuit->GetTeamUnit(id);
+        if(u && !u->IsDead()) sum+=std::max(0.f,u->GetUnit()->GetHealth());
+    }
+    return sum;
+}
+
 bool CRangedWorld::InJammerCover(const AIFloat3& pos)
 {
     // The query bound is the largest jammer radius of any ground type: found
@@ -859,6 +873,28 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     g.loss=result.loss; g.advantage=result.advantage;
     g.committed=result.commit && !uncertain && !forbidden && approach<=p.catchSeconds;
     if(staticCoverage && p.staticLossFraction<=0.f) g.committed=false;
+    // D-513: the rush hold. A commitment starts it (the members and their
+    // health now); while the members keep more than rush_hold_loss of that
+    // health the cohort stays committed whatever the advantage says, so a rush
+    // is not re-judged into a withdraw every plan. A hard hazard (forbidden:
+    // a commander, a reclaimer or a death blast on the approach) still ends it.
+    if(p.rushHoldLoss>0.f) {
+        if(g.committed && g.holdFrame<0) {
+            g.holdFrame=now; g.holdMembers=g.members; g.holdCheckFrame=now;
+            g.holdInitial=g.holdCurrent=HoldHealth(g);
+            circuit->LOG("COHORT: rush hold start group=%d members=%u health=%.0f frame=%d",
+                CohortOf(g.members.front()),unsigned(g.holdMembers.size()),g.holdInitial,now);
+        } else if(g.holdFrame>=0) {
+            if(now-g.holdCheckFrame>=HOLD_CHECK_FRAMES) { g.holdCurrent=HoldHealth(g); g.holdCheckFrame=now; }
+            if(!forbidden && rush_hold::Holds(g.holdCurrent,g.holdInitial,p.rushHoldLoss)) g.committed=true;
+            else {
+                circuit->LOG("COHORT: rush hold end group=%d health=%.0f/%.0f forbidden=%d frame=%d",
+                    CohortOf(g.members.front()),g.holdCurrent,g.holdInitial,int(forbidden),now);
+                g.holdFrame=-1;
+            }
+        }
+        if(g.holdFrame>=0) Mark(g,wp::RUSH_HOLD);
+    }
     if(!g.committed) g.assault.clear();
     if(g.supporting) Mark(g,wp::SCREENING);
     if(approach>=horizon || approach>p.catchSeconds) Mark(g,wp::TOO_FAR);
@@ -883,7 +919,7 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
         auto* u=circuit->GetTeamUnit(member);
         if(u && cohort::Admit(P(u->GetPos(now)),P(g.center),p.cohortRadius*.5f)) ++ready;
     }
-    if(!g.supporting && now<g.regroupUntil && ready*4<g.members.size()*3 && distance>enemy.hazardRadius+p.spacing) {
+    if(!g.supporting && g.holdFrame<0 && now<g.regroupUntil && ready*4<g.members.size()*3 && distance>enemy.hazardRadius+p.spacing) {
         g.committed=false; g.assault.clear(); g.mode=cohort::Mode::REGROUP; g.reason=cohort::Reason::ASSEMBLE;
         Mark(g,wp::ASSEMBLING);
         g.radius=std::max(firing,distance); // hold vanguard; do not pull it rearward

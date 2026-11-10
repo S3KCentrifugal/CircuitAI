@@ -138,6 +138,14 @@ struct RangedPolicy {
     // toward help, and holds there to heal. 0 switches each off.
     float momentumPress = 0.f, momentumCaution = 0.f, momentumPush = 0.f, momentumFallBack = 0.f;
     float pushStep = 800.f, fallBackDistance = 600.f;
+    // D-513 (control/kernel/RushHold.h): rush_hold_loss: once a cohort commits it
+    // stays committed (and its members skip their own retreat and repair trips)
+    // until the members it committed with have lost this share of their health
+    // then (the dead count as 0), the target is gone, or a hard hazard vetoes it
+    // (0: off, the commitment is re-judged every plan). rush_gather: a rushing
+    // member farther than this from its slot walks to it instead of holding
+    // where it has a shot (0: off).
+    float rushHoldLoss = 0.f, rushGather = 0.f;
     float intentGain = 0.f; // required relative endpoint improvement; zero preserves old micro
     // D-294: per-shooter target exclusion, resolved once from JSON
     // "avoid_categories" (BAR category names, e.g. "GROUNDSCOUT"). Zero = none.

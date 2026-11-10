@@ -28,6 +28,10 @@ namespace Military {
         // (systems/combat/battle_group_air.as; how many is native, the
         // template's "air" rank and air_* levers in behaviour.json).
         bool BattleGroupAirEnabled = true;
+        // D-514: a lab starts the resurrection bot the battle groups are short of
+        // (systems/combat/battle_group_crew.as; how many is native, the
+        // template's "repair" rank and crew levers in behaviour.json).
+        bool BattleGroupCrewEnabled = true;
         // D-502: FRONT's ground objective stays this far down the lane past the
         // commander (manager/military.as AiGroundObjective); 0: off.
         float BattleGroupLeadDistance = 400.0f;

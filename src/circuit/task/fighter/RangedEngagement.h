@@ -20,6 +20,7 @@ public:
     bool IsSustainedRush() const { return world.IsSustainedRush(id); }
     // D-432: read by the support controller to build its directive.
     CRangedWorld& World() { return world; }
+    const CRangedWorld& World() const { return world; }  // D-513: the disengage rule reads the rush hold
     const CRangedWorld::Capabilities& Caps() const { return caps; }
     // D-433: the hazard the last cohort decision escaped from, for the
     // retreat rule's escape test (control/unit/DisengageRule.cpp).

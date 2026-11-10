@@ -152,6 +152,11 @@ public:
         // (CBattleGroupController::Observe); 0 outside a battle group.
         float momentum=0.f;
         rush_response::Detection rush;
+        // D-513: the rush hold: the frame it began (-1: none), the members it
+        // began with and their health then and at the last check.
+        int holdFrame=-1, holdCheckFrame=-1;
+        float holdInitial=0.f, holdCurrent=0.f;
+        std::vector<int> holdMembers;
         springai::AIFloat3 helpAnchor;
     };
     const CohortPlan& PlanCohort(CCircuitUnit* unit);
@@ -245,6 +250,9 @@ private:
     // to help and hold there (losing). O(log lane) / FindHelp's cost.
     void PushOn(CCircuitUnit* unit, CohortPlan& g);
     void FallBackToHelp(CCircuitUnit* unit, CohortPlan& g);
+    // D-513: the summed health of the members a rush hold began with (the dead
+    // count 0), refreshed at most every HOLD_CHECK_FRAMES. O(members) engine reads.
+    float HoldHealth(const CohortPlan& g) const;
     std::vector<rush_response::Cell> helpCells;  // reused per anchor search
     bool nonnegativeHazardCosts = true;
     bool finiteStaticHazards = true;

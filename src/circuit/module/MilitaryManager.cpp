@@ -2488,6 +2488,12 @@ CCircuitDef* CMilitaryManager::BattleGroupAirRequest(CCircuitUnit* factory) cons
 	return (groups != nullptr && factory != nullptr) ? groups->AirRequest(factory->GetCircuitDef()) : nullptr;
 }
 
+CCircuitDef* CMilitaryManager::BattleGroupCrewRequest(CCircuitUnit* factory) const
+{
+	const CBattleGroupController* groups = circuit->GetBattleGroupController();
+	return (groups != nullptr && factory != nullptr) ? groups->CrewRequest(factory->GetCircuitDef()) : nullptr;
+}
+
 bool CMilitaryManager::HasRangedUnits() const
 {
 	return rangedWorld && rangedWorld->HasMembers();

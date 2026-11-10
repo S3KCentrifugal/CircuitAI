@@ -19,6 +19,7 @@
 #include "control/unit/skirmisher/SkirmisherController.h"
 #include "control/unit/support/SupportController.h"
 #include "control/unit/escort/EscortController.h"
+#include "control/unit/rezzer/RezzerController.h"
 #include "control/group/BattleGroupController.h"
 #include "control/unit/artillery/ArtilleryController.h"
 #include "control/unit/commander/CommanderController.h"
@@ -702,6 +703,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     skirmisherController=controllers->Add(std::make_unique<CSkirmisherController>(this));
     supportController=controllers->Add(std::make_unique<CSupportController>(this));
     escortController=controllers->Add(std::make_unique<CEscortController>(this));  // D-509
+    rezzerController=controllers->Add(std::make_unique<CRezzerController>(this));  // D-514
     battleGroupController=controllers->AddGroup(std::make_unique<CBattleGroupController>(this));
     artilleryCensus=controllers->Add(std::make_unique<CArtilleryController>(this));  // D-493
     controllers->ReadConfig(setupManager->GetConfig());

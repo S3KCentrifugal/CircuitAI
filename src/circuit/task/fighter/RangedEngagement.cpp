@@ -765,6 +765,9 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         // D-503: a shooter far from its slot walks to it (firing on the way)
         // instead of fighting alone wherever it stands.
         && (!keepRows || pos.SqDistance2D(slotPoint)<=policy.slotHoldDistance*policy.slotHoldDistance)
+        // D-513: in a rush, a member far from its place around the target joins
+        // the fight there instead of shooting from wherever it stands.
+        && !(group.mode==cohort::Mode::RUSH && policy.rushGather>0.f && pos.SqDistance2D(slotPoint)>policy.rushGather*policy.rushGather)
         && !(policy.supportAllies && group.supporting && group.committed
             && (pos.x-group.focus.x)*group.back.x+(pos.z-group.focus.z)*group.back.z>group.screenDepth+policy.spacing)) {
         // A safe, spaced shooter already contributes to the firing line.

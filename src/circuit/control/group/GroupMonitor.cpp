@@ -93,7 +93,11 @@ std::string DescribeGroups(CCircuitAI* ai, int minTaskMembers)
 			out += "," + std::to_string(l.airNeed) + "," + std::to_string(l.airCap) + "," + Num(l.airHeld, 0) + ",";
 			AppendMembers(out, l.escortIds);
 			// D-512: appended, the trade momentum and the decayed metal killed and lost.
-			out += "," + Num(l.momentum, 2) + "," + Num(l.killed, 0) + "," + Num(l.lost, 0) + ";";
+			out += "," + Num(l.momentum, 2) + "," + Num(l.killed, 0) + "," + Num(l.lost, 0);
+			// D-514: appended, the repair crew needed, the crew and the member on its repair trip.
+			out += "," + std::to_string(l.crewNeed) + ",";
+			AppendMembers(out, l.crewIds);
+			out += "," + std::to_string(l.tripUnit) + ";";
 		}
 	}
 
@@ -189,6 +193,8 @@ std::string DescribeUnit(CCircuitAI* ai, int unitId)
 	if (const CBattleGroupController* groups = ai->GetBattleGroupController()) {
 		springai::AIFloat3 slot; int group = -1;
 		if (groups->EscortPoint(unitId, slot, group)) out += ",escort=" + std::to_string(group);
+		if (groups->CrewPoint(unitId, slot, group)) out += ",crew=" + std::to_string(group);  // D-514
+		if (groups->RepairTrip(unitId, slot)) out += ",trip=1";                              // D-514
 	}
 	return out;
 }

@@ -1,0 +1,64 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "crew",
+      "pattern": "REZZER: unit=\\d+ group=\\d+ station=",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "jammer_removed",
+      "pattern": "fixture_units_removed unit=corjamt count=1",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "resurrect",
+      "pattern": "REZZER: resurrect unit=\\d+ feature=",
+      "scope": "any",
+      "by_minute": 3,
+      "after_key": "jammer_removed"
+    },
+    {
+      "key": "jammer_back",
+      "pattern": "finished id=\\d+ team=0 unit=corjamt",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "resurrect"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "INVARIANT",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena|Removed widget: Ranged combat arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "policy",
+      "pattern": "has invalid ranged policy|CONFIG controllers: preset|CONFIG formations:",
+      "scope": "any"
+    }
+  ]
+}

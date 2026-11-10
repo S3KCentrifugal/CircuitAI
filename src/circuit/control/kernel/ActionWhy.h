@@ -32,7 +32,7 @@
 
 namespace circuit::why {
 
-using Set = std::uint32_t;
+using Set = std::uint64_t;  // D-513: 64 bits (the plan table outgrew 32)
 
 // The cohort plan (CRangedWorld::CohortPlan::why), reset on every plan.
 namespace plan {
@@ -69,6 +69,7 @@ enum Bit : int {
     STANDS,           // D-510: rushed by raiders it cannot outrun, help too far: stands and fires
     PRESSING,         // D-512: trading well: commits sooner and pushes on with nothing in sight
     FALLING_BACK,     // D-512: trading badly: falls back toward help to heal
+    RUSH_HOLD,        // D-513: committed to a rush until its members lose rush_hold_loss of their health
     COUNT
 };
 inline constexpr const char* CODES[] = {
@@ -76,7 +77,7 @@ inline constexpr const char* CODES[] = {
     "favorable", "outmatched", "unknown_contact", "hazard_on_path", "battery", "target_repaired",
     "too_far", "off_map", "static_cover", "outranged", "siege", "assembling", "spread_out",
     "jammer_hold", "screening", "rush", "rush_cooldown", "follows_screen",
-    "rushed", "toward_help", "down_lane", "to_base", "stands", "pressing", "falling_back",
+    "rushed", "toward_help", "down_lane", "to_base", "stands", "pressing", "falling_back", "rush_hold",
 };
 static_assert(sizeof(CODES) / sizeof(CODES[0]) == COUNT, "why::plan::CODES must follow why::plan::Bit");
 } // namespace plan
@@ -122,13 +123,14 @@ enum Bit : int {
     STAND_FIRM,    // shorter-ranged enemies push: the screen stands and fires
     STAGGERED,     // screen and support follow the order at different delays
     AIR_THREAT,    // D-509: armed enemy air near the screen: anti-air escorts needed
+    REPAIR_TRIP,   // D-514: one member is walking back to the repair crew
     COUNT
 };
-inline constexpr const char* CODES[] = { "script_order", "order_held", "stand_firm", "staggered", "air_threat" };
+inline constexpr const char* CODES[] = { "script_order", "order_held", "stand_firm", "staggered", "air_threat", "repair_trip" };
 static_assert(sizeof(CODES) / sizeof(CODES[0]) == COUNT, "why::group::CODES must follow why::group::Bit");
 } // namespace group
 
-static_assert(plan::COUNT <= 32 && unit::COUNT <= 32 && group::COUNT <= 32, "a factor set is 32 bits");
+static_assert(plan::COUNT <= 64 && unit::COUNT <= 64 && group::COUNT <= 64, "a factor set is 64 bits");
 
 constexpr Set Of(int bit) { return Set(1) << bit; }
 
@@ -165,8 +167,8 @@ inline Activity UnitActivity(Activity cohortActivity, Set factors) {
 
 // A factor set as lower-case hex without prefix ("0" when empty).
 inline std::string Hex(Set set) {
-    char buf[12];
-    std::snprintf(buf, sizeof(buf), "%x", unsigned(set));
+    char buf[20];
+    std::snprintf(buf, sizeof(buf), "%llx", static_cast<unsigned long long>(set));
     return buf;
 }
 
