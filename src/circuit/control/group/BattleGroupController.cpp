@@ -523,7 +523,18 @@ void CBattleGroupController::Update()
     const int frame = ai->GetLastFrame();
     if (frame < nextFrame) return;
     auto* military = ai->GetMilitaryManager();
-    if (military == nullptr || !military->HasRangedUnits()) { nextFrame = frame + 30; return; }
+    if (military == nullptr || !military->HasRangedUnits()) {
+        // No screen or support hull is left: every battle group is gone. Drop
+        // them (and their directives) now, and release the escorts, so the
+        // air request falls to zero and escorts return to their ordinary
+        // tasks. Returning before this kept the last groups: their air
+        // shortfall had every T1 bot lab build anti-air bots without end, and
+        // escorts stayed bound to dead slots (D-509 correction). O(G + E).
+        if (!groups.empty() || !directives.empty()) { groups.clear(); directives.clear(); }
+        AssignEscorts(frame);
+        nextFrame = frame + 30;
+        return;
+    }
     performance::Scope measured(ai, performance::BATTLE_GROUP_DECISION);
     auto world = military->GetRangedWorld();
     world->Refresh();  // idempotent per frame
