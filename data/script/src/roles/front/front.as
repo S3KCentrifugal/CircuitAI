@@ -23,6 +23,7 @@
 #include "../../systems/construction/front_mex_upgrade.as"
 #include "../../systems/construction/front_overflow.as"
 #include "../../systems/construction/front_factory_nanos.as"
+#include "../../systems/construction/front_gantry_nanos.as"
 #include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/front_agitator.as"
 #include "../../systems/construction/front_tactical.as"
@@ -53,6 +54,7 @@ namespace RoleFront {
     void Front_Init() {
         FrontGeothermal::Reset();
         FrontFactoryNanos::Reset();
+        FrontGantryNanos::Reset();
         FrontLabPorc::Reset();
         FrontAgitator::Reset();
         FrontTactical::Reset();
@@ -219,6 +221,7 @@ namespace RoleFront {
 
     void Front_MainUpdate() {
         FrontConstructors::Watch();   // D-465: stale geothermal orders of the energy seat, every second
+        FrontGantryNanos::Tick();     // owner 2026-11-12: gantry caretakers, T1 constructors requisitioned (front_gantry_nanos.as)
         // Delay dynamic quota adjustments until 5 minutes into the game to avoid
         // early-game oscillations while armies and caches are still forming.
         if (ai.frame < FRONT_DYNAMIC_QUOTA_DELAY_FRAMES) {
@@ -950,6 +953,7 @@ namespace RoleFront {
 
     void Front_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
         FrontFactoryNanos::TaskRemoved(task, done);
+        FrontGantryNanos::TaskRemoved(task, done);
         FrontLabPorc::TaskRemoved(task, done);
         FrontAgitator::TaskRemoved(task, done);
         FrontTactical::TaskRemoved(task, done);
@@ -1242,6 +1246,7 @@ namespace RoleFront {
             nanoCap = Global::RoleSettings::Front::NanoMaxCount;
         }
         nanoCap = FrontFactoryNanos::Cap(nanoCap);   // the T2 labs' turrets still to be framed
+        nanoCap = FrontGantryNanos::Cap(nanoCap);    // ... and the gantries' caretakers
         // D-486: while metal floats, fill mode may add FillWorkers turrets past
         // the energy cap (played: the cap, energy income / 150, held a FRONT AI
         // at +58 metal/s to its turrets, and every fill ask was refused).

@@ -149,6 +149,8 @@ namespace FrontlineEngineering {
         return null;
     }
     bool Protected(CCircuitUnit@ u) {
+        // owner 2026-11-12: a constructor requisitioned for gantry caretakers is not taken back (front_gantry_nanos.as)
+        if(u !is null && FrontGantryNanos::IsCon(u.id)) return true;
         IUnitTask@ task=u.task;
         return task !is null && (task.IsExternalControlled() || task.IsEnemyReclaim()
             || task.GetType()==Task::Type::PLAYER || task.GetType()==Task::Type::RETREAT);

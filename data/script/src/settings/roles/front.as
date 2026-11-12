@@ -503,6 +503,22 @@ namespace Front {
             float T2FactoryNanoTakeRadius = 1200.0f;   // ... and ones walking to an unframed build this near
             int T2FactoryNanoScanSeconds = 2;          // turret count refresh while a lab is short
 
+            // Gantry caretakers (owner, 2026-11-12; systems/construction/front_gantry_nanos.as): from the
+            // moment a land gantry of ours is framed it gets a random GantryCaretakersMin..Max construction
+            // turrets in a TECH-style turret block behind it (native ReserveNanoBlockAt, pinned orders, as
+            // the t3rush gantry's cluster), and FRONT requisitions up to GantryCaretakerCons of its T1
+            // constructors at high priority to build them (busy ones too, except on a factory frame, a
+            // retreat or a player order). They go back to the idle pool when the complement stands.
+            // Played: on Tartarus Steppes (GreenParrots, 2026-11-11) FRONT gantries stood with few turrets,
+            // the seated T1 constructors never asked anything but their seat. 0: off (experimental_balanced: 10-14).
+            int GantryCaretakersMin = 0;
+            int GantryCaretakersMax = 0;
+            int GantryCaretakerCons = 8;              // T1 constructors requisitioned at once
+            int GantryCaretakerParallel = 8;          // turret orders open at once (past that a constructor helps a turret frame)
+            float GantryCaretakerReach = 5000.0f;     // constructors this near the gantry are requisitioned
+            float GantryCaretakerRadius = 600.0f;     // a turret this near the gantry (and nearer than any other factory) is its
+            int GantryCaretakerScanSeconds = 2;       // requisition and count refresh while a gantry is short
+
             // T2 lab corridors and forward lab porc (owner, 2026-10-30; systems/construction/front_lab_porc.as).
             // LabCorridor: every T2 bot lab and vehicle plant of ours reserves its exit cone and a corridor
             // along its movement class's coarse route to the nearest enemy start; no structure goes

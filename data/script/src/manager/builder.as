@@ -2008,6 +2008,10 @@ namespace Builder {
         // FRONT ownership precedes generic edge/spam/economy providers and
         // tracking gates. Otherwise they can bypass the role's front ladder.
         if(Global::AISettings::Role==AiRole::FRONT) {
+            // owner, 2026-11-12: a T1 constructor requisitioned for gantry caretakers keeps that work,
+            // seat or not (front_gantry_nanos.as); none left: null and it goes on below as usual
+            IUnitTask@ caretaker=FrontGantryNanos::Work(u);
+            if(caretaker !is null) return caretaker;
             IUnitTask@ support=FrontFactorySupport::Assist(u,false);
             if(support !is null) return support;
             FrontEnergy::Update(); // before any group/base/default provider can enqueue energy

@@ -114,6 +114,8 @@ namespace Main {
         Global::RoleSettings::Front::OverflowExtraT2Seconds = 20;
         Global::RoleSettings::Front::T2FactoryNanos = 6; // owner 2026-10-25: a T2 lab's turrets from its frame (front_factory_nanos.as)
         Global::RoleSettings::Front::T2FactoryNanosMax = 14; // owner 2026-10-25: up to 14 as the metal bank nears overflow
+    Global::RoleSettings::Front::GantryCaretakersMin = 10; // owner 2026-11-12: 10-14 turrets on a gantry, T1 constructors requisitioned (front_gantry_nanos.as)
+    Global::RoleSettings::Front::GantryCaretakersMax = 14;
         Global::RoleSettings::Front::LabCorridor = true; // owner 2026-10-30: every T2 lab keeps a corridor to the enemy base, mexes only (front_lab_porc.as)
         Global::RoleSettings::Front::LabPorc = true;     // owner 2026-10-30: T2 labs beyond 900 from our start get 2 pop-ups, a heavy plasma and a T2 flak
         Global::RoleSettings::Front::Agitator = true;    // owner 2026-11-01: forward agitator at a front mex / porc 40%+ toward the enemy after the bank hit 50% (front_agitator.as)
