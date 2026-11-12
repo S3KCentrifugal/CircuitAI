@@ -37,6 +37,9 @@ public:
 
 	bool IsInitialized() const { return isInitialized; }
 	bool CanChooseStartPos() const { return false/*startPosType == CGameSetup::StartPos_ChooseInGame*/; }
+	// Start-position pick: true when start points are placed in game (start boxes).
+	// BAR accepts an AI team's start point inside its box since BAR PR #9749 (2026-10-22).
+	bool IsChooseInGame() const { return startPosType == CGameSetup::StartPos_ChooseInGame; }
 
 	CAllyTeam* GetAllyTeam(int allyTeamId) { return allyTeams[allyTeamId]; }
 	int GetAllyTeamCount() const { return (int)allyTeams.size(); }  // D-127

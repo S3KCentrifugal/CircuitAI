@@ -72,6 +72,13 @@ public:
 	struct SScriptTeam { int team; int allyTeam; bool known; springai::AIFloat3 pos; };
 	const std::vector<SScriptTeam>& GetScriptTeams();
 	bool CanChooseStartPos() const;
+	// Start-position pick (script policy, systems/world/start_pick.as): start points are
+	// placed in game; the playing AI teams of this ally team that run this same AI
+	// (shortName), sorted by team id, so every ally computes the same order; and the
+	// mechanism that sends the chosen point (inside our start box) to the game.
+	bool IsChooseInGame() const;
+	std::vector<int> GetAllySameAITeams();
+	bool SendStartPos(const springai::AIFloat3& pos);
 
 	void PickStartPos(StartPosType type);
 	void SetStartPos(const springai::AIFloat3& pos) { startPos = basePos = pos; }
@@ -119,6 +126,7 @@ private:
 	struct SScriptStart { springai::AIFloat3 pos; int allyTeam; };
 	std::vector<SScriptStart> scriptStarts;
 	std::vector<SScriptTeam> scriptTeams;
+	std::map<int, std::string> scriptAIShortNames;  // team -> lower-case AI shortName
 	bool scriptStartsParsed = false;
 	void FindStart();
 	void CalcStartPos();

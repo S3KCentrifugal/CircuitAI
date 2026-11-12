@@ -10,6 +10,7 @@
 #include "helpers/spatial/layout_helpers.as"
 #include "global.as"
 #include "maps.as"
+#include "systems/world/start_pick.as"
 
 // Role Handlers (renamed folder)
 #include "roles/front/front.as"
