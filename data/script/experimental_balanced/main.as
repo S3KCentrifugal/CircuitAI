@@ -190,6 +190,10 @@ namespace Main {
 
 		GenericHelpers::LogUtil("registerMaps", 1);
 		Maps::registerMaps();
+		// Start pick (2026-11-11): send our own start point, a map StartSpot inside our box
+		// (systems/world/start_pick.as; needs BAR PR #9749)
+		Global::StartPick::Enabled = true;
+		StartPick::Run();
 		// Map + profile setup deferred until first factory selection in AiGetFactoryToBuild
 
 		// HARD difficulty strategy selection: decide per-weight which strategies to enable for the TECH role

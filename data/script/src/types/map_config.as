@@ -22,6 +22,10 @@ class MapConfig {
     // Optional: per-role unit limit overlays (roleKey -> dictionary of unitName->limit)
     dictionary RoleUnitLimitOverlays;
     StartSpot@[] StartSpots; // optional list of predefined start spots (may be empty)
+    // Start pick (systems/world/start_pick.as): the order in which an ally team's AIs take
+    // the spots inside their start box, as 1-based spot numbers (P1 = StartSpots[0]).
+    // Empty: TECH, AIR, SUPPORT, SEA, TACTICAL spots first, then FRONT, each in list order.
+    array<int> StartPickOrder;
     dictionary FactoryWeights; // optional: role -> (dictionary of factoryName -> weight)
     array<Objectives::StrategicObjective@> Objectives;  // optional list of strategic objectives
     // Optional TECH overrides. Zero keeps Global::RoleSettings::Tech defaults.

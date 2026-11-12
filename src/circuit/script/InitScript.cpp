@@ -615,6 +615,20 @@ static std::atomic<int> introDoneFrame(-1);
 static void AiMarkIntroDone(int frame) { introDoneFrame = frame; }
 static int AiIntroDoneFrame() { return introDoneFrame; }
 
+// Start-position pick: this ally team's AI teams running this AI, in team id order
+static CScriptArray* CSetupManager_GetAllySameAITeams(CSetupManager* setupMgr)
+{
+	asIScriptEngine* engine = asGetActiveContext()->GetEngine();
+	auto cache = static_cast<CScriptManager::STypeInfoCache*>(engine->GetUserData());
+	const std::vector<int> teams = setupMgr->GetAllySameAITeams();
+	CScriptArray* arr = CScriptArray::Create(cache->idArray, (asUINT)teams.size());
+	asUINT i = 0;
+	for (int teamId : teams) {
+		*(CAllyTeam::Id*)arr->At(i++) = teamId;
+	}
+	return arr;
+}
+
 static AIFloat3 CSetupManager_GetLanePos(CSetupManager* setupMgr)
 {
 	return setupMgr->GetLanePos();
@@ -1639,6 +1653,9 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CSetupManager", "int EnemyStartBoxAt(const AIFloat3& in) const", asMETHOD(CSetupManager, EnemyStartBoxAt), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
 	r = engine->RegisterObjectMethod("CSetupManager", "int FriendlyStartBoxAt(const AIFloat3& in) const", asMETHOD(CSetupManager, FriendlyStartBoxAt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSetupManager", "int GetScriptStartCount()", asMETHOD(CSetupManager, GetScriptStartCount), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
+	r = engine->RegisterObjectMethod("CSetupManager", "bool IsChooseInGame() const", asMETHOD(CSetupManager, IsChooseInGame), asCALL_THISCALL); ASSERT(r >= 0);  // start pick
+	r = engine->RegisterObjectMethod("CSetupManager", "array<Id>@ GetAllySameAITeams()", asFUNCTION(CSetupManager_GetAllySameAITeams), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSetupManager", "bool SendStartPos(const AIFloat3& in)", asMETHOD(CSetupManager, SendStartPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSetupManager", "AIFloat3 GetScriptStart(int)", asMETHOD(CSetupManager, GetScriptStart), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
 	r = engine->RegisterObjectMethod("CSetupManager", "bool IsScriptStartEnemy(int)", asMETHOD(CSetupManager, IsScriptStartEnemy), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
 	r = engine->RegisterObjectMethod("CSetupManager", "float ConfigFloat(const string& in, float)", asFUNCTION(CSetupManager_ConfigFloat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
