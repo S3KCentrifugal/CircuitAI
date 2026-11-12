@@ -36,6 +36,15 @@
 	// seconds; max_tries starts in a row put it straight on the cap.
 	"max_tries": 3,
 	"retry_cap": 600,
+	// Crater zones (owner 2026-11-12): our structure dies with a death blast of
+	// crater_min_aoe or more (advanced fusion 1280): half its blast + 64 (at most
+	// crater_max_radius) is restored down to crater_damage elmos, with up to
+	// crater_max_active patches on top of max_active, for crater_seconds.
+	"crater_damage": 5,
+	"crater_min_aoe": 400,
+	"crater_max_radius": 800,
+	"crater_seconds": 900,
+	"crater_max_active": 2,
 	"protect": true        // a restorer keeps its patch against ordinary builder/wait tasks
 },
 		// Native base-layout mechanism is permitted for this profile; TECH must

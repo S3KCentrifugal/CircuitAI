@@ -7,6 +7,11 @@
 --         cfg.pathNukes times (a crater a Thor cannot climb)
 --   lava  the silo nukes low ground on the lane, original height a little
 --         above the lava, so the crater fills with lava (lava maps)
+--   afus  the AI's own advanced fusions die (owner 2026-11-12: an air raid
+--         took allied AFUS): from cfg.afusFrame, once cfg.afusCount are up
+--         (or at cfg.afusDeadline, any; none: the fixture gives them), every
+--         one is destroyed at once with its normal death blast (BAR dev helper destroyunits). Each
+--         becomes a site; a new AFUS started or finished near it is logged.
 -- Read-only after setup. Every site is compared with the engine's original
 -- heightmap once a second: damaged points, crater lava, points a Thor cannot
 -- stand on (TestMoveOrder against the site's own count before the strike)
@@ -33,6 +38,11 @@ local wx,wz,ex,ez
 local thorDef=UnitDefNames[cfg.thor or "armthor"]
 local probeDef=UnitDefNames[cfg.probe or "armfus"]
 local mexDef=UnitDefNames["armmex"]
+local afusDefs={}
+for _,n in ipairs({"armafus","corafus","legafus"}) do if UnitDefNames[n] then afusDefs[UnitDefNames[n].id]=n end end
+local afusDone=false
+local afusGiven=-1
+local afusSites={}
 local function echo(s) Spring.Echo("[RestoreTest] "..s) end
 local function give(name,team,x,z)
     queue[#queue+1]="give 1 "..name.." "..team.." @"..math.floor(x)..","..math.floor(Spring.GetGroundHeight(x,z))..","..math.floor(z)
@@ -61,8 +71,9 @@ end
 local function measure(x,z,r)
     local depth,count,lava,thor=0,0,0,0
     local ll=lavaLevel()
-    for dz=-r,r,16 do
-        for dx=-r,r,16 do
+    local step=(r>200) and 32 or 16   -- AFUS craters: a coarser grid
+    for dz=-r,r,step do
+        for dx=-r,r,step do
             local px,pz=x+dx,z+dz
             if px>=0 and pz>=0 and px<Game.mapSizeX and pz<Game.mapSizeZ then
                 local g=Spring.GetGroundHeight(px,pz)
@@ -71,7 +82,7 @@ local function measure(x,z,r)
                 if d>depth then depth=d end
                 if d>=12 then count=count+1 end
                 if ll and g<ll and o>=ll+4 then lava=lava+1 end
-                if thorBlocked(px,pz,g) then thor=thor+1 end
+                if thorDef and step==16 and thorBlocked(px,pz,g) then thor=thor+1 end
             end
         end
     end
@@ -84,9 +95,9 @@ local function structureNear(x,z,r)
     end
     return nil
 end
-local function addSite(name,x,z)
-    local s={name=name,x=x,z=z,frame=-1,state="waiting"}
-    local depth,count,lava,thor=measure(x,z,cfg.radius)
+local function addSite(name,x,z,r)
+    local s={name=name,x=x,z=z,frame=-1,state="waiting",r=r or cfg.radius}
+    local depth,count,lava,thor=measure(x,z,s.r)
     s.baseThor=thor; s.baseLava=lava
     s.buildBefore=buildable(probeDef,x,z)
     sites[#sites+1]=s
@@ -173,7 +184,21 @@ local function pickPathSpot()
     end
     return best
 end
+local function afusNear(id,def,team,what)
+    if team~=0 or not afusDefs[def] then return end
+    local x,_,z=Spring.GetUnitPosition(id)
+    for _,s in ipairs(afusSites) do
+        if s.blastFrame and math.sqrt((x-s.x)^2+(z-s.z)^2)<=400 and not s[what] then
+            s[what]=Spring.GetGameFrame()
+            echo(string.format("%s AFUS %s again: %s id=%d at (%.0f,%.0f) %.0f from the site, %.0f s after the blast",
+                s.name,what=="rebuiltStart" and "started" or "finished",afusDefs[def],id,x,z,math.sqrt((x-s.x)^2+(z-s.z)^2),(s[what]-s.blastFrame)/30))
+            return
+        end
+    end
+end
+function widget:UnitFinished(id,def,team) afusNear(id,def,team,"rebuiltDone") end
 function widget:UnitCreated(id,def,team)
+    afusNear(id,def,team,"rebuiltStart")
     local name=UnitDefs[def].name
     if team==1 and name=="armsilo" and not silo then silo=id end
     if team==1 and name==cfg.bomb and not bomber and Spring.GetGameFrame()>=cfg.bombFrame then bomber=id end
@@ -256,10 +281,56 @@ function widget:GameFrame(f)
         end
     end
 
+    -- the AFUS raid: every finished AFUS of the AI dies at once
+    if cases.afus and not afusDone and f>=cfg.afusFrame and f%30==0 then
+        local list={}
+        for _,u in ipairs(Spring.GetTeamUnits(0) or {}) do
+            local d=Spring.GetUnitDefID(u)
+            local _,_,_,_,bp=Spring.GetUnitHealth(u)
+            if afusDefs[d] and bp and bp>=1 then list[#list+1]=u end
+        end
+        if #list>=cfg.afusCount or (f>=cfg.afusDeadline and #list>0) then
+            afusDone=true
+            local ids={}
+            for i,u in ipairs(list) do
+                local x,_,z=Spring.GetUnitPosition(u)
+                local site=addSite("afus"..i,x,z,cfg.afusRadius)
+                site.afusId=u
+                afusSites[#afusSites+1]=site
+                ids[#ids+1]=tostring(u)
+            end
+            local metal=Spring.GetTeamResources(0,"metal")
+            echo(string.format("afus raid: %d AFUS destroyed at once (ids %s), AI metal %.0f",#list,table.concat(ids," "),metal or 0))
+            -- BAR dev helper (the /destroy engine command does nothing here): DestroyUnit, death blast kept
+            Spring.SendLuaRulesMsg("$dev$:destroyunits "..table.concat(ids," "))
+            for _,s in ipairs(afusSites) do s.blastFrame=f end
+        elseif f>=cfg.afusDeadline and #list==0 and afusGiven<0 then
+            afusGiven=f
+            local dx=(ex>wx) and -1 or 1
+            for i=1,cfg.afusCount do give(cfg.afusDef or "armafus",0,wx+dx*(350+(i-1)*160),wz+300) end
+            echo("no AFUS by the deadline: gave the AI "..cfg.afusCount.." "..(cfg.afusDef or "armafus"))
+        end
+    end
+
     -- observe every site once a second
     if f%30==0 then
         for _,s in ipairs(sites) do
-            local depth,count,lava,thor=measure(s.x,s.z,cfg.radius)
+            local depth,count,lava,thor=measure(s.x,s.z,s.r)
+            -- AFUS craters: the ground's own numbers 5 s, 1, 3 and 6 min after the blast,
+            -- whatever the damage threshold says (a shallow crater is still a crater)
+            if s.blastFrame then
+                local age=f-s.blastFrame
+                if age==150 or age==1800 or age==5400 or age==10800 then
+                    local n6=0
+                    local st=(s.r>200) and 32 or 16
+                    for dz=-s.r,s.r,st do for dx=-s.r,s.r,st do
+                        local px,pz=s.x+dx,s.z+dz
+                        if math.abs(Spring.GetGroundHeight(px,pz)-Spring.GetGroundOrigHeight(px,pz))>=6 then n6=n6+1 end
+                    end end
+                    echo(string.format("%s ground %d s after the blast: max %.1f elmos off, %d points >=12, %d points >=6 (of %d), structure=%s",
+                        s.name,age/30,depth,count,n6,(2*math.floor(s.r/st)+1)^2,tostring(structureNear(s.x,s.z,96))))
+                end
+            end
             local thorOver=thor-s.baseThor
             if s.state=="waiting" and count>=4 then
                 s.state="damaged"; s.frame=f; s.maxDepth=depth; s.maxCount=count; s.maxLava=lava; s.maxThor=thorOver
@@ -299,7 +370,7 @@ function widget:GameFrame(f)
                     echo(string.format("%s still damaged frame=%d depth=%.0f points=%d lava=%d thor_blocked=+%d",s.name,f,depth,count,lava,thorOver))
                 end
             elseif s.state=="restored" and not s.built then
-                local b=structureNear(s.x,s.z,cfg.radius)
+                local b=structureNear(s.x,s.z,s.r)
                 if b then
                     s.built=b; s.builtFrame=f
                     echo(string.format("%s built on after restore: %s frame=%d seconds_after_restore=%.0f",s.name,b,f,(f-s.restoredFrame)/30))
@@ -313,9 +384,10 @@ function widget:GameFrame(f)
         local settled=#sites>0
         if silo and not strikesPlanned then settled=false end
         if (cases.nuke or cases.path or cases.lava) and not strikesPlanned then settled=false end
+        if cases.afus and not afusDone then settled=false end
         for _,st in ipairs(strikes) do if st.left>0 then settled=false end end
         for _,s in ipairs(sites) do
-            if s.state~="restored" or (s.name=="bomb" and not s.built) then settled=false end
+            if s.state~="restored" or (s.name=="bomb" and not s.built) or (s.afusId and not s.rebuiltDone) then settled=false end
         end
         if settled or f>=cfg.endFrame then
             done=true
@@ -330,6 +402,11 @@ function widget:GameFrame(f)
                     s.passFrame and string.format("%.0f",(s.passFrame-s.frame)/30) or "-",
                     s.buildBefore or "-",s.buildDamaged or "-",s.buildAfter or "-",
                     tostring(s.built or "-"))
+                if s.afusId then
+                    parts[#parts]=parts[#parts]..string.format(" afus_started=%s afus_finished=%s",
+                        s.rebuiltStart and string.format("%.0f",(s.rebuiltStart-s.blastFrame)/30) or "-",
+                        s.rebuiltDone and string.format("%.0f",(s.rebuiltDone-s.blastFrame)/30) or "-")
+                end
             end
             echo("RESULT case="..cfg.case.." units="..cfg.units.." "..table.concat(parts," | "))
         end

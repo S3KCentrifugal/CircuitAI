@@ -20,6 +20,16 @@
  * thousand floats), and only a candidate patch reads its height cells
  * (at most 51x51). Nothing runs per frame. Commands: one restore order per
  * patch, at most restore.max_active at once.
+ *
+ * Crater zones (owner 2026-11-12: little effort after allied AFUS died to an
+ * air raid): when one of our structures dies with a death blast of at least
+ * restore.crater_min_aoe (advanced fusion 1280, fusion, silos), the blast's
+ * circle becomes a zone for restore.crater_seconds. Inside it the damage line
+ * is restore.crater_damage (5 elmos, not 12: the 12 line left a 6-16 elmo
+ * bowl over most of an AFUS crater), and up to restore.crater_max_active
+ * patches run on top of max_active. Cost: one sector read of the circle per
+ * zone per scan (an AFUS circle is ~700 elmos: a few hundred sectors), zones
+ * at most 8, gone when a scan finds the circle clean or the time is up.
  */
 
 #ifndef SRC_CIRCUIT_MODULE_RESTORECONTROL_H_
@@ -46,7 +56,7 @@ class CEnemyUnit;
 
 class CRestoreControl final {
 public:
-	enum Reason: int {BASE = 0, SITE = 1, LAVA = 2, SCRIPT = 3, PATH = 4};
+	enum Reason: int {BASE = 0, SITE = 1, LAVA = 2, SCRIPT = 3, PATH = 4, CRATER = 5};
 
 	CRestoreControl(CCircuitAI* circuit);
 	~CRestoreControl();
@@ -67,6 +77,11 @@ public:
 	float GetLavaMargin() const { return lavaMargin; }
 
 	void TaskEnded(CBRestoreTask* task, bool done, float seconds);
+	// One of our structures died at pos (main thread, from its destroyed
+	// handler): a big death blast opens a crater zone there.
+	void StructureLost(CCircuitDef* cdef, const springai::AIFloat3& pos);
+	// The damage line a patch of this reason is measured against
+	float ThresholdFor(int reason) const { return (reason == CRATER) ? craterThreshold : threshold; }
 	// A restorer went away mid-patch (killed or taken): the whole patch area
 	// (radius + 64) backs off, so the crater is not re-sent at a shifted centre.
 	void Lost(const springai::AIFloat3& pos, float radius, bool killed);
@@ -77,7 +92,7 @@ public:
 	bool IsProtected() const { return protect; }
 	// Live heights in the square, our and allied structures' pads skipped,
 	// every 2nd cell (at most 26x26 engine reads for the 200 cap).
-	CTerrainManager::STerrainDamage MeasureLive(const springai::AIFloat3& pos, float radius);
+	CTerrainManager::STerrainDamage MeasureLive(const springai::AIFloat3& pos, float radius, float damageLine = -1.f);
 	// Fewer than min_cells in the every-2nd-cell sample (about 4x min_cells
 	// cells): a residue the engine leaves at corners, too small to start on
 	bool IsRestored(const CTerrainManager::STerrainDamage& damage) const { return damage.cells < minCells; }
@@ -90,8 +105,9 @@ private:
 		int lavaCells;
 		float depth;
 	};
-	bool BuildPatch(const springai::AIFloat3& nearPos, SPatch& patch);
-	CTerrainManager::STerrainDamage Measure(const springai::AIFloat3& pos, float radius, bool live, int step);
+	bool BuildPatch(const springai::AIFloat3& nearPos, SPatch& patch, float damageLine);
+	CTerrainManager::STerrainDamage Measure(const springai::AIFloat3& pos, float radius, bool live, int step, float damageLine);
+	float DeathBlastAoe(const CCircuitDef* cdef) const;  // cached per def, 0 when none
 	// Spots tried before: each start or loss doubles the spot's wait from
 	// restore.cooldown up to restore.retry_cap; restore.max_tries starts in a
 	// row put it straight on the cap. A real restore (3 s+) clears the count.
@@ -152,6 +168,21 @@ private:
 	float porcMargin = 100.f; // elmos beyond an enemy static weapon's range a front patch must be
 	float porcRange = 1500.f; // ground weapons longer than this (Juno, nukes, LRPC) are not porc
 	int baseSeenFrame = -1;   // last scan that had base/site work: PATH leaves it a slot
+	float craterThreshold = 5.f;  // elmos off inside a crater zone
+	float craterMinAoe = 400.f;   // death blasts this wide or wider open a zone
+	float craterMaxRadius = 800.f;// a zone's radius cap (half the blast + 64)
+	int craterSeconds = 900;      // a zone lives this long at most
+	int craterMaxActive = 2;      // crater patches on top of max_active
+	struct SZone {
+		springai::AIFloat3 pos;
+		float radius;
+		int until;   // frame
+		int found;   // scans that found damage in it
+		int from;    // frame it opened
+		std::string def;
+	};
+	std::vector<SZone> zones;
+	mutable std::map<int, float> deathAoe;  // def id -> death blast area of effect
 	std::vector<SSpot> spots; // at most 64, the oldest dropped
 	std::vector<char> blocked;// structure mask scratch, reused
 

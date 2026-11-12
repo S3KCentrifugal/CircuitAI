@@ -149,7 +149,7 @@ void CBRestoreTask::OnUnitIdle(CCircuitUnit* unit)
 	// allies' building pads are skipped as in the scan, and less than a
 	// patch's minimum is restored (the scan would never start it).
 	const float inner = std::max(radius - 2.f * SQUARE_SIZE, float(SQUARE_SIZE));
-	const CTerrainManager::STerrainDamage left = control->MeasureLive(position, inner);
+	const CTerrainManager::STerrainDamage left = control->MeasureLive(position, inner, control->ThresholdFor(reason));
 	if (control->IsRestored(left)) {
 		manager->DoneTask(this);
 		return;

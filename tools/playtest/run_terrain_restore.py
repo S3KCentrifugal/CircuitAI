@@ -9,6 +9,10 @@ comma list:
         the starts, `--path-nukes` times (craters a Thor cannot climb)
   lava  the silo nukes low ground near the lane on a lava map (crater lava)
   both  bomb,nuke
+  afus  the AI's own AFUS all die at once (an air raid, owner 2026-11-12): from
+        `--afus-minute`, once `--afus-count` are finished (or any by
+        `--afus-deadline`; none: the fixture gives them); the craters must be
+        restored and an AFUS rebuilt near each
 The AI finds and restores the ground itself; the fixture compares each site
 with the engine's original heightmap, the lava level, Thor passability and a
 probe building's placement, and prints one `[RestoreTest] RESULT` line.
@@ -52,11 +56,16 @@ def main():
     p.add_argument('--role', default='TECH', help='the AI role (FRONT sends the ground army down the lanes)')
     p.add_argument('--porc', default='', help='path case: give the enemy this turret beside the crater (e.g. armllt)')
     p.add_argument('--porc-dist', type=int, default=250, help='elmos from the path site to the --porc turret')
+    p.add_argument('--afus-minute', type=float, default=14, help='afus case: the raid from this minute')
+    p.add_argument('--afus-count', type=int, default=2, help='afus case: AFUS up before the raid')
+    p.add_argument('--afus-deadline', type=float, default=24, help='afus case: raid on any AFUS by this minute')
+    p.add_argument('--afus-radius', type=int, default=320, help='afus case: fixture measuring radius per crater')
+    p.add_argument('--bonus', type=int, default=0, help='handicap percent for the AI under test')
     p.add_argument('--seed', type=int, default=31031, help='the AI random_seed option')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     for c in a.case.split(','):
-        if c not in ('bomb', 'nuke', 'path', 'lava', 'both'):
+        if c not in ('bomb', 'nuke', 'path', 'lava', 'both', 'afus'):
             p.error('unknown case ' + c)
     give = [u.strip() for u in a.give.split(',') if u.strip()] + ([a.t2] if a.t2 else [])
     d = Path(a.dir).resolve(); d.mkdir(parents=True, exist_ok=True)
@@ -85,17 +94,21 @@ def main():
                    '--modoption', 'dynamiccheats=0', '--modoption', 'deathmode=neverend',
                    '--ai-option', 'profile=experimental_balanced', '--ai-option', f'random_seed={a.seed}',
                    '--speed', '20', '--minutes', str(a.minutes), '--headless', '--lean-render',
+                   '--bonus', str(a.bonus),
                    '--extra-widget', str(HERE / 'widgets/terrain_restore_fixture.lua')]
     subprocess.run(stage, cwd=ROOT, check=True)
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     fps = 30
     (d / 'LuaUI/Config/terrain_restore.lua').write_text(
         'return {case=%s, units=%s, give={%s}, bomb=%s, bombFrame=%d, nukeFrame=%d, nukeOffset=%d, radius=%d, endFrame=%d,'
-        ' pathAt=%s, pathNukes=%d, nukeGap=%d, lavaBand=%s, probe=%s, porc=%s, porcDist=%d, thor="armthor"}\n' % (
+        ' pathAt=%s, pathNukes=%d, nukeGap=%d, lavaBand=%s, probe=%s, porc=%s, porcDist=%d, thor="armthor",'
+        ' afusFrame=%d, afusCount=%d, afusDeadline=%d, afusRadius=%d, afusDef=%s}\n' % (
             json.dumps(a.case), json.dumps(a.units), ', '.join(json.dumps(u) for u in give), json.dumps(a.bomb),
             int(a.bomb_minute * 60 * fps), int(a.nuke_minute * 60 * fps), a.nuke_offset, a.radius,
             int((a.minutes - 0.5) * 60 * fps), repr(a.path_at), a.path_nukes, int(a.nuke_gap * fps),
-            repr(a.lava_band), json.dumps(a.probe), json.dumps(a.porc), a.porc_dist))
+            repr(a.lava_band), json.dumps(a.probe), json.dumps(a.porc), a.porc_dist,
+            int(a.afus_minute * 60 * fps), a.afus_count, int(a.afus_deadline * 60 * fps), a.afus_radius,
+            json.dumps({'armada': 'armafus', 'cortex': 'corafus', 'legion': 'legafus'}.get(a.side, 'armafus'))))
     # the unit classes under test
     staged = d / 'AI/Skirmish/BARbTest/test/config/experimental_balanced/behaviour.json'
     s = staged.read_text()

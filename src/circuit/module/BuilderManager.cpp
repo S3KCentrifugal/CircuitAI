@@ -256,6 +256,8 @@ void CBuilderManager::InitHandlers()
 		int frame = this->circuit->GetLastFrame();
 		int facing = unit->GetUnit()->GetBuildingFacing();
 		this->circuit->GetTerrainManager()->DelBlocker(unit->GetCircuitDef(), unit->GetPos(frame), facing, true);
+		// owner 2026-11-12: a big death blast (an advanced fusion) opens a crater zone
+		restoreControl->StructureLost(unit->GetCircuitDef(), unit->GetPos(frame));
 	};
 
 	/*

@@ -27,11 +27,13 @@
 #include "Game.h"
 #include "Log.h"
 #include "UnitDef.h"
+#include "WeaponDef.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <memory>
 
 namespace circuit {
 
@@ -52,6 +54,7 @@ static const char* ReasonName(int reason)
 		case CRestoreControl::LAVA:   return "lava";
 		case CRestoreControl::SCRIPT: return "script";
 		case CRestoreControl::PATH:   return "path";
+		case CRestoreControl::CRATER: return "crater";
 		default: return "?";
 	}
 }
@@ -117,7 +120,13 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 	maxPerTask = std::clamp(cfg.get("max_per_task", maxPerTask).asInt(), 1, 2);
 	porcMargin = std::max(0.f, cfg.get("porc_margin", porcMargin).asFloat());
 	porcRange = std::max(0.f, cfg.get("porc_range", porcRange).asFloat());
+	craterThreshold = std::clamp(cfg.get("crater_damage", craterThreshold).asFloat(), 2.f, threshold);
+	craterMinAoe = std::max(0.f, cfg.get("crater_min_aoe", craterMinAoe).asFloat());
+	craterMaxRadius = std::clamp(cfg.get("crater_max_radius", craterMaxRadius).asFloat(), RESTORE_MIN_RADIUS, 2000.f);
+	craterSeconds = std::max(0, cfg.get("crater_seconds", craterSeconds).asInt());
+	craterMaxActive = std::max(0, cfg.get("crater_max_active", craterMaxActive).asInt());
 	unitClass.clear();
+	deathAoe.clear();
 	RLOG(circuit, "%s units=%s%s%s%s%s damage=%.0f min_cells=%i base_radius=%.0f max_active=%i lava=%i path=%i path_slope=%.0f path_reach=%.0f max_tries=%i retry_cap=%i protect=%i path_lane=%i path_memory=%i max_per_task=%i porc_margin=%.0f porc_range=%.0f",
 			enabled ? "on" : "off",
 			(allowMask & CLASS_COMMANDER) ? "commander " : "", (allowMask & CLASS_T1) ? "t1 " : "",
@@ -125,6 +134,52 @@ void CRestoreControl::ReadConfig(const Json::Value& root)
 			(allowMask & CLASS_T2) ? "t2 " : "", (allowMask & CLASS_REZ) ? "rez " : "",
 			threshold, minCells, baseRadius, maxActive, int(lava), int(path), slopeDeg, pathReach,
 			maxTries, retryCapSeconds, int(protect), int(pathLane), pathMemory, maxPerTask, porcMargin, porcRange);
+	RLOG(circuit, "crater zones: damage=%.0f min_aoe=%.0f max_radius=%.0f seconds=%i max_active=%i",
+			craterThreshold, craterMinAoe, craterMaxRadius, craterSeconds, craterMaxActive);
+}
+
+float CRestoreControl::DeathBlastAoe(const CCircuitDef* cdef) const
+{
+	auto it = deathAoe.find(cdef->GetId());
+	if (it != deathAoe.end()) {
+		return it->second;
+	}
+	float aoe = 0.f;
+	const std::unique_ptr<WeaponDef> wd(cdef->GetDef()->GetDeathExplosion());
+	if (wd != nullptr) {
+		aoe = wd->GetAreaOfEffect();
+	}
+	deathAoe[cdef->GetId()] = aoe;
+	return aoe;
+}
+
+void CRestoreControl::StructureLost(CCircuitDef* cdef, const AIFloat3& pos)
+{
+	if (!enabled || (craterSeconds <= 0) || (craterMaxActive <= 0) || (cdef == nullptr) || !geom::is_valid(pos)) {
+		return;
+	}
+	const float aoe = DeathBlastAoe(cdef);
+	if ((aoe <= 0.f) || (aoe < craterMinAoe)) {
+		return;
+	}
+	// The engine digs up to the blast's area of effect, but the ground moves
+	// little past half of it (AFUS 1280: ~600 elmos across, 32 deep at the
+	// centre): half the blast + 64, capped.
+	const float radius = std::min(aoe * 0.5f + 64.f, craterMaxRadius);
+	const int frame = circuit->GetLastFrame();
+	for (SZone& z : zones) {
+		if (z.pos.SqDistance2D(pos) < SQUARE(64.f)) {
+			z.until = frame + FRAMES_PER_SEC * craterSeconds;
+			z.radius = std::max(z.radius, radius);
+			return;
+		}
+	}
+	if (zones.size() >= 8) {
+		zones.erase(zones.begin());  // the oldest
+	}
+	zones.push_back({pos, radius, frame + FRAMES_PER_SEC * craterSeconds, 0, frame, cdef->GetDef()->GetName()});
+	RLOG(circuit, "crater zone opened: %s died at (%.0f, %.0f), blast %.0f, zone r=%.0f for %i s (%i zones)",
+			zones.back().def.c_str(), pos.x, pos.z, aoe, radius, craterSeconds, int(zones.size()));
 }
 
 int CRestoreControl::GetScanInterval() const
@@ -292,7 +347,7 @@ void CRestoreControl::CoolDown(const AIFloat3& pos, float radius, int frames)
 	cooldown[terrainMgr->GetSectorIndex(pos)] = until;
 }
 
-CTerrainManager::STerrainDamage CRestoreControl::Measure(const AIFloat3& nearPos, float radius, bool live, int step)
+CTerrainManager::STerrainDamage CRestoreControl::Measure(const AIFloat3& nearPos, float radius, bool live, int step, float damageLine)
 {
 	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	const int frame = circuit->GetLastFrame();
@@ -331,7 +386,7 @@ CTerrainManager::STerrainDamage CRestoreControl::Measure(const AIFloat3& nearPos
 	}
 
 	CTerrainManager::SDamageQuery query;
-	query.threshold = threshold;
+	query.threshold = damageLine;
 	query.lavaLevel = GetLavaLevel();
 	query.lavaMargin = lavaMargin;
 	query.live = live;
@@ -347,9 +402,9 @@ CTerrainManager::STerrainDamage CRestoreControl::Measure(const AIFloat3& nearPos
 	return terrainMgr->GetTerrainDamage(nearPos, radius, query);
 }
 
-CTerrainManager::STerrainDamage CRestoreControl::MeasureLive(const AIFloat3& pos, float radius)
+CTerrainManager::STerrainDamage CRestoreControl::MeasureLive(const AIFloat3& pos, float radius, float damageLine)
 {
-	return Measure(pos, std::min(radius, RESTORE_MAX_RADIUS), true, 2);
+	return Measure(pos, std::min(radius, RESTORE_MAX_RADIUS), true, 2, (damageLine > 0.f) ? damageLine : threshold);
 }
 
 void CRestoreControl::ClearCoolDown(const AIFloat3& pos, float radius)
@@ -361,10 +416,10 @@ void CRestoreControl::ClearCoolDown(const AIFloat3& pos, float radius)
 	}
 }
 
-bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
+bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch, float damageLine)
 {
 	patch.center = -RgtVector;
-	const CTerrainManager::STerrainDamage damage = Measure(nearPos, RESTORE_MAX_RADIUS, false, 1);
+	const CTerrainManager::STerrainDamage damage = Measure(nearPos, RESTORE_MAX_RADIUS, false, 1, damageLine);
 	if (damage.cells < minCells) {
 		return false;
 	}
@@ -383,7 +438,7 @@ bool CRestoreControl::BuildPatch(const AIFloat3& nearPos, SPatch& patch)
 	// a patch the engine already restored is "done" at once and found again.
 	// At most 26x26 engine reads, for the few candidates a scan tries.
 	// Same square as the restorer's done check (RestoreTask::OnUnitIdle).
-	return !IsRestored(MeasureLive(patch.center, std::max(patch.radius - 2.f * SQUARE_SIZE, float(SQUARE_SIZE))));
+	return !IsRestored(MeasureLive(patch.center, std::max(patch.radius - 2.f * SQUARE_SIZE, float(SQUARE_SIZE)), damageLine));
 }
 
 CRestoreControl::SSpot& CRestoreControl::Spot(const AIFloat3& pos)
@@ -519,7 +574,25 @@ void CRestoreControl::Scan()
 			}
 		}
 	}
-	if (int(active.size()) >= maxActive) {
+	// Crater patches have their own slots (restore.crater_max_active) on top
+	// of max_active, so a raid's craters never wait behind a front patch.
+	int craterActive = 0;
+	for (const SActive& a : active) {
+		if (a.reason == CRATER) {
+			++craterActive;
+		}
+	}
+	int normalActive = int(active.size()) - craterActive;
+	for (auto it = zones.begin(); it != zones.end();) {
+		if (it->until <= frame) {
+			RLOG(circuit, "crater zone closed: %s at (%.0f, %.0f), time up (%i scans found damage)",
+					it->def.c_str(), it->pos.x, it->pos.z, it->found);
+			it = zones.erase(it);
+		} else {
+			++it;
+		}
+	}
+	if ((normalActive >= maxActive) && (zones.empty() || (craterActive >= craterMaxActive))) {
 		return;
 	}
 
@@ -532,6 +605,30 @@ void CRestoreControl::Scan()
 		float order;  // lower first
 	};
 	std::vector<SCandidate> candidates;
+
+	// 0. Crater zones: the blast circle of a big structure of ours that died,
+	// at the crater damage line, centre first. The sector damage is the
+	// terrain worker's 10 s cache, so a zone is kept 30 s before an empty
+	// read closes it, and while a patch of it is still running.
+	for (auto it = zones.begin(); it != zones.end();) {
+		std::vector<int> sectors;
+		terrainMgr->FindDamagedSectors(it->pos, it->radius, craterThreshold, lavaLevel, sectors);
+		if (sectors.empty()) {
+			if ((frame - it->from > FRAMES_PER_SEC * 30) && !IsCovered(it->pos)) {
+				RLOG(circuit, "crater zone closed: %s at (%.0f, %.0f), restored below %.0f elmos after %.0f s",
+						it->def.c_str(), it->pos.x, it->pos.z, craterThreshold, float(frame - it->from) / FRAMES_PER_SEC);
+				it = zones.erase(it);
+				continue;
+			}
+		} else {
+			++it->found;
+			for (int i : sectors) {
+				const AIFloat3 pos = terrainMgr->GetSectorCenter(i);
+				candidates.push_back({pos, CRATER, 0.75f + std::sqrt(pos.SqDistance2D(it->pos)) * 1e-5f});
+			}
+		}
+		++it;
+	}
 
 	// 1. Crater lava under our own ground units.
 	if (lavaLevel > -1e8f) {
@@ -584,7 +681,7 @@ void CRestoreControl::Scan()
 	// the front, and while there is base or site work (this scan or the last
 	// two) the front keeps one of the max_active slots free for it.
 	for (const SCandidate& c : candidates) {
-		if ((c.reason == BASE) || (c.reason == SITE) || (c.reason == SCRIPT)) {
+		if ((c.reason == BASE) || (c.reason == SITE) || (c.reason == SCRIPT) || (c.reason == CRATER)) {
 			baseSeenFrame = frame;
 			break;
 		}
@@ -603,8 +700,12 @@ void CRestoreControl::Scan()
 	const int cooldownFrames = FRAMES_PER_SEC * cooldownSeconds;
 	int tried = 0;
 	for (const SCandidate& c : candidates) {
-		if ((int(active.size()) >= maxActive) || (tried >= 8)) {
+		if (((normalActive >= maxActive) && (craterActive >= craterMaxActive)) || (tried >= 8)) {
 			break;
+		}
+		const bool crater = (c.reason == CRATER);
+		if (crater ? (craterActive >= craterMaxActive) : (normalActive >= maxActive)) {
+			continue;
 		}
 		const bool front = (c.reason == PATH) || (c.reason == LAVA);
 		if (front && (frontActive >= frontSlots)) {
@@ -620,7 +721,7 @@ void CRestoreControl::Scan()
 		}
 		++tried;
 		SPatch patch;
-		if (!BuildPatch(c.pos, patch)) {
+		if (!BuildPatch(c.pos, patch, ThresholdFor(c.reason))) {
 			CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
 			if (geom::is_valid(patch.center)) {
 				CoolDown(patch.center, patch.radius, cooldownFrames);  // cached damage the live ground lacks
@@ -679,6 +780,11 @@ void CRestoreControl::Scan()
 		active.push_back({task, patch.center, patch.radius, c.reason, cls});
 		if (front) {
 			++frontActive;
+		}
+		if (crater) {
+			++craterActive;
+		} else {
+			++normalActive;
 		}
 		HoldSpot(patch.center, patch.radius);
 		CoolDown(c.pos, terrainMgr->GetConvertStoP() * 0.5f, cooldownFrames);
