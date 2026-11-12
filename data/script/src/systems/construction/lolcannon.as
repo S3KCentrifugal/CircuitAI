@@ -265,6 +265,8 @@ namespace LolCannon {
     int nextRestoreAsk = 0;
     int restoreHoldFrom = -1;        // the frame the cannon order was first held for cratered ground, -1 none
     int nextRestoreLog = 0;
+    // owner 2026-11-12: the cover is laid out the moment the cannon stands, not after the strip
+    bool coverPlaced = false;
 
     bool Enabled() { return Global::LolCannon::Enabled; }
     bool RoleMay() { return Global::AISettings::Role == AiRole::FRONT || Global::AISettings::Role == AiRole::TECH; }
@@ -1692,9 +1694,20 @@ namespace LolCannon {
             return (w is null) ? Wait(3) : w;   // the phase ends in FinishExtras
         }
         if (phase == STORES) {
+            // owner 2026-11-12: the cover goes up at once beside the strip. T2 crew (starter,
+            // storage) build the cover first, then the storages; the turret crews finish the
+            // turrets, then help the cover's frames (any constructor can), then the strip.
             const bool turretCrew = kind == AIR || kind == GROUND;
-            IUnitTask@ w = turretCrew ? TurretWork(u) : StoreWork(u);
-            if (w is null) @w = turretCrew ? StoreWork(u) : TurretWork(u);
+            IUnitTask@ w = null;
+            if (turretCrew) {
+                @w = TurretWork(u);
+                if (w is null && coverPlaced) @w = ExtraWork(u);
+                if (w is null) @w = StoreWork(u);
+            } else {
+                if (coverPlaced) @w = ExtraWork(u);
+                if (w is null) @w = StoreWork(u);
+                if (w is null) @w = TurretWork(u);
+            }
             return (w is null) ? Wait(3) : w;   // the phase ends in FinishStores, not on one crew member's empty hand
         }
         IUnitTask@ t = null;
@@ -1830,6 +1843,7 @@ namespace LolCannon {
         started = ai.frame;
         restoreHoldFrom = -1;
         nextRestoreAsk = 0;
+        coverPlaced = false;
         orderFrame = -1;
         frameFrame = -1;
         nextCrewOrder = 0;
@@ -1918,6 +1932,15 @@ namespace LolCannon {
                 + turrets + " of " + turretPos.length() + " turrets; their crews finish them" + (ExtrasOn() ? ", then the cover" : ""));
             phase = STORES;
             storesUntil = ai.frame + Global::LolCannon::StoreFinishSeconds * SECOND;
+            // owner 2026-11-12: crews sat idle 60-300 s after the cannon stood while one or
+            // two storages were short (the cover only began once the strip was done or
+            // StoreFinishSeconds passed). The cover is laid out now and built alongside.
+            if (ExtrasOn()) {
+                PlaceExtras();
+                coverPlaced = true;
+                extrasStarted = ai.frame;
+                GenericHelpers::LogUtil("[LolCannon] cover laid out as the cannon stands; built alongside the last storages and turrets", 1);
+            }
             return;
         }
         if (BeginExtras(Gun().GetName() + " stands with its turrets and storages")) { ReleaseHeldBlock(); return; }
@@ -2243,7 +2266,8 @@ namespace LolCannon {
     bool BeginExtras(const string &in why)
     {
         if (!ExtrasOn() || Gun() is null || site.x < 0.0f) return false;
-        PlaceExtras();
+        if (!coverPlaced) { PlaceExtras(); extrasStarted = ai.frame; }
+        coverPlaced = true;
         int slots = 0, reserved = 0;
         string at = "";
         for (int g = 0; g < 3; ++g) {
@@ -2255,7 +2279,6 @@ namespace LolCannon {
         }
         if (slots == 0) return false;
         phase = EXTRAS;
-        extrasStarted = ai.frame;
         ReleaseUnable();
         nextCoverClaim = 0;
         ClaimCoverCrew();
@@ -2480,6 +2503,7 @@ namespace LolCannon {
             ReplaceStores();
         }
         if (phase == STORES) {
+            if (coverPlaced) ReplaceExtras();   // blocked cover slots re-picked while the strip finishes
             FinishStores();
             return;
         }

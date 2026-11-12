@@ -104,15 +104,15 @@ namespace LrpcBlock {
     {
         const array<AIFloat3> starts = Lanes::EnemyStarts();
         const AIFloat3 home = Home();
-        array<AIFloat3> out; array<float> d;
+        array<AIFloat3> found; array<float> d;
         for (uint i = 0; i < starts.length(); ++i) {
             if (LolCannon::TargetedStart(starts[i])) continue;
             const float sq = MapHelpers::SqDist(starts[i], home);
-            uint at = out.length();
+            uint at = found.length();
             while (at > 0 && d[at - 1] > sq) --at;
-            out.insertAt(at, starts[i]); d.insertAt(at, sq);
+            found.insertAt(at, starts[i]); d.insertAt(at, sq);
         }
-        return out;
+        return found;
     }
 
     // The anchor in lolcannon mode: an enemy start neither lolcannon was sited against;
