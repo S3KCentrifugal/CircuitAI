@@ -299,10 +299,16 @@
 		"launcher_priority": {
 			"enabled": true,
 			"units": ["armemp", "cortron", "legperdition"],   // Paralyzer, Catalyst, Perdition
-			"primary": ["armanni", "cordoom", "legbastion"],  // Pulsar, Bulwark, Bastion
+			// Owner 2026-11-12: enemy lolcannons (Ragnarok, Calamity, Starfall; techlevel 2, so tertiary_t3 missed them)
+			// are primary: 26-33.5k health, so the Catalyst/Perdition synced volley suits them.
+			"primary": ["armanni", "cordoom", "legbastion",   // Pulsar, Bulwark, Bastion
+				"armvulc", "corbuzz", "legstarfall"],          // Ragnarok, Calamity, Starfall (lolcannons)
 			"primary_shields": true,
 			"commander_max_speed": 12,
-			"tertiary": ["cortoast", "armamb", "legacluster"], // Persecutor, Rattlesnake, Eviscerator
+			// Owner 2026-11-12: enemy Paralyzer / Catalyst / Perdition are tertiary (counter-battery; 3.3-4k health,
+			// one Catalyst or two Perdition missiles, so no synced volley).
+			"tertiary": ["cortoast", "armamb", "legacluster",  // Persecutor, Rattlesnake, Eviscerator
+				"armemp", "cortron", "legperdition"],          // Paralyzer, Catalyst, Perdition
 			"tertiary_t3": true,
 			"t3_max_speed": 3,
 			"sync_units": ["cortron", "legperdition"],
