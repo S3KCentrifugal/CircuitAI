@@ -95,6 +95,8 @@ namespace Military {
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
         if(u !is null && CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
+        IUnitTask@ emergency = AirEmergencyDefense::MilitaryMakeTask(u);   // owner, 2026-11-12: FRONT air-emergency squads
+        if (emergency !is null) return emergency;
 		// A transport is never spam and never subject to a role's military
 		// policy: it exists to carry, and the only task that carries is the
 		// native CFerryTask that DefaultMakeTask hands a TRANS-role unit.
@@ -197,6 +199,7 @@ namespace Military {
 		TechFlank::UnitRemoved(unit);
         AmphibiousOps::UnitRemoved(unit);
         ScoutRaid::UnitRemoved(unit);
+        AirEmergencyDefense::UnitRemoved(unit);
 
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;

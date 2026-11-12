@@ -627,6 +627,25 @@ namespace Front {
             // Hard AFUS admission floors, unlike native energy-table preferences.
             float MinimumMetalIncomeForAFUS = 70.0f;
             float MinimumEnergyIncomeForAFUS = 4000.0f;
+            // Air emergency defense (owner, 2026-11-12; systems/combat/air_emergency_defense.as). While an allied
+            // AIR's base emergency (AirBaseResponse contact) is on, the AirEmergencyDefenseFronts FRONTs whose
+            // starts are nearest the attacked spot switch their non-spam T1/T2 land labs to fast-defense units
+            // (AirEmergencyDefenseUnits), which move to the spot and patrol it, and stay on patrol after it ends.
+            // The emergency ends AirEmergencyDefenseEndSeconds after AIR's last "on" (4 s after its "off").
+            // A new spot over AirEmergencyDefenseNewSite from the old one is a new emergency (new nearest FRONTs).
+            // Log [FRONT][AirEmergency].
+            bool AirEmergencyDefense = true;
+            int AirEmergencyDefenseFronts = 2;
+            int AirEmergencyDefenseEndSeconds = 12;
+            float AirEmergencyDefenseNewSite = 1500.0f;
+            float AirEmergencyDefenseRerouteDistance = 400.0f;  // same emergency: the patrol follows a moved spot
+            float AirEmergencyDefenseSquadMerge = 1200.0f;      // a later emergency this near an old squad reuses it
+            float AirEmergencyDefenseApproach = 300.0f;         // the move point, this far from the spot toward home
+            int AirEmergencyDefenseMaxSquads = 12;
+            // Grunt, Pawn, Blitz, Incisor, Phobos, Alaris, Fiend, Tiger, Bull, Gunslinger, Sprinter, Banisher,
+            // Welder, Hoplite, Gladiator. Each lab makes the ones it can build, in turn.
+            array<string> AirEmergencyDefenseUnits = { "corak", "armpw", "armflash", "corgator", "legcen", "leghades",
+                "corpyro", "correap", "armbull", "armmav", "armfast", "corban", "armzeus", "legstr", "legaskirmtank" };
         }
 }
 }

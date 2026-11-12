@@ -139,6 +139,9 @@ namespace Factory {
             if(replacement !is null) return replacement;
         }
         if(Global::AISettings::Role==AiRole::FRONT) {
+            // owner, 2026-11-12: an allied AIR's base emergency near us: fast defense first
+            IUnitTask@ emergency=AirEmergencyDefense::FactoryMakeTask(u);
+            if(emergency !is null) return emergency;
             IUnitTask@ support=FrontFactorySupport::Assist(u,true);
             if(support !is null) return support;
             IUnitTask@ front=CommanderGroup::Recruit(u);

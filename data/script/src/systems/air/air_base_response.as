@@ -237,6 +237,8 @@ namespace AirBaseResponse {
         if (Global::RoleSettings::Air::BomberSupportEnabled && contact && !bomberBase) selected[1] = -1;
         bomberContact = selected[1] >= 0;
         if (contact) lastSeen = ai.frame;
+        // owner 2026-11-12: the nearest FRONTs send fast defense to the same spot
+        AirEmergencyDefense::Announce(contact, contact ? aiBattle.GetGroundContactPos(selected[0]) : AIFloat3(-1.0f, 0.0f, -1.0f));
         if (contact != previous) {
             GenericHelpers::LogUtil("[AIR][BaseResponse] contact=" + contact, 1);
             // owner 2026-11-03: the due scout package flies what is built now, owes the rest
