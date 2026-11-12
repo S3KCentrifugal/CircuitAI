@@ -521,7 +521,11 @@ bool CRangedWorld::FriendlyLine(const Weapon& w,int id,const AIFloat3& from,cons
 }
 float CRangedWorld::Range(const Weapon& w,const AIFloat3& from,const AIFloat3& to) const
 {
-    const float h=(to.y-from.y)*w.heightMod;
+    // Owner 2026-11-12: a static_exact_reach hull (Barrage) measures the height
+    // difference to the ground under the target, not to its mid point: a 90-tall
+    // Twin Guard cut the Barrage ring from 530 to 507, inside Beamer reach.
+    const float toY=exactStatic ? std::min(to.y,circuit->GetTerrainManager()->GetAreaData()->GetElevationAt(to.x,to.z)) : to.y;
+    const float h=(toY-from.y)*w.heightMod;
     if(w.cylinder>0.f) return std::fabs(h)<w.cylinder*w.range ? w.range : 0.f;
     // Conservative uphill correction; do not assume bonus downhill reach.
     // The engine remains authoritative for actual firing reach and aim.

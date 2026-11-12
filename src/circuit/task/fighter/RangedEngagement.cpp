@@ -1206,7 +1206,18 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) { ++terrainRejected; continue; }
             if(!world.FreeSlot(id,point,spacing)) { ++slotRejected; continue; }
             if(!world.Safe(pos,point,StaticMargin(policy),true,policy.pressStatic,GhostRange(policy))
-                || world.DangerSign(point,policy.safetyMargin,policy.pressStatic,GhostRange(policy),StaticDanger(policy))>0.f) { ++coverageRejected; continue; }
+                || world.DangerSign(point,policy.safetyMargin,policy.pressStatic,GhostRange(policy),StaticDanger(policy))>0.f) {
+                if(report && k==0) {
+                    world.Nearby(point,900.f,coverageProbe);
+                    for(int ci:coverageProbe) {
+                        const auto& q=contacts[ci];
+                        ai->LOG("RANGED: coverage unit=%d site=%.0f,%.0f ring=%.1f contact=%d def=%s mobile=%d ghost=%d hz=%.1f hazard=%.1f dist=%.1f exact=%d",
+                            id,point.x,point.z,range,q.id,q.def?q.def->GetDef()->GetName():"-",int(q.mobile),int(q.ghost),
+                            world.Hz(q,policy.pressStatic),q.hazardRadius,std::sqrt(point.SqDistance2D(q.pos)),int(world.ExactStatic()));
+                    }
+                }
+                ++coverageRejected; continue;
+            }
             // D-295: an assist standoff stays behind the allied screen.
             if(assisting && policy.assistScreen && !world.HasScreen(id,point,c.pos)) { ++coverageRejected; continue; }
             if(!world.Trajectory(w,point,c.pos)) { ++fireRejected; continue; }
