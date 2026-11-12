@@ -20,9 +20,15 @@ namespace FrontLongAA {
     int nextOrder = 0;
     int nextLog = -100000;
     const float LongAASideStep = 700.0f;
+    const int SiteRestSeconds = 300;
+    int pendingFrame = 0, lastSite = -1, quickDeaths = 0;
+    array<int> siteRest;   // per site index: no order there before this frame
 
     void Reset()
     {
+        siteRest.resize(0);
+        lastSite = -1;
+        quickDeaths = 0;
         @pending = null;
         pendingAt = AIFloat3(-1.0f, 0.0f, -1.0f);
         nextOrder = 0;
@@ -88,10 +94,22 @@ namespace FrontLongAA {
         if (pending is null || task !is pending) return;
         @pending = null;
         pendingAt = AIFloat3(-1.0f, 0.0f, -1.0f);
+        if (done) quickDeaths = 0;
         if (!done) {
-            nextOrder = AiMax(nextOrder, ai.frame + Global::RoleSettings::Front::LongAARetrySeconds * SECOND);
-            GenericHelpers::LogUtil("[FRONT][LongAA] order ended unbuilt; next in "
-                + Global::RoleSettings::Front::LongAARetrySeconds + " s", 1);
+            // played 11-12: the engine found no spot near one site and killed the order the frame it was
+            // made, every 20 s; that site rests SiteRestSeconds and the next order tries another
+            const bool quick = ai.frame - pendingFrame < 5 * SECOND;
+            if (quick && lastSite >= 0) {
+                if (siteRest.length() <= uint(lastSite)) siteRest.resize(lastSite + 1);
+                siteRest[lastSite] = ai.frame + SiteRestSeconds * SECOND;
+            }
+            // played 11-12 (Tartar, a crowded FRONT base): every site died the frame it was ordered, one order
+            // per 20 s for minutes; quick deaths in a row double the wait, up to SiteRestSeconds
+            quickDeaths = quick ? quickDeaths + 1 : 0;
+            const int wait = AiMin(SiteRestSeconds, Global::RoleSettings::Front::LongAARetrySeconds * (1 << AiMin(quickDeaths, 4)));
+            nextOrder = AiMax(nextOrder, ai.frame + wait * SECOND);
+            GenericHelpers::LogUtil("[FRONT][LongAA] order ended unbuilt after " + ((ai.frame - pendingFrame) / SECOND)
+                + " s; next in " + wait + " s", 1);
         }
     }
 
@@ -99,9 +117,21 @@ namespace FrontLongAA {
     {
         if (u is null || u.circuitDef is null) return null;
         if (Global::AISettings::Role != AiRole::FRONT || !Global::RoleSettings::Front::LongAA) return null;
+        // A re-ask of the builder on our order: the same task, so native keeps it (played 11-12: returning
+        // null let another rung swap it off and the unframed order died 4 frames later)
+        if (pending !is null && !pending.IsDead() && u.task is pending) return pending;
         if (UnitHelpers::IsCommander(u.circuitDef) || !u.circuitDef.IsMobile()) return null;
-        if (pending !is null && !pending.IsDead()) return null;   // one at a time
+        const bool free = FrontFactoryNanos::Free(u);
+        if (pending !is null && !pending.IsDead()) {   // one at a time: a free T2 constructor nearby joins it
+            IBuilderTask@ b = cast<IBuilderTask>(pending);
+            array<CCircuitUnit@>@ on = pending.GetUnits();
+            if ((on is null || on.length() < 2) && free && b !is null && b.buildDef !is null && u.circuitDef.CanBuild(b.buildDef)
+                && MapHelpers::SqDist(u.GetPos(ai.frame), b.GetBuildPos()) <= 2000.0f * 2000.0f)
+                return pending;
+            return null;
+        }
         @pending = null;
+        if (!free && !FrontFactoryNanos::Takeable(u)) return null;
         if (ai.frame < nextOrder || !Economy::IncomeWindowReady()) return null;
         const float income = Economy::GetMinMetalIncomeLast10s();
         const int allowed = Allowed(income);
@@ -119,20 +149,24 @@ namespace FrontLongAA {
         AIFloat3 at(-1.0f, 0.0f, -1.0f);
         float bestNear = -1.0f;   // when every site is crowded, the one farthest from our nearest
         AIFloat3 fallback(-1.0f, 0.0f, -1.0f);
+        int atSite = -1, fallbackSite = -1;
         for (uint s = 0; s < sites.length(); ++s) {
+            if (s < siteRest.length() && ai.frame < siteRest[s]) continue;
             float nearest = 1e30f;
             for (uint k = 0; k < have.length(); ++k) nearest = AiMin(nearest, MapHelpers::SqDist(have[k], sites[s]));
             if (!aiTerrainMgr.CanReachAt(u, sites[s], range + 256.0f)) continue;
-            if (nearest >= spacing * spacing) { at = sites[s]; break; }
-            if (nearest > bestNear) { bestNear = nearest; fallback = sites[s]; }
+            if (nearest >= spacing * spacing) { at = sites[s]; atSite = int(s); break; }
+            if (nearest > bestNear) { bestNear = nearest; fallback = sites[s]; fallbackSite = int(s); }
         }
-        if (at.x < 0.0f) at = fallback;
+        if (at.x < 0.0f) { at = fallback; atSite = fallbackSite; }
         if (at.x < 0.0f) { Held("no reachable site for " + d.GetName()); nextOrder = ai.frame + 10 * SECOND; return null; }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, d, at,
             SQUARE_SIZE * 32, true, Global::RoleSettings::Front::LongAAOrderTimeoutSeconds * SECOND));
         if (t is null) { nextOrder = ai.frame + 10 * SECOND; return null; }
         @pending = t;
         pendingAt = at;
+        pendingFrame = ai.frame;
+        lastSite = atSite;
         nextOrder = ai.frame + 5 * SECOND;
         GenericHelpers::LogUtil("[FRONT][LongAA] " + d.GetName() + " " + (have.length() + 1) + " of " + allowed
             + " at (" + int(at.x) + ", " + int(at.z) + "); 10 s min metal +" + int(income)
