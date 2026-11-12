@@ -190,6 +190,19 @@ namespace Front {
             int SiloGridRetryMaxSeconds = 300;
             int SiloGridMaxTries = 12;          // reservations tried per search (each reserves up to NukeLimit slots)
 
+            // T2 long-range AA (owner 2026-11-12; systems/construction/front_long_aa.as): Mercury / Screamer /
+            // Xyston (armmercury / corscreamer / leglraa, 1600 M, 33k E, range 2400). Once the 10 s minimum metal
+            // income is at least LongAAMetalIncome (100 m/s held 10 s), T2 constructors build one, then one more
+            // per further LongAAMetalStep of that income, up to LongAALimit, one order at a time, spread at least
+            // LongAASpacing apart round the eco anchor behind our start. Log [FRONT][LongAA].
+            bool LongAA = true;
+            float LongAAMetalIncome = 100.0f;   // owner 2026-11-12: 100 metal/s for 10 s
+            float LongAAMetalStep = 100.0f;     // +1 allowed per 100 m/s more (100 -> 1, 200 -> 2, ...)
+            int LongAALimit = 4;
+            float LongAASpacing = 900.0f;       // range 2400: sites this far apart still overlap over the base
+            int LongAAOrderTimeoutSeconds = 240;
+            int LongAARetrySeconds = 20;        // after an order dies unbuilt
+
             // Dynamic Quota Settings
             float DynamicQuotaEnemyCostAttackThresholdMultiplier = 1.0f;
             float DynamicQuotaEnemyCostWithdrawThresholdMultiplier = 0.8f;

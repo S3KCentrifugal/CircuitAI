@@ -28,6 +28,7 @@
 #include "../../systems/construction/front_agitator.as"
 #include "../../systems/construction/front_tactical.as"
 #include "../../systems/construction/front_silo_grid.as"
+#include "../../systems/construction/front_long_aa.as"
 #include "../../systems/construction/front_layout.as"
 #include "../../systems/production/front_factory_support.as"
 #include "../../systems/construction/commander_front.as"
@@ -58,6 +59,7 @@ namespace RoleFront {
         FrontLabPorc::Reset();
         FrontAgitator::Reset();
         FrontTactical::Reset();
+        FrontLongAA::Reset();
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
         // Apply FRONT role settings
@@ -716,6 +718,9 @@ namespace RoleFront {
         // Owner (2026-11-02): Paralyzer / Catalyst / Perdition just inside range of clustered enemy heavy turrets (front_tactical.as)
         IUnitTask@ tactical=FrontTactical::Work(builder);
         if (tactical !is null) return tactical;
+        // Owner (2026-11-12): Mercury / Screamer / Xyston once the 10 s minimum metal income reaches 100 (front_long_aa.as)
+        IUnitTask@ longAA=FrontLongAA::Work(builder);
+        if (longAA !is null) return longAA;
         // Select explicit geo work before asking native to enqueue another
         // energy task. Overriding an already-created task would leak work.
         IUnitTask@ geothermal=FrontGeothermal::Work(builder);
@@ -957,6 +962,7 @@ namespace RoleFront {
         FrontLabPorc::TaskRemoved(task, done);
         FrontAgitator::TaskRemoved(task, done);
         FrontTactical::TaskRemoved(task, done);
+        FrontLongAA::TaskRemoved(task, done);
         FrontOverflow::TaskRemoved(task, done);
         Front_GantryTaskRemoved(task);
     }
