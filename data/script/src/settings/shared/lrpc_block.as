@@ -7,6 +7,11 @@ namespace LrpcBlock {
     // Off by default; experimental_balanced/main.as sets it from its roll
     // (StrategyWeights::Tech_LRPC_BLOCK, 60%). TECH only.
     bool Enabled = false;
+    // Owner 2026-11-11: with the lolcannons on, every TECH builds the block once its
+    // AfterLolCannons-th lolcannon stands (the roll and MetalIncomeGate do not apply),
+    // anchored on an enemy start no lolcannon was sited against (the one nearest our
+    // base); 0 keeps the roll and the heavy-defence anchor
+    int AfterLolCannons = 2;
     // the gate: our 10 s minimum metal income (Economy::GetMinMetalIncomeLast10s)
     float MetalIncomeGate = 500.0f;
     float MinEnergyIncome = 0.0f;      // none asked; each shot costs 5000-6000 energy

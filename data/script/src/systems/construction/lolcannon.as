@@ -259,6 +259,12 @@ namespace LolCannon {
     int nextCoverClaim = 0;
     int extrasStarted = 0, extrasUntil = 0, nextExtrasLog = 0;
     int blockFails = 0;              // cannon order failures on a site whose turret block stands
+    // owner 2026-11-11: the next cannon waits NextCannonDelaySeconds after a program ends
+    int lastProgramEnd = -1;         // the frame the last program (cover included) ended, -1 none
+    // owner 2026-11-11: a lost cannon's cratered ground is restored before the rebuild
+    int nextRestoreAsk = 0;
+    int restoreHoldFrom = -1;        // the frame the cannon order was first held for cratered ground, -1 none
+    int nextRestoreLog = 0;
 
     bool Enabled() { return Global::LolCannon::Enabled; }
     bool RoleMay() { return Global::AISettings::Role == AiRole::FRONT || Global::AISettings::Role == AiRole::TECH; }
@@ -308,10 +314,29 @@ namespace LolCannon {
         const int secs = ai.frame / SECOND;
         const array<float>@ gates = GateList();
         const int gate = int(Gate());
+        // owner 2026-11-11: a further cannon only NextCannonDelaySeconds after the last program
+        // (the cannon, its turrets, storages and cover, or their retries given up) ended
+        const int sinceEnd = (lastProgramEnd < 0) ? -1 : (ai.frame - lastProgramEnd) / SECOND;
+        const bool waited = built == 0 || lastProgramEnd < 0 || sinceEnd >= Global::LolCannon::NextCannonDelaySeconds;
         why = "cannon " + (built + 1) + ": metal " + int(m) + "/" + gate + ", energy " + int(e) + "/"
-            + int(Global::LolCannon::MinEnergyIncome) + " (10 s minima)";
-        return Economy::IncomeWindowReady() && secs >= Global::LolCannon::MinGameSeconds && MoreCannons()
+            + int(Global::LolCannon::MinEnergyIncome) + " (10 s minima)"
+            + (built > 0 && lastProgramEnd >= 0 ? ", " + sinceEnd + "/" + Global::LolCannon::NextCannonDelaySeconds + " s since cannon " + built + "'s program ended" : "");
+        return Economy::IncomeWindowReady() && secs >= Global::LolCannon::MinGameSeconds && MoreCannons() && waited
             && LolCannonMath::GateOpen(built, m, e, gates, Global::LolCannon::MinEnergyIncome, GateStep());
+    }
+
+    // Public (owner 2026-11-11, for the LRPC block): cannons finished by this AI's
+    // program, and the enemy starts they were sited against.
+    int Built() { return built; }
+    bool TargetedStart(const AIFloat3 &in p) { return Targeted(p); }
+
+    // The program ended (cover included): the next cannon's delay counts from here.
+    void ProgramEnded()
+    {
+        lastProgramEnd = ai.frame;
+        restoreHoldFrom = -1;
+        phase = IDLE;
+        nextPlan = ai.frame + 30 * SECOND;
     }
 
     // The role's metal gates (owner 2026-10-27: TECH from 600 every 80, FRONT every 500).
@@ -847,6 +872,12 @@ namespace LolCannon {
         }
         if (fresh.length() > 0) { why = fresh.length() + " enemy FRONT spawn(s) no cannon is sited against"; return fresh; }
         if (freshAny.length() > 0) { why = "no untargeted enemy FRONT spawn; " + freshAny.length() + " other enemy spawn(s)"; return freshAny; }
+        if (Global::LolCannon::NewStartEachCannon && doneTargets.length() > 0) {
+            // owner 2026-11-11: a further cannon is never sited against a start an earlier one took
+            why = "every enemy spawn already has a cannon sited against it";
+            array<AIFloat3> none;
+            return none;
+        }
         why = "every enemy spawn already has a cannon; " + (fronts.length() > 0 ? "the FRONT spawns again" : "all spawns again");
         return fronts.length() > 0 ? fronts : all;
     }
@@ -860,7 +891,7 @@ namespace LolCannon {
         string targetWhy;
         const array<AIFloat3> starts = TargetStarts(targetWhy);
         if (starts.length() == 0) {
-            GenericHelpers::LogUtil("[LolCannon] no enemy start known; site search retried in 30 s", 1);
+            GenericHelpers::LogUtil("[LolCannon] no enemy start to site against (" + (targetWhy == "" ? "none known" : targetWhy) + "); site search retried in 30 s", 1);
             return false;
         }
         const AIFloat3 home = Home();
@@ -1369,6 +1400,28 @@ namespace LolCannon {
         }
         if (!mayOrder) return null;
         if (ai.frame < nextGunTry || !TurretsReady()) return null;
+        // owner 2026-11-11: cratered ground under the footprint (a lost cannon's death
+        // explosion; the cannon takes 13 degrees of slope at most) is restored first: the
+        // order waits RestoreWaitSeconds at most, the restore asked meanwhile (Advance)
+        float depth = 0.0f;
+        if (Global::LolCannon::RestoreLostSite && SiteCratered(depth)) {
+            if (restoreHoldFrom < 0) restoreHoldFrom = ai.frame;
+            const int held = (ai.frame - restoreHoldFrom) / SECOND;
+            if (held < Global::LolCannon::RestoreWaitSeconds) {
+                nextGunTry = ai.frame + 5 * SECOND;
+                if (ai.frame >= nextRestoreLog) {
+                    nextRestoreLog = ai.frame + 60 * SECOND;
+                    GenericHelpers::LogUtil("[LolCannon] cannon order at (" + int(site.x) + ", " + int(site.z) + ") held for the ground: "
+                        + int(depth) + " elmos off its start height under the footprint; restore asked (" + held + " of "
+                        + Global::LolCannon::RestoreWaitSeconds + " s)", 1);
+                }
+                return null;
+            }
+        } else if (restoreHoldFrom >= 0) {
+            GenericHelpers::LogUtil("[LolCannon] the ground at (" + int(site.x) + ", " + int(site.z) + ") is restored after "
+                + ((ai.frame - restoreHoldFrom) / SECOND) + " s; the cannon is ordered", 1);
+            restoreHoldFrom = -1;
+        }
         string unsafe;
         if (!SiteSafe(u, unsafe)) {
             // The engine's build-site search only takes ground with no enemy threat
@@ -1478,6 +1531,84 @@ namespace LolCannon {
         return false;
     }
 
+    // ---------------------------------------------------------------- the ground (owner 2026-11-11)
+
+    // The largest height change (elmos, dug or raised, against the heightmap at game
+    // start) under the cannon's footprint; the cached 10 s heightmap, no engine call.
+    bool SiteCratered(float &out depth)
+    {
+        depth = 0.0f;
+        CCircuitDef@ gun = Gun();
+        if (gun is null || site.x < 0.0f || StandingGun() !is null || ProjectGun() !is null) return false;
+        // the four quarters of the footprint: two or more off their start height make a
+        // crater the native restore takes on (a lone dent is below its min_cells and would
+        // hold the order for nothing)
+        const float q = LolCannonMath::Pitch(Layout::Across(gun, facing)) * 0.25f;
+        int quarters = 0;
+        for (int i = 0; i < 4; ++i) {
+            const AIFloat3 p(site.x + ((i & 1) == 0 ? -q : q), 0.0f, site.z + ((i & 2) == 0 ? -q : q));
+            const float d = aiTerrainMgr.GetTerrainDamage(p, q);
+            if (d > depth) depth = d;
+            if (d >= Global::LolCannon::RestoreDamage) ++quarters;
+        }
+        return quarters >= 2;
+    }
+
+    // One restore request for p when its ground (RestoreRadius round it) is off its
+    // start height; native checks the patch on its next scan (structures' pads are not
+    // damage there) and sends a restorer (commander, T1 and air constructors, rez bots).
+    string AskRestoreAt(const AIFloat3 &in p, const string &in what)
+    {
+        if (p.x < 0.0f) return "";
+        const float r = Global::LolCannon::RestoreRadius;
+        const float d = aiTerrainMgr.GetTerrainDamage(p, r);
+        if (d < Global::LolCannon::RestoreDamage) return "";
+        const bool ok = aiBuilderMgr.RequestRestore(p, r);
+        return what + " (" + int(p.x) + ", " + int(p.z) + ") " + int(d) + " elmos" + (ok ? "" : " (cooling down or covered)");
+    }
+
+    // Once every RestoreAskSeconds while a cannon is to be built with no frame down: the
+    // footprint, the turret block and the storage strip. Cost: three bounded heightmap
+    // reads (51 x 51 cells at the 200 radius) every 10 s, only in BUILD.
+    void AskRestore()
+    {
+        if (!Global::LolCannon::RestoreLostSite || ai.frame < nextRestoreAsk || site.x < 0.0f) return;
+        nextRestoreAsk = ai.frame + AiMax(1, Global::LolCannon::RestoreAskSeconds) * SECOND;
+        if (StandingGun() !is null || ProjectGun() !is null) return;
+        string said = AskRestoreAt(site, "cannon");
+        const string b = AskRestoreAt(blockCentre, "turret block");
+        if (b != "") said += (said == "" ? "" : ", ") + b;
+        const string s = AskRestoreAt(stripCentre, "storage strip");
+        if (s != "") said += (said == "" ? "" : ", ") + s;
+        if (said != "" && ai.frame >= nextRestoreLog) {
+            nextRestoreLog = ai.frame + 60 * SECOND;
+            GenericHelpers::LogUtil("[LolCannon] restore asked for the " + (rebuild ? "lost cannon's " : "") + "site: " + said, 1);
+        }
+    }
+
+    // The cannon was lost while its storages or cover were still going up (CheckLost
+    // only ran once the program was idle, up to ExtrasFinishSeconds later): the cover
+    // orders are dropped and the same crews rebuild the cannon at once.
+    bool LostBeforeIdle()
+    {
+        CCircuitDef@ gun = Gun();
+        if (gun is null || site.x < 0.0f || aiBuilderMgr.FindOwnNear(site, 96.0f, gun) !is null) return false;
+        for (int g = 0; g < 3; ++g) {
+            for (uint k = 0; k < extraTask[g].length(); ++k)
+                if (extraTask[g][k] !is null && !extraTask[g][k].IsDead()) aiBuilderMgr.AbortTask(extraTask[g][k]);
+            ReleaseAll(extraRes[g]);
+            for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1;
+        }
+        ReleaseHeldBlock();
+        GenericHelpers::LogUtil("[LolCannon] the cannon at (" + int(site.x) + ", " + int(site.z) + ") was lost during its "
+            + (phase == EXTRAS ? "cover" : "storage strip") + "; the same crews rebuild it", 1);
+        phase = IDLE;
+        if (CheckLost()) return true;
+        ReleaseCrew("the cannon was lost and no done site needs it");
+        ProgramEnded();
+        return true;
+    }
+
     bool GunFailed(const string &in why)
     {
         @gunTask = null;
@@ -1519,7 +1650,10 @@ namespace LolCannon {
         ReleaseAll(turretRes); ReleaseAll(storeRes);
         turretRes.resize(0); storeRes.resize(0);
         const AIFloat3 old = site;
-        failedSites.insertLast(old);
+        // owner 2026-11-11: a lost cannon's own site is not avoided (its ground is restored
+        // and close by is still good ground); only sites a first build moved back from are
+        if (!rebuild) failedSites.insertLast(old);
+        restoreHoldFrom = -1;
         if (rebuild) {
             for (uint i = 0; i < doneSites.length(); ++i) {
                 if (MapHelpers::SqDist(doneSites[i], old) > 1.0f) continue;
@@ -1694,6 +1828,8 @@ namespace LolCannon {
     {
         rebuild = again;
         started = ai.frame;
+        restoreHoldFrom = -1;
+        nextRestoreAsk = 0;
         orderFrame = -1;
         frameFrame = -1;
         nextCrewOrder = 0;
@@ -1787,8 +1923,7 @@ namespace LolCannon {
         if (BeginExtras(Gun().GetName() + " stands with its turrets and storages")) { ReleaseHeldBlock(); return; }
         ReleaseHeldBlock();
         ReleaseCrew(Gun().GetName() + " stands (" + built + " built; the next at " + int(Gate()) + " metal/s)");
-        phase = IDLE;
-        nextPlan = ai.frame + 30 * SECOND;
+        ProgramEnded();
     }
 
     // The finishing phase: done when every storage stands or no slot is left to
@@ -1812,8 +1947,7 @@ namespace LolCannon {
         if (BeginExtras("storage strip " + (done ? "done" : "left short") + ", turrets " + (turretsDone ? "done" : "left short"))) { ReleaseHeldBlock(); return; }
         ReleaseHeldBlock();
         ReleaseCrew("storage strip " + (done ? "done" : "left short") + ", turrets " + (turretsDone ? "done" : "left short"));
-        phase = IDLE;
-        nextPlan = ai.frame + 30 * SECOND;
+        ProgramEnded();
     }
 
     // ---------------------------------------------------------------- the cover
@@ -2220,9 +2354,9 @@ namespace LolCannon {
         GenericHelpers::LogUtil("[LolCannon] REPORT cover " + tally + " at=" + (ai.frame / SECOND) + "s took=" + ((ai.frame - extrasStarted) / SECOND) + "s (" + why + ")", 1);
         // slots never ordered still hold their reservation (TECH too: an ordered one is -1, owned by its order)
         for (int g = 0; g < 3; ++g) { ReleaseAll(extraRes[g]); for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1; }
-        ReleaseCrew("cover " + why + " (" + built + " built; the next at " + int(Gate()) + " metal/s)");
-        phase = IDLE;
-        nextPlan = ai.frame + 30 * SECOND;
+        ReleaseCrew("cover " + why + " (" + built + " built; the next at " + int(Gate()) + " metal/s, "
+            + Global::LolCannon::NextCannonDelaySeconds + " s from now at the earliest)");
+        ProgramEnded();
     }
 
     // The cover begins: crew members that can build none of it (the T1 air and ground
@@ -2335,6 +2469,9 @@ namespace LolCannon {
 
     void Advance()
     {
+        // owner 2026-11-11: a cannon killed while its strip or cover still went up is rebuilt at once
+        if ((phase == STORES || phase == EXTRAS) && LostBeforeIdle()) return;
+        if (phase == BUILD) AskRestore();
         if (phase == BUILD || phase == STORES) {
             CountSite();
             RetryTurrets();

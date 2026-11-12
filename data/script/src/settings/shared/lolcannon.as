@@ -11,8 +11,26 @@ namespace LolCannon {
     // One cannon per entry of the role's gates, then one more every step metal/s
     // past the last of them (0: none). Owner 2026-10-27: TECH at 600, 680, 760, ...;
     // FRONT at 500, 1000, 1500, ... A lost cannon is rebuilt on its own site.
-    array<float> MetalIncomeGates = { 600.0f };          // TECH
+    // Owner 2026-11-11: TECH's second cannon at 650 (third on at 730, 810, ...)
+    array<float> MetalIncomeGates = { 600.0f, 650.0f };  // TECH
     float ExtraCannonMetalStep = 80.0f;                  // TECH
+    // Owner 2026-11-11: a further cannon waits this long after the previous program
+    // ended (its cover standing, or given up after its retries / ExtrasFinishSeconds)
+    int NextCannonDelaySeconds = 60;
+    // Owner 2026-11-11: each further cannon is sited against an enemy start no earlier
+    // cannon was sited against; true never falls back to a start already taken
+    bool NewStartEachCannon = true;
+    // Owner 2026-11-11: a lost cannon's cratered ground is restored before the rebuild
+    // (CMD_RESTORE through aiBuilderMgr.RequestRestore): the site, its turret block and its
+    // storage strip are asked for every RestoreAskSeconds while their ground is off its
+    // start height by RestoreDamage elmos or more; the cannon order waits for it up to
+    // RestoreWaitSeconds, and the rebuild never gives the site up while the ground is
+    // still being restored
+    bool RestoreLostSite = true;
+    float RestoreDamage = 12.0f;
+    float RestoreRadius = 200.0f;
+    int RestoreAskSeconds = 10;
+    int RestoreWaitSeconds = 300;
     array<float> FrontMetalIncomeGates = { 500.0f };
     float FrontExtraCannonMetalStep = 500.0f;
     int MaxCannons = 0;                                  // a cap on the count, 0 none

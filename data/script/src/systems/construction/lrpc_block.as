@@ -46,6 +46,14 @@ the lolcannon program (lolcannon.as), TECH only:
           released. One block a game; GiveUpSeconds (1800) without it done
           releases the crew and tries a new site after RetrySeconds.
 
+Owner 2026-11-11: with the lolcannons on (LolCannon::Enabled) and
+AfterLolCannons (2) > 0, every TECH builds the block, with no roll and no
+metal gate, once its second lolcannon stands; the anchor is an enemy start
+neither lolcannon was sited against (the nearest our base first, the next
+after each failed search or give-up), so the block stands 50-80% of the LRPC's
+range from a third spawn. A map with no such start falls back to the heavy
+defence anchor above.
+
 Cost: Tick once a second, nothing while off or done. The anchor scan walks
 aiBattle's ground contacts and ghosts once every 10 s while waiting for a
 site. The site search runs at most every 30 s until one is found: rings x
@@ -85,7 +93,40 @@ namespace LrpcBlock {
     array<array<int>> miss(5);
     int coverStarted = -1;
 
-    bool On() { return Global::LrpcBlock::Enabled && Global::AISettings::Role == AiRole::TECH; }
+    // Owner 2026-11-11: with the lolcannons on, the block follows the AfterLolCannons-th
+    // lolcannon (every TECH, no roll) and is anchored on a third enemy start.
+    bool FollowsLolCannons() { return Global::LolCannon::Enabled && Global::LrpcBlock::AfterLolCannons > 0; }
+    bool On() { return (Global::LrpcBlock::Enabled || FollowsLolCannons()) && Global::AISettings::Role == AiRole::TECH; }
+    int startTries = 0;              // failed site searches against the untargeted starts (rotates through them)
+
+    // The enemy starts no lolcannon of ours was sited against, nearest our base first.
+    array<AIFloat3> FreeStarts()
+    {
+        const array<AIFloat3> starts = Lanes::EnemyStarts();
+        const AIFloat3 home = Home();
+        array<AIFloat3> out; array<float> d;
+        for (uint i = 0; i < starts.length(); ++i) {
+            if (LolCannon::TargetedStart(starts[i])) continue;
+            const float sq = MapHelpers::SqDist(starts[i], home);
+            uint at = out.length();
+            while (at > 0 && d[at - 1] > sq) --at;
+            out.insertAt(at, starts[i]); d.insertAt(at, sq);
+        }
+        return out;
+    }
+
+    // The anchor in lolcannon mode: an enemy start neither lolcannon was sited against;
+    // the nearest first, the next one after each failed site search. With none (a map
+    // with two enemy starts), the frontmost heavy defence as before.
+    bool ThirdStartAnchor()
+    {
+        const array<AIFloat3> free = FreeStarts();
+        if (free.length() == 0) return FindAnchor();
+        const uint i = uint(startTries) % free.length();
+        anchor = free[i];
+        anchorWhat = "enemy start " + (i + 1) + " of " + free.length() + " no lolcannon is sited against";
+        return true;
+    }
     string Key(int id) { return "" + id; }
     string Side() { return Global::AISettings::Side; }
     int SideIndex() { const string s = Side(); return (s == "legion") ? 2 : (s == "cortex" ? 1 : 0); }
@@ -661,6 +702,7 @@ namespace LrpcBlock {
                 if (tasks[g][k] !is null && !tasks[g][k].IsDead()) aiBuilderMgr.AbortTask(tasks[g][k]);
         ClearSlots();
         if (site.x >= 0.0f) failedSites.insertLast(site);
+        ++startTries;   // lolcannon mode: the next try is against the next untargeted start
         ReleaseCrew(why);
         phase = IDLE;
         nextPlan = ai.frame + Global::LrpcBlock::RetrySeconds * SECOND;
@@ -685,6 +727,32 @@ namespace LrpcBlock {
         if (phase == DONE) return;
         if (phase == IDLE) {
             if (ai.frame < nextPlan) return;
+            if (FollowsLolCannons()) {
+                // owner 2026-11-11: once the second lolcannon stands, the block goes up in
+                // range of a third enemy start (not the two the lolcannons were sited against)
+                const int have = LolCannon::Built(), want = Global::LrpcBlock::AfterLolCannons;
+                if (have < want) {
+                    if (ai.frame >= nextGateLog && have > 0) {
+                        nextGateLog = ai.frame + 120 * SECOND;
+                        GenericHelpers::LogUtil("[LrpcBlock] waiting for lolcannon " + want + " (" + have + " stand)", 1);
+                    }
+                    return;
+                }
+                if (gateOpenAt < 0) {
+                    gateOpenAt = ai.frame;
+                    GenericHelpers::LogUtil("[LrpcBlock] gate open: lolcannon " + want + " stands", 1);
+                }
+                nextPlan = ai.frame + 30 * SECOND;
+                if (!ThirdStartAnchor()) return;
+                if (!Plan()) { ++startTries; return; }
+                started = ai.frame;
+                nextCrew = 0;
+                phase = BUILD;
+                GenericHelpers::LogUtil("[LrpcBlock] program starts: " + pos[GUN].length() + " " + Def(GUN).GetName() + ", " + pos[NANO].length()
+                    + " turrets, crew " + int(Global::LrpcBlock::CrewShare * 100.0f) + "% of our T1/T2 constructors; anchor " + anchorWhat, 1);
+                ClaimCrew();
+                return;
+            }
             const float m = Economy::GetMinMetalIncomeLast10s(), e = Economy::GetMinEnergyIncomeLast10s();
             if (!Economy::IncomeWindowReady() || m < Global::LrpcBlock::MetalIncomeGate || e < Global::LrpcBlock::MinEnergyIncome) {
                 if (ai.frame >= nextGateLog && m >= Global::LrpcBlock::MetalIncomeGate * 0.5f) {
