@@ -23,6 +23,8 @@
 //   support: Armada Compass/2 Smuggler/Archangel, Cortex Augur/2 Deceiver/Manticore, Legion Euclid/2 Tiresias/Aquilon
 // Owner (2026-11-01): Armada light artillery bot squad, T2BotSquadLightShare of Armada's artillery rolls:
 //   3 Gunslinger, 5 Recluse, with a Compass, 2 Smugglers and 2 Archangels
+// Owner (2026-11-12): T2BotSquadSuperShare of Armada/Legion heavy rolls are superheavy: Armada 5-6 Fatboys,
+//   Legion 5 Incinerators, same support. Cortex has none.
 // They move and fight as the vehicle squad, except the lead is the longest-ranged member (ties: the slowest),
 // and the squad keeps the slowest member's pace through the cohesion wait. Log [FRONT][ArtySquad] ... bot squad.
 namespace FrontArtySquad {
@@ -83,12 +85,16 @@ namespace FrontArtySquad {
 
     // Owner (2026-10-31): T2 bot lab squads; arty false = the heavy squad, light (Armada) = the light artillery
     // squad. Unit ids from Beyond-All-Reason unitdefs.
-    array<string> BotComposition(const string &in side, bool arty, bool light = false) {
+    array<string> BotComposition(const string &in side, bool arty, bool light = false, bool superHeavy = false) {
         array<string> n;
         array<string> support;
         if (side == "armada") {
             support = array<string> = {"armmark", "armaser", "armaser", "armaak"};   // Compass, 2 Smuggler, Archangel
-            if (arty && light) {
+            if (superHeavy && !arty) {
+                const int lo = AiMax(1, Global::RoleSettings::Front::T2BotSquadSuperFatboyMin);
+                const int k = AiRandom(lo, AiMax(lo, Global::RoleSettings::Front::T2BotSquadSuperFatboyMax));
+                for (int i = 0; i < k; ++i) n.insertLast("armfboy");                   // Fatboy
+            } else if (arty && light) {
                 support.insertLast("armaak");                                         // a second Archangel
                 for (int i = 0; i < 3; ++i) n.insertLast("armmav");                   // Gunslinger
                 for (int i = 0; i < 5; ++i) n.insertLast("armsptk");                  // Recluse
@@ -109,6 +115,9 @@ namespace FrontArtySquad {
                 for (int i = 0; i < 5; ++i) n.insertLast("leghrk");                   // Thanatos
                 for (int i = 0; i < 3; ++i) n.insertLast("legstr");                   // Hoplite
                 n.insertLast("leginc");                                               // Incinerator
+            } else if (superHeavy) {
+                for (int i = 0; i < AiMax(1, Global::RoleSettings::Front::T2BotSquadSuperIncinerators); ++i)
+                    n.insertLast("leginc");                                           // Incinerator
             } else {
                 for (int i = 0; i < 3; ++i) n.insertLast("leginc");                   // Incinerator
             }
@@ -155,8 +164,15 @@ namespace FrontArtySquad {
             const array<float> lk = {1.0f - ls, ls};
             light = AiDice(lk) == 1;
         }
-        IUnitTask@ first = Queue(u, null, side, BotComposition(side, arty, light), -1,
-            light ? "light artillery bot squad" : (arty ? "artillery bot squad" : "heavy bot squad"),
+        // Owner (2026-11-12): a share of Armada/Legion heavy rolls are the superheavy squad
+        bool superHeavy = false;
+        const float ss = AiMax(0.0f, AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadSuperShare));
+        if (!arty && ss > 0.0f && (side == "armada" || side == "legion")) {
+            const array<float> sk = {1.0f - ss, ss};
+            superHeavy = AiDice(sk) == 1;
+        }
+        IUnitTask@ first = Queue(u, null, side, BotComposition(side, arty, light, superHeavy), -1,
+            light ? "light artillery bot squad" : (arty ? "artillery bot squad" : (superHeavy ? "superheavy bot squad" : "heavy bot squad")),
             Global::RoleSettings::Front::T2BotSquadGatherSeconds);
         if (first !is null) GenericHelpers::LogUtil("[FRONT][ArtySquad] bot squad roll hit at lab " + u.id + "; next at " + (nextBotRoll / SECOND) + " s", 1);
         return first;

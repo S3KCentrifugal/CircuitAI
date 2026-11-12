@@ -315,6 +315,9 @@ namespace Main {
         // ... and a T2 bot lab all game: every 3 min, 50% for a heavy or (half the time) artillery bot squad with a
         // radar, two jammer and a flak bot, moving together behind its longest-ranged unit (owner, 2026-10-31)
         Global::RoleSettings::Front::T2BotSquadChance = 0.5f;
+        // owner, 2026-11-12: Armada and Legion heavy 25% -> 20% heavy + 5% superheavy (5-6 Fatboys / 5 Incinerators);
+        // a fifth of their heavy rolls. Cortex keeps 25% heavy (5 Mammoths)
+        Global::RoleSettings::Front::T2BotSquadSuperShare = 0.2f;
         // FRONT bot labs (owner, 2026-10-19): every 3 min from the opener wave to the first T2 factory, 50% for 10-15
         // Pawns/Grunts or 15-20 Goblins held at the lab until the last is out, then one attack wave (BotWave*, off in src)
         Global::RoleSettings::Front::BotWaveChance = 0.4f;

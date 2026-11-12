@@ -386,6 +386,13 @@ namespace Front {
             float T2BotSquadArtyShare = 0.5f;
             float T2BotSquadLightShare = 0.5f;    // Armada artillery rolls that make the light squad (owner, 2026-11-01)
             int T2BotSquadGatherSeconds = 600;
+            // Owner (2026-11-12): T2BotSquadSuperShare of Armada and Legion heavy rolls make the superheavy squad instead:
+            // Armada T2BotSquadSuperFatboyMin..Max Fatboys, Legion T2BotSquadSuperIncinerators Incinerators (with the same
+            // support). Cortex keeps its heavy squad. Off here, on in experimental_balanced.
+            float T2BotSquadSuperShare = 0.0f;
+            int T2BotSquadSuperFatboyMin = 5;
+            int T2BotSquadSuperFatboyMax = 6;
+            int T2BotSquadSuperIncinerators = 5;
             // Owner (2026-10-19): bot lab FRONTs, from the opener wave until a T2 factory stands: every
             // BotWaveIntervalSeconds, BotWaveChance for BotWaveMin..Max Pawns/Grunts (Goblins: BotWaveGoblinMin..Max),
             // held at the lab until the last is out, then one attack wave. Off here, on in experimental_balanced.
