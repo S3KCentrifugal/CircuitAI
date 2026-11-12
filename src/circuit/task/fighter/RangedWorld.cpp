@@ -300,7 +300,7 @@ bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,boo
     const float query=(margin>=0.f && finiteStaticHazards?largestStaticRange:largestRange)+margin+std::sqrt(from.SqDistance2D(to))*.5f;
     const bool safe=!staticHazards.Any(P(center),query,[&](int i) {
         const auto& c=contacts[i];
-        const float hazard=HazardFor(c,press);
+        const float hazard=Hz(c,press);
         if(!(hazard>0.f)) return false;
         const float radius=hazard+margin;
         if(escaping) return !ranged::SafeSegment(P(from),P(to),P(c.pos),radius);
@@ -312,8 +312,8 @@ bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,boo
         // the old expensive query and checks static-bound reduction in-engine.
         bool legacy=true;
         enemies.Query(P(center),largestRange+margin+std::sqrt(from.SqDistance2D(to))*.5f,[&](int i) {
-            const auto& c=contacts[i]; if(!legacy || HazardFor(c,press)<=0.f || c.mobile) return;
-            const float radius=HazardFor(c,press)+margin;
+            const auto& c=contacts[i]; if(!legacy || Hz(c,press)<=0.f || c.mobile) return;
+            const float radius=Hz(c,press)+margin;
             legacy=escaping ? ranged::SafeSegment(P(from),P(to),P(c.pos),radius)
                 : ranged::SegmentDistanceSq(P(c.pos),P(from),P(to))>=radius*radius;
         });
@@ -328,7 +328,7 @@ bool CRangedWorld::GhostBlocks(const AIFloat3& from,const AIFloat3& to,float mar
     return ghostHazards.Any(P(center),largestGhostHazard+std::max(0.f,margin)+std::sqrt(from.SqDistance2D(to))*.5f,[&](int i) {
         const auto& c=ghosts[i];
         if(c.groundRange>ghostRange) return false;
-        const float hazard=HazardFor(c,press);
+        const float hazard=Hz(c,press);
         if(!(hazard>0.f)) return false;
         const float radius=hazard+margin;
         if(escaping) return !ranged::SafeSegment(P(from),P(to),P(c.pos),radius);
@@ -385,7 +385,7 @@ void CRangedWorld::NearbyGhosts(const AIFloat3& pos,float margin,float ghostRang
     ghostHazards.Query(P(pos),largestGhostHazard+std::max(0.f,margin),[&](int i) {
         const auto& c=ghosts[i];
         if(c.groundRange>ghostRange) return;
-        const float hazard=HazardFor(c,press);
+        const float hazard=Hz(c,press);
         if(hazard>0.f && pos.SqDistance2D(c.pos)<std::pow(hazard+margin,2.f)) result.push_back(i);
     });
 }
@@ -395,13 +395,13 @@ float CRangedWorld::Danger(const AIFloat3& pos,float margin,float press,float gh
     const float fixedMargin=staticMargin<0.f?margin:staticMargin;
     const float queryMargin=std::max(margin,fixedMargin);
     enemies.Query(P(pos),largestRange+queryMargin,[&](int i) {
-        const auto& c=contacts[i]; const float hazard=HazardFor(c,press); if(hazard<=0.f) return;
+        const auto& c=contacts[i]; const float hazard=Hz(c,press); if(hazard<=0.f) return;
         const float m=c.mobile?margin:fixedMargin;
         if(pos.SqDistance2D(c.pos)<std::pow(hazard+m,2.f)) danger+=c.cost;
     });
     if(ghostRange>0.f && !ghosts.empty()) ghostHazards.Query(P(pos),largestGhostHazard+std::max(0.f,fixedMargin),[&](int i) {
         const auto& c=ghosts[i]; if(c.groundRange>ghostRange) return;
-        const float hazard=HazardFor(c,press); if(hazard<=0.f) return;
+        const float hazard=Hz(c,press); if(hazard<=0.f) return;
         if(pos.SqDistance2D(c.pos)<std::pow(hazard+fixedMargin,2.f)) danger+=c.cost;
     });
     return danger;
@@ -419,7 +419,7 @@ int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press,float 
     } else {
         const float fixedMargin=staticMargin<0.f?margin:staticMargin;
         const auto hit=[&](const Contact& c) {
-            const float hazard=HazardFor(c,press);
+            const float hazard=Hz(c,press);
             const float m=(c.mobile && !c.ghost)?margin:fixedMargin;
             return hazard>0.f && c.cost>0.f
                 && pos.SqDistance2D(c.pos)<std::pow(hazard+m,2.f);

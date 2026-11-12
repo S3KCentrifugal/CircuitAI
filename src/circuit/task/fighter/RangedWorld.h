@@ -6,6 +6,7 @@
 #include "terrain/GroundCohort.h"
 #include "terrain/LocalRush.h"
 #include "AIFloat3.h"
+#include <algorithm>
 #include <map>
 #include <deque>
 #include <memory>
@@ -80,6 +81,18 @@ public:
     static float HazardFor(const Contact& c, float press) {
         return Pressed(c,press) ? c.explosionRadius : c.hazardRadius;
     }
+    // Owner 2026-11-12 (Barrage vs Beamer/Twin Guard): static_exact_reach.
+    // While set (by the engagement of a hull with that policy key), static
+    // contacts and ghost porc count their bare weapon range: no structure
+    // radius on top (hazardRadius is range + radius). Mobiles and blind hits
+    // are unchanged. Bounds stay conservative (exact <= hazardRadius).
+    void SetExactStatic(bool on) const { exactStatic=on; }
+    bool ExactStatic() const { return exactStatic; }
+    float Hz(const Contact& c, float press) const {
+        const float h=HazardFor(c,press);
+        if(!exactStatic || !c.def || (c.mobile && !c.ghost) || Pressed(c,press)) return h;
+        return std::min(h,std::max(c.armed ? c.groundRange : 0.f,c.explosionRadius));
+    }
     bool FriendlySplash(int id, const springai::AIFloat3& target, float radius) const;
     bool FriendlyLine(const Weapon& weapon, int id, const springai::AIFloat3& from, const springai::AIFloat3& target) const;
     bool HasScreen(int id, const springai::AIFloat3& from, const springai::AIFloat3& target) const;
@@ -151,6 +164,7 @@ private:
     const CRangedObservation::Allies& allies;
     int frame = -1;
     float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f;
+    mutable bool exactStatic = false;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;

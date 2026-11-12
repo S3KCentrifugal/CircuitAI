@@ -693,6 +693,7 @@ void CFactoryManager::ReadConfig()
             number("ghost_porc_range", policy.ghostPorcRange, 0.f, ranged_policy_defaults::GHOST_PORC_MAX_RANGE);
             number("static_margin", policy.staticMargin, 0.f, 512.f);
             number("direct_move_radius", policy.directMoveRadius, 0.f, 1024.f);
+            boolean("static_exact_reach", policy.staticExactReach);
             // The cohort controller has its own static admission (assault list).
             if (policy.pressStatic > 0.f && policy.coordinated) valid = false;
             // D-295: assist is an individual-controller lever; a coordinated

@@ -834,7 +834,7 @@ void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
  * + 16 of an identified armed structure (live, radar or a ghost that still
  * stands) or of a live (LOS/radar) identified armed mobile. O(known enemies).
  */
-bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at)
+bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at, float margin)
 {
 	for (const auto& kv : circuit->GetEnemyInfos()) {
 		const CEnemyInfo* e = kv.second;
@@ -844,14 +844,18 @@ bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at)
 		if (d->IsMobile() ? !live : (!live && GhostGone(circuit, e->GetId()))) continue;
 		if (live && e->IsBeingBuilt()) continue;
 		const float r = d->GetMaxRange(CCircuitDef::RangeType::LAND);
-		if ((r > 0.f) && (at.SqDistance2D(e->GetPos()) < SQUARE(r + 16.f))) return true;
+		if ((r > 0.f) && (at.SqDistance2D(e->GetPos()) < SQUARE(r + margin))) return true;
 	}
 	return false;
 }
 
 static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame)
 {
-	if (!IsSlowMissileLauncher(unit->GetCircuitDef()->GetDef()->GetName())) {
+	// Owner 2026-11-12: a ranged hull with static_exact_reach (Barrage) uses the
+	// Ambassador real-reach test with no margin: bare weapon range of known
+	// armed enemies, not the padded threat map, before its ghost volleys.
+	const bool exactReach = unit->GetCircuitDef()->GetRangedPolicy().staticExactReach;
+	if (!exactReach && !IsSlowMissileLauncher(unit->GetCircuitDef()->GetDef()->GetName())) {
 		CThreatMap* tm = circuit->GetThreatMap();
 		tm->SetThreatType(unit);
 		return tm->GetThreatAt(pos) > THREAT_MIN;
@@ -859,7 +863,7 @@ static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloa
 	CMilitaryManager::SArtySnipeState& st = circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame);
 	if (st.unsafeFrame != frame) {
 		st.unsafeFrame = frame;
-		st.unsafeHere = ArtyRealUnsafeAt(circuit, pos);
+		st.unsafeHere = ArtyRealUnsafeAt(circuit, pos, exactReach ? 0.f : 16.f);
 	}
 	return st.unsafeHere;
 }

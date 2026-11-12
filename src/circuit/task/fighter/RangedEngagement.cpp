@@ -43,6 +43,14 @@ static float GhostRange(const RangedPolicy& p) { return p.coordinated && !p.coho
 static float StaticMargin(const RangedPolicy& p) { return (!p.coordinated && p.staticMargin>=0.f) ? p.staticMargin : p.safetyMargin; }
 // DangerSign/Danger argument: -1 keeps one margin for every contact.
 static float StaticDanger(const RangedPolicy& p) { return (!p.coordinated && p.staticMargin>=0.f) ? p.staticMargin : -1.f; }
+// Owner 2026-11-12: static_exact_reach on for this hull's decisions/path checks.
+namespace {
+struct ExactStaticScope {
+    const CRangedWorld& w; bool prev;
+    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()) { w.SetExactStatic(!p.coordinated && p.staticExactReach); }
+    ~ExactStaticScope() { w.SetExactStatic(prev); }
+};
+}
 
 CRangedEngagement::CRangedEngagement(CCircuitAI* ai,IUnitTask* owner,CCircuitUnit* unit)
     : ai(ai),owner(owner),worldOwner(ai->GetMilitaryManager()->GetRangedWorld()),world(*worldOwner),
@@ -202,6 +210,7 @@ void CRangedEngagement::Hold(CCircuitUnit* unit,bool unsafe)
 bool CRangedEngagement::SafeMove(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,float margin,bool escape)
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    ExactStaticScope exact(world,p);
     return p.coordinated && p.engagementSeconds>0.f ? world.CohortSafe(unit,from,to,margin,escape)
         :world.Safe(from,to,margin,escape,p.pressStatic,GhostRange(p));
 }
@@ -248,6 +257,7 @@ void CRangedEngagement::Disperse(CCircuitUnit* unit)
 bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape,bool urgent)
 {
     const auto& policy=unit->GetCircuitDef()->GetRangedPolicy();
+    ExactStaticScope exact(world,policy);
     const auto pos=unit->GetPos(ai->GetLastFrame());
     bool reusable=true;
     if(policy.sustainedRush && world.IsSustainedRush(id)) {
@@ -431,6 +441,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
     const int frame=ai->GetLastFrame();
     const auto pos=unit->GetPos(frame);
     auto* def=unit->GetCircuitDef(); const auto& policy=def->GetRangedPolicy();
+    ExactStaticScope exact(world,policy);
     // Preserve the per-dark-period budget even through a long retreat or live-target fight.
     if (policy.ghostVolleys > 0) ai->GetMilitaryManager()->GetArtySnipeState(id,frame).lastCall = frame;
     const auto& group=world.PlanCohort(unit);
@@ -830,6 +841,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     nextFrame=frame+8; // decision sampling, not an order/APM limit; damage/idle invalidates
     world.Refresh();
     auto* def=unit->GetCircuitDef(); const auto& policy=def->GetRangedPolicy();
+    ExactStaticScope exact(world,policy);
     // Preserve the per-dark-period budget even through a long retreat or live-target fight.
     if (policy.ghostVolleys > 0) ai->GetMilitaryManager()->GetArtySnipeState(id,frame).lastCall = frame;
     const auto pos=unit->GetPos(frame);
@@ -919,7 +931,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     for(int i:nearby) {
         // Owner 2026-10-19: a pressed static defence is fought, not escaped;
         // only its death blast still pushes the hull back.
-        const auto& c=contacts[i]; const float hazard=CRangedWorld::HazardFor(c,policy.pressStatic);
+        const auto& c=contacts[i]; const float hazard=world.Hz(c,policy.pressStatic);
         if(hazard<=0.f) continue;
         // D-294: escaping a much faster avoided contact (Tick) is futile and
         // only spends MOVEs. It remains a hazard for Safe/DangerSign below.
@@ -935,7 +947,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     world.NearbyGhosts(pos,StaticMargin(policy),GhostRange(policy),policy.pressStatic,ghostNearby);
     for(int i:ghostNearby) {
         const auto& c=world.Ghosts()[i];
-        const float reach=CRangedWorld::HazardFor(c,policy.pressStatic)+StaticMargin(policy);
+        const float reach=world.Hz(c,policy.pressStatic)+StaticMargin(policy);
         const float d=std::sqrt(pos.SqDistance2D(c.pos));
         if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
     }
@@ -1217,7 +1229,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // that line, outside every known weapon/death-blast disc. This does not
         // invent a safe firing solution or relax path/splash/retreat checks.
         // Bounded 3x9 sites, only after the normal 17-site search fails.
-        const float radius = std::max(maxRange, CRangedWorld::HazardFor(c, policy.pressStatic) + (c.mobile ? policy.safetyMargin : StaticMargin(policy))) + policy.spacing;
+        const float radius = std::max(maxRange, world.Hz(c, policy.pressStatic) + (c.mobile ? policy.safetyMargin : StaticMargin(policy))) + policy.spacing;
         for (int ring = 0; ring < 3; ++ring) for (int k = 0; k < 9; ++k) {
             const int side = k == 0 ? 0 : ((k % 2) ? (k + 1) / 2 : -k / 2);
             const float angle = baseAngle + side * .16f;

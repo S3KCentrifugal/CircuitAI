@@ -189,6 +189,11 @@ struct RangedPolicy {
     // escape. With static_margin set, a hull that drifts into static reach
     // steps out just past it (16 elmos) instead of backing off 160+.
     float staticMargin = -1.f;
+    // Owner 2026-11-12 (Barrage vs Beamer/Twin Guard, both 490): static porc
+    // and ghost porc reach is the bare weapon range, without the structure's
+    // radius (range + radius was 490 + ~40, past a 535 Barrage's 0.99 ring).
+    // Individual controller only; mobiles keep range + radius + safety_margin.
+    bool staticExactReach = false;
     // 0 = off. A firing-site move no longer than this, whose straight line is
     // walkable and outside static coverage, is one direct MOVE instead of a
     // grid path (grid nodes sit up to 45 elmos off the line and fail the
