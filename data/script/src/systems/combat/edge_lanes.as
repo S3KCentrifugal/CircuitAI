@@ -257,6 +257,45 @@ namespace EdgeLanes {
         for (uint i = 0; i < ps.length(); ++i) best = AiMin(best, MapHelpers::SqDist(p, ps[i]));
         return best;
     }
+    // From rim sample i1, follow the rim both ways through the back (back or behind
+    // samples), over short gaps; ends[0] the last sample reached going +1, ends[1] going -1.
+    // Owner, 2026-10-30 (Starwatcher): a gap is also a playable sample that is not back but
+    // not an ally's either - the map's corner sample, just past RimBackReach of every enemy
+    // start, cut the left edge lane's walk there, so it never crossed to the far corner.
+    // O(samples).
+    void Walk(const array<AIFloat3> &in rim, const array<bool> &in back, const array<bool> &in behind,
+        const array<AIFloat3> &in theirs, const array<AIFloat3> &in ours, int i1, array<int> &inout ends)
+    {
+        const int n = int(rim.length());
+        ends[0] = i1; ends[1] = i1;
+        for (int k = 0; k < 2; ++k) {
+            const int dir = (k == 0) ? 1 : -1;
+            int j = i1, gap = 0;
+            for (int c = 0; c < n; ++c) {
+                j = (j + dir + n) % n;
+                if (back[j] || behind[j]) { ends[k] = j; gap = 0; }
+                else if (gap < Global::Spam::RimGapSamples
+                    && (rim[j].x < 0.0f || NearestSq(rim[j], theirs) < NearestSq(rim[j], ours))) ++gap;
+                else {
+                    // owner, 2026-11-08 (The Tartar Steppe): the top-left corner is
+                    // unreachable for 5-6 samples, but the rim either side of it (pulled
+                    // in) stands ~600 apart. Bridge such a pocket: the next back/behind
+                    // sample within RimBridgeSamples whose point is within RimBridgeReach
+                    // of the walk's last one. O(RimBridgeSamples) per break.
+                    int next = -1, skipped = 0, q = j;
+                    for (int b = 1; b <= Global::Spam::RimBridgeSamples; ++b) {
+                        q = (q + dir + n) % n;
+                        if (q == i1) break;
+                        if ((back[q] || behind[q]) && MapHelpers::SqDist(rim[q], rim[ends[k]])
+                            <= Global::Spam::RimBridgeReach * Global::Spam::RimBridgeReach) { next = q; skipped = b; break; }
+                    }
+                    if (next < 0) break;
+                    c += skipped;   // the skipped samples count toward the one lap
+                    j = next; ends[k] = j; gap = 0;
+                }
+            }
+        }
+    }
     dictionary rimTurn;    // lane key -> +1 / -1, the random side for a lane ending mid-back
     // The lane's end on the enemy's back edge and its jackknife along it (turn.x < 0:
     // none). `toward`: a point on the lane's own line (sideways place); or, with
@@ -316,45 +355,51 @@ namespace EdgeLanes {
             behind[i] = true;
             if (de > reach) continue;
             back[i] = true;
-            const float sd = (p.x - s0.x) * nx + (p.z - s0.z) * nz;
-            // where the lane's line meets the back (a little deeper wins), or its far end on the lane's side
-            const float score = (sideSign != 0) ? -sd * float(sideSign) : abs(sd - ts) - 0.25f * al;
-            if (score < best) { best = score; i1 = i; }
         }
-        if (i1 < 0) return false;
-        end = rim[i1];
-        // follow the rim both ways through the back, over short gaps; the far end on the other side.
-        // Owner, 2026-10-30 (Starwatcher): a gap is also a playable sample that is not back but
-        // not an ally's either - the map's corner sample, just past RimBackReach of every enemy
-        // start, cut the left edge lane's walk there, so it never crossed to the far corner
-        array<int> ends = { i1, i1 };
-        for (int k = 0; k < 2; ++k) {
-            const int dir = (k == 0) ? 1 : -1;
-            int j = i1, gap = 0;
-            for (int c = 0; c < n; ++c) {
-                j = (j + dir + n) % n;
-                if (back[j] || behind[j]) { ends[k] = j; gap = 0; }
-                else if (gap < Global::Spam::RimGapSamples
-                    && (rim[j].x < 0.0f || NearestSq(rim[j], theirs) < NearestSq(rim[j], ours))) ++gap;
-                else {
-                    // owner, 2026-11-08 (The Tartar Steppe): the top-left corner is
-                    // unreachable for 5-6 samples, but the rim either side of it (pulled
-                    // in) stands ~600 apart. Bridge such a pocket: the next back/behind
-                    // sample within RimBridgeSamples whose point is within RimBridgeReach
-                    // of the walk's last one. O(RimBridgeSamples) per break.
-                    int next = -1, skipped = 0, q = j;
-                    for (int b = 1; b <= Global::Spam::RimBridgeSamples; ++b) {
-                        q = (q + dir + n) % n;
-                        if (q == i1) break;
-                        if ((back[q] || behind[q]) && MapHelpers::SqDist(rim[q], rim[ends[k]])
-                            <= Global::Spam::RimBridgeReach * Global::Spam::RimBridgeReach) { next = q; skipped = b; break; }
-                    }
-                    if (next < 0) break;
-                    c += skipped;   // the skipped samples count toward the one lap
-                    j = next; ends[k] = j; gap = 0;
-                }
+        // Owner, 2026-11-12 (Proving Grounds, team 8's left edge lane): the end can stand on
+        // a short piece of back rim cut off from the rest of the back edge (the bottom rim
+        // at (3128,12856), ~1,700 from the left edge's back across an unplayable south-west
+        // corner), so the walk found no turn and the lane had no jackknife and no return.
+        // A walk whose two ends stand within RimMinSweep of each other is such a piece: its
+        // samples are left out and the next best end is tried, at most RimEndTries ends;
+        // when none sweeps that far the longest walk is kept. Cost: O(tries * samples).
+        array<bool> skip(n);
+        for (int i = 0; i < n; ++i) skip[i] = false;
+        array<int> ends = { -1, -1 };
+        int bestI1 = -1;
+        float bestSweep = -1.0f;
+        array<int> bestEnds = { -1, -1 };
+        int tried = 0;
+        for (int attempt = 0; attempt < AiMax(1, Global::Spam::RimEndTries); ++attempt) {
+            i1 = -1;
+            best = 1.0e30f;
+            for (int i = 0; i < n; ++i) {
+                if (!back[i] || skip[i]) continue;
+                const AIFloat3 p = rim[i];
+                const float al = (p.x - s0.x) * ax + (p.z - s0.z) * az;
+                const float sd = (p.x - s0.x) * nx + (p.z - s0.z) * nz;
+                // where the lane's line meets the back (a little deeper wins), or its far end on the lane's side
+                const float score = (sideSign != 0) ? -sd * float(sideSign) : abs(sd - ts) - 0.25f * al;
+                if (score < best) { best = score; i1 = i; }
             }
+            if (i1 < 0) break;
+            Walk(rim, back, behind, theirs, ours, i1, ends);
+            ++tried;
+            // the longest chord from the end (the turn is one of the two walk ends)
+            const float sweep = sqrt(AiMax(MapHelpers::SqDist(rim[ends[0]], rim[i1]), MapHelpers::SqDist(rim[ends[1]], rim[i1])));
+            if (sweep > bestSweep) { bestSweep = sweep; bestI1 = i1; bestEnds[0] = ends[0]; bestEnds[1] = ends[1]; }
+            if (sweep >= Global::Spam::RimMinSweep) break;
+            // leave out the piece walked, from ends[1] (+1 steps) to ends[0]
+            const int span = (ends[0] - ends[1] + n) % n;
+            for (int k = 0; k <= span; ++k) skip[(ends[1] + k) % n] = true;
         }
+        if (bestI1 < 0) return false;
+        if (tried > 1)
+            GenericHelpers::LogUtil("[EdgeLanes] rim end " + ((sideSign != 0) ? ("for the " + Name(sideSign) + " side") : ("of lane " + key)) + " at (" + int(rim[bestI1].x) + ","
+                + int(rim[bestI1].z) + ") after " + tried + " end(s) tried: it sweeps " + int(bestSweep) + " of the back edge", (sideSign != 0) ? 1 : 2);
+        i1 = bestI1;
+        ends[0] = bestEnds[0]; ends[1] = bestEnds[1];
+        end = rim[i1];
         int t = sideSign;
         if (t == 0) {
             const float off = (end.x - s0.x) * nx + (end.z - s0.z) * nz - enemySide;

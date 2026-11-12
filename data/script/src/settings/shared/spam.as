@@ -124,6 +124,12 @@ namespace Spam {
         // RimBridgeReach of its last one (an unreachable corner, the rim either side
         // pulled in close together). A long sea or cliff run stays a stop.
         int RimBridgeSamples = 8;
+    // owner, 2026-11-12 (Proving Grounds): a lane's end whose back-rim walk reaches no
+    // further than RimMinSweep from it is a cut-off piece of the back edge (no jackknife,
+    // no return); its samples are left out and the next end tried, at most RimEndTries
+    // ends; the longest walk wins when none reaches that far. 1 = the old single end.
+    float RimMinSweep = 1200.0f;
+    int RimEndTries = 4;
         float RimBridgeReach = 1600.0f;
         // owner, 2026-10-26: after the jackknife to the back edge's far corner, every
         // lane (edge lanes, gantries, FRONT and TECH pumps) runs back along the same
