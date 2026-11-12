@@ -301,10 +301,14 @@ namespace Main {
         Global::RoleSettings::Front::VehicleTankOpenerChance = 0.0f;
         // FRONT vehicles (owner, 2026-10-19): every 3 min from the opener to the first T2 factory, 50% for 5-8
         // medium tanks held at the plant until the last is out (src/settings/roles/front.as VehicleTankMass*, off there)
-        Global::RoleSettings::Front::VehicleTankMassChance = 0.5f;
+        Global::RoleSettings::Front::VehicleTankMassChance = 0.4f;
+        // owner, 2026-11-12: 40% for 5-8, 10% for 9-12 (was 50% for 5-8)
+        Global::RoleSettings::Front::VehicleTankMassBigChance = 0.1f;
         // ... and a T2 vehicle plant all game: every 3 min, 35% for 5-8 Bull/Tiger/Prometheus sent as one attack squad
         // with a jammer, radar and flak vehicle built first, kept at the wave's safe centre (owner, 2026-10-19/20)
-        Global::RoleSettings::Front::VehicleT2TankMassChance = 0.35f;
+        Global::RoleSettings::Front::VehicleT2TankMassChance = 0.3f;
+        // owner, 2026-11-12: 30% for 5-8, 5% for 9-12 (was 35% for 5-8); the 15% artillery squad is unchanged
+        Global::RoleSettings::Front::VehicleT2TankMassBigChance = 0.05f;
         Global::RoleSettings::Front::VehicleT2WaveEscorts = true;
         // ... and 15% for a faction artillery squad instead (owner, 2026-10-20; systems/production/front_arty_squad.as)
         Global::RoleSettings::Front::VehicleT2ArtySquadChance = 0.15f;
@@ -313,10 +317,14 @@ namespace Main {
         Global::RoleSettings::Front::T2BotSquadChance = 0.5f;
         // FRONT bot labs (owner, 2026-10-19): every 3 min from the opener wave to the first T2 factory, 50% for 10-15
         // Pawns/Grunts or 15-20 Goblins held at the lab until the last is out, then one attack wave (BotWave*, off in src)
-        Global::RoleSettings::Front::BotWaveChance = 0.5f;
+        Global::RoleSettings::Front::BotWaveChance = 0.4f;
+        // owner, 2026-11-12: 40% for 10-15, 10% for 16-21 (was 50% for 10-15)
+        Global::RoleSettings::Front::BotWaveBigChance = 0.1f;
         // ... and T1 vehicle plants the same: every 3 min, 50% for 10-15 Blitz/Incisor/Alaris as one attack wave; Legion bot
         // waves are 10-15 Phobos, no Goblins (owner, 2026-11-07; VehicleRaiderWave*, off in src)
-        Global::RoleSettings::Front::VehicleRaiderWaveChance = 0.5f;
+        Global::RoleSettings::Front::VehicleRaiderWaveChance = 0.4f;
+        // owner, 2026-11-12: 40% for 10-15, 10% for 16-21 (was 50% for 10-15)
+        Global::RoleSettings::Front::VehicleRaiderWaveBigChance = 0.1f;
         // D-471 (owner, 2026-11-04): Cortex vehicles open Rascal scout, then ten Incisors.
         Global::RoleSettings::Front::VehicleTankOpenerChanceCortex = 1.0f;
         // Owner (2026-11-08): Armada vehicle plants hold the ten opener Blitzes at the plant and send them as one

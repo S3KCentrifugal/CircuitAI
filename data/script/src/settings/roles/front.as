@@ -329,6 +329,11 @@ namespace Front {
             int VehicleTankMassMin = 5;
             int VehicleTankMassMax = 8;
             int VehicleTankMassGatherSeconds = 480; // release a disrupted/incomplete mass
+            // Owner (2026-11-12): the same roll also carries VehicleTankMassBigChance for a bigger mass of
+            // VehicleTankMassBigMin..Max (one draw: miss / normal / big). Off here, on in experimental_balanced.
+            float VehicleTankMassBigChance = 0.0f;
+            int VehicleTankMassBigMin = 9;
+            int VehicleTankMassBigMax = 12;
             // Owner (2026-10-19): the same for a finished T2 vehicle plant, all game: Bull/Tiger/Prometheus,
             // held until the last is out, then sent at the enemy as one attack squad. Off here, on in experimental_balanced.
             float VehicleT2TankMassChance = 0.0f;
@@ -336,6 +341,10 @@ namespace Front {
             int VehicleT2TankMassMin = 5;
             int VehicleT2TankMassMax = 8;
             int VehicleT2TankMassGatherSeconds = 600;
+            // Owner (2026-11-12): and VehicleT2TankMassBigChance for VehicleT2TankMassBigMin..Max. Off here.
+            float VehicleT2TankMassBigChance = 0.0f;
+            int VehicleT2TankMassBigMin = 9;
+            int VehicleT2TankMassBigMax = 12;
             // Owner (2026-10-19): each T2 wave also gets a radar jammer, radar and flak vehicle from the same plant,
             // moved every WaveEscortUpdateSeconds to the wave's safe centre (its tanks' centroid, WaveEscortBehind
             // back toward our start) once that moves WaveEscortRepath. Off here (systems/production/front_wave_escort.as).
@@ -387,6 +396,10 @@ namespace Front {
             int BotWaveGoblinMin = 15;
             int BotWaveGoblinMax = 20;
             int BotWaveGatherSeconds = 360;
+            // Owner (2026-11-12): and BotWaveBigChance for BotWaveBigMin..Max. Off here.
+            float BotWaveBigChance = 0.0f;
+            int BotWaveBigMin = 16;
+            int BotWaveBigMax = 21;
             // Owner (2026-11-07): the bot wave's rules for a T1 vehicle plant, on its own timer: every
             // VehicleRaiderWaveIntervalSeconds, VehicleRaiderWaveChance for VehicleRaiderWaveMin..Max Blitz/Incisor/Alaris,
             // held at the plant until the last is out, then one attack wave. Legion bot waves are Phobos now (BotWaveGoblin* unused).
@@ -396,6 +409,10 @@ namespace Front {
             int VehicleRaiderWaveMin = 10;
             int VehicleRaiderWaveMax = 15;
             int VehicleRaiderWaveGatherSeconds = 360;
+            // Owner (2026-11-12): and VehicleRaiderWaveBigChance for VehicleRaiderWaveBigMin..Max. Off here.
+            float VehicleRaiderWaveBigChance = 0.0f;
+            int VehicleRaiderWaveBigMin = 16;
+            int VehicleRaiderWaveBigMax = 21;
             float SwitchFactoryCostMultiplier = 1.2f;
             int ScoutAssignmentLimit = 5;
             float BuilderCostThresholdForBase = 200.0f;

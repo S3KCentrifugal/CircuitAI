@@ -91,7 +91,9 @@ namespace FrontTankMass {
             return Roll(u, side, 0, Global::RoleSettings::Front::VehicleTankMassIntervalSeconds,
                 Global::RoleSettings::Front::VehicleTankMassChance, MediumTank(side),
                 Global::RoleSettings::Front::VehicleTankMassMin, Global::RoleSettings::Front::VehicleTankMassMax,
-                Global::RoleSettings::Front::VehicleTankMassGatherSeconds, Task::FightType::RAID);
+                Global::RoleSettings::Front::VehicleTankMassGatherSeconds, Task::FightType::RAID,
+                Global::RoleSettings::Front::VehicleTankMassBigChance,
+                Global::RoleSettings::Front::VehicleTankMassBigMin, Global::RoleSettings::Front::VehicleTankMassBigMax);
         }
         if (UnitHelpers::IsT1BotLab(factoryName)) {
             if (botFinished || !openerDone || Global::RoleSettings::Front::BotWaveChance <= 0.0f) return null;
@@ -103,14 +105,18 @@ namespace FrontTankMass {
             return Roll(u, side, 2, Global::RoleSettings::Front::BotWaveIntervalSeconds,
                 Global::RoleSettings::Front::BotWaveChance, WaveBot(side),
                 Global::RoleSettings::Front::BotWaveMin, Global::RoleSettings::Front::BotWaveMax,
-                Global::RoleSettings::Front::BotWaveGatherSeconds, Task::FightType::ATTACK);
+                Global::RoleSettings::Front::BotWaveGatherSeconds, Task::FightType::ATTACK,
+                Global::RoleSettings::Front::BotWaveBigChance,
+                Global::RoleSettings::Front::BotWaveBigMin, Global::RoleSettings::Front::BotWaveBigMax);
         }
         if (UnitHelpers::IsT2VehicleLab(factoryName)) {
             if (Global::RoleSettings::Front::VehicleT2TankMassChance <= 0.0f || u.GetBuildProgress() < 1.0f) return null;
             return Roll(u, side, 1, Global::RoleSettings::Front::VehicleT2TankMassIntervalSeconds,
                 Global::RoleSettings::Front::VehicleT2TankMassChance, MainTank(side),
                 Global::RoleSettings::Front::VehicleT2TankMassMin, Global::RoleSettings::Front::VehicleT2TankMassMax,
-                Global::RoleSettings::Front::VehicleT2TankMassGatherSeconds, Task::FightType::ATTACK);
+                Global::RoleSettings::Front::VehicleT2TankMassGatherSeconds, Task::FightType::ATTACK,
+                Global::RoleSettings::Front::VehicleT2TankMassBigChance,
+                Global::RoleSettings::Front::VehicleT2TankMassBigMin, Global::RoleSettings::Front::VehicleT2TankMassBigMax);
         }
         return null;
     }
@@ -126,12 +132,14 @@ namespace FrontTankMass {
         return Roll(u, side, 3, Global::RoleSettings::Front::VehicleRaiderWaveIntervalSeconds,
             Global::RoleSettings::Front::VehicleRaiderWaveChance, WaveRaider(side),
             Global::RoleSettings::Front::VehicleRaiderWaveMin, Global::RoleSettings::Front::VehicleRaiderWaveMax,
-            Global::RoleSettings::Front::VehicleRaiderWaveGatherSeconds, Task::FightType::ATTACK);
+            Global::RoleSettings::Front::VehicleRaiderWaveGatherSeconds, Task::FightType::ATTACK,
+            Global::RoleSettings::Front::VehicleRaiderWaveBigChance,
+            Global::RoleSettings::Front::VehicleRaiderWaveBigMin, Global::RoleSettings::Front::VehicleRaiderWaveBigMax);
     }
 
     IUnitTask@ Roll(CCircuitUnit@ u, const string &in side, uint t, int intervalSeconds,
                     float chance, const string &in tankName, int minCount, int maxCount, int gatherSeconds,
-                    Task::FightType promote) {
+                    Task::FightType promote, float bigChance = 0.0f, int bigMin = 0, int bigMax = 0) {
         const string tier = t == 0 ? "T1" : (t == 1 ? "T2" : (t == 2 ? "Bots" : "Raiders"));
         const int interval = AiMax(1, intervalSeconds) * SECOND;
         if (nextRoll[t] < 0) {
@@ -150,10 +158,14 @@ namespace FrontTankMass {
         nextRoll[t] = ai.frame + interval;
         // Owner (2026-10-20): the T2 roll also carries VehicleT2ArtySquadChance for a faction artillery squad
         const float squadChance = t == 1 ? AiMax(0.0f, Global::RoleSettings::Front::VehicleT2ArtySquadChance) : 0.0f;
-        if (chance < 1.0f || squadChance > 0.0f) {
+        // Owner (2026-11-12): the same draw also carries bigChance for a bigger batch of bigMin..bigMax
+        const float big = AiMax(0.0f, bigChance);
+        bool bigHit = false;
+        if (chance < 1.0f || squadChance > 0.0f || big > 0.0f) {
             // AiDice's rare -1 endpoint counts as a miss (KI-628, as FrontOpener::ChooseTank)
-            const array<float> weights = {AiMax(0.0f, 1.0f - chance - squadChance), chance, squadChance};
+            const array<float> weights = {AiMax(0.0f, 1.0f - chance - squadChance - big), chance, squadChance, big};
             const int pick = AiDice(weights);
+            bigHit = pick == 3;
             if (pick == 2) {
                 IUnitTask@ squad = FrontArtySquad::Begin(u, side, gatherSeconds);
                 if (squad !is null) {
@@ -162,7 +174,7 @@ namespace FrontTankMass {
                     return squad;
                 }
                 // no squad possible (Legion without a T2 bot lab): the tank wave instead
-            } else if (pick != 1) {
+            } else if (pick != 1 && pick != 3) {
                 GenericHelpers::LogUtil("[FRONT][TankMass] " + tier + " roll missed; next at " + (nextRoll[t] / SECOND) + " s", 1);
                 return null;
             }
@@ -172,8 +184,8 @@ namespace FrontTankMass {
             GenericHelpers::LogUtil("[FRONT][TankMass] " + tier + " roll hit but no tank '" + tankName + "' at " + u.circuitDef.GetName(), 1);
             return null;
         }
-        const int lo = AiMax(1, minCount);
-        const int count = AiRandom(lo, AiMax(lo, maxCount));
+        const int lo = AiMax(1, bigHit ? bigMin : minCount);
+        const int count = AiRandom(lo, AiMax(lo, bigHit ? bigMax : maxCount));
         // Owner (2026-10-19/20): each T2 wave gets a jammer, radar and flak vehicle from the same plant,
         // queued first so they are out before the tanks; the wave holds until they are
         IUnitTask@ escortFirst = null;
@@ -187,7 +199,7 @@ namespace FrontTankMass {
             );
             FrontOpener::Recruit(last);
         }
-        GenericHelpers::LogUtil("[FRONT][TankMass] " + tier + " roll hit: " + count + " x " + def.GetName() + " at factory "
+        GenericHelpers::LogUtil("[FRONT][TankMass] " + tier + (bigHit ? " big" : "") + " roll hit: " + count + " x " + def.GetName() + " at factory "
             + u.id + "; next roll at " + (nextRoll[t] / SECOND) + " s", 1);
         return escortFirst !is null ? escortFirst : last;
     }
