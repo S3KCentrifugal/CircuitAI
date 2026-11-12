@@ -27,6 +27,7 @@ namespace FrontGantryNanos {
     const int RecheckSeconds = 30;
     const int OrderTimeoutSeconds = 120;
     const int HelpTimeoutSeconds = 30;
+    const int GiveLimit = 6;           // hand-outs of one order before it is dropped
     const int OrphanSeconds = 5;       // an order with nobody on it this long after it was handed out is free to take
     const int FallbackFailLimit = 6;   // pinned orders dying unframed in a row before engine-sited turrets
 
@@ -43,7 +44,7 @@ namespace FrontGantryNanos {
         AIFloat3 pos;
         int facing = 0;
         int want = 0;
-        int group = 0;          // turret block (0: none, engine-sited turrets)
+        array<int> groups;      // turret blocks: behind it, then beside it (none: engine-sited turrets)
         int held = 0;           // slots the block holds
         int standing = 0;       // last scan
         int framed = 0;
@@ -51,6 +52,7 @@ namespace FrontGantryNanos {
         int finishFrame = -1;   // first scan that saw it finished
         int completeFrame = -1;
         int fails = 0;          // our orders that died unframed in a row
+        int onBlock = 0, sited = 0;   // our orders: pinned to a block slot, engine-sited
         bool alive = true;
         bool log0 = false, log2 = false, log5 = false;
     }
@@ -62,6 +64,7 @@ namespace FrontGantryNanos {
     array<int> orderGiven;      // constructors each order has been handed to
     array<int> orderFrame;      // last frame each order was handed out (AssignTask lands its unit a frame later)
     array<IUnitTask@> helps;
+    array<IUnitTask@> ownAborts;   // orders we aborted ourselves: not a site failure
     array<int> helpGantry;
     // requisitioned constructors, by id
     array<int> cons;
@@ -75,7 +78,7 @@ namespace FrontGantryNanos {
 
     void Reset() {
         gantries.resize(0); orders.resize(0); orderGantry.resize(0); orderGiven.resize(0); orderFrame.resize(0);
-        helps.resize(0); helpGantry.resize(0); cons.resize(0); scanCons.resize(0); scanNanos.resize(0);
+        helps.resize(0); helpGantry.resize(0); ownAborts.resize(0); cons.resize(0); scanCons.resize(0); scanNanos.resize(0);
         @nanoDef = null; gantryDefs.resize(0); lastScan = -100000;
     }
 
@@ -101,6 +104,11 @@ namespace FrontGantryNanos {
     }
 
     bool Live(IUnitTask@ t) { return t !is null && !t.IsDead(); }
+    void Abort(IUnitTask@ t) {
+        if (!Live(t)) return;
+        if (ownAborts.findByRef(t) < 0) ownAborts.insertLast(t);
+        aiBuilderMgr.AbortTask(t);
+    }
     int LiveOrders(int gid) {
         int n = 0;
         for (uint i = 0; i < orders.length(); ++i) if (orderGantry[i] == gid && Live(orders[i])) ++n;
@@ -134,7 +142,10 @@ namespace FrontGantryNanos {
         if (zone > 0) aiTerrainMgr.ReleaseZone(zone); else aiTerrainMgr.ReleaseGroup(group);
     }
 
-    // The biggest full block behind the gantry that holds g.want, else the fullest partial one
+    // Turret blocks for g.want turrets: behind the gantry first (TECH's layout), then, where buildings
+    // already stand there, beside it on either side (the block laid with the facing turned a quarter, so
+    // the exit stays clear); in each place the biggest shape that holds what is still missing, else the
+    // fullest partial one
     void Reserve(Gantry@ g, CCircuitUnit@ unit) {
         if (g is null || unit is null || unit.circuitDef is null || nanoDef is null) return;
         const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
@@ -142,23 +153,45 @@ namespace FrontGantryNanos {
             GenericHelpers::LogUtil("[FRONT][GantryNano] the profile's layout gate is closed: engine-sited turrets for gantry " + g.id, 1);
             return;
         }
-        int best = 0, bestN = 0, bestC = 0, bestR = 0;
-        for (uint s = 0; s + 1 < Shapes.length(); s += 2) {
-            const int c = Shapes[s], r = Shapes[s + 1];
-            if (c * r < g.want && bestN >= g.want) continue;
-            const int grp = aiTerrainMgr.ReserveNanoBlockAt(nanoDef, unit.circuitDef, g.pos, g.facing, c, r, 0);
-            const int n = grp > 0 ? aiTerrainMgr.GetGroupCount(grp, false) : 0;
-            if (n > bestN) {
-                if (best > 0) ReleaseBlock(best);
-                best = grp; bestN = n; bestC = c; bestR = r;
-                if (n >= g.want) break;   // the first (biggest useful) shape that holds the roll
-            } else if (grp > 0) ReleaseBlock(grp);
+        const array<int> turns = { 0, 1, 3 };
+        string where = "";
+        for (uint t = 0; t < turns.length() && g.held < g.want; ++t) {
+            const int facing = (g.facing + turns[t]) % 4;
+            const int need = g.want - g.held;
+            int best = 0, bestN = 0, bestC = 0, bestR = 0;
+            for (uint s = 0; s + 1 < Shapes.length(); s += 2) {
+                const int c = Shapes[s], r = Shapes[s + 1];
+                if (c * r < need && bestN >= need) continue;
+                const int grp = aiTerrainMgr.ReserveNanoBlockAt(nanoDef, unit.circuitDef, g.pos, facing, c, r, 0);
+                const int n = grp > 0 ? aiTerrainMgr.GetGroupCount(grp, false) : 0;
+                if (n > bestN) {
+                    if (best > 0) ReleaseBlock(best);
+                    best = grp; bestN = n; bestC = c; bestR = r;
+                    if (n >= need) break;   // the first (biggest useful) shape that holds the rest
+                } else if (grp > 0) ReleaseBlock(grp);
+            }
+            if (best <= 0) continue;
+            g.groups.insertLast(best); g.held += bestN;
+            where += (where.length() > 0 ? ", " : "") + (turns[t] == 0 ? "behind " : "beside ") + bestC + "x" + bestR + " holds " + bestN;
         }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
-        g.group = best; g.held = bestN;
         GenericHelpers::LogUtil("[FRONT][GantryNano] " + g.defName + " " + g.id + " at (" + int(g.pos.x) + ", " + int(g.pos.z) + ") facing " + g.facing
-            + ": " + g.want + " caretakers; " + (best > 0 ? "turret block " + bestC + "x" + bestR + " holds " + bestN
-                + (bestN < g.want ? " (the rest engine-sited)" : "") : "no turret block (engine-sited turrets)"), 1);
+            + ": " + g.want + " caretakers; " + (g.groups.length() > 0 ? "turret blocks " + where + " (" + g.held + " slots"
+                + (g.held < g.want ? ", the rest engine-sited)" : ")") : "no turret block (engine-sited turrets)"), 1);
+    }
+
+    // The block slot nearest u over g's blocks that u can use, -1 if none
+    int Slot(CCircuitUnit@ u, Gantry@ g) {
+        if (u is null || g is null) return -1;
+        int best = -1;
+        float bestSq = 1.0e12f;
+        for (uint i = 0; i < g.groups.length(); ++i) {
+            const int slot = SupportSites::Nearest(u, nanoDef, g.groups[i], g.pos);
+            if (slot < 0) continue;
+            const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), aiTerrainMgr.GetReservationPos(slot));
+            if (sq < bestSq) { bestSq = sq; best = slot; }
+        }
+        return best;
     }
 
     // ------------------------------------------------------------ scan
@@ -223,9 +256,9 @@ namespace FrontGantryNanos {
         for (int i = int(gantries.length()) - 1; i >= 0; --i) {
             Gantry@ g = gantries[i];
             if (g.alive) { Report(g); continue; }
-            for (uint k = 0; k < orders.length(); ++k) if (orderGantry[k] == g.id && Live(orders[k])) aiBuilderMgr.AbortTask(orders[k]);
-            for (uint k = 0; k < helps.length(); ++k) if (helpGantry[k] == g.id && Live(helps[k])) aiBuilderMgr.AbortTask(helps[k]);
-            ReleaseBlock(g.group);
+            for (uint k = 0; k < orders.length(); ++k) if (orderGantry[k] == g.id) Abort(orders[k]);
+            for (uint k = 0; k < helps.length(); ++k) if (helpGantry[k] == g.id) Abort(helps[k]);
+            for (uint k = 0; k < g.groups.length(); ++k) ReleaseBlock(g.groups[k]);
             GenericHelpers::LogUtil("[FRONT][GantryNano] " + g.defName + " " + g.id + " is gone; its turret work ends", 1);
             gantries.removeAt(i);
         }
@@ -258,7 +291,8 @@ namespace FrontGantryNanos {
         if (g.completeFrame < 0 && g.standing >= g.want) {
             g.completeFrame = ai.frame;
             GenericHelpers::LogUtil("[FRONT][GantryNano] " + g.defName + " " + g.id + " complete: " + g.standing + "/" + g.want + " turrets at " + Clock(ai.frame)
-                + (g.finishFrame >= 0 ? " (" + ((ai.frame - g.finishFrame) / SECOND) + " s after its finish)" : " (before its finish)"), 1);
+                + (g.finishFrame >= 0 ? " (" + ((ai.frame - g.finishFrame) / SECOND) + " s after its finish)" : " (before its finish)")
+                + "; our orders " + g.onBlock + " on block slots, " + g.sited + " engine-sited", 1);
         }
         if (g.finishFrame < 0) return;
         const int after = ai.frame - g.finishFrame;
@@ -315,7 +349,9 @@ namespace FrontGantryNanos {
             if (ai.frame - orderFrame[i] < OrphanSeconds * SECOND) continue;   // just handed out: its unit may not be on it yet
             array<CCircuitUnit@>@ on = orders[i].GetUnits();
             if (on !is null && on.length() > 0) continue;
-            if (orderGiven[i] >= 2) { aiBuilderMgr.AbortTask(orders[i]); continue; }   // left twice: its site is bad
+            // other work takes constructors off our orders (native and script swaps); a pinned order
+            // nobody is on stays and goes to the next constructor. Only one left over and over is dropped.
+            if (orderGiven[i] >= GiveLimit) { Abort(orders[i]); continue; }
             orderGiven[i]++; orderFrame[i] = ai.frame;
             return orders[i];
         }
@@ -323,7 +359,7 @@ namespace FrontGantryNanos {
             // the energy-based turret cap is raised by Cap at the next economy update; until then by one
             if (nanoDef.maxThisUnit >= 0 && nanoDef.count >= nanoDef.maxThisUnit) nanoDef.maxThisUnit = nanoDef.count + 1;
             if (nanoDef.IsAvailable(ai.frame)) {
-                const int slot = (g.group > 0 && g.fails < FallbackFailLimit) ? SupportSites::Nearest(u, nanoDef, g.group, g.pos) : -1;
+                const int slot = (g.groups.length() > 0 && g.fails < FallbackFailLimit) ? Slot(u, g) : -1;
                 if (slot >= 0) {
                     const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
                     IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, Task::Priority::HIGH, nanoDef, at, 0.0f, true, OrderTimeoutSeconds * SECOND));
@@ -331,16 +367,18 @@ namespace FrontGantryNanos {
                     if (t !is null) {
                         GenericHelpers::LogUtil("[FRONT][GantryNano] turret " + (Committed(g) + 1) + "/" + g.want + " for " + g.defName + " " + g.id
                             + " on block slot " + slot + " by " + u.circuitDef.GetName() + " " + u.id, 2);
+                        g.onBlock++;
                         return Track(t, g);
                     }
                 }
                 // no block, the block full or refused, or its orders keep dying: an engine-sited turret beside the gantry
-                if (g.group <= 0 || slot < 0 || g.fails >= FallbackFailLimit) {
+                if (slot < 0 || g.fails >= FallbackFailLimit) {
                     IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, Task::Priority::HIGH, nanoDef, g.pos,
                         SQUARE_SIZE * 24, true, OrderTimeoutSeconds * SECOND));
                     if (t !is null) {
                         GenericHelpers::LogUtil("[FRONT][GantryNano] turret " + (Committed(g) + 1) + "/" + g.want + " for " + g.defName + " " + g.id
                             + " engine-sited by " + u.circuitDef.GetName() + " " + u.id, 2);
+                        g.sited++;
                         return Track(t, g);
                     }
                 }
@@ -445,12 +483,14 @@ namespace FrontGantryNanos {
     // Front_BuilderAiTaskRemoved
     void TaskRemoved(IUnitTask@ task, bool done) {
         if (task is null) return;
+        const int own = ownAborts.findByRef(task);
+        if (own >= 0) ownAborts.removeAt(own);
         for (uint i = 0; i < orders.length(); ++i) {
             if (orders[i] !is task) continue;
             Gantry@ g = Find(orderGantry[i]);
             if (g !is null) {
                 if (done) g.fails = 0;
-                else if (++g.fails == FallbackFailLimit)
+                else if (own < 0 && ++g.fails == FallbackFailLimit)
                     GenericHelpers::LogUtil("[FRONT][GantryNano] " + g.fails + " turret orders for " + g.defName + " " + g.id
                         + " ended unframed in a row: engine-sited turrets from now", 1);
             }
