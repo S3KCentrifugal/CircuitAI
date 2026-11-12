@@ -207,11 +207,19 @@ namespace Main {
 		// Example of user-assigned custom attributes
 		array<string> names = {Factory::armalab, Factory::coralab, Factory::armavp, Factory::coravp,
 			Factory::armaap, Factory::coraap, Factory::armasy, Factory::corasy};
-		for (uint i = 0; i < names.length(); ++i)
-			Factory::userData[ai.GetCircuitDef(names[i]).id].attr |= Factory::Attr::T2;
+		// A def is null when its faction is not loaded (Legion off: leggant), so skip it;
+		// one null here used to abort AiMain before ApplyProfileSettings (owner 2026-11-12).
+		for (uint i = 0; i < names.length(); ++i) {
+			CCircuitDef@ fdef = ai.GetCircuitDef(names[i]);
+			if (fdef !is null)
+				Factory::userData[fdef.id].attr |= Factory::Attr::T2;
+		}
 		names = {Factory::armshltx, Factory::corgant, Factory::leggant};
-		for (uint i = 0; i < names.length(); ++i)
-			Factory::userData[ai.GetCircuitDef(names[i]).id].attr |= Factory::Attr::T3;
+		for (uint i = 0; i < names.length(); ++i) {
+			CCircuitDef@ fdef = ai.GetCircuitDef(names[i]);
+			if (fdef !is null)
+				Factory::userData[fdef.id].attr |= Factory::Attr::T3;
+		}
 
 		ApplyProfileSettings();
 	}
