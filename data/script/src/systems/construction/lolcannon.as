@@ -100,7 +100,7 @@ this program (owner, 2026-10-26):
           heavy porc (armanni Pulsar / cordoom Bulwark / legbastion Bastion)
           ExtraPorcAhead (200) further towards the enemy start the cannon is
           sited against, ExtraPorcSpread (480) apart across the facing, and
-          ExtraFlak (1) T2 flak (armflak / corflak / legflak) behind the
+          ExtraFlak (3) T2 flak (armflak / corflak / legflak) behind the
           cannon. Each slot reserves the nearest free spot round its place;
           T2 constructors order, the rest help the frames. Once all stand
           (or each short slot failed three orders, or no crew member can

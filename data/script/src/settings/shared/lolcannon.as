@@ -166,7 +166,7 @@ namespace LolCannon {
     bool Extras = true;
     int ExtraShields = 2;
     int ExtraHeavyPorc = 2;
-    int ExtraFlak = 1;
+    int ExtraFlak = 3;      // owner 2026-11-12: 3 T2 flak (was 1), 160 elmos apart
     float ExtraShieldSpread = 320.0f;   // elmos between the two shields, across the facing
     float ExtraPorcAhead = 200.0f;      // elmos from the shields' front edge to the heavy porc
     float ExtraPorcSpread = 480.0f;     // elmos between the heavy porc, across the facing
