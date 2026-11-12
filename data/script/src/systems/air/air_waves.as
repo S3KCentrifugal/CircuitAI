@@ -375,6 +375,8 @@ namespace AirWaves {
             Global::RoleSettings::Air::StrikeRankSpacing, Global::RoleSettings::Air::StrikeLossAbort, Global::Map::StartPos);
         wt.SetAssemblyPolicy(Global::RoleSettings::Air::StrikeAssemblyRadius,
             Global::RoleSettings::Air::StrikeAssemblyFraction, Global::RoleSettings::Air::StrikeJoinSeconds * SECOND);
+        // owner 2026-11-12: never wait on escorts at home past this (ATG 11-11 waves 9/10/17)
+        wt.SetAssemblyTimeout(Global::RoleSettings::Air::StrikeAssemblyTimeoutSeconds);
         wt.SetStrikePolicy(first, count < 0 ? int(roster.getSize()) : count, Global::RoleSettings::Air::StrikePassFraction,
             Global::RoleSettings::Air::StrikeDamageMargin, Global::RoleSettings::Air::StrikeThreatWeight,
             Global::RoleSettings::Air::StrikeMaxThreat);

@@ -754,6 +754,7 @@ void CFactoryManager::ReadConfig()
 		cdef->SetOn(behaviour.get("on", true).asBool());
 		cdef->SetBuildAllowed(behaviour.get("build", true).asBool());
 		cdef->SetStandoff(std::clamp(behaviour.get("standoff", 0.f).asFloat(), 0.f, 0.95f));
+		if (behaviour.get("lag_exempt", false).asBool()) cdef->SetLagExempt();  // owner 2026-11-12: Liches
         const auto& targetCost = behaviour["target_min_cost"];
         // Validate once at profile load. The zero default preserves every
         // unconfigured unit, including other aircraft and all land units.

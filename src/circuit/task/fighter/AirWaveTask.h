@@ -71,6 +71,8 @@ public:
     void SetStrikePolicy(CCircuitDef* bomber, int count, float passFraction, float margin, float threatWeight, float maxThreat);
     void ConsiderStrikeAircraft(CCircuitDef* bomber);
     void SetAssemblyPolicy(float radius, float fraction, int joinFrames);
+    // Owner 2026-11-12: phase-0 assembly gives up waiting for escorts after this (0 = never)
+    void SetAssemblyTimeout(int seconds);
     void SetMissionPolicy(float padding, float inset, float unknown, float riskScale, float armyReserve, float localAAReserve, bool synchronize);
     void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
     void SetOperationPolicy(bool offensive, int preference, const springai::AIFloat3& assembly, float lead, float routeCeiling, float localRadius);
@@ -225,6 +227,13 @@ private:
     std::set<CCircuitUnit*> operationIdle;
     std::map<CCircuitUnit*, springai::AIFloat3> operationDestinations;
     std::set<CCircuitUnit*> operationArrived;
+    // 2026-11-12 (ATG 11-11): next frame an un-arrived member may be re-asked its leg MOVE.
+    // A cohort MOVE can be dropped by the LagLoad move floor when another owner moved the
+    // unit moments before; the idle-only re-ask never saw a patrolling fighter again.
+    std::map<CCircuitUnit*, int> operationReask;
+    int assemblyTimeoutFrames = 0;
+    int operationReasks = 0;  // non-idle re-asks this leg (logged at assembly end)
+    static constexpr int OPERATION_REASK_FRAMES = 3 * 30;  // FRAMES_PER_SEC
     std::vector<springai::AIFloat3> searchPoints;
     unsigned int searchIndex = 0;
     void PrepareOperationRoute();

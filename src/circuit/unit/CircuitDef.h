@@ -347,6 +347,10 @@ public:
 	bool IsBuilder()         const { return !buildOptions.empty(); }
 	enum class LagClass : char { NONE, MOBILE, TURRET };
 	LagClass GetLagClass()   const { return lagClass; }
+	// Owner 2026-11-12: behaviour.json "lag_exempt": true takes a def out of the
+	// unit-count throttle (util/LagLoad.h), as commanders are (Liches: a dropped
+	// follow MOVE left them behind their bomber wave).
+	void SetLagExempt() { lagClass = LagClass::NONE; }
 	float GetTechLevel()     const { return techLevel; }  // customParams.techlevel, 1 when absent
 	bool IsLagMortar()       const { return isLagMortar; }
 

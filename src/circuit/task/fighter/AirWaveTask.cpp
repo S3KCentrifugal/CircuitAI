@@ -18,6 +18,7 @@
 #include "unit/enemy/EnemyUnit.h"
 #include "CircuitAI.h"
 #include "spring/SpringCallback.h"
+#include "spring/SpringUnit.h"
 #include "util/Utils.h"
 
 #include "AISCommands.h"
@@ -89,7 +90,7 @@ void CAirWaveTask::RemoveAssignee(CCircuitUnit* unit)
     assembled.erase(unit);
     routed.erase(unit); attackAt.erase(unit); attackIssued.erase(unit);
     returnRoutes.erase(unit); returnSteps.erase(unit);
-    operationIdle.erase(unit); operationDestinations.erase(unit); operationArrived.erase(unit);
+    operationIdle.erase(unit); operationDestinations.erase(unit); operationArrived.erase(unit); operationReask.erase(unit);
     if (safeFlight) {
         unit->TrySetFireState(unit->GetCircuitDef()->GetFireState());
         unit->TrySetMoveState(unit->GetCircuitDef()->GetMoveState());
@@ -238,6 +239,11 @@ void CAirWaveTask::SetAssemblyPolicy(float radius, float fraction, int frames)
     assemblyRadius = std::clamp(radius, 64.f, 800.f);
     assemblyFraction = std::clamp(fraction, .5f, 1.f);
     joinFrames = std::clamp(frames, 0, FRAMES_PER_SEC * 60);
+}
+
+void CAirWaveTask::SetAssemblyTimeout(int seconds)
+{
+    assemblyTimeoutFrames = std::clamp(seconds, 0, 600) * FRAMES_PER_SEC;
 }
 
 void CAirWaveTask::SetMissionPolicy(float padding, float inset, float unknown, float scale, float army, float localAA, bool sync)
@@ -1264,7 +1270,7 @@ void CAirWaveTask::IssueOperationLeg()
     AIFloat3 dir(goal.x-from.x, 0.f, goal.z-from.z);
     const float length = std::sqrt(dir.SqLength2D());
     dir = length > 1.f ? dir / length : AIFloat3(0.f,0.f,1.f);
-    operationDestinations.clear(); operationArrived.clear(); operationIdle.clear();
+    operationDestinations.clear(); operationArrived.clear(); operationIdle.clear(); operationReask.clear();
     for (auto* unit : units) {
         const bool bomber = IsOperationBomber(unit);
         const auto slot = air_geometry::FormationSlot(slots[unit], maxWidth, spacing, rankSpacing);
@@ -1345,15 +1351,37 @@ void CAirWaveTask::UpdateOperation()
                 operationArrived.insert(unit);
             if (IsOperationBomber(unit)) { ++total; if (operationArrived.count(unit)) ++arrived; }
             else { ++escortTotal; if (operationArrived.count(unit)) ++escortArrived; }
-            if (dest != operationDestinations.end() && !operationArrived.count(unit) && operationIdle.erase(unit)
-                && !circuit->GetCallback()->Unit_HasCommands(unit->GetId())) {
-                TRY_UNIT(circuit, unit, unit->CmdMoveTo(dest->second, 0, frame + FRAMES_PER_SEC * 3600);)
+            if (dest != operationDestinations.end() && !operationArrived.count(unit)) {
+                // Owner 2026-11-12 (ATG 11-11 waves 9/10/17 never left home): re-ask an
+                // un-arrived member whose live queue does not end at its point, idle or
+                // not, at most once per OPERATION_REASK_FRAMES. Two engine reads per
+                // un-arrived member per re-ask; arrived members cost nothing.
+                const bool idle = operationIdle.erase(unit) > 0;
+                auto reask = operationReask.find(unit);
+                if (idle || reask == operationReask.end() || frame >= reask->second) {
+                    operationReask[unit] = frame + OPERATION_REASK_FRAMES;
+                    auto* api = circuit->GetUnitAPI();
+                    const int count = api->GetCMDQueueSize(unit->GetId());
+                    if (count <= 0 || !api->LastMoveAt(unit->GetId(), count, dest->second.x, dest->second.z, 16.f)) {
+                        TRY_UNIT(circuit, unit, unit->CmdMoveTo(dest->second, 0, frame + FRAMES_PER_SEC * 3600);)
+                        if (!idle) ++operationReasks;
+                    }
+                }
             }
         }
         formedCount = arrived;
+        // Owner 2026-11-12: phase 0 never waits on escorts past assemblyTimeoutFrames.
+        const int escortNeed = int(std::ceil(escortTotal*assemblyFraction));
+        const bool assemblyTimedOut = operationPhase == 0 && assemblyTimeoutFrames > 0
+            && operationIssuedFrame >= 0 && frame - operationIssuedFrame >= assemblyTimeoutFrames;
         // Actual arrivals latch. Never require fast fixed-wing units to arrive simultaneously.
         if (arrived < std::max(1, int(std::ceil(total*assemblyFraction)))
-            || (operationPhase == 0 && escortArrived < int(std::ceil(escortTotal*assemblyFraction)))) return;
+            || (operationPhase == 0 && !assemblyTimedOut && escortArrived < escortNeed)) return;
+        if (operationPhase == 0 && (escortArrived < escortNeed || operationReasks > 0)) {
+            circuit->LOG("WAVE: assembly %s bombers=%i/%i escorts=%i/%i reasks=%i after %is", assemblyTimedOut && escortArrived < escortNeed
+                ? "timeout" : "done", arrived, total, escortArrived, escortTotal, operationReasks, (frame - operationIssuedFrame) / FRAMES_PER_SEC);
+        }
+        operationReasks = 0;
         if (operationPhase == 0) {
             committed = offensive;
             PrepareOperationRoute();

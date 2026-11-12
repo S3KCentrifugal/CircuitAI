@@ -306,6 +306,9 @@ namespace Air {
             float StrikeAssemblyRadius = 600.0f; // measured fixed-wing arrival tolerance, not lane spacing
             float StrikeAssemblyFraction = 0.8f;
             int StrikeJoinSeconds = 20;
+            // Owner 2026-11-12: the home assembly flies once the bombers are there after this
+            // long, whatever the escorts (0 = wait for them forever, the old behaviour).
+            int StrikeAssemblyTimeoutSeconds = 45;
             float StrikeLaneSpacing = 180.0f;
             float StrikeRankSpacing = 240.0f;
             float StrikeLossAbort = 0.35f;
@@ -611,6 +614,9 @@ namespace Air {
             // (600); owner 2026-10-26: the Liches share the bombers' full range again (1800).
             float LicheStrikeRadiusShare = 1.0f;
             int LicheStrikersPerTarget = 5;  // Liches on one target at once (owner 2026-10-26: 5); the rest keep guarding (<= 0: no cap)
+            // Owner 2026-11-12: a Liche whose wave is still assembling this long after launch
+            // goes home and is held for the next wave (ATG 11-11: 6 Liches parked all game).
+            int LicheStallSeconds = 90;
             int LicheStrikeSeconds = 45;     // an ATTACK not resolved by then ends and the Liche rejoins the wave
 
             /******************** T2 BOMBER TARGET TIERS (systems/air/air_strike_tiers.as) ********************/

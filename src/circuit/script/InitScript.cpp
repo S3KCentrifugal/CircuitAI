@@ -2060,6 +2060,7 @@ void CInitScript::RegisterCAirWaveTask(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetMissionPolicy(float, float, float, float, float, float, bool)", asMETHOD(CAirWaveTask, SetMissionPolicy), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void ExcludeStrikeRegion(const AIFloat3& in, float)", asMETHOD(CAirWaveTask, ExcludeStrikeRegion), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAssemblyPolicy(float, float, int)", asMETHOD(CAirWaveTask, SetAssemblyPolicy), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAssemblyTimeout(int)", asMETHOD(CAirWaveTask, SetAssemblyTimeout), asCALL_THISCALL); ASSERT(r >= 0);  // owner 2026-11-12
 	r = engine->RegisterObjectMethod("CAirWaveTask", "bool PickStrikeTarget(const AIFloat3& in from, int preference, float minStaticCost, bool includeHeavy)", asMETHOD(CAirWaveTask, PickStrikeTarget), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetOperationPolicy(bool, int, const AIFloat3& in, float, float, float)", asMETHOD(CAirWaveTask, SetOperationPolicy), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetAttackHandoffPolicy(bool, float, float)", asMETHOD(CAirWaveTask, SetAttackHandoffPolicy), asCALL_THISCALL); ASSERT(r >= 0);

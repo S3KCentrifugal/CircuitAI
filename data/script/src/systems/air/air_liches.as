@@ -73,8 +73,10 @@ namespace AirLiches {
     const string Name = "armliche";
     dictionary held;                  // id string -> true: finished Liches staged at home
     array<CEscortStrikeTask@> runs;   // live Liche escorts
-    array<IUnitTask@> raids;          // parallel to runs: the bomber wave each one flies with
+    array<CAirWaveTask@> raids;       // parallel to runs: the bomber wave each one flies with
     array<int> runStrikes;            // parallel to runs: strikes issued when last logged
+    array<int> runLaunched;           // parallel to runs: launch frame (stalled-wave release)
+    array<int> runLogged;             // parallel to runs: last [Liche] position line
     AirStrikeTiers::Roster roster;    // the eight Liche tiers
     int ordersSinceLiche = 0;
 
@@ -88,7 +90,7 @@ namespace AirLiches {
 
     void Init()
     {
-        held.deleteAll(); runs.resize(0); raids.resize(0); runStrikes.resize(0); ordersSinceLiche = 0;
+        held.deleteAll(); runs.resize(0); raids.resize(0); runStrikes.resize(0); runLaunched.resize(0); runLogged.resize(0); ordersSinceLiche = 0;
     }
 
     /**************************************************************************
@@ -223,7 +225,7 @@ namespace AirLiches {
         }
         if (cohort.isEmpty()) { raw.Abort(); return 0; }
         AirOperations::TrackBombers(raw, cohort); // Liches on a run count toward Target()
-        runs.insertLast(et); raids.insertLast(raid); runStrikes.insertLast(0);
+        runs.insertLast(et); raids.insertLast(raid); runStrikes.insertLast(0); runLaunched.insertLast(ai.frame); runLogged.insertLast(ai.frame);
         GenericHelpers::LogUtil("[AIR][Liche] launched liches=" + cohort.getSize() + " guarding wave bombers=" + bombers.length()
             + " vip=" + et.GetVipId() + " strikeRadius=" + int(StrikeRadius())
             + " perTarget=" + Global::RoleSettings::Air::LicheStrikersPerTarget
@@ -245,16 +247,28 @@ namespace AirLiches {
                 if (et !is null)
                     GenericHelpers::LogUtil("[AIR][Liche] run over strikes=" + et.GetStrikesIssued() + " fired=" + et.GetShotsFired()
                         + " destroyed=" + et.GetTargetsDestroyed(), 1);
-                runs.removeAt(i); raids.removeAt(i); runStrikes.removeAt(i);
+                _Drop(i);
                 continue;
             }
             if ((raids[i] is null || raids[i].IsDead()) && et.GetStriking() == 0) {
                 GenericHelpers::LogUtil("[AIR][Liche] wave over: escort ends, liches=" + et.GetUnits().length() + " go home; strikes="
                     + et.GetStrikesIssued() + " fired=" + et.GetShotsFired() + " destroyed=" + et.GetTargetsDestroyed(), 1);
                 et.Abort();
-                runs.removeAt(i); raids.removeAt(i); runStrikes.removeAt(i);
+                _Drop(i);
                 continue;
             }
+            // Owner 2026-11-12: a wave still assembling at home LicheStallSeconds after launch
+            // will not carry the Liches (ATG 11-11): they go home to be held for the next wave.
+            if (raids[i] !is null && !raids[i].IsDead() && raids[i].GetState() < 3 /* not ATTACKING yet */
+                && ai.frame - runLaunched[i] >= Global::RoleSettings::Air::LicheStallSeconds * SECOND) {
+                GenericHelpers::LogUtil("[AIR][Liche] wave stalled at assembly " + ((ai.frame - runLaunched[i]) / SECOND)
+                    + " s: escort ends, liches=" + et.GetUnits().length() + " go home", 1);
+                et.Abort();
+                _Drop(i);
+                continue;
+            }
+            // Owner 2026-11-12 test line: where the run's Liches are against the wave, every 10 s.
+            if (ai.frame - runLogged[i] >= 10 * SECOND) { runLogged[i] = ai.frame; _LogFormation(et, raids[i]); }
             if (et.GetStrikesIssued() != runStrikes[i]) {
                 runStrikes[i] = et.GetStrikesIssued();
                 GenericHelpers::LogUtil("[AIR][Liche] run strikes=" + et.GetStrikesIssued() + " striking=" + et.GetStriking()
@@ -263,6 +277,33 @@ namespace AirLiches {
         }
     }
 
+    void _Drop(int i)
+    {
+        runs.removeAt(i); raids.removeAt(i); runStrikes.removeAt(i); runLaunched.removeAt(i); runLogged.removeAt(i);
+    }
+    // [AIR][Liche] formation: centre of the wave's bombers, its fighter count within 1200 of that
+    // centre, and each Liche's distance to it. O(wave members + Liches), every 10 s per run.
+    void _LogFormation(CEscortStrikeTask@ et, CAirWaveTask@ raid)
+    {
+        if (raid is null || raid.IsDead()) return;
+        array<CCircuitUnit@>@ members = raid.GetUnits();
+        AIFloat3 c; int bombers = 0;
+        for (uint i = 0; i < members.length(); ++i)
+            if (members[i] !is null && AirWaves::IsWaveBomber(members[i].circuitDef)) { c = c + members[i].GetPos(ai.frame); ++bombers; }
+        if (bombers == 0) return;
+        c = AIFloat3(c.x / bombers, 0, c.z / bombers);
+        int fighters = 0;
+        for (uint i = 0; i < members.length(); ++i)
+            if (members[i] !is null && !AirWaves::IsWaveBomber(members[i].circuitDef)
+                && MapHelpers::SqDist(members[i].GetPos(ai.frame), c) <= 1200.0f * 1200.0f) ++fighters;
+        array<CCircuitUnit@>@ liches = et.GetUnits();
+        string d = "";
+        for (uint i = 0; i < liches.length(); ++i)
+            if (liches[i] !is null) d += (i > 0 ? "," : "") + int(sqrt(MapHelpers::SqDist(liches[i].GetPos(ai.frame), c)));
+        GenericHelpers::LogUtil("[AIR][Liche] formation state=" + raid.GetState() + " centre=" + int(c.x) + "," + int(c.z)
+            + " home=" + int(sqrt(MapHelpers::SqDist(c, Global::Map::StartPos))) + " bombers=" + bombers
+            + " fightersNear=" + fighters + " striking=" + et.GetStriking() + " licheDist=" + d, 1);
+    }
     void Removed(CCircuitUnit@ u) { if (u !is null) held.delete("" + u.id); }
     // AirProduction::Leave: held Liches return to native defaults; their staging tasks are aborted there.
     array<string>@ HeldIds() { return held.getKeys(); }

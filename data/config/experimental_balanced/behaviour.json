@@ -2075,6 +2075,7 @@
 			},
 			"armliche": {
 				"role": ["bomber", "air"],
+				"lag_exempt": true,  // owner 2026-11-12: never throttled (LagLoad), like commanders
 				"attribute": ["siege"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}	
