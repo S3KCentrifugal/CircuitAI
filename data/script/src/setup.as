@@ -318,7 +318,10 @@ namespace Setup {
 		// 	@Global::Map::NearestMapStartPosition = MapHelpers::NearestSpot(startPos, spots);
 		// }
 
-		@Global::Map::NearestMapStartPosition = MapHelpers::NearestSpot(startPos, spots);
+		// Start pick: the spot this AI sent keeps its role even when it was pulled into the box
+		StartSpot@ picked = StartPick::PickedSpot(startPos, spots);
+		@Global::Map::NearestMapStartPosition = (picked !is null) ? picked : MapHelpers::NearestSpot(startPos, spots);
+		if (picked !is null) GenericHelpers::LogUtil("[StartPick] setupMap uses the picked spot", 1);
 		
 		AiRole derivedRole;
 
