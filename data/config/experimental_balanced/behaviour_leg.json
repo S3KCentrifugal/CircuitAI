@@ -981,8 +981,8 @@
 				"attribute": ["siege", "rare", "ranged"],
 				// Owner 2026-11-03: Sharpshooter (armsnipe) micro at max range - firing sites at 98% of this unit's own weapon range (from its def), kites back to it; always fires at will.
 				// Owner 2026-11-04: 99% of range; static porc (live or ghost) counts its reach + 16 instead of + 48 and a drift into it is a 16-elmo step out, mobiles keep + 48 and the full retreat; firing-site steps up to 300 are one straight MOVE (grid paths cut into Sentry reach).
-				// Owner 2026-11-12: porc (live or ghost) counts its bare weapon range, no structure radius and no margin (Beamer/Twin Guard 490 < 0.99 x 535 = 530); ghost structures get 3 blind volleys each (Ambassador ghost fire, real-reach safety with no margin).
-				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 0, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				// Owner 2026-11-12: porc (live or ghost) reach = its weapon range + 24 for our own hull edge (BAR weapons aim at the near edge of the target, targetborder 1), no structure radius and no safety margin: Beamer/Twin Guard 490 + 24 = 514 < 0.99 x 535 = 530 (was 490 + 43 + 16 = 549); ghost structures get 3 blind volleys each (Ambassador ghost fire, real-reach safety with no margin).
+				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 24, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

@@ -852,9 +852,11 @@ bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at, float margin)
 static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame)
 {
 	// Owner 2026-11-12: a ranged hull with static_exact_reach (Barrage) uses the
-	// Ambassador real-reach test with no margin: bare weapon range of known
-	// armed enemies, not the padded threat map, before its ghost volleys.
-	const bool exactReach = unit->GetCircuitDef()->GetRangedPolicy().staticExactReach;
+	// Ambassador real-reach test: weapon range of known armed enemies plus its
+	// static_margin (the hull's own edge: BAR weapons aim at the near edge of
+	// the target's collision volume, targetborder 1), not the padded threat map.
+	const RangedPolicy& rp = unit->GetCircuitDef()->GetRangedPolicy();
+	const bool exactReach = rp.staticExactReach;
 	if (!exactReach && !IsSlowMissileLauncher(unit->GetCircuitDef()->GetDef()->GetName())) {
 		CThreatMap* tm = circuit->GetThreatMap();
 		tm->SetThreatType(unit);
@@ -863,7 +865,7 @@ static bool ArtyUnsafeHere(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloa
 	CMilitaryManager::SArtySnipeState& st = circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), frame);
 	if (st.unsafeFrame != frame) {
 		st.unsafeFrame = frame;
-		st.unsafeHere = ArtyRealUnsafeAt(circuit, pos, exactReach ? 0.f : 16.f);
+		st.unsafeHere = ArtyRealUnsafeAt(circuit, pos, exactReach ? std::max(0.f, rp.staticMargin) : 16.f);
 	}
 	return st.unsafeHere;
 }
