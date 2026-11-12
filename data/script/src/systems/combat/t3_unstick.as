@@ -27,8 +27,9 @@ Stuck, either signal:
 
 A round: every structure of ours whose footprint lies within PenGap x round of
 the unit's footprint is a candidate. Those in Global::Team::AllyClearPorc
-(T1 porc), AllyClearEco (T1 eco), a T1 construction turret or ExtraClear (T2
-flak, Rattlesnake / Persecutor / Eviscerator) are reclaimed:
+(T1 porc), AllyClearEco (T1 eco), a T1 construction turret, ExtraClear (T2
+flak, Rattlesnake / Persecutor / Eviscerator) or MexClear (our own T1 metal
+extractors, owner 2026-11-12) are reclaimed:
 one native reclaim each, construction turrets in reach pulled onto it
 (TurretsOnReclaim), and mobile T1/T2 constructors within BuilderRange join
 from Builder::AiMakeTask (BuildersPerBlocker each). Anything else in the ring
@@ -202,7 +203,8 @@ namespace T3Unstick {
     bool Clearable(const string &in name)
     {
         return Global::Team::AllyClearPorc.find(name) >= 0 || Global::Team::AllyClearEco.find(name) >= 0
-            || UnitHelpers::IsT1Nano(name) || Global::T3Unstick::ExtraClear.find(name) >= 0;
+            || UnitHelpers::IsT1Nano(name) || Global::T3Unstick::ExtraClear.find(name) >= 0
+            || Global::T3Unstick::MexClear.find(name) >= 0;
     }
 
     float HalfSize(const CCircuitDef@ d)   // half the footprint, elmos (as WallHelpers)

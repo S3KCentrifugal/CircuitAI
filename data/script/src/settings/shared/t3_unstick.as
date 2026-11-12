@@ -30,4 +30,8 @@ namespace Global { namespace T3Unstick {
     array<string> ExtraClear = {
         "armflak", "corflak", "legflak",
         "armamb", "cortoast", "legacluster" };
+    // Our own T1 metal extractors are cleared too (owner, 2026-11-12): a T1 mex
+    // penning a T3 is reclaimed like T1 eco; its spot is free for a T2 mex.
+    array<string> MexClear = {
+        "armmex", "cormex", "legmex", "armamex" };
 } }
