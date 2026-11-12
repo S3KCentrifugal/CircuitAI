@@ -18,8 +18,9 @@
 // nearest one, so the pulled point keeps its role.
 //
 // Needs BAR PR #9749 (game_initial_spawn: AI start points accepted, 2026-10-22).
-// A point the gadget rejects (outside the box, untraversable, too close to another
-// start) leaves the guess in place; setupMap then derives the role as before.
+// A point the game does not use (rejected: untraversable, too close to another start;
+// or sent after the start countdown ended) leaves the game's guess in place, and
+// setupMap still takes the picked spot's role, so an ally team's roles stay distinct.
 // Cost: runs once from AiMain; O(spots + ally AIs).
 #include "../../define.as"
 #include "../../global.as"
@@ -57,10 +58,14 @@ namespace StartPick {
 		return (a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z);
 	}
 
-	// The picked spot when the game start is (near) the point we sent, else null
+	// The spot this AI picked, or null. setupMap takes its role even when the game
+	// did not use the point (sent after the start countdown, or rejected: footing,
+	// too close to another start): the picks of an ally team are distinct, so the
+	// roles stay distinct (one AIR per team) wherever the game put the commander.
 	StartSpot@ PickedSpot(const AIFloat3& in startPos, StartSpot@[]@ spots) {
 		if (pickedIdx < 0 || spots is null || uint(pickedIdx) >= spots.length()) return null;
-		if (SqDist2(startPos, pickedPos) > 64.0f * 64.0f) return null;
+		Log("start (" + int(startPos.x) + "," + int(startPos.z) + ") is " + int(sqrt(SqDist2(startPos, pickedPos)))
+			+ " elmos from the point sent for P" + (pickedIdx + 1));
 		return spots[pickedIdx];
 	}
 
