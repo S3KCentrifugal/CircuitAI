@@ -7,4 +7,6 @@ namespace Global { namespace StartPick {
 	// Distance from the box edge a spot must keep (the gadget rejects points within
 	// 1 elmo of the rectangle edge; a little margin keeps the commander's footprint in).
 	float BoxMargin = 32.0f;
+	// Furthest a side's out-of-box spot is pulled into the box; beyond it the spot is skipped.
+	float MaxPull = 1500.0f;
 }}
