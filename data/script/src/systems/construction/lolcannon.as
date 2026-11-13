@@ -549,6 +549,11 @@ namespace LolCannon {
             if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f || crewOf.exists(Key(u.id))) continue;
             if (u.task !is null && u.task.GetType() == int(Task::Type::PLAYER)) continue;   // a player's own unit
             if (LrpcBlock::IsCrew(u.id)) continue;   // the TECH heavy LRPC block's crew (owner, 2026-11-02)
+            // owner 2026-11-12: one on a structure frame of its own finishes it first (taken on a later scan).
+            // Live game 11-12, TECH team 14 at 31:32: legaca 15618 was taken 17 s into its Eviscerator frame,
+            // the only one on it, and the frame was left standing unfinished
+            IBuilderTask@ own = cast<IBuilderTask>(u.task);
+            if (own !is null && !own.IsDead() && own.target !is null && own.GetBuildType() < int(Task::BuildType::REPAIR)) continue;
             const bool standIn = groundT2 && T2_GROUND.find(u.circuitDef.GetName()) >= 0;
             const int kind = KindFor(u.circuitDef.GetName(), standIn);
             if (kind < 0 || !Claim(u, kind, standIn ? "taken off its task, ground stand-in" : "taken off its task")) continue;
