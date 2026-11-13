@@ -965,7 +965,7 @@ namespace AirBuild {
         // converter is the only sink, and the owner's 8v8 had 8,455 of 8,459 energy at
         // +1,954 over a pull of 1,033 with every mex upgraded and twelve converters.
         if (AirEconomy::recovery || (AirEconomy::MexesReady() && !AirEconomy::EnergyFloating())
-            || AirEconomy::bankE < aiEconomyMgr.energy.storage * 0.75f) return null;
+            || AirEconomy::bankE < aiEconomyMgr.energy.storage * 0.75f || AirThinHome::T1ConvertersRetired()) return null;
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(UnitHelpers::GetSideForUnitName(u.circuitDef.GetName())));
         if (!Can(u, d)) return null;
         const int queued = aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), d);
@@ -1123,8 +1123,27 @@ namespace AirBuild {
             if (task is null || task.IsDead() || task.target !is null || task.GetBuildType() != int(Task::BuildType::NANO)) continue;
             if (AirEcoLayout::Owns(task.GetBuildPos())) return null;
         }
-        IUnitTask@ t = AirEcoLayout::Nano(u, d, true);
-        if (t !is null) AirWorkforce::Admit(d, true, true);
+        return AirEcoLayout::Nano(u, d, true);
+    }
+    // AirThinHome (owner 2026-11-13): an advanced converter is ordered BEFORE the T1
+    // converters it replaces are reclaimed. Each order credits its draw; each T1
+    // reclaim spends the T1 draw, so metal income never drops in between.
+    IUnitTask@ ThinHomeConverterReplace(CCircuitUnit@ u)
+    {
+        if (!AirThinHome::T1ConvertersRetired() || AirEconomy::recovery) return null;
+        const string side = Global::AISettings::Side;
+        CCircuitDef@ t1 = ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(side));
+        CCircuitDef@ adv = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(side));
+        if (t1 is null || adv is null || t1.count == 0 || !Can(u, adv)) return null;
+        if (AirThinHome::replaceCredit >= Global::RoleSettings::Air::ConverterDraw) return null;
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), adv) + aiBuilderMgr.GetUnfinishedCount(adv) >= 2) return null;
+        if (aiEconomyMgr.metal.current < adv.costM * 0.5f) return null;
+        IUnitTask@ t = AirLayout::Place(u, adv, Task::BuildType::CONVERT, Task::Priority::HIGH);
+        if (t !is null) {
+            AirThinHome::replaceCredit += AiMax(500.0f, aiEconomyMgr.GetEnergyUse(adv)); // armmmkr draws 600
+            GenericHelpers::LogUtil("[AIR][ThinHome] advanced converter ordered to replace T1 converters (" + t1.count
+                + " left, credit " + int(AirThinHome::replaceCredit) + " E)", 1);
+        }
         return t;
     }
     IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false, bool productionOnly = false)

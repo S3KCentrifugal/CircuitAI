@@ -26,11 +26,12 @@ namespace AirReclaim {
         const string side=UnitHelpers::GetSideForUnitName(name);
         if(name==UnitHelpers::GetWindNameForSide(side))
             return AiMax(0.0f,AiMin(25.0f,(ai.GetWindMin()+ai.GetWindMax())*0.5f));
+        if(AirThinHome::IsT1Converter(unit.circuitDef)) return 0.0f; // a converter makes no energy; retiring it frees its draw
         return aiEconomyMgr.GetEnergyMake(unit.circuitDef);
     }
     bool CandidateFits(CCircuitUnit@ unit, float pendingOutput, float pendingRefund) {
         return AirMath::EnergyRetirementFits(AirEconomy::energy,aiEconomyMgr.energy.pull,
-            Output(unit),pendingOutput,Global::RoleSettings::Air::ReclaimEnergyMargin,
+            Output(unit),pendingOutput,AirThinHome::ReclaimMargin(),
             aiEconomyMgr.metal.current,aiEconomyMgr.metal.storage,unit.circuitDef.costM,pendingRefund);
     }
     IUnitTask@ MakeTask(CCircuitUnit@ worker)
@@ -46,7 +47,11 @@ namespace AirReclaim {
             if(target !is null) {pendingOutput+=Output(target);pendingRefund+=target.circuitDef.costM;}
         }
         const string side = Global::AISettings::Side;
-        const array<string> names = {UnitHelpers::GetWindNameForSide(side), UnitHelpers::GetSolarNameForSide(side), UnitHelpers::GetAdvSolarNameForSide(side)};
+        array<string> names = {UnitHelpers::GetWindNameForSide(side), UnitHelpers::GetSolarNameForSide(side), UnitHelpers::GetAdvSolarNameForSide(side)};
+        // AirThinHome (owner 2026-11-13): T1 converters go last, while the bank can run their replacements
+        if (AirThinHome::T1ConvertersRetired() && AirThinHome::replaceCredit >= Global::RoleSettings::Air::ConverterDraw
+            && AirEconomy::bankE >= aiEconomyMgr.energy.storage * Global::RoleSettings::Air::ThinHomeConverterReclaimBank)
+            names.insertLast(UnitHelpers::GetEnergyConverterNameForSide(side));
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint tier = 0; tier < names.length(); ++tier) {
 
@@ -71,7 +76,8 @@ namespace AirReclaim {
                     if (aiTerrainMgr.GetReservationUnit(AirLayout::windClusters[c].slots[s]) is best)
                         job.slot = AirLayout::windClusters[c].slots[s];
             jobs.insertLast(job);
-            Lifecycle::Retire(best, "AIR low-tier energy replaced by completed reactor");
+            if (tier == 3) AirThinHome::replaceCredit -= Global::RoleSettings::Air::ConverterDraw;
+            Lifecycle::Retire(best, tier == 3 ? "AIR T1 converter retired past the first fusion (thin home)" : "AIR low-tier energy replaced by completed reactor");
             if (!AirEconomy::HasReactor()) Invariants::Violation("INV-110", "AIR", "low-tier energy reclaim without completed reactor");
             GenericHelpers::LogUtil("[AIR][Reclaim] " + names[tier] + " id=" + best.id + " worker=" + worker.id, 1);
             return task;

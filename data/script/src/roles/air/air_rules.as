@@ -83,6 +83,10 @@ namespace AirRules {
         }
         @t = AirReclaim::MakeTask(u);
         if (t !is null) return AirBuild::Record(t, "energy.reclaim", u);
+        if (!commander) { // AirThinHome: the replacement goes ahead of support and shared growth
+            @t = AirBuild::ThinHomeConverterReplace(u);
+            if (t !is null) return AirBuild::Record(t, "thinhome.converter.replace", u);
+        }
         // First access precedes discretionary shared economy/its assists.
         // Later factories retain the twenty-turret gate and capacity policy.
         if (AirEconomy::t2 == 0) {

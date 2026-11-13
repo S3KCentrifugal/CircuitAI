@@ -5,7 +5,8 @@ namespace AirThinHome {
     int state = -1; // -1 not judged yet, 0 off, 1 active; judged once per game
     int homeSpots = 0;
     float wind = 0.0f;
-    void Reset() { state = -1; homeSpots = 0; wind = 0.0f; }
+    float replaceCredit = 0.0f; // energy draw of advanced converters ordered and not yet spent on T1 reclaims
+    void Reset() { state = -1; homeSpots = 0; wind = 0.0f; replaceCredit = 0.0f; }
     void Judge()
     {
         wind = (ai.GetWindMin() + ai.GetWindMax()) * 0.5f;
@@ -50,6 +51,20 @@ namespace AirThinHome {
     {
         return Active() && AirEconomy::EnergyFloating() && !AirEconomy::MetalFloating()
             ? AiMin(base, Global::RoleSettings::Air::ThinHomeFloatProductionShare) : base;
+    }
+    float ReclaimMargin()
+    {
+        return Active() ? Global::RoleSettings::Air::ThinHomeReclaimMargin : Global::RoleSettings::Air::ReclaimEnergyMargin;
+    }
+    // Past the first completed reactor no T1 converter is built (owner 2026-11-13).
+    bool T1ConvertersRetired() { return Active() && AirEconomy::HasReactor(); }
+    bool IsT1Converter(const CCircuitDef@ d)
+    {
+        return d !is null && d.GetName() == UnitHelpers::GetEnergyConverterNameForSide(UnitHelpers::GetSideForUnitName(d.GetName()));
+    }
+    bool IsAdvConverter(const CCircuitDef@ d)
+    {
+        return d !is null && d.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(UnitHelpers::GetSideForUnitName(d.GetName()));
     }
     int ReclaimConcurrent()
     {

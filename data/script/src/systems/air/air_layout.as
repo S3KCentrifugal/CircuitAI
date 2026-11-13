@@ -459,6 +459,13 @@ namespace AirLayout {
             || d.GetName() == UnitHelpers::GetSolarNameForSide(side)
             || d.GetName() == UnitHelpers::GetAdvSolarNameForSide(side))) return null;
         if (AirBuild::IsReactor(d) && AirBuild::ReactorPending()) return null;
+        if (AirThinHome::T1ConvertersRetired() && AirThinHome::IsT1Converter(d)) return null;
+        // AirThinHome: advanced converters take the land near the start that reclaimed
+        // T1 converters and solars free (field ring search), the eco module slots after.
+        if (AirThinHome::Active() && AirThinHome::IsAdvConverter(d)) {
+            IUnitTask@ field = PlaceField(u, d, type, priority, false, walkRadius);
+            if (field !is null) return field;
+        }
         if (AirEcoLayout::Managed(d)) {
             // D-292: fusion, AFUS and advanced converters are module kinds. A
             // fusion reaches the ring search below only through the logged,

@@ -126,6 +126,11 @@ namespace Air {
             int ThinHomeConverterParallel = 6;          // ConverterParallel while energy floats
             float ThinHomeFloatProductionShare = 0.45f; // ProductionIncomeShare while energy floats
             int ThinHomeReclaimConcurrent = 4;          // ReclaimEnergyConcurrent
+            float ThinHomeReclaimMargin = 1.0f;         // ReclaimEnergyMargin (aircraft keep pull near income)
+            // Owner 2026-11-13: past the first fusion, T1 converters are reclaimed and never
+            // rebuilt; advanced converters take their land (field placement near the start
+            // first, eco modules after). Reclaim one only while the energy bank holds this share.
+            float ThinHomeConverterReclaimBank = 0.5f;
             float FusionAccessMinMetal = 12.0f;
             float FusionAccessMinEnergy = 450.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time
