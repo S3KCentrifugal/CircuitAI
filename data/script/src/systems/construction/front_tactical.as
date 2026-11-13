@@ -22,6 +22,13 @@
 // Launcher (TacticalUnits): Paralyzer armemp, Catalyst cortron, Perdition legperdition; a builder takes its
 // own faction's first, then any other it can build (traded constructors).
 //
+// Legion (owner, 2026-11-13; TacticalCatalystTrade): Perditions lacked the damage to kill the heavy turrets.
+// A Legion FRONT builds TacticalLegionPerditions (1) Perdition and asks a Cortex FRONT ally for a T2
+// constructor (team/catalyst_trade.as); that constructor builds a Catalyst in range of every heavy turret
+// (each on its own: with two turrets, one Catalyst in range of each), with no reach limit, guarding the
+// Perdition's builder while that order is open. Perditions and Catalysts are matched to targets each on their
+// own. No Cortex FRONT ally, or no donor answering: the Perdition cap lifts (the old behaviour).
+//
 // One per target: each of our launchers (finished or framed) is matched to one target in its range, the
 // one it is nearest to being out of range of (the one it was placed for); a target with no launcher
 // matched is open. TacticalMax caps the total standing.
@@ -71,6 +78,8 @@ namespace FrontTactical {
         AIFloat3 asset;        // our nearest mex / porc (valid when near)
         float assetDist = -1.0f;
         bool covered = false;
+        bool catCovered = false;   // a Catalyst stands in range of it (Legion trade mode)
+        bool perdCovered = false;  // a Perdition stands in range of it (Legion trade mode)
     }
 
     array<CCircuitDef@> launchers;
@@ -78,6 +87,15 @@ namespace FrontTactical {
     array<Target@> targets;
     array<AIFloat3> assets;    // our living finished mexes and static land guns
     int standing = 0;
+    int perdStanding = 0;      // our Perditions (finished or framed)
+    int catBuilders = 0;       // our finished mobile constructors that can build a Catalyst (a traded Cortex T2)
+    CCircuitDef@ catDef;       // Catalyst cortron
+    CCircuitDef@ perdDef;      // Perdition legperdition
+    IUnitTask@ catGuard;       // the traded constructor guarding the open order's builder
+    int tradedWantedAt = -1;   // when a traded constructor last had a Catalyst to build (TradedWork)
+    array<int> staged;         // traded constructors that reached our start (TradedWork), newest last, at most 16
+    IUnitTask@ stageTask;      // the walk to our start
+    const float StageRadius = 1200.0f;
     bool cluster = false;
     int lastScan = -100000;
     bool defsDone = false;
@@ -104,7 +122,9 @@ namespace FrontTactical {
 
     void Reset() {
         launchers.resize(0); targetDefs.resize(0); targets.resize(0); assets.resize(0);
-        standing = 0; cluster = false; lastScan = -100000; defsDone = false;
+        standing = 0; perdStanding = 0; catBuilders = 0; cluster = false; lastScan = -100000; defsDone = false;
+        @catDef = null; @perdDef = null; @catGuard = null; tradedWantedAt = -1; staged.resize(0); @stageTask = null;
+        Team::CatalystTrade::Reset();
         @order = null; orderKey = ""; @assist = null;
         helpers.resize(0); helperUntil.resize(0); helperTask.resize(0);
         fails.deleteAll(); holds.deleteAll(); diagAt.deleteAll(); badSites.resize(0);
@@ -118,6 +138,41 @@ namespace FrontTactical {
         for (uint i = 0; i < l.length(); ++i) { CCircuitDef@ d = ai.GetCircuitDef(l[i]); if (d !is null) launchers.insertLast(d); }
         const array<string>@ t = Global::RoleSettings::Front::TacticalTargets;
         for (uint i = 0; i < t.length(); ++i) { CCircuitDef@ d = ai.GetCircuitDef(t[i]); if (d !is null) targetDefs.insertLast(d); }
+        @catDef = ai.GetCircuitDef("cortron");
+        @perdDef = ai.GetCircuitDef("legperdition");
+    }
+
+    // Legion trade mode (owner, 2026-11-13; Front::TacticalCatalystTrade): a Legion FRONT builds one Perdition
+    // (TacticalLegionPerditions) and, with a Cortex T2 constructor traded to it (team/catalyst_trade.as), a
+    // Catalyst in range of every heavy turret it sees: Perditions alone could not kill a Pulsar / Bulwark /
+    // Bastion. Perditions and Catalysts are matched to targets each on their own. With no Cortex FRONT to
+    // trade with (CatalystTrade::Fallback) the Perdition cap lifts: the old one-Perdition-per-target behaviour.
+    bool LegionMode() {
+        return On() && Global::RoleSettings::Front::TacticalCatalystTrade && Global::AISettings::Side == "legion"
+            && catDef !is null && perdDef !is null;
+    }
+    bool IsOpen(Target@ t, bool cat, bool perd) {
+        if (t.assetDist < 0.0f) return false;
+        if (cat) return !t.catCovered;
+        if (perd) return !t.perdCovered;
+        return !t.covered;
+    }
+
+    // Team::CatalystTrade (Legion FRONT): Catalysts wanted and nothing of ours can build one. `at` = the open
+    // heavy turret nearest our mexes / porc.
+    bool NeedCatalysts(AIFloat3 &out at) {
+        at = AIFloat3(-1.0f, 0.0f, -1.0f);
+        if (!LegionMode() || FrontRecovery::Active()) return false;
+        Refresh();
+        if (catBuilders > 0 || targets.length() == 0 || standing >= Global::RoleSettings::Front::TacticalMax) return false;
+        if (Gate() != "") return false;
+        float best = 1e30f;
+        for (uint i = 0; i < targets.length(); ++i) {
+            if (!IsOpen(targets[i], true, false) || targets[i].assetDist >= best) continue;
+            best = targets[i].assetDist; at = targets[i].pos;
+        }
+        if (at.x >= 0.0f) tradedWantedAt = ai.frame;   // the gift we ask for is held on arrival (TradedWork)
+        return at.x >= 0.0f;
     }
 
     bool IsLauncher(const CCircuitDef@ d) {
@@ -149,7 +204,7 @@ namespace FrontTactical {
 
     void Scan() {
         lastScan = ai.frame;
-        targets.resize(0); assets.resize(0); standing = 0; cluster = false;
+        targets.resize(0); assets.resize(0); standing = 0; perdStanding = 0; catBuilders = 0; cluster = false;
         // enemy heavy turrets: seen now, then ghost images
         const int nc = aiBattle.GetGroundContactCount();
         for (int i = 0; i < nc; ++i)
@@ -165,13 +220,19 @@ namespace FrontTactical {
         // ours: mexes / porc, and the launchers
         array<AIFloat3> lpos;
         array<const CCircuitDef@> ldef;
+        const bool legion = LegionMode();
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null) continue;
             const CCircuitDef@ d = u.circuitDef;
-            if (IsLauncher(d)) { ++standing; lpos.insertLast(u.GetPos(ai.frame)); ldef.insertLast(d); continue; }
-            if (d.IsMobile() || u.GetBuildProgress() < 1.0f) continue;
+            if (IsLauncher(d)) { ++standing; if (d is perdDef) ++perdStanding; lpos.insertLast(u.GetPos(ai.frame)); ldef.insertLast(d); continue; }
+            if (d.IsMobile()) {
+                // Legion FRONTs only; one native CanBuild per mobile unit per TacticalScanSeconds while targets are known
+                if (legion && u.GetBuildProgress() >= 1.0f && d.CanBuild(catDef) && !UnitHelpers::IsCommander(d)) ++catBuilders;
+                continue;
+            }
+            if (u.GetBuildProgress() < 1.0f) continue;
             if (d.GetExtractsMetal() <= 0.0f && !d.HasSurfToLand()) continue;
             assets.insertLast(u.GetPos(ai.frame));
         }
@@ -188,9 +249,18 @@ namespace FrontTactical {
         // porc first, then the pair nearest to losing range. Launcher by launcher let one "cover" a far target
         // with nothing of ours near it and left its own open (fixture g12: 4 Catalysts on one Pulsar).
         // O(l x t) pairs, sorted by insertion; l <= TacticalMax, t the known heavy turrets.
+        // Legion trade mode matches Perditions and Catalysts again, each kind on its own (at most 3 passes).
+        Match(lpos, ldef, null, 0);
+        if (legion) { Match(lpos, ldef, catDef, 1); Match(lpos, ldef, perdDef, 2); }
+        if (order !is null && order.IsDead()) @order = null;
+    }
+
+    // kind 0: covered (every launcher); 1: catCovered (only `only` = Catalysts); 2: perdCovered (Perditions)
+    void Match(array<AIFloat3>@ lpos, array<const CCircuitDef@>@ ldef, const CCircuitDef@ only, int kind) {
         array<int> pl, pt;
         array<float> ps;
         for (uint l = 0; l < lpos.length(); ++l) {
+            if (only !is null && !(ldef[l] is only)) continue;
             for (uint i = 0; i < targets.length(); ++i) {
                 const float s = RangeAt(ldef[l], lpos[l], targets[i].pos) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], targets[i].pos));
                 if (s < 0.0f) continue;
@@ -202,11 +272,12 @@ namespace FrontTactical {
         }
         array<bool> used(lpos.length(), false);
         for (uint k = 0; k < ps.length(); ++k) {
-            if (used[uint(pl[k])] || targets[pt[k]].covered) continue;
+            Target@ t = targets[pt[k]];
+            const bool already = (kind == 1) ? t.catCovered : ((kind == 2) ? t.perdCovered : t.covered);
+            if (used[uint(pl[k])] || already) continue;
             used[uint(pl[k])] = true;
-            targets[pt[k]].covered = true;
+            if (kind == 1) t.catCovered = true; else if (kind == 2) t.perdCovered = true; else t.covered = true;
         }
-        if (order !is null && order.IsDead()) @order = null;
     }
 
     void Refresh() {
@@ -244,6 +315,7 @@ namespace FrontTactical {
     void TaskRemoved(IUnitTask@ task, bool done) {
         if (task is null) return;
         if (assist is task) { @assist = null; return; }
+        if (catGuard is task) { @catGuard = null; return; }
         if (order !is task) return;
         @order = null; @assist = null;
         ClearHelpers();
@@ -359,29 +431,40 @@ namespace FrontTactical {
             if (UnitHelpers::GetConstructorTier(u.circuitDef) == 1) return Help(u);
             return null;
         }
+        const bool legion = LegionMode();
+        const bool cat = legion && d is catDef;     // the traded Cortex constructor: Catalysts
+        const bool perd = legion && d is perdDef;   // our own Legion T2: one Perdition
+        if (cat && catGuard !is null && !catGuard.IsDead() && u.task is catGuard) return catGuard;
         if (order !is null && !order.IsDead()) {
             IBuilderTask@ b = cast<IBuilderTask>(order);
             array<CCircuitUnit@>@ on = order.GetUnits();
             if ((on is null || on.length() < 2) && b !is null && b.buildDef !is null && u.circuitDef.CanBuild(b.buildDef)
-                && FrontFactoryNanos::Free(u) && MapHelpers::SqDist(u.GetPos(ai.frame), b.GetBuildPos()) <= 2000.0f * 2000.0f)
+                && FrontFactoryNanos::Free(u) && (cat || MapHelpers::SqDist(u.GetPos(ai.frame), b.GetBuildPos()) <= 2000.0f * 2000.0f))
                 return order;
+            // the traded constructor helps build the other launcher, then takes the next Catalyst order
+            if (cat && b !is null && (b.buildDef is null || !u.circuitDef.CanBuild(b.buildDef))) return CatGuard(u, on);
             return null;
         }
         if (targets.length() == 0) return null;
         int open = 0;
-        for (uint i = 0; i < targets.length(); ++i) if (!targets[i].covered && targets[i].assetDist >= 0.0f) ++open;
+        for (uint i = 0; i < targets.length(); ++i) if (IsOpen(targets[i], cat, perd)) ++open;
         if (open == 0) return null;
         if (standing >= Global::RoleSettings::Front::TacticalMax) { Why("cap reached: " + standing + " standing"); return null; }
+        if (perd && perdStanding >= Global::RoleSettings::Front::TacticalLegionPerditions && !Team::CatalystTrade::Fallback()) {
+            Why("perdition cap: " + perdStanding + " Perdition(s) standing; Catalysts from a traded Cortex T2 constructor cover the rest");
+            return null;
+        }
         const string gate = Gate();
         if (gate != "") { Why("waiting: " + gate + " (" + open + " heavy turrets near our mexes / porc)"); return null; }
         const bool free = FrontFactoryNanos::Free(u);
         if (!free && !FrontFactoryNanos::Takeable(u)) return null;
-        const float reach = free ? Global::RoleSettings::Front::TacticalReach : Global::RoleSettings::Front::TacticalTakeRadius;
+        // the traded constructor stands wherever its donor handed it over: no reach limit
+        const float reach = cat ? 1e9f : (free ? Global::RoleSettings::Front::TacticalReach : Global::RoleSettings::Front::TacticalTakeRadius);
         const AIFloat3 wp = u.GetPos(ai.frame);
         // nearest our mexes / porc first
         array<int> order_;
         for (uint i = 0; i < targets.length(); ++i) {
-            if (targets[i].covered || targets[i].assetDist < 0.0f) continue;
+            if (!IsOpen(targets[i], cat, perd)) continue;
             uint at = 0;
             while (at < order_.length() && targets[order_[at]].assetDist <= targets[i].assetDist) ++at;
             order_.insertAt(at, int(i));
@@ -411,6 +494,54 @@ namespace FrontTactical {
             return order;
         }
         return null;
+    }
+
+    // Legion trade mode: while the open order is another launcher (the Perdition) the traded Cortex constructor
+    // guards that order's builder, so it walks to the anti-porc site at once and helps; Update aborts the guard
+    // when the order ends, and the re-ask takes the next Catalyst order
+    IUnitTask@ CatGuard(CCircuitUnit@ u, array<CCircuitUnit@>@ on) {
+        if (on is null || on.length() == 0 || on[0] is null || on[0] is u) return null;
+        @catGuard = aiBuilderMgr.Enqueue(TaskB::Guard(Task::Priority::HIGH, on[0], true, AssistGuardSeconds * SECOND));
+        if (catGuard !is null)
+            RateLog("catguard", "traded " + u.circuitDef.GetName() + " " + u.id + " guards " + on[0].circuitDef.GetName() + " " + on[0].id
+                + " on the open order against " + orderKey + " until its Catalyst order");
+        return catGuard;
+    }
+
+    // Builder AiMakeTask, before every other FRONT rung: a constructor traded to us for Catalysts
+    // (Team::CatalystTrade::IsTraded) works only on them while a heavy turret near our mexes / porc has no
+    // Catalyst; when no order can be placed yet (gate closed, another launcher's order without a builder) it
+    // waits where it stands. Without this native and ForwardGeo took it at once (headless Tartar 2026-11-13:
+    // corack 10747 walked to a forward geo vent and died before the gate opened). Null: free for other work.
+    IUnitTask@ TradedWork(CCircuitUnit@ u) {
+        if (!LegionMode() || u is null || u.circuitDef is null || !Team::CatalystTrade::IsTraded(u.id)) return null;
+        if (FrontRecovery::Active() || !(LauncherFor(u) is catDef)) return null;
+        if (u.task !is null && (u.task.IsExternalControlled() || u.task.GetType() == int(Task::Type::PLAYER)
+            || u.task.GetType() == int(Task::Type::RETREAT))) return u.task;
+        Refresh();
+        bool wanted = (order !is null && !order.IsDead() && u.task is order);
+        for (uint i = 0; i < targets.length() && !wanted; ++i) wanted = IsOpen(targets[i], true, false);
+        // the known turrets come and go between scans (out of radar, a ghost cleared): it stays held
+        // TacticalTradeDeliverSeconds after Catalysts were last wanted (headless 2026-11-13: a gift that arrived
+        // in such a gap was taken by FrontRadar and the lolcannon crew)
+        if (wanted) tradedWantedAt = ai.frame;
+        else if (tradedWantedAt < 0 || ai.frame - tradedWantedAt > Global::RoleSettings::Front::TacticalTradeDeliverSeconds * SECOND) return null;
+        if (!(u.task is order) && staged.find(u.id) < 0) {
+            // first through our own start: the straight walk from the donor's base to the site went past the
+            // heavy turrets themselves (headless 2026-11-13: 5 of 6 gifts died 500-700 from a Pulsar on the way)
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), Global::Map::StartPos) > StageRadius * StageRadius) {
+                if (stageTask !is null && !stageTask.IsDead() && u.task is stageTask) return stageTask;
+                @stageTask = aiBuilderMgr.Enqueue(TaskB::Patrol(Task::Priority::HIGH, Global::Map::StartPos, 30 * SECOND));
+                RateLog("stage", "traded " + u.circuitDef.GetName() + " " + u.id + " walks to our start first ("
+                    + int(sqrt(MapHelpers::SqDist(u.GetPos(ai.frame), Global::Map::StartPos))) + " away)");
+                return stageTask;
+            }
+            staged.insertLast(u.id);
+            if (staged.length() > 16) staged.removeAt(0);
+        }
+        IUnitTask@ t = Work(u);
+        if (t !is null) return t;
+        return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
     }
 
     // A T1 constructor helps the order: guard its T2 constructor until the frame stands, then repair the frame
@@ -476,6 +607,12 @@ namespace FrontTactical {
     // swapped off is given its help again. Cost: one owned-unit scan per PullSeconds while an order is open,
     // O(units + T1s x helpers).
     void Update() {
+        if (catGuard !is null && (catGuard.IsDead() || order is null || order.IsDead())) {
+            // the order the traded constructor guarded ended: free it for the next Catalyst order
+            IUnitTask@ g = catGuard;
+            @catGuard = null;
+            if (!g.IsDead()) aiBuilderMgr.AbortTask(g);
+        }
         if (!On() || order is null || order.IsDead() || FrontRecovery::Active()) return;
         if (ai.frame - lastPull < PullSeconds * SECOND) return;
         lastPull = ai.frame;
@@ -556,7 +693,8 @@ namespace FrontTactical {
     // (fixture g12: 9 Perdition orders died 0.5-20 s after their T2 took them).
     bool Owns(CCircuitUnit@ u) {
         if (!On() || u is null || u.task is null || u.task.IsDead()) return false;
-        return (order !is null && !order.IsDead() && u.task is order) || (assist !is null && !assist.IsDead() && u.task is assist);
+        return (order !is null && !order.IsDead() && u.task is order) || (assist !is null && !assist.IsDead() && u.task is assist)
+            || (catGuard !is null && !catGuard.IsDead() && u.task is catGuard);
     }
 
     // Builder AiMakeTask, before the FRONT T1 seats route to native work: the base / expansion /

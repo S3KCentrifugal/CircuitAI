@@ -650,6 +650,15 @@ namespace Front {
             int TacticalAssistT1 = 3;                  // T1 constructors helping an order
             float TacticalAssistReach = 4000.0f;       // ... from this near the site (FrontTactical::Update pulls them)
             int TacticalScanSeconds = 5;
+// Legion (owner, 2026-11-13): one Perdition, then Catalysts from a Cortex T2 constructor a Cortex FRONT ally
+// trades over (systems/team/catalyst_trade.as). Log [Team][CatalystTrade].
+bool TacticalCatalystTrade = true;
+int TacticalLegionPerditions = 1;          // Perditions a Legion FRONT builds while it can trade for Catalysts
+int TacticalTradeOfferSeconds = 4;         // offers collected before the requester picks a donor
+int TacticalTradeDeliverSeconds = 300;     // an accepted request with no constructor by then is asked again
+int TacticalTradeRetrySeconds = 60;        // between requests (a lost constructor, no donor)
+int TacticalTradeFallbackSeconds = 300;    // no donor: the second Perdition is allowed this long
+int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 constructor only when it keeps this many others
             // Hard AFUS admission floors, unlike native energy-table preferences.
             float MinimumMetalIncomeForAFUS = 70.0f;
             float MinimumEnergyIncomeForAFUS = 4000.0f;

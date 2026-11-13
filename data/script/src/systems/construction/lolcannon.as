@@ -554,6 +554,7 @@ namespace LolCannon {
             // the only one on it, and the frame was left standing unfinished
             IBuilderTask@ own = cast<IBuilderTask>(u.task);
             if (own !is null && !own.IsDead() && own.target !is null && own.GetBuildType() < int(Task::BuildType::REPAIR)) continue;
+            if (Team::CatalystTrade::IsTraded(u.id)) continue;   // a Cortex T2 traded to us for Catalysts (owner, 2026-11-13)
             const bool standIn = groundT2 && T2_GROUND.find(u.circuitDef.GetName()) >= 0;
             const int kind = KindFor(u.circuitDef.GetName(), standIn);
             if (kind < 0 || !Claim(u, kind, standIn ? "taken off its task, ground stand-in" : "taken off its task")) continue;

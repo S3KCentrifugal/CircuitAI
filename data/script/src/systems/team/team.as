@@ -18,6 +18,7 @@
 #include "../world/coverage_lanes.as"
 #include "../production/rez_replenish.as"
 #include "engineering_lanes.as"
+#include "catalyst_trade.as"
 
 namespace Team {
     // Return true if the def represents a T2 constructor (land or air)
@@ -65,6 +66,7 @@ namespace Team {
         if (EdgeLanes::HandleMessage(msg, fromTeamId)) return;    // owner, 2026-11-01: an edge-lane FRONT judged dead
         if (ScoutRaid::HandleMessage(msg, fromTeamId)) return;    // owner, 2026-11-07: allied scout pile-up pins and rush calls
         if (AirEmergencyDefense::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-12: AIR base emergency -> nearest FRONTs
+        if (CatalystTrade::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-13: Legion FRONT asks a Cortex FRONT for a T2 constructor
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim

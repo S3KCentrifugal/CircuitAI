@@ -251,6 +251,7 @@ namespace RoleFront {
         FrontMexUp::Update(); // owner, 2026-10-22: T2 helpers move to open mex upgrades
         FrontAgitator::Sample(); // owner, 2026-11-01: bank at 50% in the last 2 min gates forward agitators
         FrontTactical::Update(); // owner, 2026-11-02: T1 constructors pulled to help an open tactical launcher order (front_tactical.as)
+        Team::CatalystTrade::Update(); // owner, 2026-11-13: Legion FRONT trades for a Cortex T2 constructor to build Catalysts (catalyst_trade.as)
         FrontOverflow::Update(); // owner, 2026-10-31: energy overflow into T2 converter blocks; per-minute overflow log
         FrontLayout::CheckFirstFactory();   // D-494: INV-267
 

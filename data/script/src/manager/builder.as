@@ -2028,6 +2028,9 @@ namespace Builder {
             }
             // owner, 2026-11-02: a constructor on a tactical launcher order (or its frame repair) keeps it (front_tactical.as)
             if (FrontTactical::Owns(u)) return u.task;
+            // owner, 2026-11-13: a Cortex T2 constructor traded to a Legion FRONT builds only Catalysts while wanted
+            IUnitTask@ traded = FrontTactical::TradedWork(u);
+            if (traded !is null) return traded;
               if (FrontAgitator::OnOrder(u)) return u.task; // all four artillery steps keep their crew
             if(CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
             if (FrontConstructors::Eligible(u)) {
@@ -2483,6 +2486,7 @@ namespace Builder {
 		// its construction ships here, TACTICAL unlocks its shipyard caps the
 		// moment it owns one. Each branch checks its own AiRole.
 		Team::SeaAssist::OnUnitAdded(unit);
+		Team::CatalystTrade::OnUnitAdded(unit);   // owner, 2026-11-13: the constructor a Cortex FRONT owes a Legion FRONT
 
 		const CCircuitDef@ cdef = unit.circuitDef;
 		// Construction turrets are the layout's biggest reservation and the one

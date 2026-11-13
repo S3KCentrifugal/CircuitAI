@@ -142,6 +142,9 @@ namespace Factory {
             // owner, 2026-11-12: an allied AIR's base emergency near us: fast defense first
             IUnitTask@ emergency=AirEmergencyDefense::FactoryMakeTask(u);
             if(emergency !is null) return emergency;
+            // owner, 2026-11-13: a Cortex FRONT owes a Legion FRONT a T2 constructor for its Catalysts
+            IUnitTask@ trade=Team::CatalystTrade::FactoryMakeTask(u);
+            if(trade !is null) return trade;
             IUnitTask@ support=FrontFactorySupport::Assist(u,true);
             if(support !is null) return support;
             IUnitTask@ front=CommanderGroup::Recruit(u);
