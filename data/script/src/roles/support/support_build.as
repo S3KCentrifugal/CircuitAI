@@ -213,6 +213,7 @@ namespace SupportBuild {
     }
 
     void Tick() {
+        FrontOverflow::Update();   // owner 2026-11-13: overflow state, converter cells, per-minute [SUPPORT][Overflow] line
         if (TechChain::Active() && TechChain::objective != "t2")
             Invariants::Violation("INV-181", "support-opening", "SUPPORT inherited a non-T2 strategic rush");
         TechBuild::TrackMetal();
@@ -382,6 +383,9 @@ namespace SupportBuild {
             @task = TechBuild::ReclaimT1Lab(unit, Global::RoleSettings::Tech::ExpAssistRadius);
             if (task !is null) return task;
         }
+        // owner 2026-11-13: energy wasting -> T2 converter blocks before anything else a T2 constructor would do
+        @task = FrontOverflow::Work(unit);
+        if (task !is null) return task;
         // Spend the first owned advanced worker's metal on nearby upgrades.
         // Geo remains the first large energy project, ahead of fusion.
         if (transitioned && donationResolved && !economyReady

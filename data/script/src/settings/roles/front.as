@@ -271,6 +271,10 @@ namespace Front {
             // experimental_balanced. OverflowLog (the per-minute [FRONT][Overflow] line) runs either way.
             bool OverflowConverters = false;
             bool OverflowLog = true;
+            // Owner 2026-11-13: native's T2 converter fill-in placed in the same gap-free blocks (any profile)
+            bool TidyNativeConverters = true;
+            float OverflowNanoBonus = 300.0f;     // owner 2026-11-13: block site score per nano turret of ours reaching it...
+            int OverflowNanoCount = 4;            // ...counting at most this many
             float OverflowBankPercent = 0.9f;     // the energy bank this full...
             float OverflowSpareEnergy = 800.0f;   // ...or income beating the pull by this
             int OverflowSeconds = 20;             // for this long
@@ -640,7 +644,7 @@ namespace Front {
             array<string> TacticalTargets = { "armanni", "cordoom", "legbastion" };    // Pulsar, Bulwark, Bastion
             float TacticalClusterRadius = 700.0f;      // two targets this near each other open the step
             float TacticalFrontRadius = 2250.0f;       // a target counts with one of our mexes / porc this near it
-            float TacticalMinMetalIncome = 150.0f;     // 10 s minimum metal income
+            float TacticalMinMetalIncome = 90.0f;      // 10 s minimum metal income (owner 2026-11-13: was 150)
             float TacticalMinEnergyIncome = 5000.0f;   // energy income
             float TacticalRangeMargin = 120.0f;        // the site stands this far inside the launcher's range
             float TacticalShake = 40.0f;               // native looks this far round the site for room
@@ -650,6 +654,14 @@ namespace Front {
             int TacticalAssistT1 = 3;                  // T1 constructors helping an order
             float TacticalAssistReach = 4000.0f;       // ... from this near the site (FrontTactical::Update pulls them)
             int TacticalScanSeconds = 5;
+            // Heavy static artillery (owner, 2026-11-13): Persecutor / Rattlesnake / Eviscerator, at the same
+            // TacticalClusterRadius. With no two heavy turrets clustered: 1 heavy turret + 1 artillery = the full
+            // launcher set, each in range of both; 2 artillery with no heavy turret near = 1 launcher in range of
+            // both; 3+ artillery with no heavy turret near = the full set, each in range of a different pair.
+            // Empty turns the artillery rules off.
+            array<string> TacticalArtiTargets = { "cortoast", "armamb", "legacluster" };
+            float TacticalArtiMinMetalIncome = 65.0f;   // owner 2026-11-13: 10 s minimum metal income for the artillery rules
+            int TacticalSetSize = 2;                   // launchers in a full set (a Legion FRONT trading for Catalysts: +1 Perdition)
 // Legion (owner, 2026-11-13): one Perdition, then Catalysts from a Cortex T2 constructor a Cortex FRONT ally
 // trades over (systems/team/catalyst_trade.as). Log [Team][CatalystTrade].
 bool TacticalCatalystTrade = true;

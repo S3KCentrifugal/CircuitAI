@@ -84,7 +84,7 @@
         "commander_group_tactical_rear": 300,
         "commander_group_tactical_retry_seconds": 10,
         "commander_group_tactical_order_seconds": 300,
-        "commander_group_tactical_definitions": "armemp,cortron,legperdition",
+        "commander_group_tactical_definitions": "armemp,cortron",   // owner 2026-11-13: Perditions only from FRONT tactical
         // D-479: static artillery on the tactical queue, built by one group
         // constructor while the rest keep expansion. T2 (Rattlesnake, Persecutor,
         // Eviscerator) from 45 metal/s; T1 (Gauntlet, Agitator, Amputator) from

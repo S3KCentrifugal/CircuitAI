@@ -23,9 +23,35 @@
 //   [FRONT][Overflow] min N | E +income pull bank/storage | full Xs | over E | conv ... | M +income
 // "over" is the energy above a full bank (income beyond the pull while the bank is at 98%+), which is
 // shared to allies or lost.
+//
+// SUPPORT (owner, 2026-11-13; Support::OverflowConverters): Hades Ponds, a Legion SUPPORT floated its energy bank
+// for most of the game and never built a converter (its eco planner's converters wait behind defence, labs and a
+// full metal bank). A SUPPORT T2 constructor asking for work now plants the same blocks, Support::OverflowBlockCols
+// (2) wide, until the overflow ends; no fusion needed first. FRONT stays as set
+// (off in experimental_balanced since 2026-11-08). Log [SUPPORT][Overflow].
 namespace FrontOverflow {
-    bool On() { return Global::RoleSettings::Front::OverflowConverters && Global::AISettings::Role == AiRole::FRONT; }
-    bool LogOn() { return Global::RoleSettings::Front::OverflowLog && Global::AISettings::Role == AiRole::FRONT; }
+    bool Support() { return Global::AISettings::Role == AiRole::SUPPORT; }
+    bool On()
+    {
+        if (Support()) return Global::RoleSettings::Support::OverflowConverters;
+        return Global::RoleSettings::Front::OverflowConverters && Global::AISettings::Role == AiRole::FRONT;
+    }
+    bool LogOn() { return (Global::RoleSettings::Front::OverflowLog && Global::AISettings::Role == AiRole::FRONT) || (Support() && On()); }
+    // Owner 2026-11-13: FRONT keeps native's converter fill-in (overflow blocks off), but its T2 converters go into
+    // the same gap-free blocks: a native CONVERT order for the T2 converter is swapped for the next block cell
+    // (TidyNative). Front::TidyNativeConverters.
+    bool Tidy() { return Global::RoleSettings::Front::TidyNativeConverters && Global::AISettings::Role == AiRole::FRONT; }
+    string Tag() { return Support() ? "[SUPPORT][Overflow] " : "[FRONT][Overflow] "; }
+    int BlockCols() { return Support() ? Global::RoleSettings::Support::OverflowBlockCols : Global::RoleSettings::Front::OverflowBlockCols; }
+    int BlockRows() { return Support() ? Global::RoleSettings::Support::OverflowBlockRows : Global::RoleSettings::Front::OverflowBlockRows; }
+    // FRONT: its eco ladder's first fusion; SUPPORT (no ladder): any fusion or equivalent standing
+    bool FirstFusion()
+    {
+        // SUPPORT: no fusion needed (headless Hades Ponds 11-13: a Legion SUPPORT on geos and advanced solars sat at
+        // 95% of an 8,800 bank with +300-600 spare and no fusion, so the blocks never opened); a T2 constructor is
+        if (!Support()) return FrontEcoLadder::FirstFusionStands();
+        return true;
+    }
 
     CCircuitDef@ ConvDef() { return ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side)); }
     const float ConvDraw = 600.0f;      // armmmkr / cormmkr / legadveconv energyconv_capacity
@@ -44,7 +70,7 @@ namespace FrontOverflow {
         return BankFull(Global::RoleSettings::Front::OverflowBankPercent) || Spare() >= Global::RoleSettings::Front::OverflowSpareEnergy;
     }
     int OverflowFor() { return overflowSince < 0 ? 0 : (ai.frame - overflowSince) / SECOND; }
-    bool Active() { return On() && FrontEcoLadder::FirstFusionStands() && OverflowFor() >= Global::RoleSettings::Front::OverflowSeconds; }
+    bool Active() { return On() && FirstFusion() && OverflowFor() >= Global::RoleSettings::Front::OverflowSeconds; }
 
     int Pending()
     {
@@ -130,9 +156,49 @@ namespace FrontOverflow {
     }
 
     // The best site for a cols x rows block: rings round the eco anchor, the side away from the map centre first
+    // Owner 2026-11-13: blocks prefer ground our finished nano turrets reach, so they help build it. Our turrets
+    // (positions, build ranges) are read once per ChooseBlock; a block site scores Front::OverflowNanoBonus per
+    // turret reaching its centre (at most OverflowNanoCount), and points round each turret within 2500 of the
+    // eco anchor are tried besides the rings round the anchor.
+    array<AIFloat3> nanoPos;
+    array<float> nanoReach;
+    void ReadNanos()
+    {
+        nanoPos.resize(0); nanoReach.resize(0);
+        const array<string> names = {"armnanotc", "cornanotc", "legnanotc", "armnanotct2", "cornanotct2", "legnanotct2"};
+        array<CCircuitDef@> defs;
+        for (uint i = 0; i < names.length(); ++i) { CCircuitDef@ nd = ai.GetCircuitDef(names[i]); if (nd !is null) defs.insertLast(nd); }
+        if (defs.length() == 0) return;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ n = ai.GetTeamUnit(ids[i]);
+            if (n is null || n.circuitDef is null || n.GetBuildProgress() < 1.0f) continue;
+            bool nano = false;
+            for (uint k = 0; k < defs.length() && !nano; ++k) nano = (defs[k] is n.circuitDef);
+            if (!nano) continue;
+            nanoPos.insertLast(n.GetPos(ai.frame));
+            nanoReach.insertLast(n.circuitDef.GetBuildDistance());
+        }
+    }
+    int NanosReaching(const AIFloat3 &in c)
+    {
+        int k = 0;
+        for (uint i = 0; i < nanoPos.length(); ++i) {
+            const float r = nanoReach[i] - 48.0f;   // the block's centre, so its inner cells are in reach
+            if (r > 0.0f && MapHelpers::SqDist(c, nanoPos[i]) <= r * r) ++k;
+        }
+        return AiMin(k, Global::RoleSettings::Front::OverflowNanoCount);
+    }
+
+    // a block round `anchor`: the eco anchor first, then our start (headless Hades Ponds 11-13: a corner anchor at
+    // 640,640 fitted no SUPPORT block in 35 min)
     bool SearchBlock(CCircuitDef@ d, CCircuitUnit@ u, int cols, int rows, AIFloat3 &out best, array<AIFloat3>@ bestCells)
     {
-        const AIFloat3 anchor = FrontEcoLadder::Anchor();
+        if (SearchBlockAt(FrontEcoLadder::Anchor(), d, u, cols, rows, best, bestCells)) return true;
+        return SearchBlockAt(FrontEcoLadder::Clamped(Global::Map::StartPos.x, Global::Map::StartPos.z), d, u, cols, rows, best, bestCells);
+    }
+    bool SearchBlockAt(const AIFloat3 &in anchor, CCircuitDef@ d, CCircuitUnit@ u, int cols, int rows, AIFloat3 &out best, array<AIFloat3>@ bestCells)
+    {
         const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
         const AIFloat3 centre(w * 0.5f, 0.0f, h * 0.5f);
         float bx = anchor.x - centre.x, bz = anchor.z - centre.z;
@@ -142,6 +208,23 @@ namespace FrontOverflow {
         array<AIFloat3> fit;
         best = AIFloat3(-1.0f, 0.0f, -1.0f);
         float bestScore = -1.0e9f;
+        // round our nano turrets first: a block just inside each turret's reach, 8 directions
+        const float bonus = Global::RoleSettings::Front::OverflowNanoBonus;
+        for (uint ni = 0; ni < nanoPos.length(); ++ni) {
+            if (MapHelpers::SqDist(nanoPos[ni], anchor) > 2500.0f * 2500.0f) continue;
+            const float off = AiMax(96.0f, nanoReach[ni] - 48.0f - 32.0f);
+            for (int a = 0; a < 8; ++a) {
+                const float ang = 6.2831853f * float(a) / 8.0f;
+                const AIFloat3 p = FrontEcoLadder::Clamped(nanoPos[ni].x + cos(ang) * off, nanoPos[ni].z + sin(ang) * off);
+                const float back = (p.x - centre.x) * bx + (p.z - centre.z) * bz;
+                if (back < startBack - 200.0f) continue;
+                const float ring = sqrt(MapHelpers::SqDist(p, anchor));
+                const float score = back - 0.5f * ring + bonus * float(NanosReaching(p));
+                if (score <= bestScore || NearGivenUp(p)) continue;
+                if (!CellsFit(d, p, fit, u, cols, rows)) continue;
+                bestScore = score; best = p; bestCells = fit;
+            }
+        }
         const array<float> rings = {0.0f, 160.0f, 320.0f, 480.0f, 640.0f, 800.0f, 1000.0f, 1200.0f, 1400.0f, 1600.0f};
         for (uint ri = 0; ri < rings.length(); ++ri) {
             const int spokes = rings[ri] <= 0.0f ? 1 : 12;
@@ -151,7 +234,7 @@ namespace FrontOverflow {
                 // away from the centre, then near the anchor; never nearer the centre than the start by more than 200
                 const float back = (p.x - centre.x) * bx + (p.z - centre.z) * bz;
                 if (back < startBack - 200.0f) continue;
-                const float score = back - 0.5f * rings[ri];
+                const float score = back - 0.5f * rings[ri] + bonus * float(NanosReaching(p));
                 if (score <= bestScore || NearGivenUp(p)) continue;
                 if (!CellsFit(d, p, fit, u, cols, rows)) continue;
                 bestScore = score; best = p; bestCells = fit;
@@ -166,18 +249,19 @@ namespace FrontOverflow {
     bool ChooseBlock(CCircuitDef@ d, CCircuitUnit@ u)
     {
         if (ai.frame < blockRetry) return false;
-        const int c0 = Global::RoleSettings::Front::OverflowBlockCols, r0 = Global::RoleSettings::Front::OverflowBlockRows;
+        const int c0 = BlockCols(), r0 = BlockRows();
         const array<int> shapes = {c0, r0, c0, AiMax(1, r0 - 1), AiMax(1, r0 - 1), c0, 2, 2};
         AIFloat3 best;
         array<AIFloat3> bestCells;
         int cols = 0, rows = 0;
+        ReadNanos();
         for (uint k = 0; k + 1 < shapes.length() && cols == 0; k += 2) {
             if (SearchBlock(d, u, shapes[k], shapes[k + 1], best, bestCells)) { cols = shapes[k]; rows = shapes[k + 1]; }
         }
         const AIFloat3 anchor = FrontEcoLadder::Anchor();
         if (cols == 0) {
             blockRetry = ai.frame + 60 * SECOND;
-            GenericHelpers::LogUtil("[FRONT][Overflow] no " + c0 + "x" + r0 + " (nor smaller) converter block fits round the eco anchor "
+            GenericHelpers::LogUtil(Tag() + "no " + c0 + "x" + r0 + " (nor smaller) converter block fits round the eco anchor "
                 + int(anchor.x) + "," + int(anchor.z) + "; retry in 60 s", 1);
             return false;
         }
@@ -186,8 +270,9 @@ namespace FrontOverflow {
         for (uint i = 0; i < cells.length(); ++i) { cellState[i] = 0; @cellTasks[i] = null; }
         blockCentre = best; blocks++; failsHere = 0; blockFirstCell = allCells.length(); anchored = false;
         for (uint i = 0; i < cells.length(); ++i) allCells.insertLast(cells[i]);
-        GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " at " + int(best.x) + "," + int(best.z) + " ("
-            + cols + "x" + rows + ", eco anchor " + int(anchor.x) + "," + int(anchor.z) + ")", 1);
+        GenericHelpers::LogUtil(Tag() + "converter block " + blocks + " at " + int(best.x) + "," + int(best.z) + " ("
+            + cols + "x" + rows + ", eco anchor " + int(anchor.x) + "," + int(anchor.z) + ", " + NanosReaching(best) + " of our "
+            + nanoPos.length() + " nano turrets reach it)", 1);
         return true;
     }
 
@@ -219,7 +304,7 @@ namespace FrontOverflow {
                 if (MapHelpers::SqDist(allCells[k], was) < 1.0f) { allCells[k] = cells[i]; break; }
             moved++;
         }
-        if (moved > 0) GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " follows its first converter: "
+        if (moved > 0) GenericHelpers::LogUtil(Tag() + "converter block " + blocks + " follows its first converter: "
             + moved + " open cells moved " + int(dx) + "," + int(dz), 1);
     }
 
@@ -249,7 +334,7 @@ namespace FrontOverflow {
             int dropped = 0;
             for (uint i = 0; i < cells.length(); ++i) if (cellState[i] == 0) { cellState[i] = 3; dropped++; }
             givenUp.insertLast(blockCentre);
-            GenericHelpers::LogUtil("[FRONT][Overflow] converter block " + blocks + " given up after " + failsHere
+            GenericHelpers::LogUtil(Tag() + "converter block " + blocks + " given up after " + failsHere
                 + " failed cells (" + dropped + " not ordered)", 1);
         }
     }
@@ -275,8 +360,10 @@ namespace FrontOverflow {
         const int i = OpenCell();
         if (i < 0) return null;   // the rest of the block is ordered
         if (Planned(d, cells[i])) { cellState[i] = 3; blockFails++; failsHere++; return null; }   // planned over since the block was chosen
-        if (!aiTerrainMgr.CanMoveTo(u, cells[i]) || aiBattle.SurfThreat(cells[i]) > Global::RoleSettings::Front::OverflowMaxThreat) return null;   // another constructor, or later
+        if ((u !is null && !aiTerrainMgr.CanMoveTo(u, cells[i])) || aiBattle.SurfThreat(cells[i]) > Global::RoleSettings::Front::OverflowMaxThreat) return null;   // another constructor, or later
+        ordering = true;
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::CONVERT, Task::Priority::HIGH, d, cells[i], 0.0f, true, 180 * SECOND));
+        ordering = false;
         if (t is null) { cellState[i] = 3; blockFails++; failsHere++; return null; }
         IBuilderTask@ bt = cast<IBuilderTask>(t);
         if (bt !is null) {
@@ -289,8 +376,8 @@ namespace FrontOverflow {
         if (cellOrdered.length() < cells.length()) cellOrdered.resize(cells.length());
         cellOrdered[i] = ai.frame;
         ordered++;
-        GenericHelpers::LogUtil("[FRONT][Overflow] T2 converter " + (d.count + Pending()) + " in block " + blocks + " cell " + (i + 1) + "/" + cells.length()
-            + " at " + int(cells[i].x) + "," + int(cells[i].z) + " by " + u.circuitDef.GetName() + " " + u.id + " (" + why + ")"
+        GenericHelpers::LogUtil(Tag() + "T2 converter " + (d.count + Pending()) + " in block " + blocks + " cell " + (i + 1) + "/" + cells.length()
+            + " at " + int(cells[i].x) + "," + int(cells[i].z) + (u is null ? "" : " by " + u.circuitDef.GetName() + " " + u.id) + " (" + why + ")"
             + " | E +" + int(aiEconomyMgr.energy.income) + " pull " + int(aiEconomyMgr.energy.pull)
             + " bank " + int(aiEconomyMgr.energy.current) + "/" + int(aiEconomyMgr.energy.storage) + " for " + OverflowFor() + " s", 1);
         return t;
@@ -301,14 +388,14 @@ namespace FrontOverflow {
     // Front_BuilderAiTaskRemoved: how a cell order ended (arm C diagnosis: cells failed with no site abort)
     void TaskRemoved(IUnitTask@ task, bool done)
     {
-        if (task is null || !On()) return;
+        if (task is null || (!On() && !Tidy())) return;
         for (uint i = 0; i < cellTasks.length(); ++i) {
             if (cellTasks[i] !is task) continue;
             IBuilderTask@ bt = cast<IBuilderTask>(task);
             const bool framed = bt !is null && bt.target !is null;
             const float pct = aiEconomyMgr.energy.storage > 0.0f ? aiEconomyMgr.energy.current / aiEconomyMgr.energy.storage : 0.0f;
             const int age = i < cellOrdered.length() ? (ai.frame - cellOrdered[i]) / SECOND : -1;
-            GenericHelpers::LogUtil("[FRONT][Overflow] cell " + (i + 1) + " of block " + blocks + " order ended " + (done ? "done" : "unbuilt")
+            GenericHelpers::LogUtil(Tag() + "cell " + (i + 1) + " of block " + blocks + " order ended " + (done ? "done" : "unbuilt")
                 + (framed ? ", frame stands" : ", no frame") + " after " + age + " s, builders " + task.GetUnits().length()
                 + " | bank " + int(pct * 100.0f) + "% M bank " + int(aiEconomyMgr.metal.current), 1);
             // native's own converter abort (bank under 55%, no frame yet): the cell is fine, it opens again
@@ -327,11 +414,16 @@ namespace FrontOverflow {
     // Front_BuilderAiMakeTask, before the eco ladder
     IUnitTask@ Work(CCircuitUnit@ u)
     {
+        if (!On() && Tidy() && u !is null && u.circuitDef !is null && FrontMexUp::IsT2Constructor(u)) {
+            if (IsCellTask(u.task)) return u.task;
+            if (FrontFactoryNanos::Free(u)) return Orphan(u);   // a block cell nobody is on (null: native work)
+            return null;
+        }
         if (!On() || u is null || u.circuitDef is null || UnitHelpers::IsCommander(u.circuitDef)) return null;
         if (IsAssistBot(u)) return Assist(u);
         if (!FrontMexUp::IsT2Constructor(u) || LolCannon::IsCrew(u.id)) return null;
         // mexes first while energy is not what we lack
-        if (Global::RoleSettings::Front::OverflowMexFirst && BankFull(Global::RoleSettings::Front::OverflowBankPercent) && T1MexesLeft() > 0) {
+        if (!Support() && Global::RoleSettings::Front::OverflowMexFirst && BankFull(Global::RoleSettings::Front::OverflowBankPercent) && T1MexesLeft() > 0) {
             IUnitTask@ up = FrontMexUp::Upgrade(u, "mexes before more energy (bank full)");
             if (up !is null) return up;
         }
@@ -354,6 +446,51 @@ namespace FrontOverflow {
         for (uint i = 0; i < cellTasks.length(); ++i) if (cellTasks[i] is t) return true;
         return false;
     }
+    // Front_BuilderAiMakeTask: native's default task is a CONVERT order (CEconomyManager fill-in: energy bank
+    // over 88%, metal not full, under 2 converter orders). A T2 converter there is replaced by the next cell of
+    // the current block (an orphan cell first); null keeps native's order (no block fits, not our T2 converter).
+    // Front_BuilderAiTaskAdded: native's T2 converter orders reach builders without our AiMakeTask too (headless
+    // Legion FRONT 11-13: 14 converters, none through the default task), so every one is noted when added and
+    // swapped for a block cell on the next Update while nobody has framed it.
+    bool ordering = false;      // our own cell Enqueue in progress
+    array<IUnitTask@> natives;
+    void NoteNative(IUnitTask@ task)
+    {
+        if (!Tidy() || ordering || task is null) return;
+        IBuilderTask@ b = cast<IBuilderTask>(task);
+        if (b is null || b.GetBuildType() != int(Task::BuildType::CONVERT)) return;
+        CCircuitDef@ d = ConvDef();
+        if (d is null || !(b.buildDef is d)) return;
+        natives.insertLast(task);
+    }
+    void SwapNatives()
+    {
+        CCircuitDef@ d = ConvDef();
+        for (int i = int(natives.length()) - 1; i >= 0; --i) {
+            IBuilderTask@ b = cast<IBuilderTask>(natives[i]);
+            natives.removeAt(uint(i));
+            if (d is null || b is null || b.IsDead() || b.target !is null || IsCellTask(b)) continue;
+            array<CCircuitUnit@>@ on = b.GetUnits();
+            CCircuitUnit@ u = (on is null || on.length() == 0) ? null : on[0];
+            IUnitTask@ t = OrderCell(u, d, "native fill-in, tidied into the block");
+            if (t is null) continue;   // no block: native's order stands
+            aiBuilderMgr.AbortTask(b);
+            if (u !is null && ai.GetTeamUnit(u.id) !is null) aiBuilderMgr.AssignTask(u, t);
+        }
+    }
+
+    IUnitTask@ TidyNative(CCircuitUnit@ u, IBuilderTask@ nat)
+    {
+        if (!Tidy() || u is null || nat is null || nat.IsDead() || IsCellTask(nat)) return null;
+        CCircuitDef@ d = ConvDef();
+        if (d is null || !(nat.buildDef is d) || !u.circuitDef.CanBuild(d)) return null;
+        IUnitTask@ t = Orphan(u);
+        if (t is null) @t = OrderCell(u, d, "native fill-in, tidied into the block");
+        if (t is null) return null;
+        aiBuilderMgr.AbortTask(nat);
+        return t;
+    }
+
     // an ordered cell nobody is building, that this constructor can reach
     IUnitTask@ Orphan(CCircuitUnit@ u)
     {
@@ -449,7 +586,7 @@ namespace FrontOverflow {
         if (t is null) return null;
         lastRecruit = ai.frame;
         recruits++;
-        GenericHelpers::LogUtil("[FRONT][Overflow] " + labName + " " + lab.id + " recruits " + name + ": " + why, 1);
+        GenericHelpers::LogUtil(Tag() + "" + labName + " " + lab.id + " recruits " + name + ": " + why, 1);
         return t;
     }
     int recruits = 0;
@@ -462,7 +599,7 @@ namespace FrontOverflow {
     int minutes = 0;
     void Update()
     {
-        if (!LogOn() && !On()) return;
+        if (!LogOn() && !On() && !Tidy()) return;
         const int dt = lastUpdate < 0 ? 0 : AiMin(ai.frame - lastUpdate, 10 * SECOND);
         lastUpdate = ai.frame;
         if (Overflowing()) { if (overflowSince < 0) overflowSince = ai.frame; }
@@ -472,10 +609,11 @@ namespace FrontOverflow {
             fullSeconds += sec;
             overE += AiMax(0.0f, Spare()) * sec;
         }
-        if (On()) {
+        if (On() || Tidy()) {
             CCircuitDef@ d = ConvDef();
             if (d !is null) RefreshCells(d);
-            Pull();
+            if (On()) Pull();
+            else SwapNatives();
         }
         if (ai.frame - minuteFrom >= 60 * SECOND) {
             minutes++;
@@ -508,7 +646,7 @@ namespace FrontOverflow {
         const int queued = d is null ? 0 : aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), d);
         int inBlocks = 0;
         for (uint i = 0; i < cells.length(); ++i) if (cellState[i] == 2) inBlocks++;
-        GenericHelpers::LogUtil("[FRONT][Overflow] min " + minutes + " | E +" + int(aiEconomyMgr.energy.income) + " pull " + int(aiEconomyMgr.energy.pull)
+        GenericHelpers::LogUtil(Tag() + "min " + minutes + " | E +" + int(aiEconomyMgr.energy.income) + " pull " + int(aiEconomyMgr.energy.pull)
             + " bank " + int(aiEconomyMgr.energy.current) + "/" + int(aiEconomyMgr.energy.storage)
             + " | full " + int(fullSeconds) + " s, over " + int(overE) + " E (" + int(overE / 60.0f) + "/s)"
             + " | total full " + int(totalFull) + " s, over " + int(totalOver) + " E"

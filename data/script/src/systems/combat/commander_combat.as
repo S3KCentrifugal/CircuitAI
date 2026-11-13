@@ -222,7 +222,7 @@ namespace CommanderCombat {
             }
             aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",-1.f);
             array<string>@ tacticalNames=aiSetupMgr.ConfigString("commander/combat/commander_group_tactical_definitions",
-                "armemp,cortron,legperdition").split(",");
+                "armemp,cortron").split(",");   // owner 2026-11-13: Perditions only from FRONT tactical
             for(uint i=0;i<tacticalNames.length();++i) {
                 CCircuitDef@ launcher=ai.GetCircuitDef(tacticalNames[i]);
                 if(launcher !is null) aiBuilderMgr.SetCommanderCombatOption("commander_group_tactical_definition",float(launcher.id));

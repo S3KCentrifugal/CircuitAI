@@ -191,7 +191,7 @@ namespace Tech {
             float WeaponGroundFrontRadius = 1800.0f;    // short-range clusters must support that front
             int WeaponArmadaEmpCount = 1;
             int WeaponCortexTacticalCount = 1;
-            int WeaponLegionPerditionCount = 3;
+            int WeaponLegionPerditionCount = 0;   // owner 2026-11-13: Perditions only from FRONT tactical (was 3)
             float WeaponSpecialSpacing = 240.0f;
             float WeaponGeoClusterRadius = 1600.0f;
             float WeaponLaneFrontReserve = 512.0f;     // stand this far behind the selected lane's observed front

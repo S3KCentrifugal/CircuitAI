@@ -16,7 +16,8 @@
 //  - cluster: two known targets (any mix) within TacticalClusterRadius (700) of each other, anywhere;
 //  - near us: the target has one of our living, finished mexes or static land guns ("porc") within
 //    TacticalFrontRadius (2250). Only such targets get a launcher ("it sees");
-//  - economy: 10 s minimum metal income >= TacticalMinMetalIncome (150) and energy income >=
+//  - economy: 10 s minimum metal income >= TacticalMinMetalIncome (90, was 150 to 2026-11-13; the artillery rules below:
+//    TacticalArtiMinMetalIncome, 65) and energy income >=
 //    TacticalMinEnergyIncome (5000).
 //
 // Launcher (TacticalUnits): Paralyzer armemp, Catalyst cortron, Perdition legperdition; a builder takes its
@@ -28,6 +29,18 @@
 // (each on its own: with two turrets, one Catalyst in range of each), with no reach limit, guarding the
 // Perdition's builder while that order is open. Perditions and Catalysts are matched to targets each on their
 // own. No Cortex FRONT ally, or no donor answering: the Perdition cap lifts (the old behaviour).
+//
+// Heavy static artillery (owner, 2026-11-13; TacticalArtiTargets: Persecutor cortoast, Rattlesnake armamb,
+// Eviscerator legacluster), known the same way, at the same TacticalClusterRadius. The 2-porc rule above comes
+// first: while two heavy turrets are clustered anywhere it alone runs, and artillery near a heavy turret is left
+// to it. Otherwise (BuildSlots):
+//  (a) a heavy turret with artillery near it: the full set (TacticalSetSize launchers; a Legion FRONT trading for
+//      Catalysts: 1 Perdition + 2 Catalysts), each in range of both;
+//  (b) two artillery with no heavy turret near: one launcher in range of both;
+//  (c) three or more artillery with no heavy turret near: the full set, each in range of a different pair.
+// Each is a slot holding two targets, covered by one launcher of any kind; the site keeps the farther target
+// just in range and stays LauncherGap from our launchers (so a set fans out by the +-20 degree turns). Firing:
+// launcher_priority lists the artillery as primary, so two Catalysts / Perditions on one fire a synced volley.
 //
 // One per target: each of our launchers (finished or framed) is matched to one target in its range, the
 // one it is nearest to being out of range of (the one it was placed for); a target with no launcher
@@ -68,6 +81,7 @@ namespace FrontTactical {
     const uint MaxBadSites = 32;
     const float EdgeGap = 96.0f;       // a site stands this far inside every map edge
     const float ShortestRangeShare = 0.7f;
+    const float LauncherGap = 112.0f;  // a new site keeps this far from our launchers
     const int DiagSeconds = 30;
 
     class Target {
@@ -80,11 +94,21 @@ namespace FrontTactical {
         bool covered = false;
         bool catCovered = false;   // a Catalyst stands in range of it (Legion trade mode)
         bool perdCovered = false;  // a Perdition stands in range of it (Legion trade mode)
+        // artillery rules (slots): a launcher must hold pos and pos2 both; one launcher of any kind covers it
+        bool has2 = false;
+        AIFloat3 pos2;
+        bool single = false;
+        string rule = "porc";
     }
 
     array<CCircuitDef@> launchers;
     array<CCircuitDef@> targetDefs;
-    array<Target@> targets;
+    array<CCircuitDef@> artiDefs;  // TacticalArtiTargets: Persecutor, Rattlesnake, Eviscerator
+    array<Target@> targets;    // the slots: one launcher each
+    array<Target@> heavy;      // known enemy heavy turrets this scan
+    array<Target@> artis;      // known enemy heavy static artillery this scan
+    array<AIFloat3> launcherPos;   // our launchers (finished or framed) at the last scan
+    string lastRules = "";
     array<AIFloat3> assets;    // our living finished mexes and static land guns
     int standing = 0;
     int perdStanding = 0;      // our Perditions (finished or framed)
@@ -122,6 +146,8 @@ namespace FrontTactical {
 
     void Reset() {
         launchers.resize(0); targetDefs.resize(0); targets.resize(0); assets.resize(0);
+        artiDefs.resize(0); heavy.resize(0); artis.resize(0); launcherPos.resize(0); lastRules = "";
+        placedAt.resize(0); placedKey.resize(0);
         standing = 0; perdStanding = 0; catBuilders = 0; cluster = false; lastScan = -100000; defsDone = false;
         @catDef = null; @perdDef = null; @catGuard = null; tradedWantedAt = -1; staged.resize(0); @stageTask = null;
         Team::CatalystTrade::Reset();
@@ -138,6 +164,8 @@ namespace FrontTactical {
         for (uint i = 0; i < l.length(); ++i) { CCircuitDef@ d = ai.GetCircuitDef(l[i]); if (d !is null) launchers.insertLast(d); }
         const array<string>@ t = Global::RoleSettings::Front::TacticalTargets;
         for (uint i = 0; i < t.length(); ++i) { CCircuitDef@ d = ai.GetCircuitDef(t[i]); if (d !is null) targetDefs.insertLast(d); }
+        const array<string>@ a = Global::RoleSettings::Front::TacticalArtiTargets;
+        for (uint i = 0; i < a.length(); ++i) { CCircuitDef@ d = ai.GetCircuitDef(a[i]); if (d !is null) artiDefs.insertLast(d); }
         @catDef = ai.GetCircuitDef("cortron");
         @perdDef = ai.GetCircuitDef("legperdition");
     }
@@ -153,6 +181,7 @@ namespace FrontTactical {
     }
     bool IsOpen(Target@ t, bool cat, bool perd) {
         if (t.assetDist < 0.0f) return false;
+        if (t.single) return !t.covered;
         if (cat) return !t.catCovered;
         if (perd) return !t.perdCovered;
         return !t.covered;
@@ -165,10 +194,10 @@ namespace FrontTactical {
         if (!LegionMode() || FrontRecovery::Active()) return false;
         Refresh();
         if (catBuilders > 0 || targets.length() == 0 || standing >= Global::RoleSettings::Front::TacticalMax) return false;
-        if (Gate() != "") return false;
+        if (Gate(LowestNeed(true, false)) != "") return false;
         float best = 1e30f;
         for (uint i = 0; i < targets.length(); ++i) {
-            if (!IsOpen(targets[i], true, false) || targets[i].assetDist >= best) continue;
+            if (!IsOpen(targets[i], true, false) || !MetalOk(targets[i]) || targets[i].assetDist >= best) continue;
             best = targets[i].assetDist; at = targets[i].pos;
         }
         if (at.x >= 0.0f) tradedWantedAt = ai.frame;   // the gift we ask for is held on arrival (TradedWork)
@@ -183,17 +212,121 @@ namespace FrontTactical {
         for (uint i = 0; i < targetDefs.length(); ++i) if (int(targetDefs[i].id) == defId) return true;
         return false;
     }
+    bool IsArtiDef(int defId) {
+        for (uint i = 0; i < artiDefs.length(); ++i) if (int(artiDefs[i].id) == defId) return true;
+        return false;
+    }
+
+    // where our launchers were built for which slot (finished orders), newest last, at most 32
+    array<AIFloat3> placedAt;
+    array<string> placedKey;
+    string PlacedKey(const AIFloat3 &in p) {
+        for (int i = int(placedAt.length()) - 1; i >= 0; --i)
+            if (MapHelpers::SqDist(p, placedAt[i]) <= 96.0f * 96.0f) return placedKey[i];
+        return "";
+    }
 
     string Key(const AIFloat3 &in p) { return "" + int(p.x / 32.0f) + "_" + int(p.z / 32.0f); }
 
-    void AddTarget(const AIFloat3 &in p, int defId, bool ghost) {
-        for (uint i = 0; i < targets.length(); ++i)
-            if (MapHelpers::SqDist(targets[i].pos, p) <= 48.0f * 48.0f) return;   // the same structure
+    void AddTarget(array<Target@>@ list, const AIFloat3 &in p, int defId, bool ghost) {
+        for (uint i = 0; i < list.length(); ++i)
+            if (MapHelpers::SqDist(list[i].pos, p) <= 48.0f * 48.0f) return;   // the same structure
         Target@ t = Target();
         t.key = Key(p); t.pos = p; t.ghost = ghost;
         CCircuitDef@ d = ai.GetCircuitDef(defId);
         t.defName = (d is null) ? ("def " + defId) : d.GetName();
-        targets.insertLast(t);
+        list.insertLast(t);
+    }
+    void Collect(int defId, const AIFloat3 &in p, bool ghost) {
+        if (IsTargetDef(defId)) AddTarget(heavy, p, defId, ghost);
+        else if (IsArtiDef(defId)) AddTarget(artis, p, defId, ghost);
+    }
+
+    // Launchers in a full set: TacticalSetSize, +1 for a Legion FRONT trading for Catalysts (1 Perdition + 2 Catalysts)
+    int SetSize() {
+        int n = Global::RoleSettings::Front::TacticalSetSize;
+        if (LegionMode() && !Team::CatalystTrade::Fallback()) ++n;
+        return AiMax(1, n);
+    }
+
+    // A slot one launcher must hold both a and b from; key stable across scans
+    Target@ PairSlot(Target@ a, Target@ b, const string &in rule, int k) {
+        Target@ t = Target();
+        t.pos = a.pos; t.has2 = true; t.pos2 = b.pos; t.single = true; t.rule = rule;
+        t.ghost = a.ghost || b.ghost;
+        t.defName = a.defName + "+" + b.defName;
+        t.key = ((a.key < b.key) ? (a.key + "+" + b.key) : (b.key + "+" + a.key)) + "#" + k;
+        return t;
+    }
+
+    // The slots (owner, 2026-11-13). Two heavy turrets within TacticalClusterRadius (anywhere): every heavy
+    // turret is a slot of its own (the 2-porc rule, first over all) and artillery near one is left to it.
+    // Otherwise:
+    //  (a) a heavy turret with artillery within the radius: SetSize slots, each holding the turret and its
+    //      nearest artillery;
+    //  artillery with no heavy turret within the radius, grouped by the radius (linked):
+    //  (b) two: one slot holding both;
+    //  (c) three or more: SetSize slots, each holding a different pair (nearest pairs first).
+    // O(h x a + a^2) per scan.
+    void BuildSlots() {
+        targets.resize(0);
+        const float cr = Global::RoleSettings::Front::TacticalClusterRadius;
+        const float cr2 = cr * cr;
+        if (cluster) for (uint i = 0; i < heavy.length(); ++i) targets.insertLast(heavy[i]);
+        if (artis.length() == 0) return;
+        const int set = SetSize();
+        array<bool> nearHeavy(artis.length(), false);
+        for (uint a = 0; a < artis.length(); ++a)
+            for (uint h = 0; h < heavy.length() && !nearHeavy[a]; ++h)
+                nearHeavy[a] = MapHelpers::SqDist(artis[a].pos, heavy[h].pos) <= cr2;
+        if (!cluster) {
+            for (uint h = 0; h < heavy.length(); ++h) {
+                int best = -1;
+                float bestSq = cr2;
+                for (uint a = 0; a < artis.length(); ++a) {
+                    const float sq = MapHelpers::SqDist(artis[a].pos, heavy[h].pos);
+                    if (sq <= bestSq) { bestSq = sq; best = int(a); }
+                }
+                if (best < 0) continue;
+                for (int k = 0; k < set; ++k) targets.insertLast(PairSlot(heavy[h], artis[best], "porc+arti", k));
+            }
+        }
+        // artillery groups with no heavy turret near
+        array<int> group(artis.length(), -1);
+        int groups = 0;
+        for (uint a = 0; a < artis.length(); ++a) {
+            if (nearHeavy[a] || group[a] >= 0) continue;
+            group[a] = groups;
+            array<uint> stack = { a };
+            while (stack.length() > 0) {
+                const uint c = stack[stack.length() - 1];
+                stack.removeLast();
+                for (uint b = 0; b < artis.length(); ++b) {
+                    if (nearHeavy[b] || group[b] >= 0 || MapHelpers::SqDist(artis[c].pos, artis[b].pos) > cr2) continue;
+                    group[b] = groups;
+                    stack.insertLast(b);
+                }
+            }
+            ++groups;
+        }
+        for (int g = 0; g < groups; ++g) {
+            array<int> m;
+            for (uint a = 0; a < artis.length(); ++a) if (group[a] == g) m.insertLast(int(a));
+            if (m.length() < 2) continue;
+            if (m.length() == 2) { targets.insertLast(PairSlot(artis[m[0]], artis[m[1]], "arti pair", 0)); continue; }
+            // every pair in the group, nearest first; the first SetSize
+            array<int> pa, pb;
+            array<float> pd;
+            for (uint i = 0; i < m.length(); ++i)
+                for (uint j = i + 1; j < m.length(); ++j) {
+                    const float sq = MapHelpers::SqDist(artis[m[i]].pos, artis[m[j]].pos);
+                    uint k = 0;
+                    while (k < pd.length() && pd[k] <= sq) ++k;
+                    pa.insertAt(k, m[i]); pb.insertAt(k, m[j]); pd.insertAt(k, sq);
+                }
+            for (uint k = 0; k < pd.length() && int(k) < set; ++k)
+                targets.insertLast(PairSlot(artis[pa[k]], artis[pb[k]], "arti group", 0));
+        }
     }
 
     // The launcher's range to a target at `to` when standing at `from` (height aware)
@@ -204,19 +337,19 @@ namespace FrontTactical {
 
     void Scan() {
         lastScan = ai.frame;
-        targets.resize(0); assets.resize(0); standing = 0; perdStanding = 0; catBuilders = 0; cluster = false;
-        // enemy heavy turrets: seen now, then ghost images
+        targets.resize(0); heavy.resize(0); artis.resize(0); launcherPos.resize(0);
+        assets.resize(0); standing = 0; perdStanding = 0; catBuilders = 0; cluster = false;
+        // enemy heavy turrets and heavy static artillery: seen now, then ghost images
         const int nc = aiBattle.GetGroundContactCount();
-        for (int i = 0; i < nc; ++i)
-            if (IsTargetDef(aiBattle.GetGroundContactDefId(i))) AddTarget(aiBattle.GetGroundContactPos(i), aiBattle.GetGroundContactDefId(i), false);
+        for (int i = 0; i < nc; ++i) Collect(aiBattle.GetGroundContactDefId(i), aiBattle.GetGroundContactPos(i), false);
         const int ng = aiBattle.GetGhostCount();
-        for (int i = 0; i < ng; ++i)
-            if (IsTargetDef(aiBattle.GetGhostDefId(i))) AddTarget(aiBattle.GetGhostPos(i), aiBattle.GetGhostDefId(i), true);
+        for (int i = 0; i < ng; ++i) Collect(aiBattle.GetGhostDefId(i), aiBattle.GetGhostPos(i), true);
         const float cr = Global::RoleSettings::Front::TacticalClusterRadius;
-        for (uint i = 0; i < targets.length() && !cluster; ++i)
-            for (uint j = i + 1; j < targets.length() && !cluster; ++j)
-                cluster = MapHelpers::SqDist(targets[i].pos, targets[j].pos) <= cr * cr;
-        if (targets.length() == 0) return;
+        for (uint i = 0; i < heavy.length() && !cluster; ++i)
+            for (uint j = i + 1; j < heavy.length() && !cluster; ++j)
+                cluster = MapHelpers::SqDist(heavy[i].pos, heavy[j].pos) <= cr * cr;
+        BuildSlots();
+        if (targets.length() == 0) { lastRules = ""; return; }
         // ours: mexes / porc, and the launchers
         array<AIFloat3> lpos;
         array<const CCircuitDef@> ldef;
@@ -226,7 +359,11 @@ namespace FrontTactical {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null) continue;
             const CCircuitDef@ d = u.circuitDef;
-            if (IsLauncher(d)) { ++standing; if (d is perdDef) ++perdStanding; lpos.insertLast(u.GetPos(ai.frame)); ldef.insertLast(d); continue; }
+            if (IsLauncher(d)) {
+                ++standing; if (d is perdDef) ++perdStanding;
+                lpos.insertLast(u.GetPos(ai.frame)); ldef.insertLast(d); launcherPos.insertLast(u.GetPos(ai.frame));
+                continue;
+            }
             if (d.IsMobile()) {
                 // Legion FRONTs only; one native CanBuild per mobile unit per TacticalScanSeconds while targets are known
                 if (legion && u.GetBuildProgress() >= 1.0f && d.CanBuild(catDef) && !UnitHelpers::IsCommander(d)) ++catBuilders;
@@ -241,9 +378,23 @@ namespace FrontTactical {
             Target@ t = targets[i];
             float best = fr * fr;
             for (uint a = 0; a < assets.length(); ++a) {
-                const float sq = MapHelpers::SqDist(t.pos, assets[a]);
+                float sq = MapHelpers::SqDist(t.pos, assets[a]);
+                if (t.has2) sq = AiMin(sq, MapHelpers::SqDist(t.pos2, assets[a]));
                 if (sq <= best) { best = sq; t.asset = assets[a]; t.assetDist = sqrt(sq); }
             }
+        }
+        // the artillery rules in force, logged when they change
+        string rules = "";
+        int artiSlots = 0;
+        for (uint i = 0; i < targets.length(); ++i) {
+            if (!targets[i].single) continue;
+            ++artiSlots;
+            if (rules.findFirst(targets[i].rule) < 0) rules += (rules == "" ? "" : ", ") + targets[i].rule;
+        }
+        if (artiSlots > 0) rules = "" + artiSlots + " artillery slots (" + rules + "); " + heavy.length() + " heavy turrets, " + artis.length() + " artillery known";
+        if (rules != lastRules) {
+            lastRules = rules;
+            if (rules != "") GenericHelpers::LogUtil("[FRONT][Tactical] " + rules, 1);
         }
         // one launcher per target: greedy over every in-range (launcher, target) pair, targets near our mexes /
         // porc first, then the pair nearest to losing range. Launcher by launcher let one "cover" a far target
@@ -262,7 +413,10 @@ namespace FrontTactical {
         for (uint l = 0; l < lpos.length(); ++l) {
             if (only !is null && !(ldef[l] is only)) continue;
             for (uint i = 0; i < targets.length(); ++i) {
-                const float s = RangeAt(ldef[l], lpos[l], targets[i].pos) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], targets[i].pos));
+                if (kind != 0 && targets[i].single) continue;   // artillery slots: one launcher of any kind
+                float s = RangeAt(ldef[l], lpos[l], targets[i].pos) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], targets[i].pos));
+                if (targets[i].has2)
+                    s = AiMin(s, RangeAt(ldef[l], lpos[l], targets[i].pos2) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], targets[i].pos2)));
                 if (s < 0.0f) continue;
                 const float key = s + ((targets[i].assetDist >= 0.0f) ? 0.0f : 1e6f);
                 uint k = 0;
@@ -271,6 +425,24 @@ namespace FrontTactical {
             }
         }
         array<bool> used(lpos.length(), false);
+        // a launcher first takes the artillery slot it was built for, while it still holds it: a launcher in
+        // range of all three of a tight group was matched to the other pair, and the next one went up for the
+        // same pair as it (headless f, 2026-11-13)
+        if (kind == 0) {
+            for (uint l = 0; l < lpos.length(); ++l) {
+                const string key = PlacedKey(lpos[l]);
+                if (key == "") continue;
+                for (uint i = 0; i < targets.length(); ++i) {
+                    Target@ t = targets[i];
+                    if (!t.single || t.covered || t.key != key) continue;
+                    float s = RangeAt(ldef[l], lpos[l], t.pos) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], t.pos));
+                    if (t.has2) s = AiMin(s, RangeAt(ldef[l], lpos[l], t.pos2) + 32.0f - sqrt(MapHelpers::SqDist(lpos[l], t.pos2)));
+                    if (s < 0.0f) continue;
+                    t.covered = true; used[l] = true;
+                    break;
+                }
+            }
+        }
         for (uint k = 0; k < ps.length(); ++k) {
             Target@ t = targets[pt[k]];
             const bool already = (kind == 1) ? t.catCovered : ((kind == 2) ? t.perdCovered : t.covered);
@@ -323,6 +495,8 @@ namespace FrontTactical {
         const string key = orderKey;
         if (done) {
             fails.delete(key);
+            placedAt.insertLast(orderSite); placedKey.insertLast(key);
+            if (placedAt.length() > 32) { placedAt.removeAt(0); placedKey.removeAt(0); }
             GenericHelpers::LogUtil("[FRONT][Tactical] built against target at " + key, 1);
             return;
         }
@@ -357,28 +531,43 @@ namespace FrontTactical {
     // A site an order died on (no constructor, no frame): the next site is looked for elsewhere
     bool NearBadSite(const AIFloat3 &in p) {
         for (uint i = 0; i < badSites.length(); ++i) if (MapHelpers::SqDist(p, badSites[i]) <= BadSiteRadius * BadSiteRadius) return true;
+        // a launcher of ours already stands there (an artillery set: the next one turns aside)
+        for (uint i = 0; i < launcherPos.length(); ++i) if (MapHelpers::SqDist(p, launcherPos[i]) <= LauncherGap * LauncherGap) return true;
         return false;
     }
 
-    // The point r0 from t along (dx, dz), pulled in until the height-aware range holds t with half the margin
-    // to spare; never below rMin (when < 0: at most 4 range fits); x < 0 when none, or it leaves the map
-    // (EdgeGap from every edge; a clamped point was not where the range was measured, B13)
+    // The slot's anchor: its target, or the middle of its pair
+    AIFloat3 Anchor(Target@ t) {
+        if (!t.has2) return t.pos;
+        return AIFloat3((t.pos.x + t.pos2.x) * 0.5f, 0.0f, (t.pos.z + t.pos2.z) * 0.5f);
+    }
+
+    // The point from the slot's anchor along (dx, dz) where the farther of its targets is r0 away, pulled in
+    // until the height-aware range holds every target with half the margin to spare; never below rMin (when < 0:
+    // at most 4 range fits); x < 0 when none, or it leaves the map (EdgeGap from every edge; a clamped point was
+    // not where the range was measured, B13), or a failed site / our launcher stands there
     AIFloat3 TrySite(CCircuitDef@ d, Target@ t, float dx, float dz, float r0, float rMin) {
         const float margin = Global::RoleSettings::Front::TacticalRangeMargin;
         const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
-        float r = r0;
-        for (int it = 0; it < 16 && (rMin >= 0.0f || it < 4); ++it) {
-            if (r < 300.0f || (rMin >= 0.0f && r < rMin)) break;
-            const AIFloat3 p(t.pos.x + dx * r, 0.0f, t.pos.z + dz * r);
+        const AIFloat3 m = Anchor(t);
+        // a pair: the half-vector h from the middle; the farther target is r0 away at r = -|u.h| + sqrt((u.h)^2 - h.h + r0^2)
+        const float hx = t.pos.x - m.x, hz = t.pos.z - m.z;
+        const float uh = abs(dx * hx + dz * hz), hh = hx * hx + hz * hz;
+        float r = (hh > 0.0f && uh * uh - hh + r0 * r0 > 0.0f) ? (sqrt(uh * uh - hh + r0 * r0) - uh) : r0;
+        const float rMin_ = (rMin >= 0.0f) ? AiMax(0.0f, rMin - (r0 - r)) : rMin;   // the walk-in floor, measured like r
+        for (int it = 0; it < 16 && (rMin_ >= 0.0f || it < 4); ++it) {
+            if (r < 300.0f || (rMin_ >= 0.0f && r < rMin_)) break;
+            const AIFloat3 p(m.x + dx * r, 0.0f, m.z + dz * r);
             if (p.x < EdgeGap || p.z < EdgeGap || p.x > w - EdgeGap || p.z > h - EdgeGap || NearBadSite(p)) {
-                if (rMin < 0.0f) break;   // the first pass keeps the range; the second walks in
+                if (rMin_ < 0.0f) break;   // the first pass keeps the range; the second walks in
                 r -= 64.0f;
                 continue;
             }
-            const float dist = sqrt(MapHelpers::SqDist(p, t.pos));
-            const float eff = RangeAt(d, p, t.pos);
-            if (dist <= eff - margin * 0.5f) return p;
-            r = AiMin(r - 64.0f, eff - margin);
+            // the worst overshoot over the slot's targets
+            float worst = AiMax(0.0f, sqrt(MapHelpers::SqDist(p, t.pos)) - (RangeAt(d, p, t.pos) - margin * 0.5f));
+            if (t.has2) worst = AiMax(worst, sqrt(MapHelpers::SqDist(p, t.pos2)) - (RangeAt(d, p, t.pos2) - margin * 0.5f));
+            if (worst <= 0.0f) return p;
+            r -= AiMax(64.0f, worst + margin * 0.5f);
         }
         return AIFloat3(-1.0f, 0.0f, -1.0f);
     }
@@ -387,9 +576,10 @@ namespace FrontTactical {
     // the direction turned by +-20, 40, 60, 80 degrees (nearest first); then the same directions down to
     // ShortestRangeShare of the range; x < 0 when there is none (the target is held)
     AIFloat3 Site(CCircuitDef@ d, Target@ t) {
-        float dx = t.asset.x - t.pos.x, dz = t.asset.z - t.pos.z;
+        const AIFloat3 m = Anchor(t);
+        float dx = t.asset.x - m.x, dz = t.asset.z - m.z;
         float len = sqrt(dx * dx + dz * dz);
-        if (len < 1.0f) { dx = Global::Map::StartPos.x - t.pos.x; dz = Global::Map::StartPos.z - t.pos.z; len = sqrt(dx * dx + dz * dz); }
+        if (len < 1.0f) { dx = Global::Map::StartPos.x - m.x; dz = Global::Map::StartPos.z - m.z; len = sqrt(dx * dx + dz * dz); }
         if (len < 1.0f) return AIFloat3(-1.0f, 0.0f, -1.0f);
         dx /= len; dz /= len;
         float range = aiBattle.MainRange(d);
@@ -408,11 +598,26 @@ namespace FrontTactical {
     }
 
     // "" when the gate is open, else why not
-    string Gate() {
-        if (!cluster) return "no two known enemy heavy turrets within " + int(Global::RoleSettings::Front::TacticalClusterRadius) + " of each other";
+    // Metal gate of a slot (owner, 2026-11-13): the artillery rules open at TacticalArtiMinMetalIncome (+65),
+    // the 2-porc rule at TacticalMinMetalIncome (+90)
+    float MinMetal(Target@ t) {
+        return t.single ? Global::RoleSettings::Front::TacticalArtiMinMetalIncome : Global::RoleSettings::Front::TacticalMinMetalIncome;
+    }
+    bool MetalOk(Target@ t) { return Economy::GetMinMetalIncomeLast10s() >= MinMetal(t); }
+    // the lowest metal gate among the open slots
+    float LowestNeed(bool cat, bool perd) {
+        float need = Global::RoleSettings::Front::TacticalMinMetalIncome;
+        for (uint i = 0; i < targets.length(); ++i) if (IsOpen(targets[i], cat, perd)) need = AiMin(need, MinMetal(targets[i]));
+        return need;
+    }
+
+    string Gate(float need = -1.0f) {
+        if (need < 0.0f) need = Global::RoleSettings::Front::TacticalMinMetalIncome;
+        if (targets.length() == 0) return "no two known enemy heavy turrets, or heavy turret and heavy artillery, or two heavy artillery within "
+            + int(Global::RoleSettings::Front::TacticalClusterRadius) + " of each other";
         const float mi = Economy::GetMinMetalIncomeLast10s();
-        if (mi < Global::RoleSettings::Front::TacticalMinMetalIncome)
-            return "10 s minimum metal income +" + int(mi) + " under +" + int(Global::RoleSettings::Front::TacticalMinMetalIncome);
+        if (mi < need)
+            return "10 s minimum metal income +" + int(mi) + " under +" + int(need);
         const float ei = aiEconomyMgr.energy.income;
         if (ei < Global::RoleSettings::Front::TacticalMinEnergyIncome)
             return "energy income +" + int(ei) + " under +" + int(Global::RoleSettings::Front::TacticalMinEnergyIncome);
@@ -454,7 +659,7 @@ namespace FrontTactical {
             Why("perdition cap: " + perdStanding + " Perdition(s) standing; Catalysts from a traded Cortex T2 constructor cover the rest");
             return null;
         }
-        const string gate = Gate();
+        const string gate = Gate(LowestNeed(cat, perd));
         if (gate != "") { Why("waiting: " + gate + " (" + open + " heavy turrets near our mexes / porc)"); return null; }
         const bool free = FrontFactoryNanos::Free(u);
         if (!free && !FrontFactoryNanos::Takeable(u)) return null;
@@ -473,6 +678,7 @@ namespace FrontTactical {
             Target@ t = targets[order_[k]];
             int until = -1;
             if (holds.get(t.key, until) && ai.frame < until) continue;
+            if (!MetalOk(t)) continue;   // a 2-porc slot under +90 while an artillery slot (+65) is open
             const AIFloat3 site = Site(d, t);
             if (site.x < 0.0f) { holds.set(t.key, ai.frame + FailHoldSeconds * SECOND); continue; }
             if (MapHelpers::SqDist(wp, site) > reach * reach) continue;
@@ -488,7 +694,10 @@ namespace FrontTactical {
             lastWhy = "";
             GenericHelpers::LogUtil("[FRONT][Tactical] " + u.circuitDef.GetName() + " " + u.id + " orders " + d.GetName() + " at (" + int(site.x) + ","
                 + int(site.z) + "), " + int(sqrt(MapHelpers::SqDist(site, t.pos))) + " from " + (t.ghost ? "ghost of " : "") + t.defName + " at ("
-                + int(t.pos.x) + "," + int(t.pos.z) + ") (range " + int(RangeAt(d, site, t.pos)) + "); our mex / porc " + int(t.assetDist)
+                + int(t.pos.x) + "," + int(t.pos.z) + ") (range " + int(RangeAt(d, site, t.pos)) + ")"
+                + (t.has2 ? (" and " + int(sqrt(MapHelpers::SqDist(site, t.pos2))) + " from (" + int(t.pos2.x) + "," + int(t.pos2.z) + ") (range "
+                    + int(RangeAt(d, site, t.pos2)) + "), rule " + t.rule + " slot " + t.key) : "")
+                + "; our mex / porc " + int(t.assetDist)
                 + " from it; mi +" + int(Economy::GetMinMetalIncomeLast10s()) + ", ei +" + int(aiEconomyMgr.energy.income) + "; " + standing
                 + " standing, " + open + " heavy turrets open", 1);
             return order;

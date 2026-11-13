@@ -6,6 +6,11 @@ namespace RoleSettings {
 namespace Support {
             // Shared TECH T2 opening and reserved economy; SUPPORT owns combat afterwards.
             bool ExperimentalBuild = true;
+            // Owner 2026-11-13: energy overflow into T2 converter blocks, as FRONT's (systems/construction/front_overflow.as,
+            // same Front::Overflow* thresholds); blocks OverflowBlockCols x OverflowBlockRows. Log [SUPPORT][Overflow].
+            bool OverflowConverters = true;
+            int OverflowBlockCols = 2;
+            int OverflowBlockRows = 3;
             int OpeningT1Constructors = 2;
             int MinimumT2Constructors = 1;
             float HomeMexRadius = 1200.0f;

@@ -1,6 +1,8 @@
 // Shared defaults; existing Global namespaces are retained for callers.
 namespace Global {
 namespace Porc {
+    // Owner 2026-11-13: never from a porc chain (any role); FRONT tactical places these (front_tactical.as)
+    array<string> FrontTacticalOnly = { "legperdition" };
         // Late game: from either threshold on, every visited cluster may take the
         // full porcupine order within its income budget (native mode FULL). Before
         // that the native front-line heuristic decides (mode AUTO).

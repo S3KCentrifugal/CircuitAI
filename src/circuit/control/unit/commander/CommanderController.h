@@ -627,8 +627,19 @@ private:
     bool IsArtilleryDef(const CCircuitDef* def) const;
     bool ArtilleryCrowded(const CCircuitDef* def) const;
     // D-479: one reserved block per definition (T1 and T2 footprints differ).
-    struct TacticalBlock { int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0; };
+    // Owner 2026-11-13 (CommanderTactical.cpp BlockLauncherWork): once 2 T2 artillery stand in a block, the
+    // faction's tactical launcher goes flush against its side or back before any more artillery there.
+    // launcher: 0 not yet, 1 ordered (launcherSite), 2 standing or given up.
+    struct TacticalBlock {
+        int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0;
+        float axisX=0,axisZ=1,across=0,along=0;
+        int launcher=0,launcherTries=0; springai::AIFloat3 launcherSite{-1,0,-1};
+    };
     std::map<int,TacticalBlock> tacticalBlocks;
+    int BlockArtilleryBuilt(const TacticalBlock& block) const;
+    bool BlockLauncherNear(const springai::AIFloat3& site,const CCircuitDef* def) const;
+    CCircuitDef* BlockLauncherDef(CCircuitUnit* unit) const;
+    IUnitTask* BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame);
     // D-495 (CommanderArtilleryT1.cpp): the T1 gun's plan, a justified target
     // and a site in its reach outside every known enemy weapon. Built from the
     // side's combat snapshot at most once per artilleryT1EvalSeconds; mutable

@@ -310,14 +310,16 @@
 			"units": ["armemp", "cortron", "legperdition"],   // Paralyzer, Catalyst, Perdition
 			// Owner 2026-11-12: enemy lolcannons (Ragnarok, Calamity, Starfall; techlevel 2, so tertiary_t3 missed them)
 			// are primary: 26-33.5k health, so the Catalyst/Perdition synced volley suits them.
+			// Owner 2026-11-13: heavy static artillery (Persecutor, Rattlesnake, Eviscerator) moved up from tertiary: FRONT
+			// tactical now places launcher sets for them (front_tactical.as), so they get the synced volley too.
 			"primary": ["armanni", "cordoom", "legbastion",   // Pulsar, Bulwark, Bastion
-				"armvulc", "corbuzz", "legstarfall"],          // Ragnarok, Calamity, Starfall (lolcannons)
+				"armvulc", "corbuzz", "legstarfall",           // Ragnarok, Calamity, Starfall (lolcannons)
+				"cortoast", "armamb", "legacluster"],          // Persecutor, Rattlesnake, Eviscerator
 			"primary_shields": true,
 			"commander_max_speed": 12,
 			// Owner 2026-11-12: enemy Paralyzer / Catalyst / Perdition are tertiary (counter-battery; 3.3-4k health,
 			// one Catalyst or two Perdition missiles, so no synced volley).
-			"tertiary": ["cortoast", "armamb", "legacluster",  // Persecutor, Rattlesnake, Eviscerator
-				"armemp", "cortron", "legperdition"],          // Paralyzer, Catalyst, Perdition
+			"tertiary": ["armemp", "cortron", "legperdition"],  // Paralyzer, Catalyst, Perdition
 			"tertiary_t3": true,
 			"t3_max_speed": 3,
 			"sync_units": ["cortron", "legperdition"],

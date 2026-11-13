@@ -35,6 +35,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <string>
 
 namespace circuit {
 using springai::AIFloat3;
@@ -189,6 +190,8 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
         if(terrain->GetGroupCount(group,false)<minimum) { terrain->ReleaseGroup(group); ++fill; continue; }
         block.group=group; block.centre=centre;
         block.radius=.5f*std::sqrt(across*across+along*along)+size;
+        block.axisX=axis.x; block.axisZ=axis.z; block.across=across; block.along=along;
+        block.launcher=0; block.launcherTries=0; block.launcherSite=AIFloat3(-1.f,0.f,-1.f);
         ai->LOG("[CommanderGroup] tactical_block group=%i slots=%i def=%s at=%.0f,%.0f facing=%i",group,
             terrain->GetGroupCount(group,false),def->GetDef()->GetName(),centre.x,centre.z,facing);
         return true;
@@ -256,6 +259,11 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         block.group=0;
     }
     if(block.group<=0 && !ReserveTacticalBlock(unit,anchor,def,frame)) return nullptr;
+    // Owner 2026-11-13: two T2 artillery up -> the launcher flush beside / behind the block, then more artillery
+    if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && block.launcher<2) {
+        if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame)) return launcherTask;
+        if(block.launcher==1) return nullptr;
+    }
     const int slot=terrain->NextSlotAny(block.group,unit->GetPos(frame));
     if(slot<0) return nullptr;
     // A builder task aborts at once, silently, when the walk to its site is not
@@ -277,6 +285,103 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     ai->LOG("[CommanderGroup] job_start queue=tactical def=%s slot=%i x=%.0f z=%.0f unit=%i team=%i",
         def->GetDef()->GetName(),slot,at.x,at.z,id,ai->GetTeamId());
     return task;
+}
+
+/*
+ * Owner 2026-11-13: "drop that faction's tactical missile launcher flush adjacent to the block (to side or
+ * behind) after 2 t2 eviscerators (etc) are built and before more are built in that block." Armada Paralyzer,
+ * Cortex Catalyst, Legion Perdition (the builder's own faction first, else any it can build). Sites, in order:
+ * the block's left side, right side, back (each centred, the launcher's edge on the block's edge), then the
+ * same 32 elmos further out. An order that ends with no launcher there tries the next site; after four the
+ * block is left to its artillery. Cost: two friendly-unit radius queries per call while the launcher is due.
+ */
+int CCommanderController::BlockArtilleryBuilt(const TacticalBlock& block) const {
+    auto* clb=ai->GetCallback();
+    const int team=ai->GetTeamId();
+    int built=0;
+    auto& units=clb->GetFriendlyUnitsIn(block.centre,block.radius);
+    for(springai::Unit* u:units) {
+        if(u && u->GetTeam()==team && !u->IsBeingBuilt()) {
+            const CCircuitDef* d=ai->GetCircuitDefSafe(clb->Unit_GetDefId(u->GetUnitId()));
+            if(d && IsArtilleryDef(d) && !IsArtilleryT1Def(d)) ++built;
+        }
+        delete u;
+    }
+    return built;
+}
+bool CCommanderController::BlockLauncherNear(const AIFloat3& site,const CCircuitDef* def) const {
+    auto* clb=ai->GetCallback();
+    const int team=ai->GetTeamId();
+    bool found=false;
+    auto& units=clb->GetFriendlyUnitsIn(site,64.f);
+    for(springai::Unit* u:units) {
+        if(u && !found && u->GetTeam()==team && def && clb->Unit_GetDefId(u->GetUnitId())==def->GetId()) found=true;
+        delete u;
+    }
+    return found;
+}
+CCircuitDef* CCommanderController::BlockLauncherDef(CCircuitUnit* unit) const {
+    static const char* names[3]={"armemp","cortron","legperdition"};
+    const int frame=ai->GetLastFrame();
+    const std::string own=std::string(unit->GetCircuitDef()->GetDef()->GetName()).substr(0,3);
+    CCircuitDef* other=nullptr;
+    for(const char* name:names) {
+        CCircuitDef* d=ai->GetCircuitDef(name);
+        if(!d || !unit->GetCircuitDef()->CanBuild(d) || !d->IsAvailable(frame)) continue;
+        if(std::string(name).substr(0,3)==own) return d;
+        if(!other) other=d;
+    }
+    return other;
+}
+IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame) {
+    if(block.launcher>=2) return nullptr;
+    CCircuitDef* ldef=BlockLauncherDef(unit);
+    if(block.launcher==1) {
+        if(ldef && BlockLauncherNear(block.launcherSite,ldef)) {
+            block.launcher=2;
+            ai->LOG("[CommanderGroup] block_launcher standing def=%s at=%.0f,%.0f block=%i",ldef->GetDef()->GetName(),
+                block.launcherSite.x,block.launcherSite.z,block.group);
+            return nullptr;
+        }
+        if(tacticalJob && !tacticalJob->IsDead()) return nullptr;
+        block.launcher=0;
+        if(++block.launcherTries>=4) {
+            block.launcher=2;
+            ai->LOG("[CommanderGroup] block_launcher given_up block=%i tries=%i",block.group,block.launcherTries);
+            return nullptr;
+        }
+    }
+    if(BlockArtilleryBuilt(block)<2) return nullptr;
+    if(!ldef) { block.launcher=2; ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i",block.group); return nullptr; }
+    auto* terrain=ai->GetTerrainManager();
+    auto* builder=ai->GetBuilderManager();
+    const float ls=float(std::max(ldef->GetDef()->GetXSize(),ldef->GetDef()->GetZSize()))*SQUARE_SIZE;
+    const float ax=block.axisX,az=block.axisZ,sx=-az,sz=ax;   // side = (-axis.z, axis.x)
+    const float sideOff=.5f*block.across+.5f*ls,backOff=.5f*block.along+.5f*ls;
+    const float dirs[3][2]={{sx,sz},{-sx,-sz},{-ax,-az}};
+    const float offs[3]={sideOff,sideOff,backOff};
+    for(int k=block.launcherTries;k<6;++k) {
+        const int d=k%3;
+        const float off=offs[d]+(k>=3?32.f:0.f);
+        AIFloat3 site(block.centre.x+dirs[d][0]*off,0.f,block.centre.z+dirs[d][1]*off);
+        if(!OnMap(site)) continue;
+        site.y=ai->GetMap()->GetElevationAt(site.x,site.z);
+        if(!terrain->CanBeBuiltAt(ldef,site) || !terrain->CanReachAtSafe(unit,site,unit->GetCircuitDef()->GetBuildDistance(),
+            unit->GetCircuitDef()->GetPower())) continue;
+        auto* task=builder->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,ldef,site,0.f,true,
+            int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC)));
+        if(!task) continue;
+        tacticalJob=task;
+        block.launcher=1; block.launcherSite=site; block.launcherTries=k;
+        ai->LOG("[CommanderGroup] block_launcher order def=%s at=%.0f,%.0f side=%s block=%i artillery=%s unit=%i team=%i",
+            ldef->GetDef()->GetName(),site.x,site.z,d==2?"back":(d==0?"left":"right"),block.group,def->GetDef()->GetName(),
+            unit->GetId(),ai->GetTeamId());
+        return task;
+    }
+    block.launcher=2;
+    ai->LOG("[CommanderGroup] block_launcher no_site def=%s block=%i at=%.0f,%.0f",ldef->GetDef()->GetName(),block.group,
+        block.centre.x,block.centre.z);
+    return nullptr;
 }
 
 } // namespace circuit

@@ -769,6 +769,11 @@ namespace RoleFront {
                 GenericHelpers::LogUtil("[FRONT] defaultTask is MEX/MEXUP/GEO/GEOUP/ENERGY; returning early", 3);
                 return defaultTask;
             }
+            // Owner (2026-11-13): native's T2 converter fill-in goes into tidy gap-free blocks (front_overflow.as)
+            if (dbt == Task::BuildType::CONVERT) {
+                IUnitTask@ tidy = FrontOverflow::TidyNative(builder, defaultBuilderTask);
+                if (tidy !is null) return tidy;
+            }
 
             // If the default task is a radar but we're low on stored energy (<90% of storage)
             // and recent energy income is also low (<200 over last 10 seconds), prefer building
@@ -958,6 +963,7 @@ namespace RoleFront {
 
     void Front_BuilderAiTaskAdded(IUnitTask@ task) {
         GenericHelpers::LogUtil("[Front_BuilderAiTaskAdded] called for task", 3);
+        FrontOverflow::NoteNative(task);   // owner 2026-11-13: native T2 converters into tidy blocks
     }
 
     void Front_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {

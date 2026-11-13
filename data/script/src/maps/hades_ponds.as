@@ -33,7 +33,7 @@ namespace HadesPonds {
 		StartSpot(AIFloat3(1164, 0, 5560), AiRole::FRONT, false), // P6  front
 		StartSpot(AIFloat3(1654, 0, 6503), AiRole::FRONT, false), // P7  front
 		StartSpot(AIFloat3(1006, 0, 6992), AiRole::FRONT, false), // P8  front
-		StartSpot(AIFloat3(7654, 0, 7522), AiRole::SUPPORT, false), // P9 SUPPORT (owner 2026-10-30: support spawn; was front)
+		StartSpot(AIFloat3(7654, 0, 7522), AiRole::FRONT, false), // P9 FRONT (owner 2026-11-13: back to front; was SUPPORT since 2026-10-30)
 		StartSpot(AIFloat3(6906, 0, 6836), AiRole::FRONT, false), // P10 front
 		StartSpot(AIFloat3(6856, 0, 5764), AiRole::FRONT, false), // P11 front
 		StartSpot(AIFloat3(7212, 0, 4828), AiRole::FRONT, false), // P12 front

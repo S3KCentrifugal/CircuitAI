@@ -301,7 +301,7 @@ namespace RoleSupport {
     }
 
     void Support_BuilderAiTaskRemoved(IUnitTask@ task, bool done) {
-
+        FrontOverflow::TaskRemoved(task, done);   // owner 2026-11-13: SUPPORT converter blocks
     }
 
     /******************************************************************************

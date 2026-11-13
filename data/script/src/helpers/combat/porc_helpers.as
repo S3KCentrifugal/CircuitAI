@@ -91,10 +91,11 @@ namespace PorcHelpers {
 	// 1250M). Different damage types, one role: a stockpiled ranged strike on a
 	// static target, which is what a defensive economic role can use and a Juno
 	// - whose only targets are radar, jammers, mines and scout spam - is not.
+	// Owner 2026-11-13: no Legion entry. Perditions are placed only by FRONT tactical (front_tactical.as), in
+	// range of enemy heavy turrets / heavy static artillery; a Legion SUPPORT keeps its Juno.
 	dictionary TacticalLaunchers = {
 		{"armada", "armemp"},
-		{"cortex", "cortron"},
-		{"legion", "legperdition"}
+		{"cortex", "cortron"}
 	};
 
 	// A side's entry from one of the tables above, or "" when the side is not
@@ -207,6 +208,27 @@ namespace PorcHelpers {
 		}
 		cfg.PorcChainHandler(side);
 		GenericHelpers::LogUtil("[Porc] " + side + ": chain set by role " + Global::AISettings::Role, 1);
+		StripFrontOnly(side);
+	}
+
+	// Owner 2026-11-13: Global::Porc::FrontTacticalOnly (Perdition) never comes from a porc chain, for any role:
+	// FRONT tactical places it in range of enemy heavy turrets / heavy static artillery. Hades Ponds: a Legion
+	// SUPPORT's chain (Juno swapped for a Perdition) built 6 on its mex clusters off a full metal bank at +61
+	// metal income. Run after every chain rewrite (ApplyForRole).
+	void StripFrontOnly(const string &in side)
+	{
+		const array<string>@ drop = Global::Porc::FrontTacticalOnly;
+		if (drop.length() == 0) return;
+		for (int w = 0; w < 2; ++w) {
+			array<string>@ chain = aiMilitaryMgr.GetPorcChain(side, w == 1);
+			if (chain is null) continue;
+			uint n = 0;
+			for (int i = int(chain.length()) - 1; i >= 0; --i)
+				if (drop.find(chain[i]) >= 0) { chain.removeAt(uint(i)); ++n; }
+			if (n == 0) continue;
+			aiMilitaryMgr.SetPorcChain(side, w == 1, chain);
+			GenericHelpers::LogUtil("[Porc] " + side + ": " + n + " FRONT-tactical-only entries removed from the " + (w == 1 ? "water" : "land") + " chain", 1);
+		}
 	}
 
 }  // namespace PorcHelpers
