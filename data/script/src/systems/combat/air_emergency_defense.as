@@ -76,6 +76,13 @@ namespace AirEmergencyDefense {
         int joined = 0, lost = 0, arrived = 0;
         float enemyStart = -1.0f, enemyPeak = 0.0f, enemyNow = 0.0f;
         bool finalDone = true;
+        // owner 2026-11-12: big attacks get groups, not a trickle. Units wait on
+        // `rally` (hold at a point toward home) and move to `task` together.
+        CRouteTask@ rally;
+        AIFloat3 rallyAt(-1.0f, 0.0f, -1.0f);
+        array<int> waiting;
+        int waitSince = -1;
+        int groups = 0;
     }
     // Report sampling (CheckOrphaned, every 30 frames, throttled to ReportSampleSeconds):
     // O(squads * (members + ground contacts)), only while a squad is reporting.
@@ -237,6 +244,7 @@ namespace AirEmergencyDefense {
         s.lastReport = ai.frame; s.joined = 0; s.lost = 0; s.arrived = 0;
         s.enemyStart = EnemyMetal(s.site); s.enemyPeak = s.enemyStart; s.enemyNow = s.enemyStart;
         s.finalDone = false;
+        s.groups = 0; s.rallyAt = AIFloat3(-1.0f, 0.0f, -1.0f);   // re-picked (and the rally re-routed) on the next big join
     }
 
     float EnemyMetal(const AIFloat3 &in site)
@@ -280,7 +288,7 @@ namespace AirEmergencyDefense {
             + ", first arrival " + (s.firstArrival < 0 ? "never" : ("+" + (s.firstArrival - s.startFrame) / SECOND + " s"))
             + ", joined " + s.joined + ", lost " + s.lost + ", alive " + s.members.length() + ", at spot " + s.arrived
             + ", enemy metal start " + int(s.enemyStart) + " peak " + int(s.enemyPeak) + " now " + int(s.enemyNow)
-            + ", cleared " + (cleared ? "yes" : "no"), 1);
+            + ", cleared " + (cleared ? "yes" : "no") + ", groups " + s.groups, 1);
     }
 
     // Team::CheckOrphaned (every 30 frames)
@@ -302,6 +310,7 @@ namespace AirEmergencyDefense {
             for (int k = int(s.members.length()) - 1; k >= 0; --k)
                 if (ai.GetTeamUnit(s.members[k]) is null) { memberOf.delete("" + s.members[k]); s.members.removeAt(k); ++s.lost; }
             Sample(s);
+            ReleaseGroup(s);
             if (s.endFrame >= 0 && ai.frame - s.endFrame >= ReportAfterSeconds * SECOND) { Final(s); continue; }
             if (s.endFrame < 0 && ai.frame - s.lastReport >= ReportEverySeconds * SECOND) {
                 s.lastReport = ai.frame;
@@ -320,7 +329,9 @@ namespace AirEmergencyDefense {
             if (s is null) continue;
             for (int k = int(s.members.length()) - 1; k >= 0; --k) {
                 CCircuitUnit@ u = ai.GetTeamUnit(s.members[k]);
-                if (u is null || u.task !is s.task) { memberOf.delete("" + s.members[k]); s.members.removeAt(k); }
+                if (u is null || (u.task !is s.task && (s.rally is null || u.task !is s.rally))) {
+                    memberOf.delete("" + s.members[k]); s.members.removeAt(k);
+                }
             }
         }
         // finished squads with nobody left go; over the cap, the oldest finished
@@ -329,6 +340,7 @@ namespace AirEmergencyDefense {
             Squad@ s = squads[i];
             if (s !is null && (!s.finalDone || !(s.patrolOnly && s.members.length() == 0))) continue;
             if (s !is null && s.task !is null && !s.task.IsDead()) s.task.Abort();
+            if (s !is null && s.rally !is null && !s.rally.IsDead()) s.rally.Abort();
             squads.removeAt(i);
         }
         for (uint i = 0; i < squads.length() && int(squads.length()) > Global::RoleSettings::Front::AirEmergencyDefenseMaxSquads; ) {
@@ -475,10 +487,83 @@ namespace AirEmergencyDefense {
             if (!s.finalDone) ++s.joined;
             memberOf.set(ukey, s.serial);
             u.SetFireState(2);
+            // a big attack: wait for the group at the rally point
+            const bool big = !s.patrolOnly && s.enemyPeak >= Global::RoleSettings::Front::AirEmergencyDefenseGroupMetal;
+            CRouteTask@ rally = big ? EnsureRally(s) : null;
+            if (rally !is null) {
+                if (s.waiting.length() == 0) s.waitSince = ai.frame;
+                s.waiting.insertLast(u.id);
+            }
             GenericHelpers::LogUtil("[FRONT][AirEmergency] squad " + s.serial + ": " + u.circuitDef.GetName() + " " + u.id
-                + " joins (" + s.members.length() + ")" + (s.patrolOnly ? ", emergency over: straight to patrol" : ""), 1);
+                + " joins (" + s.members.length() + ")" + (s.patrolOnly ? ", emergency over: straight to patrol"
+                : (rally !is null ? ", big attack (" + int(s.enemyPeak) + " metal): waits at the rally, " + s.waiting.length() + " waiting" : "")), 1);
+        }
+        if (s.waiting.find(u.id) >= 0) {
+            CRouteTask@ rally = EnsureRally(s);
+            if (rally !is null) return rally;
+            s.waiting.removeAt(s.waiting.find(u.id));
         }
         return task;
+    }
+
+    // The rally point: GroupRally short of the spot toward this FRONT's start (at most 60% of the way).
+    CRouteTask@ EnsureRally(Squad@ s)
+    {
+        if (s is null) return null;
+        if (s.rallyAt.x < 0.0f) {
+            const AIFloat3 home = Global::Map::StartPos;
+            const float d = sqrt(MapHelpers::SqDist(s.site, home));
+            const float a = AiMin(Global::RoleSettings::Front::AirEmergencyDefenseGroupRally, d * 0.6f);
+            AIFloat3 p = s.site;
+            if (d > 1.0f) { p.x += (home.x - s.site.x) / d * a; p.z += (home.z - s.site.z) / d * a; }
+            p.x = AiMax(64.0f, AiMin(float(AiTerrainWidth()) - 64.0f, p.x));
+            p.z = AiMax(64.0f, AiMin(float(AiTerrainHeight()) - 64.0f, p.z));
+            s.rallyAt = p;
+            if (s.rally !is null && !s.rally.IsDead()) { array<AIFloat3> pts = {p}; s.rally.SetRoute(pts); }
+        }
+        if (s.rally !is null && !s.rally.IsDead()) return s.rally;
+        @s.rally = cast<CRouteTask>(cast<IFighterTask>(aiMilitaryMgr.Enqueue(TaskF::Route())));
+        if (s.rally is null) return null;
+        s.rally.SetTraversal(false, 96.0f, false);
+        s.rally.SetLanes(5, 80.0f, 1.0f);
+        array<AIFloat3> pts = {s.rallyAt};
+        s.rally.SetRoute(pts);
+        return s.rally;
+    }
+
+    // Tick: send the waiting group in once it is assembled and strong enough,
+    // after GroupMaxWaitSeconds, or when the emergency is over.
+    void ReleaseGroup(Squad@ s)
+    {
+        if (s is null || s.waiting.length() == 0) return;
+        int assembled = 0;
+        float metal = 0.0f;
+        const float r = Global::RoleSettings::Front::AirEmergencyDefenseGroupRadius;
+        for (int k = int(s.waiting.length()) - 1; k >= 0; --k) {
+            CCircuitUnit@ u = ai.GetTeamUnit(s.waiting[k]);
+            if (u is null || s.rally is null || u.task !is s.rally) { s.waiting.removeAt(k); continue; }
+            if (MapHelpers::SqDist(u.GetPos(ai.frame), s.rallyAt) <= r * r) { ++assembled; metal += u.circuitDef.costM; }
+        }
+        if (s.waiting.length() == 0) { s.waitSince = -1; return; }
+        const int age = ai.frame - s.waitSince;
+        string why = "";
+        if (s.patrolOnly) why = "emergency over";
+        else if (age >= AiMax(1, Global::RoleSettings::Front::AirEmergencyDefenseGroupMaxWaitSeconds) * SECOND) why = "deadline";
+        else if (assembled >= Global::RoleSettings::Front::AirEmergencyDefenseGroupMin
+            && metal >= Global::RoleSettings::Front::AirEmergencyDefenseGroupCostRatio * s.enemyNow) why = "assembled";
+        if (why == "") return;
+        CRouteTask@ task = EnsureTask(s);
+        if (task is null) return;
+        int sent = 0;
+        for (uint k = 0; k < s.waiting.length(); ++k) {
+            CCircuitUnit@ u = ai.GetTeamUnit(s.waiting[k]);
+            if (u !is null && aiMilitaryMgr.TransferUnit(u, task)) ++sent;
+        }
+        s.waiting.resize(0); s.waitSince = -1;
+        if (sent > 0) ++s.groups;
+        GenericHelpers::LogUtil("[FRONT][AirEmergency] squad " + s.serial + ": group " + s.groups + " of " + sent
+            + " goes in (" + assembled + " at the rally, " + int(metal) + " metal vs enemy " + int(s.enemyNow)
+            + ", waited " + age / SECOND + " s, " + why + ")", 1);
     }
 
     void UnitRemoved(CCircuitUnit@ u)
@@ -492,5 +577,7 @@ namespace AirEmergencyDefense {
         if (s is null) return;
         const int k = s.members.find(u.id);
         if (k >= 0) { s.members.removeAt(k); if (!s.finalDone) ++s.lost; }
+        const int w = s.waiting.find(u.id);
+        if (w >= 0) s.waiting.removeAt(w);
     }
 }

@@ -721,6 +721,18 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             float AirEmergencyDefenseSquadMerge = 1200.0f;      // a later emergency this near an old squad reuses it
             float AirEmergencyDefenseApproach = 300.0f;         // the move point, this far from the spot toward home
             int AirEmergencyDefenseMaxSquads = 12;
+            // Big attacks (owner, 2026-11-12): while the enemy ground metal near the spot has peaked at
+            // AirEmergencyDefenseGroupMetal or more, new units hold at a rally point AirEmergencyDefenseGroupRally
+            // short of the spot (toward this FRONT's start) and go in as one group once
+            // AirEmergencyDefenseGroupMin of them stand within AirEmergencyDefenseGroupRadius of it and their
+            // metal is AirEmergencyDefenseGroupCostRatio x the enemy metal there now; after
+            // AirEmergencyDefenseGroupMaxWaitSeconds, or when the emergency ends, everyone waiting goes.
+            float AirEmergencyDefenseGroupMetal = 500.0f;
+            int AirEmergencyDefenseGroupMin = 5;
+            float AirEmergencyDefenseGroupCostRatio = 0.5f;
+            int AirEmergencyDefenseGroupMaxWaitSeconds = 45;
+            float AirEmergencyDefenseGroupRally = 1000.0f;
+            float AirEmergencyDefenseGroupRadius = 350.0f;
             // Grunt, Pawn, Blitz, Incisor, Phobos, Alaris, Fiend, Tiger, Bull, Gunslinger, Sprinter, Banisher,
             // Welder, Hoplite, Gladiator. Each lab makes the ones it can build, in turn.
             array<string> AirEmergencyDefenseUnits = { "corak", "armpw", "armflash", "corgator", "legcen", "leghades",
