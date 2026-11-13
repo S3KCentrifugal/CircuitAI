@@ -861,6 +861,7 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.minGroup = std::max(1, snipeArtyCfg.get("min_group", 3).asInt());
 		artySnipeInfo.closeMinRange = std::max(0.f, snipeArtyCfg.get("close_in_min_range", 1290.f).asFloat());
 		artySnipeInfo.groupSettleFrames = seconds("group_settle_seconds", 10.f);
+		artySnipeInfo.groupGoFrames = seconds("group_go_seconds", 30.f);
 		artySnipeInfo.doubleHeavyOverlap = utils::clamp(snipeArtyCfg.get("double_heavy_overlap", 0.5f).asFloat(), 0.f, 1.f);
 		artySnipeInfo.recruitRadius = std::max(0.f, snipeArtyCfg.get("recruit_radius", 500.f).asFloat());
 		artySnipeInfo.isEnabled = !artySnipeInfo.defs.empty()

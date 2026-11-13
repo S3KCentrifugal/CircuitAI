@@ -593,6 +593,11 @@ public:
 		// reach is beyond their snipe spot (0: everyone closes in).
 		float closeMinRange = 1290.f;
 		int groupSettleFrames = 10 * 30;
+		// Smolders 2026-11-13: 11 Boreas stood 5+ min at a Toaster's hold point
+		// because two members had a far-side hold spot and never arrived, and
+		// recruits kept joining. With min_group (3 for double heavy) gathered and
+		// settled this long after the group's first arrival, go without the rest.
+		int groupGoFrames = 30 * 30;
 		// Owner 2026-11-03 20:53Z: double heavy = the aimed heavy's weapon-range
 		// half-disc (facing the group's hold point) and another heavy's share
 		// more than this fraction of the smaller one; then go in only with 3+.
@@ -661,6 +666,7 @@ public:
 		int dhLoggedFor = -1;   // threat whose double-heavy share was last logged
 		bool atHold = false;    // stage 2: waiting at the gathering spot
 		int holdSince = -1;
+		int gatherStart = -1;   // stage 2: first arrival at the hold for this threat (not reset by leaving it)
 		bool hasSnipeSpot = false;  // stage 2: a checked snipe spot (outside other threats, safe walk)
 		springai::AIFloat3 snipeSpot;
 		int spotFor = -1;            // stage 2: threat the snipe / hold spots were chosen for

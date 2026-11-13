@@ -582,6 +582,7 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 		rs.syncWait = go;
 		rs.atHold = false;
 		rs.holdSince = -1;
+		rs.gatherStart = -1;
 		rs.hitFrame = -1;
 		rs.hasSnipeSpot = false;
 		rs.spotFor = -1;
@@ -1825,6 +1826,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		st.go = false;
 		st.atHold = false;
 		st.holdSince = -1;
+		st.gatherStart = -1;
 		st.hasSnipeSpot = false;
 		st.spotFor = -1;
 		st.holding = false;
@@ -2260,12 +2262,14 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			}
 			if (st.holdSince < 0) {
 				st.holdSince = frame;
+				if (st.gatherStart < 0) st.gatherStart = frame;
 				circuit->LOG("SNIPE: %s %i gathers %.0f from %s %i", cdef->GetDef()->GetName(), unit->GetId(),
 						d, SnipeName(threat), st.threat);
 			}
 			int members = 0, gathered = 0, going = 0;
 			int firstGo = std::numeric_limits<int>::max();  // when the group already going in left
 			int settledSince = st.holdSince;  // when the last gatherer arrived
+			int groupStart = st.gatherStart;  // first arrival of any gathered member
 			for (const auto& kv : military->GetArtySnipeStates()) {
 				const CMilitaryManager::SArtySnipeState& o = kv.second;
 				if ((o.threat != st.threat) || (o.stage == 0) || (frame - o.lastCall > FRAMES_PER_SEC * 10)) continue;
@@ -2276,6 +2280,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				} else if ((o.stage == 2) && o.atHold) {
 					++gathered;
 					settledSince = std::max(settledSince, o.holdSince);
+					if (o.gatherStart >= 0) groupStart = std::min(groupStart, o.gatherStart);
 				}
 			}
 			// Test round 3: min_group of gathered+going let part of the group in
@@ -2285,7 +2290,12 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const int need = std::min(info.minGroup, members);
 			const bool allGathered = (gathered >= members);
 			const bool settled = (frame - settledSince >= info.groupSettleFrames);
-			const bool waitOver = (frame - st.holdSince >= info.groupWaitFrames);
+			// Smolders 2026-11-13: holdSince restarts after every spam retreat, so
+			// the give-up clock never ran out; count from the first arrival.
+			const bool waitOver = (frame - st.gatherStart >= info.groupWaitFrames);
+			// Members that never reach the hold (a far-side spot, fresh recruits)
+			// no longer hold back a gathered quorum past group_go_seconds.
+			const bool quorumWait = (frame - groupStart >= info.groupGoFrames);
 			// Double heavy (port of the cluster-branch 5e482338 rule): at least 3
 			// gathered, the whole gathered group goes in together (they join within
 			// 5 s of the first leaving); no lone or late single; fewer than 3 after
@@ -2294,8 +2304,9 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const bool groupLeaving = (going > 0) && (frame - firstGo <= FRAMES_PER_SEC * 5)
 				&& (gathered + going >= doubleMin);
 			const bool go = doubleHeavy
-				? (groupLeaving || ((gathered >= doubleMin) && ((allGathered && settled) || waitOver)))
-				: ((going > 0) || (allGathered && (settled || members == 1)) || (waitOver && (gathered >= need)));
+				? (groupLeaving || ((gathered >= doubleMin) && (((allGathered || quorumWait) && settled) || waitOver)))
+				: ((going > 0) || (allGathered && (settled || members == 1)) || (quorumWait && settled && (gathered >= need))
+					|| (waitOver && (gathered >= need)));
 			if (!go) {
 				if (waitOver) {
 					return finish(doubleHeavy ? "double heavy, fewer than 3 gathered" : "too few gathered to go in");

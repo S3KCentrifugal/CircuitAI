@@ -397,6 +397,7 @@
 			"close_in_min_range": 1290,   // owner option 2026-11-03: below this range (Thanatos 1200, Arbiter 1210) prep porc
 			                              // only, no close-in on a threat that outranges the snipe spot
 			"group_settle_seconds": 10,
+			"group_go_seconds": 30,       // 2026-11-13: min_group gathered and settled this long after the first arrival go in without members still walking
 			"stage_max_seconds": 60       // a target or stage with no volley this long is given up
 		},
 		// read of "escort":  [number of builders with defenders, number of defenders for each builder, timeframe were only escorted builders are able to expand (=build mex, porc)]
