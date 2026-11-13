@@ -142,6 +142,9 @@ namespace Factory {
             // owner, 2026-11-12: an allied AIR's base emergency near us: fast defense first
             IUnitTask@ emergency=AirEmergencyDefense::FactoryMakeTask(u);
             if(emergency !is null) return emergency;
+            // owner, 2026-11-13: the first T2 factory builds the dedicated mex upgraders first
+            IUnitTask@ mexUp=EarlyMexUpgraders::FactoryMakeTask(u);
+            if(mexUp !is null) return mexUp;
             // owner, 2026-11-13: a Cortex FRONT owes a Legion FRONT a T2 constructor for its Catalysts
             IUnitTask@ trade=Team::CatalystTrade::FactoryMakeTask(u);
             if(trade !is null) return trade;
@@ -154,6 +157,11 @@ namespace Factory {
 		IUnitTask@ recovery = Team::Recovery::FactoryMakeTask(u);
 		if (recovery !is null) return recovery;
 		if (SeaFactories::Hold(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(true, SECOND));
+		// owner, 2026-11-13: the first T2 factory builds the dedicated mex upgraders first (FRONT: above)
+		if (Global::AISettings::Role != AiRole::FRONT) {
+			IUnitTask@ mexUp = EarlyMexUpgraders::FactoryMakeTask(u);
+			if (mexUp !is null) return mexUp;
+		}
 		// owner, 2026-10-27: spam-lane turrets repair the lane
 		IUnitTask@ anti = AntiSpam::FactoryMakeTask(u);
 		if (anti !is null) return anti;

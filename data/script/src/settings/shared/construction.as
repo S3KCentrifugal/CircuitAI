@@ -43,6 +43,16 @@ namespace RoleSettings {
         bool MexUpgradeFirst = true;
         float MexUpgradeRadius = 2500.0f;
         int MexUpgradeMaxConcurrent = 1;
+        // Early T2 mex upgraders (owner, 2026-11-13; systems/construction/early_mex_upgraders.as):
+        // the first T2 factory builds 1 dedicated T2 constructor (Max once SecondAt or more owned T1
+        // mexes are open) that only upgrades/assists upgrades of our T1 mexes until none is left safe
+        // to upgrade for ReleaseSeconds. LogSeconds: the "[MexUpT2] status" line (also when off).
+        bool EarlyMexUpgraders = true;
+        int EarlyMexUpgradersMax = 2;
+        int EarlyMexUpgradersSecondAt = 6;
+        int EarlyMexUpgradersReleaseSeconds = 60;
+        int EarlyMexUpgradersExtraRecruits = 2;   // factory orders past Max when another program takes one
+        int EarlyMexUpgradersLogSeconds = 60;
 
        
 

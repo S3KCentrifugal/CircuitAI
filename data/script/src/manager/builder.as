@@ -21,6 +21,7 @@
 #include "../systems/team/sea_assist.as"
 #include "../systems/construction/idle_reclaim.as"
 #include "../systems/construction/lolcannon.as"
+#include "../systems/construction/early_mex_upgraders.as"
 #include "../systems/construction/lrpc_block.as"
 
 namespace Builder {
@@ -2002,6 +2003,14 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+		// owner, 2026-11-13: the dedicated T2 mex upgraders work only on our T1 mexes (early_mex_upgraders.as)
+		EarlyMexUpgraders::Tick();
+		{
+			bool keepUp = false;
+			IUnitTask@ up = EarlyMexUpgraders::Work(u, keepUp);
+			if (keepUp) return null;
+			if (up !is null) return up;
+		}
         IUnitTask@ foundry = TechAirFoundry::Work(u);
         if (foundry !is null) return foundry;
         ForwardGeo::Update(); // D-488: judges the vents once; withdraws them on a role change
@@ -2874,6 +2883,7 @@ namespace Builder {
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site
 		LolCannon::UnitRemoved(unit);
 		LrpcBlock::UnitRemoved(unit);
+		EarlyMexUpgraders::UnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
         CommanderGroup::OnRemoved(unit);
 
