@@ -1647,6 +1647,9 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	std::vector<const SEnemyData*> candidateDatas;
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	if (WatchBlasts(unit, maxSqRange)) {
+		tierRotation.topId = -1;  // a new likely kill: the rotation restarts at the top (TopChanged)
+	}
 	const int canTargetCat = cdef->GetTargetCategory();
 	tier::Candidate best{-1, 0, 0.f, 0.f};
 	const SEnemyData* bestData = nullptr;
@@ -1657,7 +1660,12 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 				continue;
 			}
 			const auto it = tierByDef.find(e.cdef->GetId());
-			if ((it == tierByDef.end()) || (!byArea && (bestData != nullptr) && (it->second > best.tier))) {
+			if (it == tierByDef.end()) {
+				continue;
+			}
+			const bool likelyKilled = !tierLikelyKilled.empty() && (tierLikelyKilled.count(e.id) > 0);
+			const int tierOf = it->second + (likelyKilled ? std::max(0, tierBlastPenalty) : 0);
+			if (!byArea && (bestData != nullptr) && (tierOf > best.tier)) {
 				continue;
 			}
 			if (((canTargetCat & e.cdef->GetCategory()) == 0) || (e.cdef->IsMobile() && !e.IsInRadarOrLOS())) {
@@ -1667,7 +1675,10 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 			if (sqDist >= maxSqRange) {
 				continue;
 			}
-			const tier::Candidate c{e.id, it->second, e.cost, sqDist, e.pos.x, e.pos.z};
+			tier::Candidate c{e.id, it->second, e.cost, sqDist, e.pos.x, e.pos.z};
+			if (likelyKilled) {
+				c = tier::Downranked(c, tierBlastPenalty);
+			}
 			if (byArea) {
 				candidates.push_back(c);
 				candidateDatas.push_back(&e);
@@ -1733,6 +1744,180 @@ void CSuperTask::SetTierRotation(int areas, int dwellFrames, int dwellShots, flo
 	tier::Restart(tierRotation, manager->GetCircuit()->GetLastFrame());
 }
 
+void CSuperTask::SetTierBlastWatch(float minRadius, float drop, int minPoints, int penalty)
+{
+	tierBlastMinRadius = minRadius;
+	tierBlastDrop = std::max(0.1f, drop);
+	tierBlastPoints = std::clamp(minPoints, 1, tier::BLAST_RING_POINTS);
+	tierBlastPenalty = std::max(0, penalty);
+	if (tierBlastMinRadius <= 0.f) {
+		tierRings.clear();
+		tierLikelyKilled.clear();
+	}
+}
+
+void CSuperTask::SampleRing(SGroundRing& r) const
+{
+	CMap* map = manager->GetCircuit()->GetMap();
+	constexpr float STEP = 2.f * 3.14159265f / float(tier::BLAST_RING_POINTS);
+	for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) {
+		const float a = STEP * float(i);
+		r.h[i] = map->GetElevationAt(r.x + std::cos(a) * r.radius, r.z + std::sin(a) * r.radius);
+	}
+	r.frame = manager->GetCircuit()->GetLastFrame();
+}
+
+/*
+ * Likely killed (owner 2026-11-12; TierTargeting.h). Run before each roster
+ * scan. Roster structures with a big death blast within range + 800: in radar
+ * or LOS the ring round each is read (at most every 10 s) and any mark is
+ * cleared; out of sight the ring is read again, and a sunk ring marks the
+ * structure, plus every roster structure out of sight that its death blast
+ * (DeathBlastOf, AreaDamage) would kill. O(roster structures in reach); 8
+ * height reads per ring.
+ */
+bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
+{
+	if (tierBlastMinRadius <= 0.f) {
+		return false;
+	}
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	const char* gunName = unit->GetCircuitDef()->GetDef()->GetName();
+	struct SBlast { AIFloat3 pos; SDeathBlast b; int id; };
+	std::vector<SBlast> blasts;
+	// A watched structure that left the roster (its wreck seen, or the engine
+	// told us) over a sunk ring died in its own blast: whatever that blast
+	// killed out of sight stays an image unless it is marked (headless
+	// 2026-11-12: the advanced fusion's image went, the fusion and LLT beside
+	// it stayed). A ring that did not sink (reclaimed, say) marks nothing.
+	for (auto it = tierRings.begin(); it != tierRings.end();) {
+		if (circuit->GetEnemyInfo(it->first) != nullptr) {
+			++it;
+			continue;
+		}
+		SGroundRing now = it->second;
+		SampleRing(now);
+		const int sunk = tier::SunkPoints(it->second.h, now.h, tier::BLAST_RING_POINTS, tierBlastDrop);
+		if ((it->second.cdef != nullptr) && (sunk >= tierBlastPoints)) {
+			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) gone from the roster over its own crater (%i of %i ground points %.0f round it sank %.1f+ elmos): its death blast marks what it killed out of sight",
+					circuit->GetTeamId(), frame, gunName, unit->GetId(), it->second.cdef->GetDef()->GetName(), it->first,
+					int(it->second.x), int(it->second.z), sunk, tier::BLAST_RING_POINTS, it->second.radius, tierBlastDrop);
+			blasts.push_back({AIFloat3(it->second.x, 0.f, it->second.z), DeathBlastOf(it->second.cdef), it->first});
+		}
+		it = tierRings.erase(it);
+	}
+	for (auto it = tierLikelyKilled.begin(); it != tierLikelyKilled.end();) {
+		if (circuit->GetEnemyInfo(it->first) == nullptr) it = tierLikelyKilled.erase(it); else ++it;
+	}
+	const float reach = std::sqrt(maxSqRange) + 800.f;
+	const float sqReach = reach * reach;
+	const auto* enemies = circuit->GetEnemyManager();
+	auto onRoster = [this, &sqReach](const SEnemyData& e) {
+		return !(e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore() || (e.cdef == nullptr) || e.cdef->IsMobile())
+			&& (tierByDef.find(e.cdef->GetId()) != tierByDef.end())
+			&& (position.SqDistance2D(e.pos) < sqReach);
+	};
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
+		for (const SEnemyData& e : *pool) {
+			if (!onRoster(e)) {
+				continue;
+			}
+			if (e.IsInRadarOrLOS()) {
+				const auto mit = tierLikelyKilled.find(e.id);
+				if (mit != tierLikelyKilled.end()) {
+					circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) seen again %i s after it was marked likely killed; back on its tier",
+							circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
+							int(e.pos.x), int(e.pos.z), (frame - mit->second) / FRAMES_PER_SEC);
+					tierLikelyKilled.erase(mit);
+				}
+				auto rr = tierRingRadius.find(e.cdef);
+				if (rr == tierRingRadius.end()) {
+					const SDeathBlast b = DeathBlastOf(e.cdef);
+					float ring = 0.f;
+					if ((b.damage > 0.f) && (b.radius >= tierBlastMinRadius)) {
+						UnitDef* ud = e.cdef->GetDef();
+						const float hx = ud->GetXSize() * SQUARE_SIZE * 0.5f, hz = ud->GetZSize() * SQUARE_SIZE * 0.5f;
+						ring = tier::BlastRingRadius(b.radius, std::sqrt(hx * hx + hz * hz));
+					}
+					rr = tierRingRadius.emplace(e.cdef, ring).first;
+				}
+				if (rr->second <= 0.f) {
+					continue;
+				}
+				SGroundRing& r = tierRings[e.id];
+				if ((r.frame >= 0) && (frame - r.frame < FRAMES_PER_SEC * 10) && (r.x == e.pos.x) && (r.z == e.pos.z)) {
+					continue;
+				}
+				r.x = e.pos.x;
+				r.z = e.pos.z;
+				r.radius = rr->second;
+				r.cdef = e.cdef;
+				r.sunk = 0;
+				SampleRing(r);
+				continue;
+			}
+			if (tierLikelyKilled.count(e.id) > 0) {
+				continue;
+			}
+			const auto rit = tierRings.find(e.id);
+			if (rit == tierRings.end()) {
+				continue;
+			}
+			SGroundRing now = rit->second;
+			SampleRing(now);
+			const int sunk = tier::SunkPoints(rit->second.h, now.h, tier::BLAST_RING_POINTS, tierBlastDrop);
+			if (sunk < tierBlastPoints) {
+				if (sunk != rit->second.sunk) {  // a partial sink, logged when it changes (shells, a far blast)
+					rit->second.sunk = sunk;
+					circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) out of sight: %i of %i ground points sank %.1f+ elmos (%i needed)",
+							circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
+							sunk, tier::BLAST_RING_POINTS, tierBlastDrop, tierBlastPoints);
+				}
+				continue;
+			}
+			float deepest = 0.f;
+			for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) deepest = std::max(deepest, rit->second.h[i] - now.h[i]);
+			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) likely killed: %i of %i ground points %.0f round it sank %.1f+ elmos (deepest %.1f) out of sight; down %i tiers until radar or LOS shows it",
+					circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
+					sunk, tier::BLAST_RING_POINTS, rit->second.radius, tierBlastDrop, deepest, tierBlastPenalty);
+			tierLikelyKilled[e.id] = frame;
+			blasts.push_back({e.pos, DeathBlastOf(e.cdef), e.id});
+			tierRings.erase(rit);
+		}
+	}
+	if (blasts.empty()) {
+		return false;
+	}
+	// what those blasts would have killed with them
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
+		for (const SEnemyData& e : *pool) {
+			if (!onRoster(e) || e.IsInRadarOrLOS() || (tierLikelyKilled.count(e.id) > 0)
+				|| (circuit->GetEnemyInfo(e.id) == nullptr))  // the blast's own entry, gone but not yet swept from the pool
+			{
+				continue;
+			}
+			const float health = e.cdef->GetHealth();
+			for (const SBlast& s : blasts) {
+				const float dist = std::sqrt(s.pos.SqDistance2D(e.pos));
+				const float dmg = AreaDamage(s.b.damage, s.b.radius, s.b.edge, dist);
+				if ((health <= 0.f) || (dmg < health)) {
+					continue;
+				}
+				circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) likely killed with it: %.0f from the blast of %i (%.0f away) >= %.0f health",
+						circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
+						dmg, s.id, dist, health);
+				tierLikelyKilled[e.id] = frame;
+				tierRings.erase(e.id);
+				break;
+			}
+		}
+	}
+	tierBlastPos = blasts.back().pos;
+	++tierBlastSerial;
+	return true;
+}
+
 AIFloat3 CSuperTask::GetTierAreaPos(int i) const
 {
 	if (!ValidArea(i)) return -RgtVector;
@@ -1749,6 +1934,15 @@ int CSuperTask::PickTierArea(CCircuitUnit* unit, const std::vector<tier::Candida
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	tierAreas = tier::BuildAreas(candidates, tierAreaRadius, tierTargetId, size_t(tierAreaMax));
+	if (!tierLikelyKilled.empty()) {
+		// Likely killed (owner 2026-11-12): an area seeded by a likely-killed
+		// image holds nothing better; while a live area is left the rotation
+		// skips it (headless: the gun dwelt 30 s on each dead image in turn).
+		const auto dead = [this, &candidates](const tier::Area& a) { return tierLikelyKilled.count(candidates[a.aim].id) > 0; };
+		if (!std::all_of(tierAreas.begin(), tierAreas.end(), dead)) {
+			tierAreas.erase(std::remove_if(tierAreas.begin(), tierAreas.end(), dead), tierAreas.end());
+		}
+	}
 	tierAreaTargets.clear();
 	for (const tier::Area& a : tierAreas) tierAreaTargets.push_back(candidates[a.aim].id);
 	tierSeenNow.clear();

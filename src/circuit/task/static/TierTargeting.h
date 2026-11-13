@@ -93,6 +93,59 @@ inline std::vector<Area> BuildAreas(const std::vector<Candidate>& cs, float radi
 }
 
 /*
+ * Likely killed (owner 2026-11-12): a lolcannon keeps firing at the last-seen
+ * image of a structure in the fog after its shell killed it. A big death blast
+ * (fusion, advanced fusion, advanced geothermal) digs a crater the AI can read
+ * in the synced heightmap, so the ground round a big-blast roster structure is
+ * watched: its height at BLAST_RING_POINTS points on a ring just outside the
+ * footprint, kept while the structure is known alive (in radar or LOS). Out of
+ * sight, a ring where at least `minPoints` points sank by `drop` elmos or more
+ * is a blast. The engine leaves the ground under a standing building alone, so
+ * only the ring counts. The cannon shells themselves dig little (crater
+ * strength ~ (radius x 0.1)^0.6, about a tenth of an advanced fusion's) and
+ * only inside their own small bowl, so one shell cannot sink a whole ring.
+ * Engine crater (BasicMapDamage): a bowl to about 0.55 of the blast radius,
+ * a raised lip beyond it, so the ring sits at 0.3 of the radius, at least
+ * `footprint + margin`, at most 0.45 of the radius; a blast too small to put
+ * the ring outside the footprint is not watched.
+ */
+constexpr int BLAST_RING_POINTS = 8;
+
+// The ring radius for a death blast of `blastRadius` round a footprint of half
+// diagonal `footHalfDiag`; 0 when the bowl would not reach past the footprint.
+inline float BlastRingRadius(float blastRadius, float footHalfDiag, float margin = 24.f)
+{
+	const float lo = footHalfDiag + margin, hi = blastRadius * 0.45f;
+	if ((blastRadius <= 0.f) || (lo > hi)) return 0.f;
+	return std::min(hi, std::max(lo, blastRadius * 0.3f));
+}
+
+// How many ring points sank by `drop` or more from `before` to `now`.
+inline int SunkPoints(const float* before, const float* now, int n, float drop)
+{
+	int sunk = 0;
+	for (int i = 0; i < n; ++i) {
+		if (before[i] - now[i] >= drop) ++sunk;
+	}
+	return sunk;
+}
+
+// A blast at the ring: enough points sank.
+inline bool RingBlasted(const float* before, const float* now, int n, float drop, int minPoints)
+{
+	return SunkPoints(before, now, n, drop) >= std::max(1, minPoints);
+}
+
+// A likely-killed target falls `penalty` tiers (below every live tier of the
+// roster, 1-6) and adds no metal to its area, until it is seen again.
+inline Candidate Downranked(Candidate c, int penalty)
+{
+	c.tier += std::max(0, penalty);
+	c.cost = 0.f;
+	return c;
+}
+
+/*
  * The rotation through the areas (owner 2026-10-27), like the nuke silo's
  * no-repeat: Ragnarok and Calamity dwell on an area for a time, Starfall for a
  * number of shots, then the next area down, and from the last back to the top.

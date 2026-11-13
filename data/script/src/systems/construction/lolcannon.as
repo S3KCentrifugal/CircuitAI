@@ -130,6 +130,14 @@ this program (owner, 2026-10-26):
           to the top. Scouting that changes the top area (its best target
           gone, or a better one found) sends the gun back to the top at once
           (CSuperTask::SetTierRotation; TierTargeting.h).
+          Likely killed (owner 2026-11-12): a fusion, advanced fusion or
+          advanced geo on the roster that is out of sight is watched on a ring
+          of ground just outside its footprint; when its own death crater
+          sinks that ring (BlastMinPoints of 8 points by BlastDropElmos) it is
+          marked likely killed, with every roster structure out of sight its
+          death blast would kill, and they fall BlastTierPenalty tiers (metal
+          0) until radar or LOS shows them again. Each new blast sends a scout
+          package there (ScoutAreas). CSuperTask::SetTierBlastWatch.
   scouts  the first strike asks the allied AIR for ReconT1Scouts (10) T1
           scouts and ReconRadarScouts (3) radar planes at the strike, spread
           over ReconSpread (600) round it and on to the far map edge; every
@@ -1836,6 +1844,8 @@ namespace LolCannon {
             st.SetTierRotation(Global::LolCannon::StarfallAreas, SECOND, Global::LolCannon::StarfallShotsPerArea, Global::LolCannon::AreaRadius);
         else
             st.SetTierRotation(Global::LolCannon::GunAreas, Global::LolCannon::GunAreaSeconds * SECOND, 0, Global::LolCannon::AreaRadius);
+        st.SetTierBlastWatch(Global::LolCannon::BlastMinRadius, Global::LolCannon::BlastDropElmos,
+            Global::LolCannon::BlastMinPoints, Global::LolCannon::BlastTierPenalty);
         u.SetFireState(Global::LolCannon::FireState);   // owner 2026-10-26: fire at will; the tiered orders pick the target when one is in range
         GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " fires at " + st.GetTierCount()
             + " roster defs, best tier first; fire state " + Global::LolCannon::FireState, 1);
@@ -2644,6 +2654,7 @@ namespace LolCannon {
     // strike and whenever a re-scout is due and no cannon knows a target.
     // O(done sites) a second.
     int blindSince = -1;
+    dictionary blastScouted;          // cannon id -> the last blast serial scouted
     void ScoutAreas()
     {
         if (Global::LolCannon::ReScoutSeconds <= 0) return;
@@ -2651,6 +2662,24 @@ namespace LolCannon {
         if (nextScout >= 0 && !due && ai.frame - lastScoutFrame < Global::LolCannon::ReScoutMinSeconds * SECOND) return;
         CCircuitDef@ gun = Gun();
         if (gun is null) return;
+        // likely killed (owner 2026-11-12): a new death blast read from the ground at
+        // a roster target out of sight; the scouts confirm it (seen again: back on its
+        // tier) or clear its image from the roster
+        for (uint i = 0; i < doneSites.length(); ++i) {
+            CCircuitUnit@ g = aiBuilderMgr.FindOwnNear(doneSites[i], 96.0f, gun);
+            CSuperTask@ st = (g is null || g.task is null) ? null : cast<CSuperTask>(g.task);
+            if (st is null) continue;
+            const int serial = st.GetTierBlastSerial();
+            int64 seen = 0;
+            if (!blastScouted.get(Key(g.id), seen)) seen = 0;
+            if (serial <= int(seen)) continue;
+            blastScouted.set(Key(g.id), int64(serial));
+            const AIFloat3 at = st.GetTierBlastPos();
+            if (at.x < 0.0f) continue;
+            LogAreas(g, st, "likely kill: " + st.GetTierLikelyKilledCount() + " roster target(s) marked");
+            SendScouts(at, "a likely-killed target's death blast");
+            return;
+        }
         int blind = -1;
         for (uint i = 0; i < doneSites.length(); ++i) {
             CCircuitUnit@ g = aiBuilderMgr.FindOwnNear(doneSites[i], 96.0f, gun);

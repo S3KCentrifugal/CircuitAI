@@ -63,6 +63,16 @@ public:
 	int GetTierAreaTier(int i) const { return ValidArea(i) ? tierAreas[i].tier : -1; }
 	float GetTierAreaMetal(int i) const { return ValidArea(i) ? tierAreas[i].metal : 0.f; }
 	int GetTierAreaTargetId(int i) const { return ValidArea(i) ? tierAreaTargets[i] : -1; }
+	// Likely killed (owner 2026-11-12, TierTargeting.h BlastRingRadius): a
+	// roster structure out of sight whose ground shows a big death blast (death
+	// blast radius >= minRadius; ring points sunk >= drop, at least minPoints of
+	// 8), and every roster structure that blast would kill, falls `penalty`
+	// tiers until radar or LOS shows it again. minRadius <= 0: off.
+	void SetTierBlastWatch(float minRadius, float drop, int minPoints, int penalty);
+	// Each new blast found bumps the serial; the script scouts its position.
+	int GetTierBlastSerial() const { return tierBlastSerial; }
+	springai::AIFloat3 GetTierBlastPos() const { return tierBlastPos; }
+	int GetTierLikelyKilledCount() const { return int(tierLikelyKilled.size()); }
 
 private:
 	void ExecuteAttack(CCircuitUnit* unit);
@@ -214,6 +224,27 @@ private:
 	std::vector<int> tierAreaTargets;       // each area's aim, as an enemy id
 	std::unordered_set<int> tierSeenNow;            // candidate ids of this scan
 	std::unordered_map<int, int> tierLastSeen;      // candidate id -> the last scan that had it, kept TIER_SEEN_FRAMES
+	// Likely killed: see SetTierBlastWatch. One ring per watched structure.
+	struct SGroundRing {
+		float x = 0.f, z = 0.f, radius = 0.f;
+		int frame = -1;  // when h was read
+		int sunk = 0;    // points sunk at the last check out of sight (logged on change)
+		const CCircuitDef* cdef = nullptr;
+		float h[tier::BLAST_RING_POINTS] = {};
+	};
+	std::unordered_map<const CCircuitDef*, float> tierRingRadius;  // def -> ring radius, 0 not watched
+	void SampleRing(SGroundRing& r) const;
+	// The pre-pass of a roster scan: rings refreshed or checked, marks set and
+	// cleared, the blast's neighbours marked. True when a new mark was set.
+	bool WatchBlasts(CCircuitUnit* unit, float maxSqRange);
+	float tierBlastMinRadius = 0.f;   // off until the script sets it
+	float tierBlastDrop = 2.f;
+	int tierBlastPoints = 4;
+	int tierBlastPenalty = 10;
+	std::unordered_map<int, SGroundRing> tierRings;     // big-blast roster structure -> ground while last known alive
+	std::unordered_map<int, int> tierLikelyKilled;      // enemy id -> the frame it was marked
+	int tierBlastSerial = 0;
+	springai::AIFloat3 tierBlastPos = springai::AIFloat3(-1.f, 0.f, -1.f);
 	int tierShotFrame = -1000000;     // the last shot counted
 	int tierShotGap = -1;             // frames between two shots of the main weapon's salvos; -1 not yet known
 	// Debug strikes

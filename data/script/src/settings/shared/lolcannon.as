@@ -155,6 +155,19 @@ namespace LolCannon {
     // a cannon standing this long with no roster target in range (no strike, so no
     // first package) has the enemy spawn it was sited against scouted instead
     int BlindScoutSeconds = 60;
+    // likely killed (owner 2026-11-12): a roster structure out of sight whose death
+    // blast is BlastMinRadius (200; fusions 240, advanced fusions and advanced geos
+    // 640) or more is watched on a ring of 8 ground points just outside its
+    // footprint; when BlastMinPoints of them sank BlastDropElmos or more it is
+    // likely killed (its own death crater), with every roster structure out of
+    // sight that blast would kill. They fall BlastTierPenalty tiers (below every
+    // live target, metal 0) until radar or LOS shows them again, and a scout
+    // package goes to the blast (no more often than ReScoutMinSeconds).
+    // BlastMinRadius 0: off. CSuperTask::SetTierBlastWatch, TierTargeting.h.
+    float BlastMinRadius = 200.0f;
+    float BlastDropElmos = 2.0f;
+    int BlastMinPoints = 4;
+    int BlastTierPenalty = 10;
     // the cover (owner 2026-10-31): once the turrets, the storages and the cannon
     // stand, the same crews (none released) build ExtraShields of the side's shield
     // (Keeper armgate, Overseer corgate, Soteria legdeflector) just ahead of the

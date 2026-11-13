@@ -106,6 +106,49 @@ void test_top_change_needs_fresh_news()
     assert(!TopChanged(5, 7, true, true));    // a reshuffle among known targets
 }
 
+void test_blast_ring_sits_outside_the_footprint_inside_the_bowl()
+{
+    // advanced fusion: blast 640, footprint 96 x 96
+    const float afus = BlastRingRadius(640.f, 68.f);
+    assert(afus == 192.f);
+    // fusion: blast 240, footprint 80 x 64 (half diagonal 51): the footprint margin wins
+    const float fus = BlastRingRadius(240.f, 51.f);
+    assert(fus > 74.f && fus < 76.f);
+    // too small a blast for the bowl to reach past the footprint
+    assert(BlastRingRadius(120.f, 51.f) == 0.f);
+    assert(BlastRingRadius(0.f, 10.f) == 0.f);
+    // a wider footprint pushes the ring out, up to 0.45 of the blast
+    assert(BlastRingRadius(240.f, 70.f) == 94.f);
+    assert(BlastRingRadius(240.f, 90.f) == 0.f);
+}
+void test_ring_blast_needs_enough_sunk_points()
+{
+    const float before[BLAST_RING_POINTS] = {100, 100, 100, 100, 100, 100, 100, 100};
+    const float crater[BLAST_RING_POINTS] = {90, 91, 100, 92, 95, 100, 97, 99};   // 5 sank 2+ (a building blocks two)
+    const float shell[BLAST_RING_POINTS] = {97, 100, 100, 101, 100, 100, 100, 100};  // one shell bowl, the lip raised one
+    assert(SunkPoints(before, crater, BLAST_RING_POINTS, 2.f) == 5);
+    assert(RingBlasted(before, crater, BLAST_RING_POINTS, 2.f, 4));
+    assert(!RingBlasted(before, crater, BLAST_RING_POINTS, 2.f, 6));
+    assert(!RingBlasted(before, shell, BLAST_RING_POINTS, 2.f, 4));
+    assert(!RingBlasted(before, before, BLAST_RING_POINTS, 2.f, 0));  // minPoints is at least 1
+}
+void test_likely_killed_target_falls_below_live_tiers()
+{
+    const Candidate afusGhost = Downranked(At(1, 1, 9000.f, 0.f, 0.f), 10);
+    const Candidate llt = At(2, 6, 90.f, 50.f, 0.f);
+    assert(afusGhost.tier == 11 && afusGhost.cost == 0.f);
+    assert(Better(llt, &afusGhost, 1));       // even while the ghost is the one under fire
+    assert(!Better(afusGhost, &llt, 1));
+    // its area ranks under a live area and adds no metal to the one it joins
+    const std::vector<Candidate> cs = {afusGhost, At(3, 4, 4000.f, 100.f, 0.f), At(4, 6, 90.f, 2000.f, 0.f)};
+    const std::vector<Area> areas = BuildAreas(cs, 300.f, -1, 6);
+    assert(areas.size() == 2);
+    assert(areas[0].seedId == 3 && areas[0].metal == 4000.f);
+    assert(areas[1].seedId == 4);
+    // penalty 0: no change
+    assert(Downranked(At(5, 2, 100.f, 0.f, 0.f), 0).tier == 2);
+}
+
 int main()
 {
     test_first_candidate_is_taken();
@@ -118,6 +161,9 @@ int main()
     test_rotation_dwells_by_time_and_wraps();
     test_rotation_dwells_by_shots();
     test_top_change_needs_fresh_news();
+    test_blast_ring_sits_outside_the_footprint_inside_the_bowl();
+    test_ring_blast_needs_enough_sunk_points();
+    test_likely_killed_target_falls_below_live_tiers();
     std::cout << "tier_targeting_test: PASS\n";
     return 0;
 }
