@@ -106,9 +106,9 @@ def analyse(directory):
         return {'error': 'no infolog'}
     text = log.read_text(errors='replace')
     roles = {int(m.group(2)): m.group(1) for m in re.finditer(r'\[BlastKillTest\] target (\w+) unit=(\d+)', text)}
-    m = re.search(r'\[BlastKillTest\] destroyed A unit=\d+ frame=(\d+)', text)
+    m = re.search(r'\[BlastKillTest\] destroyed A unit=\d+ frame=(\d+)', text)  # F goes at the same frame
     killed_at = int(m.group(1)) if m else None
-    expected_dead = {'Afus', 'Allt'}
+    expected_dead = {'Afus', 'Allt', 'Fllt'}
     pos = {int(m.group(2)): (int(m.group(3)), int(m.group(4)))
            for m in re.finditer(r'\[BlastKillTest\] target (\w+) unit=(\d+) def=\w+ x=(\d+) z=(\d+)', text)}
     # a big structure's real death: its owner's restore opens a crater zone there
@@ -119,7 +119,7 @@ def analyse(directory):
                 died.setdefault(uid, int(m.group(1)))
     if killed_at is not None:
         for uid, role in roles.items():
-            if role in expected_dead or role == 'A':
+            if role in expected_dead or role in ('A', 'F'):
                 died.setdefault(uid, killed_at)
     marks = []
     for m in re.finditer(r'TIER: team=0 frame=(\d+) \S+: (\w+)\((\d+)\) at \(\S+\) likely killed(:| with it)', text):
@@ -128,8 +128,8 @@ def analyse(directory):
         marks.append({'unit': uid, 'role': roles.get(uid, '?'), 'def': name, 'frame': frame, 'died': death,
             'how': 'ground' if m.group(4) == ':' else 'neighbour',
             'verdict': 'ok' if death is not None and frame >= death else 'FALSE (no death before the mark)'})
-    targets = [{'frame': int(f), 'tier': int(t), 'def': d, 'unit': int(u), 'role': roles.get(int(u), '?')}
-        for f, t, d, u in re.findall(r'TIER: team=0 frame=(\d+) armvulc\(\d+\): tier (\d+) (\w+)\((\d+)\)', text)]
+    targets = [{'frame': int(f), 'gun': int(g), 'tier': int(t), 'def': d, 'unit': int(u), 'role': roles.get(int(u), '?')}
+        for f, g, t, d, u in re.findall(r'TIER: team=0 frame=(\d+) armvulc\((\d+)\): tier (\d+) (\w+)\((\d+)\)', text)]
     # the harm: a dead image fired at on its live tier after its death
     wasted = [t for t in targets if t['unit'] in died and t['frame'] > died[t['unit']] and t['tier'] <= 6]
     seen_empty = re.findall(r'ENEMY: ghost (\w+) (\d+) seen empty, removed', text)
@@ -139,6 +139,7 @@ def analyse(directory):
         'seen_again': re.findall(r'TIER: team=0 .* seen again .*', text),
         'seen_empty': [{'def': d, 'unit': int(u), 'role': roles.get(int(u), '?')} for d, u in seen_empty],
         'targets': targets}
+    result['guns'] = sorted({t['gun'] for t in targets})
     result['verdict'] = 'PASS' if (not wasted and result['false_marks'] == 0 and marks) else 'FAIL'
     (directory/'blastkill-result.json').write_text(json.dumps(result, indent=2))
     return result

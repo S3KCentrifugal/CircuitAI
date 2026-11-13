@@ -1647,6 +1647,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	std::vector<const SEnemyData*> candidateDatas;
 	CCircuitDef* cdef = unit->GetCircuitDef();
 	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	tierDeadNow.clear();
 	if (WatchBlasts(unit, maxSqRange)) {
 		tierRotation.topId = -1;  // a new likely kill: the rotation restarts at the top (TopChanged)
 	}
@@ -1663,7 +1664,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 			if (it == tierByDef.end()) {
 				continue;
 			}
-			const bool likelyKilled = !tierLikelyKilled.empty() && (tierLikelyKilled.count(e.id) > 0);
+			const bool likelyKilled = IsMarked(e);
 			const int tierOf = it->second + (likelyKilled ? std::max(0, tierBlastPenalty) : 0);
 			if (!byArea && (bestData != nullptr) && (tierOf > best.tier)) {
 				continue;
@@ -1678,6 +1679,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 			tier::Candidate c{e.id, it->second, e.cost, sqDist, e.pos.x, e.pos.z};
 			if (likelyKilled) {
 				c = tier::Downranked(c, tierBlastPenalty);
+				tierDeadNow.insert(e.id);
 			}
 			if (byArea) {
 				candidates.push_back(c);
@@ -1750,10 +1752,6 @@ void CSuperTask::SetTierBlastWatch(float minRadius, float drop, int minPoints, i
 	tierBlastDrop = std::max(0.1f, drop);
 	tierBlastPoints = std::clamp(minPoints, 1, tier::BLAST_RING_POINTS);
 	tierBlastPenalty = std::max(0, penalty);
-	if (tierBlastMinRadius <= 0.f) {
-		tierRings.clear();
-		tierLikelyKilled.clear();
-	}
 	tierRingRadius.clear();  // the drop lines follow the floor
 }
 
@@ -1764,7 +1762,7 @@ void CSuperTask::SetTierBlastDepth(float refDepth, float share)
 	tierRingRadius.clear();
 }
 
-void CSuperTask::SampleRing(SGroundRing& r) const
+void CSuperTask::SampleRing(tier::GroundRing& r) const
 {
 	CMap* map = manager->GetCircuit()->GetMap();
 	constexpr float STEP = 2.f * 3.14159265f / float(tier::BLAST_RING_POINTS);
@@ -1775,14 +1773,30 @@ void CSuperTask::SampleRing(SGroundRing& r) const
 	r.frame = manager->GetCircuit()->GetLastFrame();
 }
 
+tier::BlastLedger& CSuperTask::Blasts() const
+{
+	return manager->GetCircuit()->GetAllyTeam()->GetLolBlasts();
+}
+
+bool CSuperTask::IsMarked(const SEnemyData& e) const
+{
+	const tier::BlastLedger& L = Blasts();
+	if (L.marks.empty() || (e.cdef == nullptr)) return false;
+	const auto it = L.marks.find(e.id);
+	return (it != L.marks.end()) && tier::MarkMatches(it->second, e.cdef->GetId(), e.pos.x, e.pos.z);
+}
+
 /*
  * Likely killed (owner 2026-11-12; TierTargeting.h). Run before each roster
- * scan. Roster structures with a big death blast within range + 800: in radar
- * or LOS the ring round each is read (at most every 10 s) and any mark is
- * cleared; out of sight the ring is read again, and a sunk ring marks the
- * structure, plus every roster structure out of sight that its death blast
- * (DeathBlastOf, AreaDamage) would kill. O(roster structures in reach); 8
- * height reads per ring.
+ * scan, on the ally team's ledger (BlastLedger: one for every allied
+ * lolcannon, so a ring read or a mark set by one cannon serves all, a cannon
+ * built after the blast included). Roster structures with a big death blast
+ * within range + 800: in radar or LOS the ring round each is read (at most
+ * every 10 s, by whichever cannon scans first) and any mark is cleared; out of
+ * sight the ring is read again, and a sunk ring marks the structure, plus
+ * every roster structure out of sight that its death blast (DeathBlastOf,
+ * AreaDamage) would kill. O(roster structures in reach) per scan; 8 height
+ * reads per ring checked.
  */
 bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 {
@@ -1790,40 +1804,50 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 		return false;
 	}
 	CCircuitAI* circuit = manager->GetCircuit();
+	tier::BlastLedger& L = Blasts();
 	const int frame = circuit->GetLastFrame();
 	const char* gunName = unit->GetCircuitDef()->GetDef()->GetName();
 	struct SBlast { AIFloat3 pos; SDeathBlast b; int id; };
 	std::vector<SBlast> blasts;
+	auto mark = [&L, frame](int id, const CCircuitDef* cdef, const AIFloat3& pos) {
+		L.marks[id] = tier::LikelyKilled{frame, cdef->GetId(), pos.x, pos.z};
+	};
+	auto meanDeepest = [](const tier::GroundRing& before, const tier::GroundRing& now, float& mean, float& deepest) {
+		float sum = 0.f;
+		deepest = 0.f;
+		for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) {
+			const float d = before.h[i] - now.h[i];
+			deepest = std::max(deepest, d);
+			sum += d;
+		}
+		mean = sum / float(tier::BLAST_RING_POINTS);
+	};
 	// A watched structure that left the roster (its wreck seen, or the engine
 	// told us) over a sunk ring died in its own blast: whatever that blast
 	// killed out of sight stays an image unless it is marked (headless
 	// 2026-11-12: the advanced fusion's image went, the fusion and LLT beside
 	// it stayed). A ring that did not sink (reclaimed, say) marks nothing.
-	for (auto it = tierRings.begin(); it != tierRings.end();) {
+	for (auto it = L.rings.begin(); it != L.rings.end();) {
 		if (circuit->GetEnemyInfo(it->first) != nullptr) {
 			++it;
 			continue;
 		}
-		SGroundRing now = it->second;
+		const CCircuitDef* rdef = (it->second.defId >= 0) ? circuit->GetCircuitDefSafe(it->second.defId) : nullptr;
+		tier::GroundRing now = it->second;
 		SampleRing(now);
 		const int sunk = tier::SunkPoints(it->second.h, now.h, tier::BLAST_RING_POINTS, it->second.drop);
-		if ((it->second.cdef != nullptr) && (sunk >= tierBlastPoints)) {
-			float deepest = 0.f, sum = 0.f;
-			for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) {
-				const float d = it->second.h[i] - now.h[i];
-				deepest = std::max(deepest, d);
-				sum += d;
-			}
+		if ((rdef != nullptr) && (sunk >= tierBlastPoints)) {
+			float mean, deepest;
+			meanDeepest(it->second, now, mean, deepest);
 			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) gone from the roster over its own crater (%i of %i ground points %.0f round it sank %.1f+ elmos; mean %.1f, deepest %.1f): its death blast marks what it killed out of sight",
-					circuit->GetTeamId(), frame, gunName, unit->GetId(), it->second.cdef->GetDef()->GetName(), it->first,
-					int(it->second.x), int(it->second.z), sunk, tier::BLAST_RING_POINTS, it->second.radius, it->second.drop,
-					sum / float(tier::BLAST_RING_POINTS), deepest);
-			blasts.push_back({AIFloat3(it->second.x, 0.f, it->second.z), DeathBlastOf(it->second.cdef), it->first});
+					circuit->GetTeamId(), frame, gunName, unit->GetId(), const_cast<CCircuitDef*>(rdef)->GetDef()->GetName(), it->first,
+					int(it->second.x), int(it->second.z), sunk, tier::BLAST_RING_POINTS, it->second.radius, it->second.drop, mean, deepest);
+			blasts.push_back({AIFloat3(it->second.x, 0.f, it->second.z), DeathBlastOf(rdef), it->first});
 		}
-		it = tierRings.erase(it);
+		it = L.rings.erase(it);
 	}
-	for (auto it = tierLikelyKilled.begin(); it != tierLikelyKilled.end();) {
-		if (circuit->GetEnemyInfo(it->first) == nullptr) it = tierLikelyKilled.erase(it); else ++it;
+	for (auto it = L.marks.begin(); it != L.marks.end();) {
+		if (circuit->GetEnemyInfo(it->first) == nullptr) it = L.marks.erase(it); else ++it;  // the image is gone (allies share LOS)
 	}
 	const float reach = std::sqrt(maxSqRange) + 800.f;
 	const float sqReach = reach * reach;
@@ -1839,12 +1863,14 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 				continue;
 			}
 			if (e.IsInRadarOrLOS()) {
-				const auto mit = tierLikelyKilled.find(e.id);
-				if (mit != tierLikelyKilled.end()) {
-					circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) seen again %i s after it was marked likely killed; back on its tier",
-							circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
-							int(e.pos.x), int(e.pos.z), (frame - mit->second) / FRAMES_PER_SEC);
-					tierLikelyKilled.erase(mit);
+				const auto mit = L.marks.find(e.id);
+				if (mit != L.marks.end()) {
+					if (tier::MarkMatches(mit->second, e.cdef->GetId(), e.pos.x, e.pos.z)) {
+						circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) seen again %i s after it was marked likely killed; back on its tier for every lolcannon",
+								circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
+								int(e.pos.x), int(e.pos.z), (frame - mit->second.frame) / FRAMES_PER_SEC);
+					}
+					L.marks.erase(mit);  // alive, or a recycled id: either way not that mark
 				}
 				auto rr = tierRingRadius.find(e.cdef);
 				if (rr == tierRingRadius.end()) {
@@ -1867,46 +1893,48 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 				if (rr->second.first <= 0.f) {
 					continue;
 				}
-				SGroundRing& r = tierRings[e.id];
-				if ((r.frame >= 0) && (frame - r.frame < FRAMES_PER_SEC * 10) && (r.x == e.pos.x) && (r.z == e.pos.z)) {
+				tier::GroundRing& r = L.rings[e.id];
+				if ((r.frame >= 0) && (frame - r.frame < FRAMES_PER_SEC * 10) && (r.x == e.pos.x) && (r.z == e.pos.z)
+					&& (r.defId == e.cdef->GetId()))
+				{
 					continue;
 				}
 				r.x = e.pos.x;
 				r.z = e.pos.z;
 				r.radius = rr->second.first;
 				r.drop = rr->second.second;
-				r.cdef = e.cdef;
+				r.defId = e.cdef->GetId();
 				r.sunk = 0;
 				SampleRing(r);
 				continue;
 			}
-			if (tierLikelyKilled.count(e.id) > 0) {
+			if (IsMarked(e)) {
 				continue;
 			}
-			const auto rit = tierRings.find(e.id);
-			if (rit == tierRings.end()) {
+			const auto rit = L.rings.find(e.id);
+			if ((rit == L.rings.end()) || (rit->second.defId != e.cdef->GetId())) {
 				continue;
 			}
-			SGroundRing now = rit->second;
+			tier::GroundRing now = rit->second;
 			SampleRing(now);
 			const int sunk = tier::SunkPoints(rit->second.h, now.h, tier::BLAST_RING_POINTS, rit->second.drop);
 			if (sunk < tierBlastPoints) {
 				if (sunk != rit->second.sunk) {  // a partial sink, logged when it changes (shells, a far blast)
 					rit->second.sunk = sunk;
-					circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) out of sight: %i of %i ground points sank %.1f+ elmos (%i needed)",
+					circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) out of sight: %i of %i ground points sank %.2f+ elmos (%i needed)",
 							circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
 							sunk, tier::BLAST_RING_POINTS, rit->second.drop, tierBlastPoints);
 				}
 				continue;
 			}
-			float deepest = 0.f;
-			for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) deepest = std::max(deepest, rit->second.h[i] - now.h[i]);
-			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) likely killed: %i of %i ground points %.0f round it sank %.1f+ elmos (deepest %.1f) out of sight; down %i tiers until radar or LOS shows it",
+			float mean, deepest;
+			meanDeepest(rit->second, now, mean, deepest);
+			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) likely killed: %i of %i ground points %.0f round it sank %.2f+ elmos (mean %.1f, deepest %.1f) out of sight; down %i tiers for every lolcannon until radar or LOS shows it",
 					circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
-					sunk, tier::BLAST_RING_POINTS, rit->second.radius, rit->second.drop, deepest, tierBlastPenalty);
-			tierLikelyKilled[e.id] = frame;
+					sunk, tier::BLAST_RING_POINTS, rit->second.radius, rit->second.drop, mean, deepest, tierBlastPenalty);
+			mark(e.id, e.cdef, e.pos);
 			blasts.push_back({e.pos, DeathBlastOf(e.cdef), e.id});
-			tierRings.erase(rit);
+			L.rings.erase(rit);
 		}
 	}
 	if (blasts.empty()) {
@@ -1915,7 +1943,7 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 	// what those blasts would have killed with them
 	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
 		for (const SEnemyData& e : *pool) {
-			if (!onRoster(e) || e.IsInRadarOrLOS() || (tierLikelyKilled.count(e.id) > 0)
+			if (!onRoster(e) || e.IsInRadarOrLOS() || IsMarked(e)
 				|| (circuit->GetEnemyInfo(e.id) == nullptr))  // the blast's own entry, gone but not yet swept from the pool
 			{
 				continue;
@@ -1930,8 +1958,8 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 				circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) likely killed with it: %.0f from the blast of %i (%.0f away) >= %.0f health",
 						circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
 						dmg, s.id, dist, health);
-				tierLikelyKilled[e.id] = frame;
-				tierRings.erase(e.id);
+				mark(e.id, e.cdef, e.pos);
+				L.rings.erase(e.id);
 				break;
 			}
 		}
@@ -1940,7 +1968,6 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 	++tierBlastSerial;
 	return true;
 }
-
 AIFloat3 CSuperTask::GetTierAreaPos(int i) const
 {
 	if (!ValidArea(i)) return -RgtVector;
@@ -1957,11 +1984,11 @@ int CSuperTask::PickTierArea(CCircuitUnit* unit, const std::vector<tier::Candida
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	tierAreas = tier::BuildAreas(candidates, tierAreaRadius, tierTargetId, size_t(tierAreaMax));
-	if (!tierLikelyKilled.empty()) {
+	if (!tierDeadNow.empty()) {
 		// Likely killed (owner 2026-11-12): an area seeded by a likely-killed
 		// image holds nothing better; while a live area is left the rotation
 		// skips it (headless: the gun dwelt 30 s on each dead image in turn).
-		const auto dead = [this, &candidates](const tier::Area& a) { return tierLikelyKilled.count(candidates[a.aim].id) > 0; };
+		const auto dead = [this, &candidates](const tier::Area& a) { return tierDeadNow.count(candidates[a.aim].id) > 0; };
 		if (!std::all_of(tierAreas.begin(), tierAreas.end(), dead)) {
 			tierAreas.erase(std::remove_if(tierAreas.begin(), tierAreas.end(), dead), tierAreas.end());
 		}

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_map>
 #include <vector>
 
 namespace circuit::tier {
@@ -152,6 +153,38 @@ inline float ExpectedRingDepth(float blastRadius, float damage, float ringRadius
 	const float s = CraterStrength(blastRadius, damage);
 	if ((s <= 0.f) || (blastRadius <= 0.f) || (hardness <= 0.f) || (scale <= 0.f)) return 0.f;
 	return scale * 3.f * std::pow(s, 0.6f) * CraterProfile(ringRadius / blastRadius) / hardness;
+}
+
+/*
+ * The ally team's blast ledger (owner 2026-11-12: a mark holds for every
+ * lolcannon of ours, and of any allied BARb): CAllyTeam owns one, every
+ * lolcannon's CSuperTask reads and writes it, so a ring read by one cannon
+ * and a mark set by one serve a cannon built later. Keyed by enemy unit id;
+ * the def id and position are kept because the engine recycles unit ids, so a
+ * mark binds only to the same def at the same spot (a rebuild there is a new
+ * id). All BARb instances of a process run on one thread.
+ */
+struct GroundRing {
+	float x = 0.f, z = 0.f, radius = 0.f;
+	float drop = 2.f;  // the sink a point must show for its def
+	int defId = -1;
+	int frame = -1;    // when h was read
+	int sunk = 0;      // points sunk at the last check out of sight (logged on change)
+	float h[BLAST_RING_POINTS] = {};
+};
+struct LikelyKilled {
+	int frame = -1;    // marked
+	int defId = -1;
+	float x = 0.f, z = 0.f;
+};
+struct BlastLedger {
+	std::unordered_map<int, GroundRing> rings;     // big-blast roster structure -> ground while last known alive
+	std::unordered_map<int, LikelyKilled> marks;   // enemy id -> its mark
+};
+
+inline bool MarkMatches(const LikelyKilled& m, int defId, float x, float z, float slack = 24.f)
+{
+	return (m.defId == defId) && (std::abs(m.x - x) <= slack) && (std::abs(m.z - z) <= slack);
 }
 
 // The drop a ring point must show: `share` of the expected depth, at least `floor`.

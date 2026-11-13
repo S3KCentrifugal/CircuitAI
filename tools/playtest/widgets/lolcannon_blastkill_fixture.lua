@@ -22,7 +22,7 @@ local cams={}
 -- the gun 600 from team 0's start towards team 1's, A 5,200 further, the rest round A
 local spots={}
 local roleOf={}
-local gunX,gunZ
+local gunX,gunZ,gun2X,gun2Z
 -- the runner writes the two AI spots here (Spring.GetTeamStartPosition(1) is nil on some maps)
 local START0, START1 = nil, nil   -- {x, z}
 local function layout()
@@ -42,6 +42,10 @@ local function layout()
     at("armllt","Allt",0,-200)
     at("armafus","B",0,1600)
     at("armllt","D",-300,-900)
+    -- a lone fusion (no advanced fusion near) and an LLT 150 beside it: its own crater alone
+    at("armfus","F",-600,2400)
+    at("armllt","Fllt",-600,2550)
+    gun2X,gun2Z=math.floor(gunX+px*400),math.floor(gunZ+pz*400)
     log(string.format("layout start0=(%.0f,%.0f) start1=(%.0f,%.0f) gun=(%d,%d) A=(%d,%d) apart=%.0f",x0,z0,x1,z1,gunX,gunZ,spots[1][2],spots[1][3],len))
 end
 function widget:Initialize()
@@ -105,6 +109,8 @@ function widget:GameFrame(f)
     if once("killA",510,f) then
         if roleOf.A then Spring.SendLuaRulesMsg("$dev$:destroyunits "..roleOf.A); log("destroyed A unit="..roleOf.A.." frame="..f)
         else log("ERROR no unit A") end
+        if roleOf.F then Spring.SendLuaRulesMsg("$dev$:destroyunits "..roleOf.F); log("destroyed F unit="..roleOf.F.." frame="..f)
+        else log("ERROR no unit F") end
     end
     if once("power",600,f) then
         -- a Ragnarok shot costs 15,000 energy: four advanced fusions and two hardened storages behind it
@@ -112,6 +118,8 @@ function widget:GameFrame(f)
         give("armuwadves",0,1000,5600); give("armuwadves",0,1300,5600)
         log("power given")
     end
+    -- a second cannon, built after the blasts: it never saw the targets alive
+    if once("gun2",700,f) then give("armvulc",0,gun2X,gun2Z); log("second gun given") end
     if once("lookagain",20*60*30,f) then camerasAt(spots); log("cameras again") end
     if once("dark2",21*60*30,f) then dropCameras() end
 

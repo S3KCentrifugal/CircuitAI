@@ -18,6 +18,7 @@
 #include "control/kernel/DefenseClaims.h"
 #include "resource/MetalField.h"
 #include "task/static/StrategicTargeting.h"
+#include "task/static/TierTargeting.h"
 
 #include <cstdlib>
 #include <memory>
@@ -166,6 +167,9 @@ public:
 	// One overnuke per ally team (owner 2026-11-01): every allied BARb's silos, FRONT's
 	// grid included, count towards the breakpoints and fire at the same target.
 	strategic::Overnuke& GetOvernuke() { return overnuke; }
+	// Lolcannon likely kills (owner 2026-11-12, TierTargeting.h BlastLedger): ground
+	// rings and marks shared by every allied lolcannon.
+	tier::BlastLedger& GetLolBlasts() { return lolBlasts; }
 	// Team rolls (owner 2026-11-03, front nukerush): one draw per key for the
 	// whole ally team, made by whichever allied BARb asks first; every later
 	// ask, by any ally, gets the same answer.
@@ -187,6 +191,7 @@ private:
 	strategic::Ledger pulseClaims, nuclearHistory, probeHistory;
 	strategic::Overnuke overnuke;
 	strategic::StrikeLedger nuclearStrikes;
+	tier::BlastLedger lolBlasts;
 	allied_layout::Reservations layoutReservations;
 	metal_field::Claims metalClaims;
 	void DelegateAuthority();

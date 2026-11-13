@@ -76,7 +76,7 @@ public:
 	// Each new blast found bumps the serial; the script scouts its position.
 	int GetTierBlastSerial() const { return tierBlastSerial; }
 	springai::AIFloat3 GetTierBlastPos() const { return tierBlastPos; }
-	int GetTierLikelyKilledCount() const { return int(tierLikelyKilled.size()); }
+	int GetTierLikelyKilledCount() const { return int(tierDeadNow.size()); }  // in range at the last scan
 
 private:
 	void ExecuteAttack(CCircuitUnit* unit);
@@ -228,17 +228,13 @@ private:
 	std::vector<int> tierAreaTargets;       // each area's aim, as an enemy id
 	std::unordered_set<int> tierSeenNow;            // candidate ids of this scan
 	std::unordered_map<int, int> tierLastSeen;      // candidate id -> the last scan that had it, kept TIER_SEEN_FRAMES
-	// Likely killed: see SetTierBlastWatch. One ring per watched structure.
-	struct SGroundRing {
-		float x = 0.f, z = 0.f, radius = 0.f;
-		int frame = -1;  // when h was read
-		int sunk = 0;    // points sunk at the last check out of sight (logged on change)
-		float drop = 2.f;  // the sink a point must show (BlastDropLine for its def)
-		const CCircuitDef* cdef = nullptr;
-		float h[tier::BLAST_RING_POINTS] = {};
-	};
+	// Likely killed: see SetTierBlastWatch. Rings and marks live in the ally team's
+	// ledger (CAllyTeam::GetLolBlasts), shared by every allied lolcannon.
+	tier::BlastLedger& Blasts() const;
+	bool IsMarked(const SEnemyData& e) const;  // a mark on this id, same def at the same spot
+	std::unordered_set<int> tierDeadNow;       // candidate ids marked likely killed at the last scan
 	std::unordered_map<const CCircuitDef*, std::pair<float, float>> tierRingRadius;  // def -> ring radius (0 not watched), drop line
-	void SampleRing(SGroundRing& r) const;
+	void SampleRing(tier::GroundRing& r) const;
 	// The pre-pass of a roster scan: rings refreshed or checked, marks set and
 	// cleared, the blast's neighbours marked. True when a new mark was set.
 	bool WatchBlasts(CCircuitUnit* unit, float maxSqRange);
@@ -248,8 +244,6 @@ private:
 	float tierBlastShare = 0.35f;     // the drop line: this share of the expected ring depth
 	int tierBlastPoints = 4;
 	int tierBlastPenalty = 10;
-	std::unordered_map<int, SGroundRing> tierRings;     // big-blast roster structure -> ground while last known alive
-	std::unordered_map<int, int> tierLikelyKilled;      // enemy id -> the frame it was marked
 	int tierBlastSerial = 0;
 	springai::AIFloat3 tierBlastPos = springai::AIFloat3(-1.f, 0.f, -1.f);
 	int tierShotFrame = -1000000;     // the last shot counted
