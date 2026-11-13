@@ -81,6 +81,7 @@ namespace EarlyMexUpgraders {
     void Tick() {
         if (ai.frame - lastLog < Global::RoleSettings::EarlyMexUpgradersLogSeconds * SECOND) return;
         lastLog = ai.frame;
+        Prune();
         if (Economy::MexTracker::myMexes.length() == 0) return;
         Status("status");
     }
@@ -102,9 +103,9 @@ namespace EarlyMexUpgraders {
 
     // A live upgrade (ours first, then an unassigned queued one) this constructor can assist
     IUnitTask@ Assist(CCircuitUnit@ u) {
-        for (int i = int(ours.length()) - 1; i >= 0; --i) {
-            if (ours[i] is null || ours[i].IsDead()) { ours.removeAt(i); continue; }
-        }
+        if (u is null) return null;
+        for (int i = int(ours.length()) - 1; i >= 0; --i)
+            if (ours[i] is null || ours[i].IsDead()) ours.removeAt(i);
         IUnitTask@ best = null;
         float bestSq = 3.4e+38f;
         const AIFloat3 at = u.GetPos(ai.frame);
@@ -145,21 +146,29 @@ namespace EarlyMexUpgraders {
         if (moho !is null)
             spot = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
                 100000.0f, u, moho);
+        // Enqueue may dispatch lifecycle callbacks: from here on the unit is read again by id
+        // (it can die or change hands between a job and the next), never through the old handle
+        const int id = u.id;
+        const string name = u.circuitDef.GetName();
         if (spot.x >= 0.0f) {
             idleSince = -1;
             IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, moho, spot, -1));
-            if (t !is null) {
+            @u = ai.GetTeamUnit(id);
+            if (u is null) { Forget(id); return null; }
+            if (t !is null && !t.IsDead()) {
                 ours.insertLast(t);
-                GenericHelpers::LogUtil("[MexUpT2] " + u.circuitDef.GetName() + " " + u.id + " upgrades ("
+                GenericHelpers::LogUtil("[MexUpT2] " + name + " " + id + " upgrades ("
                     + int(spot.x) + "," + int(spot.z) + "), open " + OpenCount(), 1);
                 return t;
             }
         }
         IUnitTask@ help = Assist(u);
-        if (help !is null) {
+        @u = ai.GetTeamUnit(id);
+        if (u is null) { Forget(id); return null; }
+        if (help !is null && !help.IsDead()) {
             idleSince = -1;
             if (help is u.task) { keep = true; return null; }
-            GenericHelpers::LogUtil("[MexUpT2] " + u.circuitDef.GetName() + " " + u.id + " assists a mex upgrade", 1);
+            GenericHelpers::LogUtil("[MexUpT2] " + name + " " + id + " assists a mex upgrade", 1);
             return help;
         }
         // nothing safe to upgrade: normal duty meanwhile; for good after the release delay
@@ -172,10 +181,28 @@ namespace EarlyMexUpgraders {
         return null;
     }
 
+    // Drop every record of a unit (died, given away, captured); engine ids are reused, so a new unit
+    // with the same id is judged afresh
+    void Forget(int id) {
+        int i = claimed.find(id);
+        if (i >= 0) { claimed.removeAt(i); GenericHelpers::LogUtil("[MexUpT2] dedicated constructor " + id + " lost", 1); }
+        i = asked.find(id);
+        if (i >= 0) asked.removeAt(i);
+    }
+
     void UnitRemoved(CCircuitUnit@ u) {
         if (u is null) return;
-        const int i = claimed.find(u.id);
-        if (i >= 0) { claimed.removeAt(i); GenericHelpers::LogUtil("[MexUpT2] dedicated constructor " + u.id + " lost", 1); }
+        Forget(u.id);
+    }
+
+    // Dead upgrades and units no longer ours leave the lists (bounded by our T2 constructors)
+    void Prune() {
+        for (int i = int(ours.length()) - 1; i >= 0; --i)
+            if (ours[i] is null || ours[i].IsDead()) ours.removeAt(i);
+        for (int i = int(claimed.length()) - 1; i >= 0; --i)
+            if (ai.GetTeamUnit(claimed[i]) is null) Forget(claimed[i]);
+        for (int i = int(asked.length()) - 1; i >= 0; --i)
+            if (ai.GetTeamUnit(asked[i]) is null) asked.removeAt(i);
     }
 
     bool IsT2Factory(const string &in n) {
@@ -217,11 +244,13 @@ namespace EarlyMexUpgraders {
         if (int(claimed.length()) >= target || recruits >= target + Global::RoleSettings::EarlyMexUpgradersExtraRecruits) return null;
         CCircuitDef@ d = ConstructorFor(factory);
         if (d is null) return null;
+        const string facName = factory.circuitDef.GetName();
         @recruit = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, d,
             factory.GetPos(ai.frame), 64.f));
+        if (recruit !is null && recruit.IsDead()) @recruit = null;
         if (recruit !is null) {
             recruits++;
-            GenericHelpers::LogUtil("[MexUpT2] " + factory.circuitDef.GetName() + " builds " + d.GetName()
+            GenericHelpers::LogUtil("[MexUpT2] " + facName + " builds " + d.GetName()
                 + " for mex upgrades (" + (claimed.length() + 1) + " of " + target + ", open " + OpenCount() + ")", 1);
         }
         return recruit;
