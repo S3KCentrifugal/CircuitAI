@@ -10,23 +10,33 @@ namespace AirThinHome {
     {
         wind = (ai.GetWindMin() + ai.GetWindMax()) * 0.5f;
         const float r = Global::RoleSettings::Air::HomeMexRadius;
+        // Spots the mex ownership resolver gives this team (owner 2026-11-13: "only sees 3
+        // mexes as belonging to itself"); Moonshine has a 4th spot inside the radius that an
+        // allied FRONT owns. Without any resolved owner nearby, every spot in the radius counts.
         homeSpots = 0;
+        int inside = 0, resolved = 0;
         const int count = ai.GetMetalSpotCount();
         for (int i = 0; i < count; ++i) {
             const AIFloat3 p = ai.GetMetalSpot(i);
-            if (p.x >= 0.0f && MapHelpers::SqDist(p, Global::Map::StartPos) <= r * r) ++homeSpots;
+            if (p.x < 0.0f || MapHelpers::SqDist(p, Global::Map::StartPos) > r * r) continue;
+            ++inside;
+            const int owner = aiEconomyMgr.MexSpotOwner(p);
+            if (owner >= 0) ++resolved;
+            if (owner == ai.teamId) ++homeSpots;
         }
+        if (resolved == 0) homeSpots = inside;
         const bool on = Global::RoleSettings::Air::ThinHomeEnabled && !aiEconomyMgr.IsMetalMap()
             && wind < Global::RoleSettings::Air::GoodWindMinimumEnergy
             && homeSpots <= Global::RoleSettings::Air::ThinHomeMaxSpots;
         state = on ? 1 : 0;
         GenericHelpers::LogUtil("[AIR][ThinHome] " + (on ? "active" : "off") + " wind=" + wind
-            + " homeSpots=" + homeSpots + " within " + int(r) + " (max " + Global::RoleSettings::Air::ThinHomeMaxSpots + ")", 1);
+            + " homeSpots=" + homeSpots + " (in radius " + inside + ", resolved " + resolved + ") within " + int(r) + " (max " + Global::RoleSettings::Air::ThinHomeMaxSpots + ")", 1);
     }
     bool Active()
     {
         if (state < 0) {
-            if (ai.frame < SECOND) return false; // the start position settles in the first second
+            // the start position and the mex ownership resolver (MexTerritory) settle in the first seconds
+            if (ai.frame < 15 * SECOND) return false;
             Judge();
         }
         return state == 1;
