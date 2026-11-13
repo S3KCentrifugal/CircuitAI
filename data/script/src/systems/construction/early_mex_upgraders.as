@@ -101,6 +101,78 @@ namespace EarlyMexUpgraders {
         return d;
     }
 
+    // Spot back-off. Played 11-13 (Tartar c1): native refused a legmoho site ("RESERVE: no site for
+    // legmoho"), the order died at once, the spot was open again and the same constructor re-ordered it
+    // every 24 frames for minutes (7,000 orders a game). An order that dies within OrderFailSeconds with
+    // the mex still T1 rests its spot for BackoffSeconds; the constructor takes the next spot meanwhile.
+    // Bounded by our owned mexes (tens); checked once per ask of a dedicated constructor.
+    array<IUnitTask@> orderTasks;
+    array<AIFloat3> orderSpots;
+    array<int> orderFrames;
+    array<AIFloat3> backSpots;
+    array<int> backUntil;
+
+    array<int> backCount;   // a spot refused BackoffLimit times is left to native for the rest of the game
+
+    bool Refused(uint i) { return backCount[i] >= Global::RoleSettings::EarlyMexUpgradersBackoffLimit; }
+    bool BackedOff(const AIFloat3 &in p) {
+        for (uint i = 0; i < backSpots.length(); ++i)
+            if (MapHelpers::IsInRange(p, backSpots[i], 35.0f)) return Refused(i) || backUntil[i] > ai.frame;
+        return false;
+    }
+    // a resting (not given up) spot: the phase does not end while one waits
+    bool AnyResting() {
+        for (uint i = 0; i < backSpots.length(); ++i)
+            if (!Refused(i) && backUntil[i] > ai.frame && !IsUpgradedAt(backSpots[i])) return true;
+        return false;
+    }
+    void Back(const AIFloat3 &in p, const string &in why) {
+        int i = -1;
+        for (uint j = 0; j < backSpots.length(); ++j)
+            if (MapHelpers::IsInRange(p, backSpots[j], 35.0f)) { i = int(j); break; }
+        if (i < 0) { backSpots.insertLast(p); backUntil.insertLast(0); backCount.insertLast(0); i = int(backSpots.length()) - 1; }
+        backCount[i]++;
+        backUntil[i] = ai.frame + Global::RoleSettings::EarlyMexUpgradersBackoffSeconds * SECOND;
+        GenericHelpers::LogUtil("[MexUpT2] spot (" + int(p.x) + "," + int(p.z) + ") " + why + ": "
+            + (Refused(uint(i)) ? "left to native" : "rests " + Global::RoleSettings::EarlyMexUpgradersBackoffSeconds + " s")
+            + " (" + backCount[i] + " refusals)", 1);
+    }
+    bool IsUpgradedAt(const AIFloat3 &in p) {
+        for (uint i = 0; i < Economy::MexTracker::myMexes.length(); ++i)
+            if (MapHelpers::IsInRange(p, Economy::MexTracker::myMexes[i].pos, 35.0f)) return Economy::MexTracker::myMexes[i].isUpgraded;
+        return false;
+    }
+    void CheckFailures() {
+        for (int i = int(orderTasks.length()) - 1; i >= 0; --i) {
+            const bool dead = orderTasks[i] is null || orderTasks[i].IsDead();
+            const bool old = ai.frame - orderFrames[i] >= Global::RoleSettings::EarlyMexUpgradersOrderFailSeconds * SECOND;
+            if (!dead && !old) continue;
+            if (dead && !old && !IsUpgradedAt(orderSpots[i])) Back(orderSpots[i], "order ended at once");
+            orderTasks.removeAt(i); orderSpots.removeAt(i); orderFrames.removeAt(i);
+        }
+    }
+
+    // Nearest owned T1 mex not upgraded, not being upgraded, not resting, buildable, reachable and safe
+    // (the same tests as MexTracker::GetNearestNonUpgradedMexInRange, plus the back-off)
+    AIFloat3 Pick(CCircuitUnit@ u, CCircuitDef@ moho) {
+        AIFloat3 best(-1, -1, -1);
+        if (u is null || moho is null) return best;
+        const AIFloat3 from = u.GetPos(ai.frame);
+        float bestSq = 3.4e+38f;
+        for (uint i = 0; i < Economy::MexTracker::myMexes.length(); ++i) {
+            Economy::MexTracker::MexInfo@ m = Economy::MexTracker::myMexes[i];
+            if (m is null || m.isUpgraded || m.isUpgradeInProgress || BackedOff(m.pos)) continue;
+            const float d = MapHelpers::SqDist(from, m.pos);
+            if (d >= bestSq) continue;
+            if (!aiTerrainMgr.CanUpgradeTerrain(moho, m.pos)
+                || !aiTerrainMgr.CanReachAtSafe(u, m.pos, u.circuitDef.GetBuildDistance())
+                || !aiEconomyMgr.IsMexSpotSafe(u, m.pos)) continue;
+            bestSq = d;
+            best = m.pos;
+        }
+        return best;
+    }
+
     // A live upgrade (ours first, then an unassigned queued one) this constructor can assist
     IUnitTask@ Assist(CCircuitUnit@ u) {
         if (u is null) return null;
@@ -143,9 +215,8 @@ namespace EarlyMexUpgraders {
         }
         CCircuitDef@ moho = Moho(u);
         AIFloat3 spot(-1, -1, -1);
-        if (moho !is null)
-            spot = Economy::MexTracker::GetNearestNonUpgradedMexInRange(u.GetPos(ai.frame), Global::Map::StartPos,
-                100000.0f, u, moho);
+        CheckFailures();
+        if (moho !is null) spot = Pick(u, moho);
         // Enqueue may dispatch lifecycle callbacks: from here on the unit is read again by id
         // (it can die or change hands between a job and the next), never through the old handle
         const int id = u.id;
@@ -155,8 +226,10 @@ namespace EarlyMexUpgraders {
             IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Spot(Task::BuildType::MEXUP, Task::Priority::NOW, moho, spot, -1));
             @u = ai.GetTeamUnit(id);
             if (u is null) { Forget(id); return null; }
+            if (t is null || t.IsDead()) Back(spot, "order refused");
             if (t !is null && !t.IsDead()) {
                 ours.insertLast(t);
+                orderTasks.insertLast(t); orderSpots.insertLast(spot); orderFrames.insertLast(ai.frame);
                 GenericHelpers::LogUtil("[MexUpT2] " + name + " " + id + " upgrades ("
                     + int(spot.x) + "," + int(spot.z) + "), open " + OpenCount(), 1);
                 return t;
@@ -172,7 +245,7 @@ namespace EarlyMexUpgraders {
             return help;
         }
         // nothing safe to upgrade: normal duty meanwhile; for good after the release delay
-        if (idleSince < 0) idleSince = ai.frame;
+        if (idleSince < 0 || AnyResting()) idleSince = ai.frame;
         if (ai.frame - idleSince >= Global::RoleSettings::EarlyMexUpgradersReleaseSeconds * SECOND) {
             done = true;
             Status("phase over, no owned T1 mex left that is safe to upgrade");

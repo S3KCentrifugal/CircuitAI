@@ -53,6 +53,9 @@ namespace RoleSettings {
         int EarlyMexUpgradersReleaseSeconds = 60;
         int EarlyMexUpgradersExtraRecruits = 2;   // factory orders past Max when another program takes one
         int EarlyMexUpgradersLogSeconds = 60;
+        int EarlyMexUpgradersOrderFailSeconds = 10;  // an upgrade order dead this soon, mex still T1: its spot rests
+        int EarlyMexUpgradersBackoffSeconds = 120;
+        int EarlyMexUpgradersBackoffLimit = 3;       // refusals before a spot is left to native
 
        
 
