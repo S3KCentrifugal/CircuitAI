@@ -603,6 +603,32 @@ namespace Front {
             float SpecialPorcMinMetalIncome = 65.0f;   // 10-second minimum, inclusive; same other gates as T1
             float SpecialPorcCoverRadius = 350.0f;
             int SpecialPorcMax = 6;
+            // Agitator counter (owner, 2026-11-12; systems/construction/front_agitator_counter.as). An enemy agitator
+            // (AgitatorCounterTargets, seen or ghost) whose range reaches one of our AgitatorCounterPorc (+ OverlapMargin)
+            // and that none of our AgitatorCounterHeavy reaches gets, at a 10 s minimum metal income of
+            // AgitatorCounterMinMetalIncome or more, one commander-group T2 constructor (nearest within Reach) that drops
+            // the faction's heavy at most RangeShare of its range from it (toward the porc), then the faction's pop-up
+            // PopupForward in front of it, then goes back to the task it had. One job at a time. Log [FRONT][AgitatorCounter].
+            bool AgitatorCounter = true;
+            array<string> AgitatorCounterTargets = { "armguard", "corpun", "legcluster" };   // Gauntlet, Agitator, Amputator
+            array<string> AgitatorCounterPorc = { "armllt", "corllt", "leglht",              // LLT: Sentry, Guard, Pharos
+                "armbeamer", "corhllt", "legmg",                                              // Beamer, Twin Guard, Cacophony
+                "armrl", "corrl", "legrl",                                                    // light AA
+                "armnanotc", "cornanotc", "legnanotc" };                                      // nano turrets
+            array<string> AgitatorCounterHeavy = { "armamb", "cortoast", "legacluster" };    // Rattlesnake, Persecutor, Eviscerator
+            array<string> AgitatorCounterPopup = { "armpb", "corvipe", "legapopupdef" };     // Pit Bull, Scorpion, Chimera
+            float AgitatorCounterMinMetalIncome = 65.0f;   // 10 s minimum, inclusive
+            float AgitatorCounterRangeShare = 0.8f;        // the heavy stands at most this share of its range from the agitator
+            float AgitatorCounterOverlapMargin = 32.0f;    // the agitator's range + this reaching our porc counts (hull edge)
+            float AgitatorCounterPopupForward = 128.0f;    // the pop-up this far in front of the heavy, toward the agitator
+            float AgitatorCounterReach = 3000.0f;          // commander-group T2s this near the heavy's site are asked
+            float AgitatorCounterShake = 64.0f;            // heavy's build shake (taken off the range so it stays within RangeShare)
+            float AgitatorCounterPopupShake = 96.0f;
+            int AgitatorCounterMax = 6;                    // heavies of ours standing (any system) at most
+            int AgitatorCounterScanSeconds = 5;
+            // T2 vehicle constructors: native drops their builds inside a scouted enemy gun's reach (conPorcSafety),
+            // so they only take a site outside the agitator's reach; T2 bots take any site
+            array<string> AgitatorCounterVehicleUnits = { "armacv", "coracv", "legacv" };
             // Tactical launchers against enemy heavy turret clusters (owner, 2026-11-02; systems/construction/front_tactical.as).
             // While two known Pulsars / Bulwarks / Bastions (seen now or ghost images) stand within TacticalClusterRadius
             // of each other, every such turret with one of our mexes / static land guns within TacticalFrontRadius gets

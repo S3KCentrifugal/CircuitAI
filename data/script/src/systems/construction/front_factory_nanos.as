@@ -211,6 +211,7 @@ namespace FrontFactoryNanos {
     // the eco kept every T1 constructor busy while the lab was a frame, and its turrets waited for it to
     // stand. The build it leaves stays queued for the next constructor; nothing is cancelled.
     bool Takeable(CCircuitUnit@ u) {
+        if (u is null || FrontAgitatorCounter::Holds(u.id)) return false;   // owner 2026-11-12: on the agitator counter job
         IBuilderTask@ b = cast<IBuilderTask>(u.task);
         if (b is null || b.IsDead() || b.target !is null) return false;
         const Task::BuildType bt = Task::BuildType(b.GetBuildType());

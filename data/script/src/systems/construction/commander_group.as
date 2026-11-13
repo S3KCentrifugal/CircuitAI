@@ -92,10 +92,13 @@ namespace CommanderGroup {
         aiTerrainMgr.SetLayoutInt("front.group.economy",economy);
         if(aiBuilderMgr.FrontCommanderId()<0) wantDecoy=true;
         aiTerrainMgr.SetLayoutInt("front.group.decoy",wantDecoy?1:0);
-        for(uint i=0;i<members.length();++i) {
+        for(uint i=0;i<members.length();++i)
             if(!Eligible(ai.GetTeamUnit(members[i]))) {members[i]=-1;Save(int(i));}
-            aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,float(members[i]));
-        }
+        // owner 2026-11-12: a T2 seat drops a heavy pop-up artillery + pop-up against an enemy agitator on our porc
+        // (front_agitator_counter.as); while on that job it is published as -1 so native group work cannot take it back
+        FrontAgitatorCounter::Update();
+        for(uint i=0;i<members.length();++i)
+            aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,float(FrontAgitatorCounter::Holds(members[i])?-1:members[i]));
         // owner 2026-11-01: the group's T1 constructor also builds forward agitators (front_agitator.as GroupPull);
         // while it is on one, native group work must not take it back, so it is unpublished meanwhile
         CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);
@@ -201,6 +204,8 @@ namespace CommanderGroup {
     IUnitTask@ Work(CCircuitUnit@ unit) {
         Update();
         if(!Owns(unit.id)) return null;
+        IUnitTask@ counter=FrontAgitatorCounter::Work(unit);   // owner 2026-11-12: the agitator counter job, then its old task
+        if(counter !is null) return counter;
         if(FrontConstructors::seats[2]==unit.id) {
             IUnitTask@ agit=FrontAgitator::GroupPull(unit);
             PublishUnit(agit !is null);

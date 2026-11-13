@@ -27,6 +27,8 @@
 #include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/front_agitator.as"
 #include "../../systems/construction/front_tactical.as"
+#include "../../systems/construction/front_agitator_counter.as"
+#include "../../systems/construction/front_agitator_counter.as"
 #include "../../systems/construction/front_silo_grid.as"
 #include "../../systems/construction/front_long_aa.as"
 #include "../../systems/construction/front_layout.as"
@@ -59,6 +61,7 @@ namespace RoleFront {
         FrontLabPorc::Reset();
         FrontAgitator::Reset();
         FrontTactical::Reset();
+        FrontAgitatorCounter::Reset();
         FrontLongAA::Reset();
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
@@ -962,6 +965,7 @@ namespace RoleFront {
         FrontLabPorc::TaskRemoved(task, done);
         FrontAgitator::TaskRemoved(task, done);
         FrontTactical::TaskRemoved(task, done);
+        FrontAgitatorCounter::TaskRemoved(task, done);
         FrontLongAA::TaskRemoved(task, done);
         FrontOverflow::TaskRemoved(task, done);
         Front_GantryTaskRemoved(task);
