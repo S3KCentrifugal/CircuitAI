@@ -2,9 +2,10 @@
 // builds 1-2 T2 constructors ahead of its normal production (EarlyMexUpgraders::FactoryMakeTask), and
 // those constructors only upgrade our own T1 mexes (Economy::MexTracker, nearest first, reachable and
 // safe: IsMexSpotSafe reads the threat map and enemy porc, ghosts too) or assist a mex upgrade.
-// They go back to normal duty once no owned T1 mex is left that is safe to upgrade (all upgraded, or
-// the rest sit under enemy porc) for EarlyMexUpgradersReleaseSeconds; after that the phase is over
-// and no more are claimed or built.
+// With none of ours left safe to upgrade they upgrade allies' T1 mexes the same way (owner, same day).
+// They go back to normal duty once no owned or allied T1 mex is left that is safe to upgrade (all
+// upgraded, or the rest under enemy porc / on the threat map) for EarlyMexUpgradersReleaseSeconds;
+// after that the phase is over and no more are claimed or built.
 // Claimed: a T2 constructor at its first ask for work (fresh from a factory, so nothing is pulled off
 // a job), not owned by another program (lolcannon / LRPC crew, FRONT commander group, tactical,
 // agitator counter, catalyst trade, TECH air foundry or flank, TECH's D-107 air constructors).
@@ -148,6 +149,10 @@ namespace EarlyMexUpgraders {
             const bool old = ai.frame - orderFrames[i] >= Global::RoleSettings::EarlyMexUpgradersOrderFailSeconds * SECOND;
             if (!dead && !old) continue;
             if (dead && !old && !IsUpgradedAt(orderSpots[i])) Back(orderSpots[i], "order ended at once");
+            // an ended order's allied spot waits for the next scan (it may be a moho now)
+            if (dead)
+                for (int j = int(allied.length()) - 1; j >= 0; --j)
+                    if (MapHelpers::IsInRange(allied[j], orderSpots[i], 35.0f)) allied.removeAt(j);
             orderTasks.removeAt(i); orderSpots.removeAt(i); orderFrames.removeAt(i);
         }
     }
@@ -169,6 +174,57 @@ namespace EarlyMexUpgraders {
                 || !aiEconomyMgr.IsMexSpotSafe(u, m.pos)) continue;
             bestSq = d;
             best = m.pos;
+        }
+        return best;
+    }
+
+    // Allied T1 mexes (owner, 2026-11-13): once none of ours is left safe to upgrade, the dedicated
+    // constructors upgrade allies' T1 mexes, nearest first, skipping any under enemy porc or on the
+    // threat map (IsMexSpotSafe). Candidates come from the ally asset list (finished friendly static
+    // mexes/builders/geos, refreshed natively every 5 s), kept to those on a metal spot and costing at
+    // most AlliedT1MaxCost; rebuilt every AlliedScanSeconds: O(assets x spots), tens x ~100, per AI.
+    array<AIFloat3> allied;
+    int alliedFrame = -100000;
+
+    void ScanAllied() {
+        if (ai.frame - alliedFrame < Global::RoleSettings::EarlyMexUpgradersAlliedScanSeconds * SECOND) return;
+        alliedFrame = ai.frame;
+        allied.resize(0);
+        if (aiEconomyMgr.IsMetalMap()) return;
+        const int spots = ai.GetMetalSpotCount();
+        const int n = aiBattle.GetAllyAssetCount();
+        for (int i = 0; i < n; ++i) {
+            if (aiBattle.GetAllyAssetCost(i) > Global::RoleSettings::EarlyMexUpgradersAlliedT1MaxCost) continue;
+            const AIFloat3 p = aiBattle.GetAllyAssetPos(i);
+            if (p.x < 0.0f || Economy::MexTracker::IsOwnedMex(p)) continue;
+            for (int s = 0; s < spots; ++s) {
+                const AIFloat3 sp = ai.GetMetalSpot(s);
+                if (MapHelpers::IsInRange(p, sp, 48.0f)) { allied.insertLast(p); break; }
+            }
+        }
+    }
+
+    bool OrderedAt(const AIFloat3 &in p) {
+        for (uint i = 0; i < orderSpots.length(); ++i)
+            if (MapHelpers::IsInRange(p, orderSpots[i], 35.0f) && orderTasks[i] !is null && !orderTasks[i].IsDead()) return true;
+        return false;
+    }
+
+    AIFloat3 PickAllied(CCircuitUnit@ u, CCircuitDef@ moho) {
+        AIFloat3 best(-1, -1, -1);
+        if (u is null || moho is null || u.circuitDef is null || !Global::RoleSettings::EarlyMexUpgradersAllied) return best;
+        ScanAllied();
+        const AIFloat3 from = u.GetPos(ai.frame);
+        float bestSq = 3.4e+38f;
+        for (uint i = 0; i < allied.length(); ++i) {
+            const AIFloat3 p = allied[i];
+            const float d = MapHelpers::SqDist(from, p);
+            if (d >= bestSq || BackedOff(p) || OrderedAt(p)) continue;
+            if (!aiTerrainMgr.CanUpgradeTerrain(moho, p)
+                || !aiTerrainMgr.CanReachAtSafe(u, p, u.circuitDef.GetBuildDistance())
+                || !aiEconomyMgr.IsMexSpotSafe(u, p)) continue;
+            bestSq = d;
+            best = p;
         }
         return best;
     }
@@ -196,7 +252,8 @@ namespace EarlyMexUpgraders {
     // Sets keep when the constructor should stay on what it has (AiMakeTask returns null).
     IUnitTask@ Work(CCircuitUnit@ u, bool &out keep) {
         keep = false;
-        if (!On() || !IsT2Constructor(u)) return null;
+        // null or half-gone unit (lost, given away, between jobs): nothing of it is read
+        if (u is null || u.circuitDef is null || !On() || !IsT2Constructor(u)) return null;
         if (!IsClaimed(u.id)) {
             if (asked.find(u.id) >= 0) return null;
             asked.insertLast(u.id);
@@ -216,7 +273,10 @@ namespace EarlyMexUpgraders {
         CCircuitDef@ moho = Moho(u);
         AIFloat3 spot(-1, -1, -1);
         CheckFailures();
+        bool ally = false;
         if (moho !is null) spot = Pick(u, moho);
+        // ours all upgraded or unsafe: an ally's T1 mex (after any upgrade of ours still to assist)
+        if (moho !is null && spot.x < 0.0f) { spot = PickAllied(u, moho); ally = spot.x >= 0.0f; }
         // Enqueue may dispatch lifecycle callbacks: from here on the unit is read again by id
         // (it can die or change hands between a job and the next), never through the old handle
         const int id = u.id;
@@ -230,7 +290,7 @@ namespace EarlyMexUpgraders {
             if (t !is null && !t.IsDead()) {
                 ours.insertLast(t);
                 orderTasks.insertLast(t); orderSpots.insertLast(spot); orderFrames.insertLast(ai.frame);
-                GenericHelpers::LogUtil("[MexUpT2] " + name + " " + id + " upgrades ("
+                GenericHelpers::LogUtil("[MexUpT2] " + name + " " + id + " upgrades " + (ally ? "allied " : "") + "("
                     + int(spot.x) + "," + int(spot.z) + "), open " + OpenCount(), 1);
                 return t;
             }
@@ -248,8 +308,10 @@ namespace EarlyMexUpgraders {
         if (idleSince < 0 || AnyResting()) idleSince = ai.frame;
         if (ai.frame - idleSince >= Global::RoleSettings::EarlyMexUpgradersReleaseSeconds * SECOND) {
             done = true;
-            Status("phase over, no owned T1 mex left that is safe to upgrade");
-            while (claimed.length() > 0) Release(claimed[0], "no safe T1 mex left");
+            Status("phase over, no owned or allied T1 mex left that is safe to upgrade");
+            // releasing only drops our claim: the unit's handle is not kept or read, native's next
+            // ask (idle or re-evaluation) gives it normal work through the providers below ours
+            while (claimed.length() > 0) Release(claimed[0], "no safe T1 mex left (ours or allied)");
         }
         return null;
     }

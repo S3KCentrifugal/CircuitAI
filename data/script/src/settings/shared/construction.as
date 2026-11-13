@@ -56,6 +56,10 @@ namespace RoleSettings {
         int EarlyMexUpgradersOrderFailSeconds = 10;  // an upgrade order dead this soon, mex still T1: its spot rests
         int EarlyMexUpgradersBackoffSeconds = 120;
         int EarlyMexUpgradersBackoffLimit = 3;       // refusals before a spot is left to native
+        // owner, 2026-11-13: ours done, the dedicated constructors upgrade allies' safe T1 mexes
+        bool EarlyMexUpgradersAllied = true;
+        float EarlyMexUpgradersAlliedT1MaxCost = 150.0f;   // T1 mexes ~50-60 metal; mohos ~600+
+        int EarlyMexUpgradersAlliedScanSeconds = 10;
 
        
 
