@@ -6,6 +6,7 @@
 // defs, which tier - stays in script (systems/construction/lolcannon.as).
 
 #include <algorithm>
+#include <cmath>
 #include <numeric>
 #include <vector>
 
@@ -118,6 +119,45 @@ inline float BlastRingRadius(float blastRadius, float footHalfDiag, float margin
 	const float lo = footHalfDiag + margin, hi = blastRadius * 0.45f;
 	if ((blastRadius <= 0.f) || (lo > hi)) return 0.f;
 	return std::min(hi, std::max(lo, blastRadius * 0.3f));
+}
+
+/*
+ * How deep the ring should sink (owner 2026-11-12: use what the ground restore
+ * measured). The engine's own crater (BasicMapDamage::Explosion): depth =
+ * 3 x strength^0.6 x profile(distance / radius) / hardness, strength =
+ * min(radius x 10, damage) x craterMult (CGameHelper::Explosion; 1 for unit
+ * death blasts). Checked against the restore runs (BAR\afus-restore-runs, Forge
+ * v2.3, 9ef618b2: an advanced fusion digs 22-38 elmos at its centre, a 6-16
+ * elmo bowl) and this kit's Proving Grounds runs (ring 192 sank 2.5-3.2): a
+ * fixed Forge depth predicted 17 there, so depth is read through the map's
+ * hardness (Map_getHardness; per-terrain-type modifiers ignored, 1 on most
+ * maps). `scale` is a calibration lever, 1 = the engine's formula.
+ */
+inline float CraterProfile(float rel)
+{
+	if ((rel < 0.f) || (rel >= 1.f)) return 0.f;
+	constexpr float PI = 3.14159265f;
+	const float c1 = std::cos((rel - 0.1f) * (PI + 0.3f));
+	const float c2 = std::cos(std::max(0.0f, rel * 3.0f - 2.0f) * PI);
+	return c1 * (1.0f - rel) * (0.5f + 0.5f * c2);
+}
+
+inline float CraterStrength(float blastRadius, float damage)
+{
+	return std::max(0.f, std::min(blastRadius * 10.f, damage));
+}
+
+inline float ExpectedRingDepth(float blastRadius, float damage, float ringRadius, float hardness, float scale = 1.f)
+{
+	const float s = CraterStrength(blastRadius, damage);
+	if ((s <= 0.f) || (blastRadius <= 0.f) || (hardness <= 0.f) || (scale <= 0.f)) return 0.f;
+	return scale * 3.f * std::pow(s, 0.6f) * CraterProfile(ringRadius / blastRadius) / hardness;
+}
+
+// The drop a ring point must show: `share` of the expected depth, at least `floor`.
+inline float BlastDropLine(float expected, float share, float floor)
+{
+	return std::max(floor, expected * share);
 }
 
 // How many ring points sank by `drop` or more from `before` to `now`.

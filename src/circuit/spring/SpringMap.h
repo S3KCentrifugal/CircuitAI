@@ -42,6 +42,7 @@ public:
 
 	float GetWaterDamage() const { return map->GetWaterDamage(); }
 	float GetGravity() const { return map->GetGravity(); }  // D-126: per frame, negative
+	float GetHardness() const { return map->GetHardness(); }  // crater depth ~ 1 / hardness (lolcannon likely killed)
 	float GetMinWind() const { return map->GetMinWind(); }
 	float GetMaxWind() const { return map->GetMaxWind(); }
 	float GetCurWind() const { return map->GetCurWind(); }

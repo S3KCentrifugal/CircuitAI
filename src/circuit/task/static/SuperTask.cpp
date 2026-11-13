@@ -1754,6 +1754,14 @@ void CSuperTask::SetTierBlastWatch(float minRadius, float drop, int minPoints, i
 		tierRings.clear();
 		tierLikelyKilled.clear();
 	}
+	tierRingRadius.clear();  // the drop lines follow the floor
+}
+
+void CSuperTask::SetTierBlastDepth(float refDepth, float share)
+{
+	tierBlastRefDepth = refDepth;
+	tierBlastShare = std::max(0.f, share);
+	tierRingRadius.clear();
 }
 
 void CSuperTask::SampleRing(SGroundRing& r) const
@@ -1798,11 +1806,18 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 		}
 		SGroundRing now = it->second;
 		SampleRing(now);
-		const int sunk = tier::SunkPoints(it->second.h, now.h, tier::BLAST_RING_POINTS, tierBlastDrop);
+		const int sunk = tier::SunkPoints(it->second.h, now.h, tier::BLAST_RING_POINTS, it->second.drop);
 		if ((it->second.cdef != nullptr) && (sunk >= tierBlastPoints)) {
-			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) gone from the roster over its own crater (%i of %i ground points %.0f round it sank %.1f+ elmos): its death blast marks what it killed out of sight",
+			float deepest = 0.f, sum = 0.f;
+			for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) {
+				const float d = it->second.h[i] - now.h[i];
+				deepest = std::max(deepest, d);
+				sum += d;
+			}
+			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) gone from the roster over its own crater (%i of %i ground points %.0f round it sank %.1f+ elmos; mean %.1f, deepest %.1f): its death blast marks what it killed out of sight",
 					circuit->GetTeamId(), frame, gunName, unit->GetId(), it->second.cdef->GetDef()->GetName(), it->first,
-					int(it->second.x), int(it->second.z), sunk, tier::BLAST_RING_POINTS, it->second.radius, tierBlastDrop);
+					int(it->second.x), int(it->second.z), sunk, tier::BLAST_RING_POINTS, it->second.radius, it->second.drop,
+					sum / float(tier::BLAST_RING_POINTS), deepest);
 			blasts.push_back({AIFloat3(it->second.x, 0.f, it->second.z), DeathBlastOf(it->second.cdef), it->first});
 		}
 		it = tierRings.erase(it);
@@ -1834,15 +1849,22 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 				auto rr = tierRingRadius.find(e.cdef);
 				if (rr == tierRingRadius.end()) {
 					const SDeathBlast b = DeathBlastOf(e.cdef);
-					float ring = 0.f;
+					float ring = 0.f, drop = tierBlastDrop;
 					if ((b.damage > 0.f) && (b.radius >= tierBlastMinRadius)) {
 						UnitDef* ud = e.cdef->GetDef();
 						const float hx = ud->GetXSize() * SQUARE_SIZE * 0.5f, hz = ud->GetZSize() * SQUARE_SIZE * 0.5f;
 						ring = tier::BlastRingRadius(b.radius, std::sqrt(hx * hx + hz * hz));
+						const float hardness = circuit->GetMap()->GetHardness();
+						const float expected = tier::ExpectedRingDepth(b.radius, b.damage, ring, hardness, tierBlastRefDepth);
+						drop = tier::BlastDropLine(expected, tierBlastShare, tierBlastDrop);
+						if (ring > 0.f) {  // once per def and gun
+							circuit->LOG("TIER: team=%i %s(%i): watching %s ground: ring %.0f of blast %.0f, map hardness %.0f, expected sink %.1f elmos, drop line %.2f",
+									circuit->GetTeamId(), gunName, unit->GetId(), ud->GetName(), ring, b.radius, hardness, expected, drop);
+						}
 					}
-					rr = tierRingRadius.emplace(e.cdef, ring).first;
+					rr = tierRingRadius.emplace(e.cdef, std::make_pair(ring, drop)).first;
 				}
-				if (rr->second <= 0.f) {
+				if (rr->second.first <= 0.f) {
 					continue;
 				}
 				SGroundRing& r = tierRings[e.id];
@@ -1851,7 +1873,8 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 				}
 				r.x = e.pos.x;
 				r.z = e.pos.z;
-				r.radius = rr->second;
+				r.radius = rr->second.first;
+				r.drop = rr->second.second;
 				r.cdef = e.cdef;
 				r.sunk = 0;
 				SampleRing(r);
@@ -1866,13 +1889,13 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 			}
 			SGroundRing now = rit->second;
 			SampleRing(now);
-			const int sunk = tier::SunkPoints(rit->second.h, now.h, tier::BLAST_RING_POINTS, tierBlastDrop);
+			const int sunk = tier::SunkPoints(rit->second.h, now.h, tier::BLAST_RING_POINTS, rit->second.drop);
 			if (sunk < tierBlastPoints) {
 				if (sunk != rit->second.sunk) {  // a partial sink, logged when it changes (shells, a far blast)
 					rit->second.sunk = sunk;
 					circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) out of sight: %i of %i ground points sank %.1f+ elmos (%i needed)",
 							circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
-							sunk, tier::BLAST_RING_POINTS, tierBlastDrop, tierBlastPoints);
+							sunk, tier::BLAST_RING_POINTS, rit->second.drop, tierBlastPoints);
 				}
 				continue;
 			}
@@ -1880,7 +1903,7 @@ bool CSuperTask::WatchBlasts(CCircuitUnit* unit, float maxSqRange)
 			for (int i = 0; i < tier::BLAST_RING_POINTS; ++i) deepest = std::max(deepest, rit->second.h[i] - now.h[i]);
 			circuit->LOG("TIER: team=%i frame=%i %s(%i): %s(%i) at (%i,%i) likely killed: %i of %i ground points %.0f round it sank %.1f+ elmos (deepest %.1f) out of sight; down %i tiers until radar or LOS shows it",
 					circuit->GetTeamId(), frame, gunName, unit->GetId(), e.cdef->GetDef()->GetName(), e.id, int(e.pos.x), int(e.pos.z),
-					sunk, tier::BLAST_RING_POINTS, rit->second.radius, tierBlastDrop, deepest, tierBlastPenalty);
+					sunk, tier::BLAST_RING_POINTS, rit->second.radius, rit->second.drop, deepest, tierBlastPenalty);
 			tierLikelyKilled[e.id] = frame;
 			blasts.push_back({e.pos, DeathBlastOf(e.cdef), e.id});
 			tierRings.erase(rit);

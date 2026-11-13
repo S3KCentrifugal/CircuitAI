@@ -165,7 +165,18 @@ namespace LolCannon {
     // package goes to the blast (no more often than ReScoutMinSeconds).
     // BlastMinRadius 0: off. CSuperTask::SetTierBlastWatch, TierTargeting.h.
     float BlastMinRadius = 200.0f;
-    float BlastDropElmos = 2.0f;
+    float BlastDropElmos = 0.5f;    // the floor of the drop line
+    // the drop line per def (owner 2026-11-12: from what the ground restore
+    // measured): a ring point must sink BlastDropShare of what the engine's crater
+    // formula says its def's ring should, over the map's hardness (TierTargeting.h
+    // ExpectedRingDepth). Calibrated 2026-11-12 in BAR\blastkill-runs: an advanced
+    // fusion's ring (192) sank 2.5 on Proving Grounds (hardness 350) and 4.4 on
+    // Forge v2.3 (hardness 200); the bare formula gave 0.9 and 1.6, so x2.8 on both.
+    // (The restore runs' 22-38 elmos on Forge were the bowl's deepest, several
+    // advanced fusions together.) A cannon shell digs about a tenth of an advanced
+    // fusion at its own centre. BlastDepthScale 0: the floor only.
+    float BlastDepthScale = 2.8f;
+    float BlastDropShare = 0.35f;
     int BlastMinPoints = 4;
     int BlastTierPenalty = 10;
     // the cover (owner 2026-10-31): once the turrets, the storages and the cannon

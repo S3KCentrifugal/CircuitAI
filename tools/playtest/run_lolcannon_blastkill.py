@@ -65,12 +65,17 @@ def prepare(args):
     pos = source.index('{', source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
     source = source[:pos]+'\n        if (ai.teamId >= 0) return aiBuilderMgr.Enqueue(TaskB::Wait(3*SECOND)); // blast-kill fixture: builders held (no radar)\n'+source[pos:]
     path.write_text(source)
+    if args.depth_scale is not None:
+        path = staged/'script/src/settings/shared/lolcannon.as'
+        s = path.read_text()
+        assert s.count('float BlastDepthScale = 2.8f;') == 1
+        path.write_text(s.replace('float BlastDepthScale = 2.8f;', f'float BlastDepthScale = {args.depth_scale:.2f}f; // fixture override'))
     if args.blast_off:
         path = staged/'script/src/settings/shared/lolcannon.as'
         s = path.read_text()
         assert s.count('float BlastMinRadius = 200.0f;') == 1
         path.write_text(s.replace('float BlastMinRadius = 200.0f;', 'float BlastMinRadius = 0.0f; // control: off'))
-    manifest = {'blast_off': args.blast_off, 'dll_sha256': hashlib.sha256(args.dll.read_bytes()).hexdigest(),
+    manifest = {'blast_off': args.blast_off, 'depth_scale': args.depth_scale, 'dll_sha256': hashlib.sha256(args.dll.read_bytes()).hexdigest(),
         'source_data': str(args.data.resolve())}
     (directory/'blastkill-fixture.json').write_text(json.dumps(manifest, indent=2))
     checks = {
@@ -104,23 +109,37 @@ def analyse(directory):
     m = re.search(r'\[BlastKillTest\] destroyed A unit=\d+ frame=(\d+)', text)
     killed_at = int(m.group(1)) if m else None
     expected_dead = {'Afus', 'Allt'}
+    pos = {int(m.group(2)): (int(m.group(3)), int(m.group(4)))
+           for m in re.finditer(r'\[BlastKillTest\] target (\w+) unit=(\d+) def=\w+ x=(\d+) z=(\d+)', text)}
+    # a big structure's real death: its owner's restore opens a crater zone there
+    died = {}
+    for m in re.finditer(r'\[f=(\d+)\][^\n]*?RESTORE\[t1\]: crater zone opened: \w+ died at \((\d+), (\d+)\)', text):
+        for uid, (x, z) in pos.items():
+            if abs(x - int(m.group(2))) < 24 and abs(z - int(m.group(3))) < 24:
+                died.setdefault(uid, int(m.group(1)))
+    if killed_at is not None:
+        for uid, role in roles.items():
+            if role in expected_dead or role == 'A':
+                died.setdefault(uid, killed_at)
     marks = []
     for m in re.finditer(r'TIER: team=0 frame=(\d+) \S+: (\w+)\((\d+)\) at \(\S+\) likely killed(:| with it)', text):
         frame, name, uid = int(m.group(1)), m.group(2), int(m.group(3))
-        role = roles.get(uid, '?')
-        ok = role in expected_dead and killed_at is not None and frame >= killed_at
-        marks.append({'unit': uid, 'role': role, 'def': name, 'frame': frame,
-            'how': 'ground' if m.group(4) == ':' else 'neighbour', 'verdict': 'ok' if ok else 'FALSE'})
-    marked = {x['role'] for x in marks}
-    seen_empty = re.findall(r'ENEMY: ghost (\w+) (\d+) seen empty, removed', text)
+        death = died.get(uid)
+        marks.append({'unit': uid, 'role': roles.get(uid, '?'), 'def': name, 'frame': frame, 'died': death,
+            'how': 'ground' if m.group(4) == ':' else 'neighbour',
+            'verdict': 'ok' if death is not None and frame >= death else 'FALSE (no death before the mark)'})
     targets = [{'frame': int(f), 'tier': int(t), 'def': d, 'unit': int(u), 'role': roles.get(int(u), '?')}
         for f, t, d, u in re.findall(r'TIER: team=0 frame=(\d+) armvulc\(\d+\): tier (\d+) (\w+)\((\d+)\)', text)]
-    result = {'roles': {str(k): v for k, v in roles.items()}, 'killed_A_frame': killed_at, 'marks': marks,
-        'missed': sorted(expected_dead - marked), 'false_marks': sum(1 for x in marks if x['verdict'] != 'ok'),
+    # the harm: a dead image fired at on its live tier after its death
+    wasted = [t for t in targets if t['unit'] in died and t['frame'] > died[t['unit']] and t['tier'] <= 6]
+    seen_empty = re.findall(r'ENEMY: ghost (\w+) (\d+) seen empty, removed', text)
+    result = {'roles': {str(k): v for k, v in roles.items()}, 'killed_A_frame': killed_at,
+        'deaths': {str(k): v for k, v in died.items()}, 'marks': marks,
+        'wasted_dwells_on_dead_images': wasted, 'false_marks': sum(1 for x in marks if x['verdict'] != 'ok'),
         'seen_again': re.findall(r'TIER: team=0 .* seen again .*', text),
         'seen_empty': [{'def': d, 'unit': int(u), 'role': roles.get(int(u), '?')} for d, u in seen_empty],
         'targets': targets}
-    result['verdict'] = 'PASS' if (not result['missed'] and result['false_marks'] == 0) else 'FAIL'
+    result['verdict'] = 'PASS' if (not wasted and result['false_marks'] == 0 and marks) else 'FAIL'
     (directory/'blastkill-result.json').write_text(json.dumps(result, indent=2))
     return result
 
@@ -132,6 +151,7 @@ def main():
     parser.add_argument('--minutes', type=int, default=22)
     parser.add_argument('--map', default='Proving Grounds v1.0', help='deformable; west and east AI spots 6,600+ apart')
     parser.add_argument('--blast-off', action='store_true', help='control: BlastMinRadius 0')
+    parser.add_argument('--depth-scale', type=float, default=None, help='override BlastDepthScale (0: the floor only)')
     parser.add_argument('--game', default='Beyond All Reason test-31836-b250a16')
     parser.add_argument('--analyse-only', action='store_true')
     args = parser.parse_args()

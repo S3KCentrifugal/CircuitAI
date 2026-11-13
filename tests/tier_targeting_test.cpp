@@ -1,5 +1,6 @@
 #include "task/static/TierTargeting.h"
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <vector>
 using namespace circuit::tier;
@@ -149,6 +150,34 @@ void test_likely_killed_target_falls_below_live_tiers()
     assert(Downranked(At(5, 2, 100.f, 0.f, 0.f), 0).tier == 2);
 }
 
+void test_drop_line_follows_the_engine_crater()
+{
+    // advanced fusion (blast 640, 10600: strength 6400), ring 192 (0.3 of the radius)
+    const float pg = ExpectedRingDepth(640.f, 10600.f, 192.f, 125.f);    // bare formula at hardness 125
+    assert(pg > 2.2f && pg < 3.2f);
+    // a soft map near the restore runs' Forge depths: centre ~30 at hardness ~18
+    const float centre = ExpectedRingDepth(640.f, 10600.f, 0.f, 18.f);
+    assert(centre > 22.f && centre < 38.f);
+    // depth ~ 1 / hardness, and the scale lever multiplies
+    assert(std::abs(ExpectedRingDepth(640.f, 10600.f, 192.f, 50.f) * 2.f - ExpectedRingDepth(640.f, 10600.f, 192.f, 25.f)) < 1e-3f);
+    assert(std::abs(ExpectedRingDepth(640.f, 10600.f, 192.f, 50.f, 2.f) - ExpectedRingDepth(640.f, 10600.f, 192.f, 25.f)) < 1e-3f);
+    // the drop line: a share of it, never below the floor
+    assert(std::abs(BlastDropLine(pg, 0.35f, 0.5f) - pg * 0.35f) < 1e-4f);
+    assert(BlastDropLine(ExpectedRingDepth(640.f, 10600.f, 192.f, 0.f), 0.35f, 0.5f) == 0.5f);
+    // a Starfall shell (crater radius 128, cratermult 0.1: strength 128, passed as damage) digs
+    // under the advanced fusion's line even at its own centre, on any hardness
+    for (float h : {18.f, 100.f, 125.f}) {
+        const float shell = ExpectedRingDepth(128.f, 128.f, 0.f, h);
+        const float line = BlastDropLine(ExpectedRingDepth(640.f, 10600.f, 192.f, h), 0.35f, 0.f);
+        assert(shell < line);
+    }
+    // the profile: the bowl ends near 0.55 of the radius, a lip beyond
+    assert(CraterProfile(0.5f) > 0.f && CraterProfile(0.6f) < 0.f && CraterProfile(1.f) == 0.f);
+    // calibration (BAR\blastkill-runs 2026-11-12): scale 2.8 gives the measured ring sinks
+    assert(std::abs(ExpectedRingDepth(640.f, 10600.f, 192.f, 350.f, 2.8f) - 2.5f) < 0.2f);   // Proving Grounds
+    assert(std::abs(ExpectedRingDepth(640.f, 10600.f, 192.f, 200.f, 2.8f) - 4.4f) < 0.2f);   // Forge v2.3
+}
+
 int main()
 {
     test_first_candidate_is_taken();
@@ -164,6 +193,7 @@ int main()
     test_blast_ring_sits_outside_the_footprint_inside_the_bowl();
     test_ring_blast_needs_enough_sunk_points();
     test_likely_killed_target_falls_below_live_tiers();
+    test_drop_line_follows_the_engine_crater();
     std::cout << "tier_targeting_test: PASS\n";
     return 0;
 }

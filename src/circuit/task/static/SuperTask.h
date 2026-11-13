@@ -69,6 +69,10 @@ public:
 	// 8), and every roster structure that blast would kill, falls `penalty`
 	// tiers until radar or LOS shows it again. minRadius <= 0: off.
 	void SetTierBlastWatch(float minRadius, float drop, int minPoints, int penalty);
+	// The drop line per def (TierTargeting.h ExpectedRingDepth): `share` of the depth its
+	// ring should sink by the engine's crater formula over the map's hardness, times
+	// `scale`; never below SetTierBlastWatch's drop. scale <= 0: the flat drop only.
+	void SetTierBlastDepth(float scale, float share);
 	// Each new blast found bumps the serial; the script scouts its position.
 	int GetTierBlastSerial() const { return tierBlastSerial; }
 	springai::AIFloat3 GetTierBlastPos() const { return tierBlastPos; }
@@ -229,16 +233,19 @@ private:
 		float x = 0.f, z = 0.f, radius = 0.f;
 		int frame = -1;  // when h was read
 		int sunk = 0;    // points sunk at the last check out of sight (logged on change)
+		float drop = 2.f;  // the sink a point must show (BlastDropLine for its def)
 		const CCircuitDef* cdef = nullptr;
 		float h[tier::BLAST_RING_POINTS] = {};
 	};
-	std::unordered_map<const CCircuitDef*, float> tierRingRadius;  // def -> ring radius, 0 not watched
+	std::unordered_map<const CCircuitDef*, std::pair<float, float>> tierRingRadius;  // def -> ring radius (0 not watched), drop line
 	void SampleRing(SGroundRing& r) const;
 	// The pre-pass of a roster scan: rings refreshed or checked, marks set and
 	// cleared, the blast's neighbours marked. True when a new mark was set.
 	bool WatchBlasts(CCircuitUnit* unit, float maxSqRange);
 	float tierBlastMinRadius = 0.f;   // off until the script sets it
-	float tierBlastDrop = 2.f;
+	float tierBlastDrop = 2.f;        // the drop line's floor
+	float tierBlastRefDepth = 1.f;    // depth scale: 1 = the engine's crater formula over the map's hardness
+	float tierBlastShare = 0.35f;     // the drop line: this share of the expected ring depth
 	int tierBlastPoints = 4;
 	int tierBlastPenalty = 10;
 	std::unordered_map<int, SGroundRing> tierRings;     // big-blast roster structure -> ground while last known alive

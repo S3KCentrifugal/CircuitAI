@@ -1846,6 +1846,7 @@ namespace LolCannon {
             st.SetTierRotation(Global::LolCannon::GunAreas, Global::LolCannon::GunAreaSeconds * SECOND, 0, Global::LolCannon::AreaRadius);
         st.SetTierBlastWatch(Global::LolCannon::BlastMinRadius, Global::LolCannon::BlastDropElmos,
             Global::LolCannon::BlastMinPoints, Global::LolCannon::BlastTierPenalty);
+        st.SetTierBlastDepth(Global::LolCannon::BlastDepthScale, Global::LolCannon::BlastDropShare);
         u.SetFireState(Global::LolCannon::FireState);   // owner 2026-10-26: fire at will; the tiered orders pick the target when one is in range
         GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " fires at " + st.GetTierCount()
             + " roster defs, best tier first; fire state " + Global::LolCannon::FireState, 1);
