@@ -131,6 +131,9 @@ namespace Air {
             // rebuilt; advanced converters take their land (field placement near the start
             // first, eco modules after). Reclaim one only while the energy bank holds this share.
             float ThinHomeConverterReclaimBank = 0.5f;
+            // Owner 2026-11-13 (All That Glitters): the T1 converter retirement above runs on
+            // every map once the first fusion stands, not only on a thin home.
+            bool RetireT1ConvertersAfterFusion = true;
             float FusionAccessMinMetal = 12.0f;
             float FusionAccessMinEnergy = 450.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time

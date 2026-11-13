@@ -57,7 +57,13 @@ namespace AirThinHome {
         return Active() ? Global::RoleSettings::Air::ThinHomeReclaimMargin : Global::RoleSettings::Air::ReclaimEnergyMargin;
     }
     // Past the first completed reactor no T1 converter is built (owner 2026-11-13).
-    bool T1ConvertersRetired() { return Active() && AirEconomy::HasReactor(); }
+    // Owner 2026-11-13 (All That Glitters, wind 0..16): on EVERY map, not only a thin
+    // home, AIR stops T1 converters and swaps them for advanced ones past its first fusion.
+    bool T1ConvertersRetired()
+    {
+        return (Global::RoleSettings::Air::RetireT1ConvertersAfterFusion || Active())
+            && !MetalEconomy::Active() && AirEconomy::HasReactor();
+    }
     bool IsT1Converter(const CCircuitDef@ d)
     {
         return d !is null && d.GetName() == UnitHelpers::GetEnergyConverterNameForSide(UnitHelpers::GetSideForUnitName(d.GetName()));

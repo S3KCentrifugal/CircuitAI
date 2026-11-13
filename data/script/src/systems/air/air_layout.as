@@ -462,7 +462,7 @@ namespace AirLayout {
         if (AirThinHome::T1ConvertersRetired() && AirThinHome::IsT1Converter(d)) return null;
         // AirThinHome: advanced converters take the land near the start that reclaimed
         // T1 converters and solars free (field ring search), the eco module slots after.
-        if (AirThinHome::Active() && AirThinHome::IsAdvConverter(d)) {
+        if (AirThinHome::T1ConvertersRetired() && AirThinHome::IsAdvConverter(d)) {
             IUnitTask@ field = PlaceField(u, d, type, priority, false, walkRadius);
             if (field !is null) return field;
         }

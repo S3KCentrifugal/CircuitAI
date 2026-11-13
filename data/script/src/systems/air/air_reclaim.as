@@ -30,6 +30,11 @@ namespace AirReclaim {
         return aiEconomyMgr.GetEnergyMake(unit.circuitDef);
     }
     bool CandidateFits(CCircuitUnit@ unit, float pendingOutput, float pendingRefund) {
+        // A T1 converter makes no energy and frees its draw when retired, so the energy
+        // margin never applies (Glitters 2026-11-13: pull ran at income and every T1
+        // converter failed the margin test); only the refund must fit the metal storage.
+        if (AirThinHome::IsT1Converter(unit.circuitDef))
+            return aiEconomyMgr.metal.storage - aiEconomyMgr.metal.current >= pendingRefund + unit.circuitDef.costM;
         return AirMath::EnergyRetirementFits(AirEconomy::energy,aiEconomyMgr.energy.pull,
             Output(unit),pendingOutput,AirThinHome::ReclaimMargin(),
             aiEconomyMgr.metal.current,aiEconomyMgr.metal.storage,unit.circuitDef.costM,pendingRefund);
