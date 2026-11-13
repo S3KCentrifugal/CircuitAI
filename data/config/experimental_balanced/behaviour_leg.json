@@ -988,6 +988,9 @@
 			},
 			"legrail": {
 				"role": ["skirmish"],
+				"attribute": ["ranged"],
+				// Owner 2026-11-13: Lance joins the Barrage ranged controller: approaches and fires from 99% of its 650 ground railgun (643; the 750 AA railgun only targets VTOL), backs off when fired upon, 1 blind volley per ghost image in range only when no LOS unit, identified radar contact or radar dot is in range; porc reach + 12 exact, always fire at will.
+				"ranged": {"ghost_volleys": 1, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 12, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
