@@ -37,7 +37,7 @@ namespace Team {
     }
 
     // Shared experimental-role recovery, replacing spare-only orphan donations.
-    void CheckOrphaned() { Recovery::Update(); SeaTech::Tick(); }
+    void CheckOrphaned() { Recovery::Update(); SeaTech::Tick(); AirEmergencyDefense::Tick(); }
 
     // True when teamId is on our ally team (ai.GetTeamIds() lists our own ally team).
     bool IsAlly(int teamId) {

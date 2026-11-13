@@ -70,7 +70,21 @@ namespace AirEmergencyDefense {
         CRouteTask@ task;
         array<int> members;
         bool patrolOnly = false;   // its emergency ended: left on patrol
+        // defense report (owner 2026-11-12), reset for each emergency the squad answers
+        int airTeam = -1;
+        int startFrame = -1, endFrame = -1, firstArrival = -1, lastReport = -100000;
+        int joined = 0, lost = 0, arrived = 0;
+        float enemyStart = -1.0f, enemyPeak = 0.0f, enemyNow = 0.0f;
+        bool finalDone = true;
     }
+    // Report sampling (CheckOrphaned, every 30 frames, throttled to ReportSampleSeconds):
+    // O(squads * (members + ground contacts)), only while a squad is reporting.
+    const int ReportSampleSeconds = 2;
+    const int ReportEverySeconds = 10;
+    const int ReportAfterSeconds = 60;       // keeps sampling this long after the emergency ends
+    const float ReportArriveRadius = 600.0f; // a member this near the spot counts as there
+    const float ReportEnemyRadius = 800.0f;  // enemy ground metal this near the spot
+    int reportSampled = -100000;
     dictionary emergencies;        // AIR team id string -> Emergency@
     array<Squad@> squads;
     dictionary owed;               // factory id string -> squad serial
@@ -90,7 +104,7 @@ namespace AirEmergencyDefense {
             e.over = true;
             if (e.mine) {
                 Squad@ s = SquadBySerial(e.serial);
-                if (s !is null) s.patrolOnly = true;
+                if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
                 GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + e.airTeam + " emergency " + e.serial
                     + " over: labs back to normal, squad " + (s is null ? 0 : int(s.members.length()))
                     + " units left on patrol at (" + int(e.site.x) + "," + int(e.site.z) + ")", 1);
@@ -194,15 +208,108 @@ namespace AirEmergencyDefense {
             if (old is null || MapHelpers::SqDist(old.site, e.site) > merge * merge) continue;
             GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + " reuses squad " + old.serial
                 + " (" + old.members.length() + " units) patrolling (" + int(old.site.x) + "," + int(old.site.z) + ")", 1);
+            if (!old.finalDone) Final(old);
             old.serial = e.serial; old.site = e.site; old.patrolOnly = false;
+            StartReport(old, e);
             Route(old);
             return old;
         }
         Prune();
         @s = Squad();
         s.serial = e.serial; s.site = e.site;
+        StartReport(s, e);
         squads.insertLast(s);
         return s;
+    }
+
+    /************************************************************************
+     Defense report (owner 2026-11-12): how well each emergency was defended.
+     [FRONT][AirEmergency][Report] lines: every ReportEverySeconds while the
+     emergency is on, then one "final" line ReportAfterSeconds after it ends.
+     Enemy metal = enemy ground contacts (units and structures) this AI knows
+     within ReportEnemyRadius of the spot. AIR's gunships fight there too, so a
+     cleared spot is not credited to the squad alone; arrival, losses and
+     presence are the squad's own numbers.
+     ************************************************************************/
+    void StartReport(Squad@ s, Emergency@ e)
+    {
+        s.airTeam = e.airTeam; s.startFrame = ai.frame; s.endFrame = -1; s.firstArrival = -1;
+        s.lastReport = ai.frame; s.joined = 0; s.lost = 0; s.arrived = 0;
+        s.enemyStart = EnemyMetal(s.site); s.enemyPeak = s.enemyStart; s.enemyNow = s.enemyStart;
+        s.finalDone = false;
+    }
+
+    float EnemyMetal(const AIFloat3 &in site)
+    {
+        float metal = 0.0f;
+        const float r2 = ReportEnemyRadius * ReportEnemyRadius;
+        const int contacts = aiBattle.GetGroundContactCount();
+        for (int i = 0; i < contacts; ++i) {
+            if (MapHelpers::SqDist(site, aiBattle.GetGroundContactPos(i)) > r2) continue;
+            const CCircuitDef@ d = ai.GetCircuitDef(aiBattle.GetGroundContactDefId(i));
+            if (d !is null) metal += d.costM;
+        }
+        return metal;
+    }
+
+    void Sample(Squad@ s)
+    {
+        int there = 0;
+        const float r2 = ReportArriveRadius * ReportArriveRadius;
+        for (uint k = 0; k < s.members.length(); ++k) {
+            CCircuitUnit@ u = ai.GetTeamUnit(s.members[k]);
+            if (u !is null && MapHelpers::SqDist(u.GetPos(ai.frame), s.site) <= r2) ++there;
+        }
+        s.arrived = there;
+        if (there > 0 && s.firstArrival < 0) {
+            s.firstArrival = ai.frame;
+            GenericHelpers::LogUtil("[FRONT][AirEmergency][Report] squad " + s.serial + ": first unit at the spot +"
+                + (ai.frame - s.startFrame) / SECOND + " s", 1);
+        }
+        s.enemyNow = EnemyMetal(s.site);
+        if (s.enemyNow > s.enemyPeak) s.enemyPeak = s.enemyNow;
+    }
+
+    void Final(Squad@ s)
+    {
+        s.finalDone = true;
+        const int end = s.endFrame >= 0 ? s.endFrame : ai.frame;
+        const bool cleared = s.enemyNow <= AiMax(50.0f, s.enemyPeak * 0.1f);
+        GenericHelpers::LogUtil("[FRONT][AirEmergency][Report] final squad " + s.serial + " AIR team " + s.airTeam
+            + " at (" + int(s.site.x) + "," + int(s.site.z) + "): emergency " + (end - s.startFrame) / SECOND + " s"
+            + ", first arrival " + (s.firstArrival < 0 ? "never" : ("+" + (s.firstArrival - s.startFrame) / SECOND + " s"))
+            + ", joined " + s.joined + ", lost " + s.lost + ", alive " + s.members.length() + ", at spot " + s.arrived
+            + ", enemy metal start " + int(s.enemyStart) + " peak " + int(s.enemyPeak) + " now " + int(s.enemyNow)
+            + ", cleared " + (cleared ? "yes" : "no"), 1);
+    }
+
+    // Team::CheckOrphaned (every 30 frames)
+    void Tick()
+    {
+        if (squads.length() == 0 || ai.frame - reportSampled < ReportSampleSeconds * SECOND) return;
+        reportSampled = ai.frame;
+        // emergencies end lazily; read them so endFrame is set on time
+        if (emergencies.getSize() > 0) {
+            array<string>@ keys = emergencies.getKeys();
+            for (uint i = 0; i < keys.length(); ++i) {
+                Emergency@ e = null;
+                if (emergencies.get(keys[i], @e) && e !is null) Live(e);
+            }
+        }
+        for (uint i = 0; i < squads.length(); ++i) {
+            Squad@ s = squads[i];
+            if (s is null || s.finalDone) continue;
+            for (int k = int(s.members.length()) - 1; k >= 0; --k)
+                if (ai.GetTeamUnit(s.members[k]) is null) { memberOf.delete("" + s.members[k]); s.members.removeAt(k); ++s.lost; }
+            Sample(s);
+            if (s.endFrame >= 0 && ai.frame - s.endFrame >= ReportAfterSeconds * SECOND) { Final(s); continue; }
+            if (s.endFrame < 0 && ai.frame - s.lastReport >= ReportEverySeconds * SECOND) {
+                s.lastReport = ai.frame;
+                GenericHelpers::LogUtil("[FRONT][AirEmergency][Report] squad " + s.serial + " +" + (ai.frame - s.startFrame) / SECOND
+                    + " s: alive " + s.members.length() + ", at spot " + s.arrived + ", lost " + s.lost
+                    + ", enemy metal near " + int(s.enemyNow) + " (peak " + int(s.enemyPeak) + ")", 1);
+            }
+        }
     }
 
     // Drops dead members; forgets (and aborts) empty finished squads over the cap.
@@ -220,12 +327,12 @@ namespace AirEmergencyDefense {
         // ones are forgotten (their units keep patrolling on their own task)
         for (int i = int(squads.length()) - 1; i >= 0; --i) {
             Squad@ s = squads[i];
-            if (s !is null && !(s.patrolOnly && s.members.length() == 0)) continue;
+            if (s !is null && (!s.finalDone || !(s.patrolOnly && s.members.length() == 0))) continue;
             if (s !is null && s.task !is null && !s.task.IsDead()) s.task.Abort();
             squads.removeAt(i);
         }
         for (uint i = 0; i < squads.length() && int(squads.length()) > Global::RoleSettings::Front::AirEmergencyDefenseMaxSquads; ) {
-            if (squads[i].patrolOnly) {
+            if (squads[i].patrolOnly && squads[i].finalDone) {
                 for (uint k = 0; k < squads[i].members.length(); ++k) memberOf.delete("" + squads[i].members[k]);
                 squads.removeAt(i);
             } else ++i;
@@ -365,6 +472,7 @@ namespace AirEmergencyDefense {
         if (task is null) { memberOf.delete(ukey); return null; }
         if (s.members.find(u.id) < 0) {
             s.members.insertLast(u.id);
+            if (!s.finalDone) ++s.joined;
             memberOf.set(ukey, s.serial);
             u.SetFireState(2);
             GenericHelpers::LogUtil("[FRONT][AirEmergency] squad " + s.serial + ": " + u.circuitDef.GetName() + " " + u.id
@@ -383,6 +491,6 @@ namespace AirEmergencyDefense {
         Squad@ s = SquadBySerial(serial);
         if (s is null) return;
         const int k = s.members.find(u.id);
-        if (k >= 0) s.members.removeAt(k);
+        if (k >= 0) { s.members.removeAt(k); if (!s.finalDone) ++s.lost; }
     }
 }
