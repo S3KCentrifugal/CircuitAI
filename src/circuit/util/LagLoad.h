@@ -10,11 +10,15 @@ namespace lagload {
 
 // Owner 2026-10-25: one load level for every SMRTBARb in this process (they
 // all run on the host's client). Entrenched Plains lagged at 2,344 AI units,
-// Esker Creek at 1,887. The throttle starts at 1,500 AI units and is full at
-// 3,500: 10 s between new move orders and between attack-target changes for
-// T1/T2 units, 5 s between new construction turret orders. Mortars reach 5 s
-// between target changes at 2,300 and 10 s at 3,500. Commanders, T3 and
-// factories (gantry included) are never throttled here.
+// Esker Creek at 1,887.
+// Owner 2026-11-13: the gap between new move orders and between attack-target
+// changes for each T1/T2 unit rises in straight lines through 0 s at 1,500 AI
+// units, 10 s at 2,500, 20 s at 3,000 and 30 s at 3,500 (held at 30 s above).
+// Pounders share that floor (their own slower ramp would now be the faster
+// one). Construction turret orders keep the old ramp, 0 s at 1,500 to 5 s at
+// 3,500: a longer hold would starve the economy, and an idle turret is never
+// held anyway. Commanders, T3, factories (gantry included) and lag_exempt defs
+// are never throttled here.
 // Plain counters on the engine thread; one recompute per second, one log line
 // per minute.
 struct State {
@@ -22,7 +26,7 @@ struct State {
 	int minute = -1;
 	int aiUnits = 0;
 	int enemyUnits = 0;  // known (seen or on radar) by the logging AI
-	float level = 0.f;   // 0 at START_UNITS, 1 at FULL_UNITS
+	float level = 0.f;   // turret ramp: 0 at START_UNITS, 1 at FULL_UNITS
 	int moveFloor = 0;   // frames
 	int targetFloor = 0;
 	int mortarFloor = 0;
@@ -34,7 +38,8 @@ struct State {
 };
 
 constexpr int START_UNITS = 1500;
-constexpr int MORTAR_MID_UNITS = 2300;
+constexpr int STEP1_UNITS = 2500;  // move/target floor 10 s
+constexpr int STEP2_UNITS = 3000;  // 20 s
 constexpr int FULL_UNITS = 3500;
 
 inline State& Get() { static State state; return state; }
@@ -43,18 +48,20 @@ inline void SetUnits(State& s, int aiUnits)
 {
 	s.aiUnits = aiUnits;
 	s.level = std::clamp(float(aiUnits - START_UNITS) / float(FULL_UNITS - START_UNITS), 0.f, 1.f);
-	s.moveFloor = int(s.level * 10.f * FRAMES_PER_SEC);
-	s.targetFloor = s.moveFloor;
-	s.turretFloor = int(s.level * 5.f * FRAMES_PER_SEC);
-	float mortar;
+	float seconds;
 	if (aiUnits <= START_UNITS) {
-		mortar = 0.f;
-	} else if (aiUnits <= MORTAR_MID_UNITS) {
-		mortar = 5.f * float(aiUnits - START_UNITS) / float(MORTAR_MID_UNITS - START_UNITS);
+		seconds = 0.f;
+	} else if (aiUnits <= STEP1_UNITS) {
+		seconds = 10.f * float(aiUnits - START_UNITS) / float(STEP1_UNITS - START_UNITS);
+	} else if (aiUnits <= STEP2_UNITS) {
+		seconds = 10.f + 10.f * float(aiUnits - STEP1_UNITS) / float(STEP2_UNITS - STEP1_UNITS);
 	} else {
-		mortar = std::min(10.f, 5.f + 5.f * float(aiUnits - MORTAR_MID_UNITS) / float(FULL_UNITS - MORTAR_MID_UNITS));
+		seconds = std::min(30.f, 20.f + 10.f * float(aiUnits - STEP2_UNITS) / float(FULL_UNITS - STEP2_UNITS));
 	}
-	s.mortarFloor = int(mortar * FRAMES_PER_SEC);
+	s.moveFloor = int(seconds * FRAMES_PER_SEC);
+	s.targetFloor = s.moveFloor;
+	s.mortarFloor = s.moveFloor;
+	s.turretFloor = int(s.level * 5.f * FRAMES_PER_SEC);
 }
 
 } // namespace lagload
