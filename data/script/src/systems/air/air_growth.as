@@ -75,7 +75,7 @@ namespace AirGrowth {
             // time left 12,000 of 16,000 energy floating at +3,800 for ten minutes while
             // twenty builders idled (played). Reactors stay one at a time.
             const bool open = converter
-                ? aiBuilderMgr.GetQueuedBuildCount(int(kind), d) + aiBuilderMgr.GetUnfinishedCount(d) < Global::RoleSettings::Air::ConverterParallel
+                ? aiBuilderMgr.GetQueuedBuildCount(int(kind), d) + aiBuilderMgr.GetUnfinishedCount(d) < AirThinHome::ConverterParallel()
                 : !AirBuild::Busy(d, kind);
             // D-368: a reactor waits while the income wants a plant the bank does not yet
             // hold (production.ladder runs first and needs PlantBankFraction of the cost;

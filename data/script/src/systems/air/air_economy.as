@@ -2,6 +2,7 @@
 #include "../../manager/economy.as"
 #include "../../helpers/math/air_math.as"
 #include "air_workforce.as"
+#include "air_thin_home.as"
 
 namespace AirEconomy {
     float metal = 0.0f, energy = 0.0f, bankM = 0.0f, bankE = 0.0f;
@@ -156,6 +157,7 @@ namespace AirEconomy {
     void Reset()
     {
         AirWorkforce::Reset();
+        AirThinHome::Reset();
         sampleFrame = -1; stableSince = -1; lastLog = -100000;
         recovery = false; badSamples = 0; goodSamples = 0;
         armedAirMemory = 0.0f; armedAirFrame = -1;
@@ -455,7 +457,8 @@ namespace AirEconomy {
     bool ProductionFunded()
     {
         if (MetalEconomy::Active()) return true;
-        const float share = t2 == 0 ? Global::RoleSettings::Air::TransitionProductionShare : Global::RoleSettings::Air::ProductionIncomeShare;
+        const float share = t2 == 0 ? Global::RoleSettings::Air::TransitionProductionShare
+            : AirThinHome::ProductionShare(Global::RoleSettings::Air::ProductionIncomeShare);
         // the live bank, as D-276 reads it: several fast births can pass between samples
         return AirMath::ProductionFunded(aiEconomyMgr.metal.current, ProductionReserve(), aiEconomyMgr.metal.pull, metal, share);
     }

@@ -977,7 +977,7 @@ namespace AirBuild {
                 Global::RoleSettings::Air::ConverterEnergyReserve, Global::RoleSettings::Air::ConverterDraw),
             d.count + queued, AirEconomy::energy, Global::RoleSettings::Air::ConverterDraw);
         if (!ProductionMath::ConverterMayQueue(target, d.count + queued, queued,
-                Global::RoleSettings::Air::ConverterParallel)) return null;
+                AirThinHome::ConverterParallel())) return null;
         return AirLayout::Place(u, d, Task::BuildType::CONVERT, Task::Priority::NORMAL);
     }
     bool IsReactor(const CCircuitDef@ d)
@@ -1112,6 +1112,20 @@ namespace AirBuild {
         IUnitTask@ task = Nano(u, false, true);
         if (task !is null) return task;
         return Assist(u, false, ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)));
+    }
+    // AirThinHome: one support turret at a time for a reactor under construction.
+    IUnitTask@ ThinHomeReactorSupport(CCircuitUnit@ u)
+    {
+        CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));
+        if (d is null || !Can(u, d) || AirEconomy::recovery) return null;
+        for (uint i = 0; i < projects.length(); ++i) {
+            IBuilderTask@ task = cast<IBuilderTask>(projects[i]);
+            if (task is null || task.IsDead() || task.target !is null || task.GetBuildType() != int(Task::BuildType::NANO)) continue;
+            if (AirEcoLayout::Owns(task.GetBuildPos())) return null;
+        }
+        IUnitTask@ t = AirEcoLayout::Nano(u, d, true);
+        if (t !is null) AirWorkforce::Admit(d, true, true);
+        return t;
     }
     IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false, bool productionOnly = false)
     {

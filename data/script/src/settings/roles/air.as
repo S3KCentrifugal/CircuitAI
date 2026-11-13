@@ -116,6 +116,16 @@ namespace Air {
             // than HomeMexMinimum mexes, it expands out to FarMexRadius (one claim at a time).
             int HomeMexMinimum = 6;
             float FarMexRadius = 2800.0f;
+            // Thin home on a calm map (owner 2026-11-13, Moonshine Run: 3 home spots, wind 0):
+            // average wind under GoodWindMinimumEnergy and at most ThinHomeMaxSpots metal spots
+            // within HomeMexRadius. AIR there lives on converted energy, so on such a map only:
+            // reactor support turrets go up with the reactor, floating energy is converted
+            // faster and ahead of aircraft, and low-tier energy is reclaimed faster.
+            bool ThinHomeEnabled = true;
+            int ThinHomeMaxSpots = 3;
+            int ThinHomeConverterParallel = 6;          // ConverterParallel while energy floats
+            float ThinHomeFloatProductionShare = 0.45f; // ProductionIncomeShare while energy floats
+            int ThinHomeReclaimConcurrent = 4;          // ReclaimEnergyConcurrent
             float FusionAccessMinMetal = 12.0f;
             float FusionAccessMinEnergy = 450.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time

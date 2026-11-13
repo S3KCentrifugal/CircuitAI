@@ -122,6 +122,10 @@ namespace AirRules {
             @t = AirBuild::Factory(u, true);
             if (t !is null) return AirBuild::Record(t, "production.ladder", u);
         }
+        if (!commander && AirThinHome::Active()) {
+            @t = AirBuild::ThinHomeReactorSupport(u);
+            if (t !is null) return AirBuild::Record(t, "thinhome.reactor.support", u);
+        }
         @t = AirGrowth::MakeTask(u);
         if (t !is null) return t;
         @t = AirBuild::FirstFusion(u);

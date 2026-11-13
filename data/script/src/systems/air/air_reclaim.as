@@ -39,7 +39,7 @@ namespace AirReclaim {
         // Reuse one owned-ID snapshot; O(3N + J) for fixed three energy types,
         // J bounded cleanup jobs. Reserve output and refunds before another order.
         if (worker is null || !worker.circuitDef.IsMobile() || !Allowed()
-            || jobs.length() >= uint(Global::RoleSettings::Air::ReclaimEnergyConcurrent)) return null;
+            || jobs.length() >= uint(AirThinHome::ReclaimConcurrent())) return null;
         float pendingOutput=0.0f,pendingRefund=0.0f;
         for(uint j=0;j<jobs.length();++j) {
             CCircuitUnit@ target=ai.GetTeamUnit(jobs[j].target);

@@ -376,17 +376,24 @@ namespace AirEcoLayout {
         }
         return null;
     }
-    IUnitTask@ Nano(CCircuitUnit@ u, CCircuitDef@ nano) {
+    // thinHome (AirThinHome): a reactor under construction gets its support bank at
+    // once, without the workforce-shortage and funding tests; the nano's cost must be
+    // banked. Moonshine 2026-11-13: both fusions finished with 0 nanos in reach.
+    IUnitTask@ Nano(CCircuitUnit@ u, CCircuitDef@ nano, bool thinHome = false) {
         for (uint i = 0; i < modules.length(); ++i) {
             Module@ m = modules[i];
             if (m.slots.length() == 0) continue;
             CCircuitUnit@ reactor = aiTerrainMgr.GetReservationUnit(m.slots[0]);
             // Reserved future districts are not a reason to build unused power.
-            if (reactor is null || reactor.GetBuildProgress() >= 1.0f || AirWorkforce::shortage <= 0
-                || !AirWorkforce::Useful(reactor, u)) continue;
-            const CCircuitDef@ job = reactor.circuitDef;
-            if (job.GetBuildTime() <= 0 || !AirWorkforce::Fund(nano, u.circuitDef.GetBuildSpeed(),
-                nano.GetBuildSpeed() * job.costM / job.GetBuildTime(), nano.GetBuildSpeed() * job.costE / job.GetBuildTime())) continue;
+            if (reactor is null || reactor.GetBuildProgress() >= 1.0f) continue;
+            if (thinHome) {
+                if (aiEconomyMgr.metal.current < nano.costM) continue;
+            } else {
+                if (AirWorkforce::shortage <= 0 || !AirWorkforce::Useful(reactor, u)) continue;
+                const CCircuitDef@ job = reactor.circuitDef;
+                if (job.GetBuildTime() <= 0 || !AirWorkforce::Fund(nano, u.circuitDef.GetBuildSpeed(),
+                    nano.GetBuildSpeed() * job.costM / job.GetBuildTime(), nano.GetBuildSpeed() * job.costE / job.GetBuildTime())) continue;
+            }
             ReserveSupport(m);
             for (uint s = 0; s < m.support.length(); ++s) {
                 const int pin = m.support[s];
