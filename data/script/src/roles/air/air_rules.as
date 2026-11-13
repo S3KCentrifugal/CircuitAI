@@ -86,6 +86,8 @@ namespace AirRules {
         if (!commander) { // AirThinHome: the replacement goes ahead of support and shared growth
             @t = AirBuild::ThinHomeConverterReplace(u);
             if (t !is null) return AirBuild::Record(t, "thinhome.converter.replace", u);
+            @t = AirBuild::OverflowAdvConverter(u);
+            if (t !is null) return AirBuild::Record(t, "overflow.advconv", u);
         }
         // First access precedes discretionary shared economy/its assists.
         // Later factories retain the twenty-turret gate and capacity policy.

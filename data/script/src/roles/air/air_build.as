@@ -1146,6 +1146,24 @@ namespace AirBuild {
         }
         return t;
     }
+    // Owner 2026-11-13: past the first fusion, overflowing energy becomes advanced
+    // converters. Headless Glitters: the shared growth chooser picked one advanced
+    // converter in ten minutes while the Legion AIR gave 500 E/s (19% of its energy)
+    // to allies at a 97% full bank. Bank at FloatingEnergyFraction with income over pull.
+    IUnitTask@ OverflowAdvConverter(CCircuitUnit@ u)
+    {
+        if (!AirThinHome::T1ConvertersRetired() || AirEconomy::recovery || !AirEconomy::EnergyFloating()
+            || AirEconomy::MetalFloating()) return null;
+        CCircuitDef@ adv = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));
+        if (adv is null || !Can(u, adv)) return null;
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::CONVERT), adv) + aiBuilderMgr.GetUnfinishedCount(adv)
+            >= Global::RoleSettings::Air::OverflowConverterParallel) return null;
+        IUnitTask@ t = AirLayout::Place(u, adv, Task::BuildType::CONVERT, Task::Priority::HIGH);
+        if (t !is null)
+            GenericHelpers::LogUtil("[AIR][Overflow] advanced converter: energy bank " + int(AirEconomy::bankE) + "/"
+                + int(aiEconomyMgr.energy.storage) + " income " + int(AirEconomy::energy) + " pull " + int(aiEconomyMgr.energy.pull), 1);
+        return t;
+    }
     IUnitTask@ Nano(CCircuitUnit@ u, bool openingOnly = false, bool productionOnly = false)
     {
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side));

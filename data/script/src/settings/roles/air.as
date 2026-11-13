@@ -134,6 +134,7 @@ namespace Air {
             // Owner 2026-11-13 (All That Glitters): the T1 converter retirement above runs on
             // every map once the first fusion stands, not only on a thin home.
             bool RetireT1ConvertersAfterFusion = true;
+            int OverflowConverterParallel = 2; // advanced converters in flight while energy overflows past the first fusion
             float FusionAccessMinMetal = 12.0f;
             float FusionAccessMinEnergy = 450.0f;
             float WarmFactoryGapSeconds = 0.5f; // prior until measured; not cold opening time
