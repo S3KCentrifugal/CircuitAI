@@ -33,6 +33,7 @@ struct RangedPolicy {
     Mode mode = Mode::SKIRMISH;
     float rangeFraction = .95f;
     int ghostVolleys = 0; // 0 disables idle ghost ground fire; per-unit, per dark period
+    int ghostVolleysHeavy = 0; // owner 2026-11-13: volleys at a heavy ghost (artillery_snipe threats/direct_threats); 0 = ghostVolleys
     float spacing = 96.f;
     float safetyMargin = 48.f;
     float hysteresis = 48.f;

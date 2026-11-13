@@ -1193,7 +1193,7 @@ bool ArtySnipeOwns(CCircuitAI* circuit, const CCircuitUnit* unit)
 }
 
 bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos, int frame,
-		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport, int volleyLimit, bool allowFire)
+		SGhostFire& track, std::unordered_map<int, bool>& ghostSupport, int volleyLimit, bool allowFire, int heavyVolleyLimit)
 {
 	// Owner 2026-11-02: listed rocket artillery (Arbiter, Negotiator, Thanatos,
 	// Ambassador, Boreas) with nothing seen to shoot fires on a ghost image of
@@ -1244,7 +1244,14 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
             // End this ground-fire order after one detected volley, so a fast
             // reload cannot silently repeat it beyond the configured budget.
             if (volleyLimit > 0) { TRY_UNIT(circuit, unit, unit->CmdStop();) }
-			const int need = volleyLimit > 0 ? volleyLimit : GhostNeedFor(gfm->GetArtySnipeInfo(), ge->GetCircuitDef(), cdef);
+			// Owner 2026-11-13 (Inferno): ghost_volleys_heavy for a heavy ghost, i.e. the
+			// artillery_snipe threats + direct_threats (Persecutor, Rattlesnake, Eviscerator,
+			// Pulsar, Bulwark, Bastion); ghost_volleys for any other. O(1) set lookups.
+			const CMilitaryManager::SArtySnipeInfo& gsi = gfm->GetArtySnipeInfo();
+			const CCircuitDef* gd = ge->GetCircuitDef();
+			const bool heavyGhost = (gd != nullptr) && ((gsi.threats.count(gd->GetId()) > 0) || (gsi.directThreats.count(gd->GetId()) > 0));
+			const int need = volleyLimit > 0 ? ((heavyGhost && heavyVolleyLimit > 0) ? heavyVolleyLimit : volleyLimit)
+				: GhostNeedFor(gsi, gd, cdef);
 			circuit->LOG("ARTY: %s %i ghost volley %i/%i at %i", cdef->GetDef()->GetName(), unit->GetId(), n, need, track.target);
 			if (n >= need) {
 				GhostDoneSet(gfs, ge);

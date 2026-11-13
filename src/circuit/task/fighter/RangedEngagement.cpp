@@ -953,7 +953,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     }
     if(report && !ghostNearby.empty()) ai->LOG("RANGED: ghost porc reach unit=%d ghosts=%u",id,unsigned(ghostNearby.size()));
     if (policy.ghostVolleys > 0 && (closing || frame < withdrawalUntil) && ghostFire.target >= 0) {
-        GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false);
+        GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false,policy.ghostVolleysHeavy);
     }
     if(!policy.holdFireline && (closing || frame<withdrawalUntil)) {
         if(closing && !(frame<withdrawalUntil && moving)) {
@@ -1055,9 +1055,9 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if (policy.ghostVolleys > 0) {
         if (best >= 0 || otherInRange || spamInRange || closing || frame < withdrawalUntil) {
             if (ghostFire.target >= 0) {
-                GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false);
+                GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false,policy.ghostVolleysHeavy);
             }
-        } else if (GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys)) {
+        } else if (GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,true,policy.ghostVolleysHeavy)) {
             query.reset(); ++generation; moving=false; path.clear(); pathCursor=0;
             return;
         }

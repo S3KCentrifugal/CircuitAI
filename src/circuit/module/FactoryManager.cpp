@@ -592,6 +592,7 @@ void CFactoryManager::ReadConfig()
 			};
 			number("range_fraction", policy.rangeFraction, .5f, .99f);
             policy.ghostVolleys = std::max(0, std::min(10, settings.get("ghost_volleys", 0).asInt()));
+            policy.ghostVolleysHeavy = std::max(0, std::min(10, settings.get("ghost_volleys_heavy", 0).asInt()));
 			number("spacing", policy.spacing, 16.f, 1024.f);
 			number("safety_margin", policy.safetyMargin, 0.f, 512.f);
 			number("range_hysteresis", policy.hysteresis, 8.f, 256.f);

@@ -1051,7 +1051,8 @@
 				"attribute": ["siege", "ranged"],
 				// Owner 2026-11-03: Sharpshooter (armsnipe) micro at max range - firing sites at 98% of this unit's own weapon range (from its def), kites back to it; always fires at will.
 				// Owner 2026-11-04: 99% of range; static porc (live or ghost) counts its reach + 16 instead of + 48 and a drift into it is a 16-elmo step out, mobiles keep + 48 and the full retreat; firing-site steps up to 300 are one straight MOVE (grid paths cut into Sentry reach).
-				"ranged": {"always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				// Owner 2026-11-13: 1 blind volley at a ghost image of ordinary porc, 3 at a heavy one (artillery_snipe threats + direct_threats: Persecutor, Rattlesnake, Eviscerator, Pulsar, Bulwark, Bastion; ghost_volleys_heavy needs the DLL from this change), only when nothing seen or on radar is in range; still 99% of range on seen targets.
+				"ranged": {"ghost_volleys": 1, "ghost_volleys_heavy": 3, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
