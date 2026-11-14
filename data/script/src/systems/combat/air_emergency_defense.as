@@ -63,6 +63,33 @@ namespace AirEmergencyDefense {
         int lastOn = -100000;
         bool mine = false;
         bool over = false;
+        int started = -1;          // owner 2026-11-14: this FRONT stops after TimeoutSeconds of constant emergency
+        bool timedOut = false;
+    }
+    // Cooldown zones (owner 2026-11-14): after this FRONT's response ends (or times
+    // out), it ignores new emergencies within CooldownRadius of the spot for
+    // CooldownSeconds. At most one zone per answered emergency, pruned on read.
+    class Cooldown { AIFloat3 site; int until = -1; }
+    array<Cooldown@> cooldowns;
+    void AddCooldown(const AIFloat3 &in site)
+    {
+        const int until = ai.frame + AiMax(0, Global::RoleSettings::Front::AirEmergencyDefenseCooldownSeconds) * SECOND;
+        const float r = Global::RoleSettings::Front::AirEmergencyDefenseCooldownRadius;
+        for (uint i = 0; i < cooldowns.length(); ++i)
+            if (MapHelpers::SqDist(cooldowns[i].site, site) <= r * r * 0.25f) { cooldowns[i].until = AiMax(cooldowns[i].until, until); return; }
+        Cooldown@ c = Cooldown(); c.site = site; c.until = until;
+        cooldowns.insertLast(c);
+    }
+    // seconds of cooldown left at site, 0 when none
+    int CoolingFor(const AIFloat3 &in site)
+    {
+        int left = 0;
+        const float r = Global::RoleSettings::Front::AirEmergencyDefenseCooldownRadius;
+        for (int i = int(cooldowns.length()) - 1; i >= 0; --i) {
+            if (cooldowns[i].until <= ai.frame) { cooldowns.removeAt(i); continue; }
+            if (MapHelpers::SqDist(cooldowns[i].site, site) <= r * r) left = AiMax(left, (cooldowns[i].until - ai.frame) / SECOND);
+        }
+        return left;
     }
     class Squad {
         int serial = 0;
@@ -112,10 +139,25 @@ namespace AirEmergencyDefense {
             if (e.mine) {
                 Squad@ s = SquadBySerial(e.serial);
                 if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
-                GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + e.airTeam + " emergency " + e.serial
-                    + " over: labs back to normal, squad " + (s is null ? 0 : int(s.members.length()))
-                    + " units left on patrol at (" + int(e.site.x) + "," + int(e.site.z) + ")", 1);
+                AddCooldown(e.site);   // counted from the end, also after a timeout
+                if (!e.timedOut)
+                    GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + e.airTeam + " emergency " + e.serial
+                        + " over: labs back to normal, squad " + (s is null ? 0 : int(s.members.length()))
+                        + " units left on patrol at (" + int(e.site.x) + "," + int(e.site.z) + "), cooldown "
+                        + Global::RoleSettings::Front::AirEmergencyDefenseCooldownSeconds + " s", 1);
             }
+        }
+        // a constant emergency: this FRONT stops sending after TimeoutSeconds; the squad stays on patrol
+        if (!e.over && e.mine && !e.timedOut && e.started >= 0
+            && ai.frame - e.started >= AiMax(1, Global::RoleSettings::Front::AirEmergencyDefenseTimeoutSeconds) * SECOND) {
+            e.timedOut = true;
+            Squad@ s = SquadBySerial(e.serial);
+            if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
+            GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + e.airTeam + " emergency " + e.serial
+                + " timed out after " + (ai.frame - e.started) / SECOND + " s: labs back to normal, squad "
+                + (s is null ? 0 : int(s.members.length())) + " units left on patrol at (" + int(e.site.x) + "," + int(e.site.z)
+                + "); no new response here until " + Global::RoleSettings::Front::AirEmergencyDefenseCooldownSeconds
+                + " s after it ends", 1);
         }
         return !e.over;
     }
@@ -183,13 +225,16 @@ namespace AirEmergencyDefense {
         if (fresh) {
             if (e !is null && !e.over) { e.lastOn = -100000; Live(e); }   // the old spot's emergency ends here
             @e = Emergency();
-            e.airTeam = fromTeamId; e.serial = nextSerial++; e.site = site; e.lastOn = ai.frame;
+            e.airTeam = fromTeamId; e.serial = nextSerial++; e.site = site; e.lastOn = ai.frame; e.started = ai.frame;
             string picked;
             e.mine = Nearest(site, picked);
+            const int cooling = e.mine ? CoolingFor(site) : 0;
+            if (cooling > 0) e.mine = false;
             emergencies.set(key, @e);
             GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + fromTeamId + " emergency " + e.serial + " at ("
                 + int(site.x) + "," + int(site.z) + "): nearest FRONTs " + picked
-                + (e.mine ? " - this FRONT's labs switch to fast defense" : " - not this FRONT"), 1);
+                + (e.mine ? " - this FRONT's labs switch to fast defense"
+                    : (cooling > 0 ? " - this FRONT is cooling down here (" + cooling + " s left)" : " - not this FRONT")), 1);
             if (e.mine) Join(e);
             return true;
         }
@@ -398,7 +443,7 @@ namespace AirEmergencyDefense {
         array<string>@ keys = emergencies.getKeys();
         for (uint i = 0; i < keys.length(); ++i) {
             Emergency@ e = null;
-            if (!emergencies.get(keys[i], @e) || e is null || !e.mine || !Live(e)) continue;
+            if (!emergencies.get(keys[i], @e) || e is null || !e.mine || !Live(e) || e.timedOut) continue;
             const float sq = MapHelpers::SqDist(pos, e.site);
             if (sq < bestSq) { bestSq = sq; @best = e; }
         }

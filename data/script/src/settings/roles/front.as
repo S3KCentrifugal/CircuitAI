@@ -727,6 +727,13 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             // AirEmergencyDefenseGroupMin of them stand within AirEmergencyDefenseGroupRadius of it and their
             // metal is AirEmergencyDefenseGroupCostRatio x the enemy metal there now; after
             // AirEmergencyDefenseGroupMaxWaitSeconds, or when the emergency ends, everyone waiting goes.
+            // Timeout and cooldown (owner, 2026-11-14): a FRONT stops sending units after
+            // AirEmergencyDefenseTimeoutSeconds of one constant emergency (its squad stays on patrol), and after
+            // an emergency it answered ends it does not answer another within AirEmergencyDefenseCooldownRadius
+            // of that spot for AirEmergencyDefenseCooldownSeconds.
+            int AirEmergencyDefenseTimeoutSeconds = 240;
+            int AirEmergencyDefenseCooldownSeconds = 120;
+            float AirEmergencyDefenseCooldownRadius = 1500.0f;
             float AirEmergencyDefenseGroupMetal = 500.0f;
             int AirEmergencyDefenseGroupMin = 5;
             float AirEmergencyDefenseGroupCostRatio = 0.5f;
