@@ -20,6 +20,7 @@
 #include "control/core/CommandWriter.h"
 #include "control/core/UnitController.h"
 #include "control/unit/DisengageRule.h"
+#include "control/unit/RepairTrip.h"
 #include "unit/RangedPolicy.h"
 
 #include <cstddef>
@@ -44,6 +45,7 @@ struct SkirmisherState : control::ControlledState {
     int lastTaskType = -1;       // detects a retreat lease ending (restore fire state)
     int leases = 0;
     disengage_rule::Memory disengage; // D-433
+    repair_trip::Memory trip;         // D-514
 };
 
 class CSkirmisherController final : public CUnitControllerBase<SkirmisherConfig, SkirmisherState> {

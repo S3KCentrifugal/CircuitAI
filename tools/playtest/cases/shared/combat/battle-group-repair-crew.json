@@ -1,0 +1,174 @@
+{
+  "name": "battle-group-repair-crew",
+  "description": "D-514: a Cortex battle group (10 Thugs screen, 4 Aggravators rear: 14 members, so one repair bot) with a Graverobber that arrives after the group has formed. The bot must be leased as the group's crew, stand behind the screen, repair the member sent back on a repair trip (one at a time, the lowest under 60%) and other damaged members, and reclaim or resurrect the wrecks of three waves spaced for repair (8 Pawns, 4 Warriors, 4 Maces with 2 Rocketeers) between repairs.",
+  "unit": "corthud",
+  "units": [
+    "corthud",
+    "corstorm",
+    "cornecro"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "line-repair-crew",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    4000,
+    3900,
+    1250
+  ],
+  "photos": [
+    90,
+    180,
+    270
+  ],
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3550,
+        4200
+      ]
+    },
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4450,
+        4200
+      ]
+    },
+    {
+      "unit": "corthud",
+      "count": 10,
+      "team": 0,
+      "position": [
+        3700,
+        3700
+      ],
+      "columns": 10,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3870,
+        3480
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 15
+    },
+    {
+      "unit": "cornecro",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3950,
+        3200
+      ],
+      "after_seconds": 25
+    },
+    {
+      "unit": "armpw",
+      "count": 8,
+      "team": 1,
+      "position": [
+        3700,
+        5200
+      ],
+      "columns": 4,
+      "spacing": 80,
+      "after_seconds": 40
+    },
+    {
+      "unit": "armwar",
+      "count": 4,
+      "team": 1,
+      "position": [
+        3800,
+        5300
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 140
+    },
+    {
+      "unit": "armham",
+      "count": 4,
+      "team": 1,
+      "position": [
+        3800,
+        5300
+      ],
+      "columns": 4,
+      "spacing": 90,
+      "after_seconds": 240
+    },
+    {
+      "unit": "armrock",
+      "count": 2,
+      "team": 1,
+      "position": [
+        3850,
+        5520
+      ],
+      "columns": 2,
+      "spacing": 100,
+      "after_seconds": 240
+    }
+  ],
+  "waves": [
+    {
+      "name": "raiders",
+      "after_seconds": 40,
+      "units": [
+        "armpw"
+      ]
+    },
+    {
+      "name": "riot",
+      "after_seconds": 140,
+      "units": [
+        "armwar"
+      ]
+    },
+    {
+      "name": "peer-line",
+      "after_seconds": 240,
+      "units": [
+        "armham",
+        "armrock"
+      ]
+    }
+  ],
+  "enemy_destination": [
+    3900,
+    3300
+  ],
+  "assertions": {
+    "min_shooters": 4,
+    "min_types_assigned": 2,
+    "min_kills": 8,
+    "max_losses": 14,
+    "min_damage": 3000
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-repair"
+}

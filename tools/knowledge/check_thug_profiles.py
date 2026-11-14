@@ -17,7 +17,8 @@ PROFILES = ('experimental_balanced', 'experimental_hard', 'experimental_terrible
 # then must be smrt-test's. Was d2d16b4a, the branch point, before the merge.
 BASE = '0ce991c0'
 NEUTRAL = ('corthud', 'corstorm', 'armham', 'armrock', 'controllers', 'formations',  # D-432: Mace and Rocketeer presets
-           'armjeth', 'corcrash')  # D-509: the T1 anti-air bots ride as battle group escorts
+           'armjeth', 'corcrash',  # D-509: the T1 anti-air bots ride as battle group escorts
+           'armrectr', 'cornecro')  # D-514: the resurrection bots serve as the battle group's repair crew
 # D-433 (thug-micro-fixes-proposal.md): the micro levers the balanced presets add
 # on top of the D-430 block. Parity with the branch point is checked without them.
 MICRO_KEYS = ('threat_weight', 'overkill_skip', 'retreat_health', 'retreat_veteran_bonus', 'repair_health', 'repair_radius',
@@ -29,7 +30,9 @@ MICRO_KEYS = ('threat_weight', 'overkill_skip', 'retreat_health', 'retreat_veter
               'jammer_hold', 'siege_standoff', 'sustained_rush_static_weight',  # D-505, D-507
               'rush_kite', 'rush_range_margin', 'rush_closing_speed', 'rush_detect_radius', 'rush_min_count',  # D-510
               'rush_value_share', 'rush_hold_seconds', 'rush_help_slack', 'retreat_to_help', 'help_radius', 'help_ratio',
-              'help_static_weight', 'help_cone', 'help_lane_step', 'escape_help_weight')
+              'help_static_weight', 'help_cone', 'help_lane_step', 'escape_help_weight',
+              'momentum_press', 'momentum_caution', 'momentum_push', 'momentum_fall_back', 'push_step',  # D-512
+              'fall_back_distance', 'rush_hold_loss', 'rush_gather')  # D-513
 
 
 # D-500: the formation families the base still names by their old (line) names.
@@ -115,10 +118,14 @@ def main():
             template = after_doc['formations'][family]
             assert 1 <= template['size_min'] <= template['size_target'] <= template['size_max'] <= 32, profile+' group size'
             assert template['split_link'] >= 0 and template['recruit_seconds'] > 0, profile+' group cohesion'
-            assert set(template.get('ranks', {})) <= {'screen', 'support', 'air'}, profile+' ranks'  # D-509: air escorts
+            assert set(template.get('ranks', {})) <= {'screen', 'support', 'air', 'repair'}, profile+' ranks'  # D-509, D-514
             air = template.get('ranks', {}).get('air')
             if air:  # D-509: escort types by unit, a per-screen share and a cap within the group
                 assert air.get('units') and 0 < air.get('per_screen', 0) <= 1 and 1 <= air.get('max', 0) <= 32, profile+' air rank'
+            repair = template.get('ranks', {}).get('repair')
+            if repair:  # D-514: crew types by unit, one per per_units members, a cap within the group
+                assert repair.get('units') and 1 <= repair.get('per_units', 0) <= 100 and 1 <= repair.get('max', 0) <= 32, profile+' repair rank'
+                assert 0 < template['repair_trip_health'] < template['repair_trip_done'] <= 1, profile+' repair trip'
             assert template['size_max'] <= policy['cohort_size'] or policy['cohort_size'] >= template['size_target'], profile+' cohort bound'
             # D-432: Mace on the skirmisher preset carries the attribute block's values;
             # the Aggravator and the Rocketeer are support presets without sustained rush.

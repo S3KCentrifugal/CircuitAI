@@ -1,0 +1,130 @@
+{
+  "name": "battle-group-siege-memory",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "description": "D-511: three Sentries seen by a camera that is removed 19 s in, once the siege has begun; from then on the towers are out of sight and radar. 6 Thugs and 6 Aggravators (475, sight 380) know them only from memory. Expected: the rockets fire at the towers' last known positions and kill all three; before D-511 BAR dropped a unit target once it was unseen and the rockets stopped firing.",
+  "storage_scenario": "bg-siege-memory",
+  "groups": [
+    {
+      "unit": "armeyes",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4000,
+        4250
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corthud",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 6,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 6,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3700,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4000,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armllt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4300,
+        4500
+      ],
+      "after_seconds": 5
+    }
+  ],
+  "waves": [
+    {
+      "name": "remembered Sentries",
+      "after_seconds": 5,
+      "units": [
+        "armllt"
+      ]
+    }
+  ],
+  "assertions": {
+    "kill_all_enemy": true,
+    "max_losses": 1,
+    "min_kills": 3,
+    "min_shooters": 1,
+    "min_damage": 1000,
+    "min_types_assigned": 2
+  },
+  "group_loss_steps": [
+    {
+      "seconds": 19,
+      "units": [
+        "armeyes"
+      ],
+      "team": 0
+    }
+  ]
+}

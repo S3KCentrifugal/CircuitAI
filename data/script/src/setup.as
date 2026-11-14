@@ -31,6 +31,7 @@
 #include "systems/combat/commander_combat.as"
 #include "systems/combat/battle_group_size.as"  // D-501
 #include "systems/combat/battle_group_air.as"   // D-509
+#include "systems/combat/battle_group_crew.as"  // D-514
 
 namespace Factory {
 	CCircuitDef@ AiGetFactoryToBuild(const AIFloat3& in pos, bool isStart, bool isReset) {

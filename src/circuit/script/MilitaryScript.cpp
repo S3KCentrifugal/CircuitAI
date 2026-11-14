@@ -98,6 +98,7 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "string DescribeUnitGroups(int) const", asMETHOD(CMilitaryManager, DescribeUnitGroups), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "string DescribeMonitorCodes() const", asMETHOD(CMilitaryManager, DescribeMonitorCodes), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "CCircuitDef@ BattleGroupAirRequest(CCircuitUnit@) const", asMETHOD(CMilitaryManager, BattleGroupAirRequest), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "CCircuitDef@ BattleGroupCrewRequest(CCircuitUnit@) const", asMETHOD(CMilitaryManager, BattleGroupCrewRequest), asCALL_THISCALL); ASSERT(r >= 0);  // D-514
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CMilitaryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueExternalControl(const string& in)", asMETHOD(CMilitaryManager, EnqueueExternalControl), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool TransferUnit(CCircuitUnit@, IUnitTask@)", asFUNCTION(CMilitaryManager_TransferUnit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

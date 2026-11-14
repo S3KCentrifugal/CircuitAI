@@ -11,6 +11,8 @@
 #include "setup/SetupManager.h"
 #include "util/Utils.h"
 #include "Log.h"
+#include "control/kernel/TradeMomentum.h"
+#include "control/kernel/RushHold.h"
 #include <algorithm>
 #include <limits>
 #include <cstdlib>
@@ -28,6 +30,10 @@ namespace wp=why::plan;
 static void Mark(CRangedWorld::CohortPlan& g,int bit) { g.why|=why::Of(bit); }
 // D-510: how often a retreating cohort looks for help again.
 static constexpr int HELP_REFRESH_FRAMES=2*FRAMES_PER_SEC;
+// D-512: a travel goal this close (squared elmos, as the travel branch's 128) is reached.
+static constexpr float PUSH_ARRIVAL_SQ=128.f*128.f;
+// D-513: how often a rush hold re-reads its members' health (half a second).
+static constexpr int HOLD_CHECK_FRAMES=FRAMES_PER_SEC/2;
 
 void CRangedWorld::JoinCohort(CCircuitUnit* unit)
 {
@@ -187,7 +193,9 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
     if(objective<0) {
         const bool lostContact=g.target>=0;
         g.target=-1;
-        if(policy.engagementSeconds>0.f && g.protectedTarget>=0) {
+        // D-512: a group trading well does not freeze on a lost contact (an
+        // enemy jammer can hide it for good); it pushes on below.
+        if(policy.engagementSeconds>0.f && g.protectedTarget>=0 && !trade::Pushes(g.momentum,policy.momentumPush)) {
             auto* memory=circuit->GetEnemyManager()->GetEnemyUnit(g.protectedTarget);
             if(memory && !memory->IsHidden() && !memory->IsDead() && !memory->IsDying()
                 && memory->GetPos().SqDistance2D(g.center)<1400.f*1400.f) {
@@ -226,9 +234,17 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
             g.focus=circuit->GetSetupManager()->GetLanePos();
         g.mode=g.center.SqDistance2D(g.focus)<16384.f?cohort::Mode::HOLD:cohort::Mode::ADVANCE;
         if(g.mode==cohort::Mode::HOLD) Mark(g,wp::ARRIVED);
+        // D-512: nothing in sight. Trading badly: walk to help and heal there.
+        // Trading well: keep advancing down the lane instead of holding. A join
+        // or recall walk (D-501, D-504) goes first.
+        if(!recalled && g.recruitTarget<0) {
+            if(trade::FallsBack(g.momentum,policy.momentumFallBack)) FallBackToHelp(unit,g);
+            else if(trade::Pushes(g.momentum,policy.momentumPush)) PushOn(unit,g);
+        }
         g.radius=0.f;
         g.assault.clear(); g.committed=false; g.reason=cohort::Reason::TRAVEL;
         g.rushed=false; g.backToHelp=false;  // D-510
+        g.holdFrame=-1;                      // D-513: no target, no hold
         // Keep formation orientation after arrival. Recomputing a direction
         // from its near-zero centroid error rotates every member's slot and
         // creates endless orders even though the battle has finished.
@@ -259,6 +275,14 @@ const CRangedWorld::CohortPlan& CRangedWorld::PlanIndependentCohort(CCircuitUnit
     if(policy.sustainedRush && rushes.Active(id)) return g;
     if(policy.engagementSeconds>0.f) {
         AssessCohort(unit,g,enemy,range);
+        // D-512: trading badly, an uncommitted group backs off fall_back_distance
+        // past the enemy's reach; RespondToRush turns that retreat toward help.
+        if(trade::FallsBack(g.momentum,policy.momentumFallBack) && !g.committed && g.mode!=cohort::Mode::RUSH
+            && g.reason!=cohort::Reason::SIEGE) {
+            g.mode=cohort::Mode::WITHDRAW; g.assault.clear();
+            g.radius=std::max({g.radius,range*policy.rangeFraction,enemy.hazardRadius+policy.safetyMargin})+policy.fallBackDistance;
+            Mark(g,wp::FALLING_BACK);
+        }
         // D-505: inside our jammer cover the group never falls back: a
         // withdraw or kite becomes a hold at its current distance (or the
         // approach to its firing band). Members still escape a commander or a
@@ -580,6 +604,51 @@ void CRangedWorld::FindHelp(CCircuitUnit* unit,CohortPlan& g,ranged::Point away)
     }
 }
 
+// D-512: winning with nothing in sight: the travel goal moves push_step down
+// the FRONT lane from the group (toward the enemy), so it never stops at an
+// objective the fog or a jammer has emptied. O(log lane points).
+void CRangedWorld::PushOn(CCircuitUnit* unit,CohortPlan& g)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    auto* battle=circuit->GetBattle();
+    if(!battle->ArmyFrontLanesEnabled() || battle->GetFrontLaneLength()<=0.f) return;
+    const float progress=battle->GetFrontLaneProgress(g.center);
+    g.focus=battle->GetFrontLanePoint(std::min(battle->GetFrontLaneLength(),progress+p.pushStep));
+    if(g.center.SqDistance2D(g.focus)>=PUSH_ARRIVAL_SQ) g.mode=cohort::Mode::ADVANCE;
+    Mark(g,wp::PRESSING);
+}
+
+// D-512: losing with nothing in sight: walk to allied strength (D-510's
+// search, within the cone toward home: back down the lane, else the base),
+// else to the base, and hold there while the trade momentum decays back.
+// FindHelp's cost, at most every 2 s.
+void CRangedWorld::FallBackToHelp(CCircuitUnit* unit,CohortPlan& g)
+{
+    const ranged::Point from=P(g.center);
+    auto* battle=circuit->GetBattle();
+    AIFloat3 home=circuit->GetSetupManager()->GetBasePos();
+    if(battle->ArmyFrontLanesEnabled() && battle->GetFrontLaneLength()>0.f)
+        home=battle->GetFrontLanePoint(std::max(0.f,battle->GetFrontLaneProgress(g.center)-unit->GetCircuitDef()->GetRangedPolicy().helpLaneStep));
+    const ranged::Point toward=rush_response::Unit({home.x-from.x,home.z-from.z});
+    if(toward.x==0.f && toward.z==0.f) return;
+    FindHelp(unit,g,toward);
+    // Allied strength is a fixed place to heal beside; with none, the base (a
+    // lane point would recede with the group and never be reached).
+    g.focus=g.helpKind==1?g.helpAnchor:circuit->GetSetupManager()->GetBasePos();
+    g.mode=g.center.SqDistance2D(g.focus)<PUSH_ARRIVAL_SQ?cohort::Mode::HOLD:cohort::Mode::ADVANCE;
+    Mark(g,wp::FALLING_BACK);
+}
+
+float CRangedWorld::HoldHealth(const CohortPlan& g) const
+{
+    float sum=0.f;
+    for(int id:g.holdMembers) {
+        auto* u=circuit->GetTeamUnit(id);
+        if(u && !u->IsDead()) sum+=std::max(0.f,u->GetUnit()->GetHealth());
+    }
+    return sum;
+}
+
 bool CRangedWorld::InJammerCover(const AIFloat3& pos)
 {
     // The query bound is the largest jammer radius of any ground type: found
@@ -793,11 +862,39 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
     float entry=p.advantageEnter;
     if(p.rampPenalty>0.f) entry=cohort::RampEntry(entry,area->GetElevationAt(enemy.pos.x,enemy.pos.z),
         area->GetElevationAt(g.center.x,g.center.z),p.rampHeight,p.rampPenalty);
-    const auto result=cohort::Assess(own,hostile,horizon,approach,entry*caution,p.advantageExit*caution,limit/caution,
+    // D-512: the group's trades scale the advantage it needs (entry and exit
+    // alike, keeping their hysteresis) and the loss it accepts. O(1).
+    const float momentumEntry=trade::EntryScale(g.momentum,p.momentumPress,p.momentumCaution);
+    const float momentumLoss=trade::LossScale(g.momentum,p.momentumPress,p.momentumCaution);
+    if(g.momentum>0.f && p.momentumPress>0.f) Mark(g,wp::PRESSING);
+    const auto result=cohort::Assess(own,hostile,horizon,approach,entry*caution*momentumEntry,p.advantageExit*caution*momentumEntry,
+        limit/caution*momentumLoss,
         g.committed || screening,screening?hostileArmed:1);
     g.loss=result.loss; g.advantage=result.advantage;
     g.committed=result.commit && !uncertain && !forbidden && approach<=p.catchSeconds;
     if(staticCoverage && p.staticLossFraction<=0.f) g.committed=false;
+    // D-513: the rush hold. A commitment starts it (the members and their
+    // health now); while the members keep more than rush_hold_loss of that
+    // health the cohort stays committed whatever the advantage says, so a rush
+    // is not re-judged into a withdraw every plan. A hard hazard (forbidden:
+    // a commander, a reclaimer or a death blast on the approach) still ends it.
+    if(p.rushHoldLoss>0.f) {
+        if(g.committed && g.holdFrame<0) {
+            g.holdFrame=now; g.holdMembers=g.members; g.holdCheckFrame=now;
+            g.holdInitial=g.holdCurrent=HoldHealth(g);
+            circuit->LOG("COHORT: rush hold start group=%d members=%u health=%.0f frame=%d",
+                CohortOf(g.members.front()),unsigned(g.holdMembers.size()),g.holdInitial,now);
+        } else if(g.holdFrame>=0) {
+            if(now-g.holdCheckFrame>=HOLD_CHECK_FRAMES) { g.holdCurrent=HoldHealth(g); g.holdCheckFrame=now; }
+            if(!forbidden && rush_hold::Holds(g.holdCurrent,g.holdInitial,p.rushHoldLoss)) g.committed=true;
+            else {
+                circuit->LOG("COHORT: rush hold end group=%d health=%.0f/%.0f forbidden=%d frame=%d",
+                    CohortOf(g.members.front()),g.holdCurrent,g.holdInitial,int(forbidden),now);
+                g.holdFrame=-1;
+            }
+        }
+        if(g.holdFrame>=0) Mark(g,wp::RUSH_HOLD);
+    }
     if(!g.committed) g.assault.clear();
     if(g.supporting) Mark(g,wp::SCREENING);
     if(approach>=horizon || approach>p.catchSeconds) Mark(g,wp::TOO_FAR);
@@ -822,7 +919,7 @@ void CRangedWorld::AssessCohort(CCircuitUnit* unit,CohortPlan& g,const Contact& 
         auto* u=circuit->GetTeamUnit(member);
         if(u && cohort::Admit(P(u->GetPos(now)),P(g.center),p.cohortRadius*.5f)) ++ready;
     }
-    if(!g.supporting && now<g.regroupUntil && ready*4<g.members.size()*3 && distance>enemy.hazardRadius+p.spacing) {
+    if(!g.supporting && g.holdFrame<0 && now<g.regroupUntil && ready*4<g.members.size()*3 && distance>enemy.hazardRadius+p.spacing) {
         g.committed=false; g.assault.clear(); g.mode=cohort::Mode::REGROUP; g.reason=cohort::Reason::ASSEMBLE;
         Mark(g,wp::ASSEMBLING);
         g.radius=std::max(firing,distance); // hold vanguard; do not pull it rearward

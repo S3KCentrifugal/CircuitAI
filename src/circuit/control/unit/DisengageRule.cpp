@@ -32,6 +32,17 @@ bool Apply(CCircuitAI* ai, CCircuitUnit* unit, const CRangedEngagement& engageme
 		return true;
 	}
 	const float health = unit->GetHealthPercent();
+	// D-513: a member of a cohort holding a rush skips its own retreat and
+	// repair trips (the legacy floor above still applies); the hold ends when
+	// the group has lost rush_hold_loss of its health. O(log K).
+	{
+		const CRangedWorld& world = engagement.World();
+		const auto plan = world.Cohorts().find(world.CohortOf(unit->GetId()));
+		if (plan != world.Cohorts().end() && plan->second.holdFrame >= 0) {
+			unit->ForceUpdate(frame + THREAT_UPDATE_RATE);
+			return false;
+		}
+	}
 	if (policy.retreatHealth > 0.f) {
 		// One engine read per unit per second at most, on damage events only.
 		if (memory.experienceFrame < 0 || frame >= memory.experienceFrame + FRAMES_PER_SEC) {

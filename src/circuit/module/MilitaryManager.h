@@ -607,6 +607,8 @@ public:
 	// D-509: the anti-air escort type this factory should start now for the
 	// battle groups, or null (CBattleGroupController::AirRequest).
 	CCircuitDef* BattleGroupAirRequest(CCircuitUnit* factory) const;
+	// D-514: the repair crew type this factory should start for a battle group, or null.
+	CCircuitDef* BattleGroupCrewRequest(CCircuitUnit* factory) const;
 	bool HasRangedUnits() const;
 
 private:

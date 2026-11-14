@@ -64,6 +64,7 @@ class CCommanderController;
 class CSkirmisherController;
 class CSupportController;
 class CEscortController;
+class CRezzerController;
 class CBattleGroupController;
 class IArtilleryCensus;
 class CControllerRegistry;
@@ -351,6 +352,7 @@ public:
     CSkirmisherController* GetSkirmisherController() const { return skirmisherController; }  // D-430, D-432
     CSupportController* GetSupportController() const { return supportController; }        // D-432
     CEscortController* GetEscortController() const { return escortController; }            // D-509
+    CRezzerController* GetRezzerController() const { return rezzerController; }            // D-514
     CBattleGroupController* GetBattleGroupController() const { return battleGroupController; }        // D-430
     // D-493: what the commander group may ask about our artillery (crowding).
     IArtilleryCensus* GetArtilleryCensus() const { return artilleryCensus; }
@@ -416,6 +418,7 @@ private:
     CSkirmisherController* skirmisherController=nullptr; // owned by controllers (D-430, D-432)
     CSupportController* supportController=nullptr;     // owned by controllers (D-432)
     CEscortController* escortController=nullptr;       // owned by controllers (D-509)
+    CRezzerController* rezzerController=nullptr;       // owned by controllers (D-514)
     CBattleGroupController* battleGroupController=nullptr;            // owned by controllers (D-430)
     IArtilleryCensus* artilleryCensus=nullptr;          // D-493: owned by controllers
     std::unique_ptr<CWidgetState> widgetState;  // D-300: AI -> widget state file

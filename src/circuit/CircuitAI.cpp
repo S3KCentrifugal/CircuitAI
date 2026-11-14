@@ -19,6 +19,7 @@
 #include "control/unit/skirmisher/SkirmisherController.h"
 #include "control/unit/support/SupportController.h"
 #include "control/unit/escort/EscortController.h"
+#include "control/unit/rezzer/RezzerController.h"
 #include "control/group/BattleGroupController.h"
 #include "control/unit/artillery/ArtilleryController.h"
 #include "control/unit/commander/CommanderController.h"
@@ -402,6 +403,9 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			struct SEnemyDestroyedEvent* evt = (struct SEnemyDestroyedEvent*)data;
 			CEnemyInfo* enemy = GetEnemyInfo(evt->enemy);
 			if (enemy != nullptr) {
+				// D-512: a kill by a battle group member books its metal to the group.
+				if (battleGroupController != nullptr && evt->attacker >= 0)
+					battleGroupController->RecordKill(evt->attacker, enemy->GetCost(), lastFrame);
 				allyTeam->DyingEnemy(enemy->GetData(), lastFrame);
 				ret = 0;
 			} else {
@@ -699,6 +703,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     skirmisherController=controllers->Add(std::make_unique<CSkirmisherController>(this));
     supportController=controllers->Add(std::make_unique<CSupportController>(this));
     escortController=controllers->Add(std::make_unique<CEscortController>(this));  // D-509
+    rezzerController=controllers->Add(std::make_unique<CRezzerController>(this));  // D-514
     battleGroupController=controllers->AddGroup(std::make_unique<CBattleGroupController>(this));
     artilleryCensus=controllers->Add(std::make_unique<CArtilleryController>(this));  // D-493
     controllers->ReadConfig(setupManager->GetConfig());
@@ -1338,6 +1343,8 @@ int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	unit->MarkDestroying();
 	destroyed.insert(unit->GetId());
 	const int lostId = unit->GetId();
+	// D-512: before its membership is erased, a member's loss books to its group.
+	if (battleGroupController != nullptr) battleGroupController->RecordLoss(lostId, unit->GetCircuitDef()->GetCostM(), lastFrame);
 	allyTeam->GetNuclearHistory().Prune(lastFrame, [lostId](int owner) { return owner != lostId; });
 	allyTeam->GetPulseClaims().ReleasePending(lostId);
 	if (battle != nullptr) {

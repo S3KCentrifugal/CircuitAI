@@ -72,6 +72,10 @@ public:
     using SpecFor = std::function<const GroupSpec*(const CCircuitDef*)>;
     void Tick(CRangedWorld& world, int frame, const SpecFor& specFor);
     void UnitRemoved(int unitId) { straySince.erase(unitId); }
+    // D-514: members on a repair trip (id -> group key), owned by the battle
+    // group controller: walking back to the crew is not straying, so the
+    // cohesion split leaves them in their group. Null: no exemptions.
+    void SetTrips(const std::unordered_map<int, int>* trips) { tripping = trips; }
 
 private:
     struct Live { int id; ranged::Point pos; };
@@ -86,6 +90,7 @@ private:
     CCircuitAI* ai;
     std::unordered_map<int, int> straySince;  // member id -> first frame away from its group
     std::unordered_map<int, int> splitSeen;   // D-502: cohort key -> check that first saw it apart
+    const std::unordered_map<int, int>* tripping = nullptr;  // D-514: borrowed from the battle group controller
     // Reused per check.
     std::vector<int> keys, label, leaving;
     std::vector<Live> live;

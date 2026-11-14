@@ -254,6 +254,7 @@ void CSupportController::Tick(CCircuitUnit* unit, State& s, int frame)
 		return;
 	}
 	if (control::SuspensionOf(unit, frame) != control::Suspension::NONE) return;
+	if (repair_trip::Step(ai, unit, *s.engagement, s.trip, frame, "SUPPORT")) return;  // D-514
 	Decide(unit, s, frame);
 	s.engagement->Update(unit);
 }
