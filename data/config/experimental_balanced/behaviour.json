@@ -266,7 +266,8 @@
 			"units": ["armmerl", "corvroc", "legavroc",   // Ambassador, Negotiator, Boreas
 				"corhrk", "leghrk",                       // Arbiter, Thanatos (T2 rocket bots)
 				"armmship", "cormship",                   // Longbow, Messenger (rocket ships)
-				"cortrem"],                               // Tremor (owner 2026-11-07: Ambassador rules)
+				"cortrem",                                 // Tremor (owner 2026-11-07: Ambassador rules)
+				"corwolv", "armart"],                     // Wolverine, Shellshocker (owner 2026-11-14: Ambassador rules, 3 ghost volleys)
 			"max_speed": 12,
 			// Owner 2026-11-01: next after a slow commander (and before any building), these
 			// heavy units in range when moving at most heavy_speed_fraction of their own top
@@ -281,7 +282,8 @@
 			// Owner 2026-11-02: these fire on a ghost image (last-seen, out of radar and LOS) of enemy porc, building
 			// radars/jammers or shields already in weapon range when nothing else is to shoot and they have not fired
 			// for ghost_idle_seconds. They never move toward a ghost.
-			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk"],   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
+			"ghost_units": ["corhrk", "corvroc", "armmerl", "legavroc", "leghrk",   // Arbiter, Negotiator, Ambassador, Boreas, Thanatos
+				"corwolv", "armart"],                     // Wolverine, Shellshocker (owner 2026-11-14: 3 volleys at any ghost, DLL by name)
 			"ghost_idle_seconds": 20,   // owner 2026-11-04: 20 s idle
 			// Owner 2026-11-04 16:58Z: target lock. A unit keeps the identified (LOS or radar) enemy it shoots until it
 			// dies; within weapon range + lock_margin (radar error) it holds and re-attacks, a structure farther out only
