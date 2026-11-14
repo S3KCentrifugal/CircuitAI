@@ -18,7 +18,7 @@
 // either side; buildable terrain (CanUpgradeTerrain), reachable by the builder, and the gun's height-aware range x
 // PorcClusterReachShare must hold at least one cluster turret. Best: most cluster turrets held, then furthest out
 // of the cluster turrets' reach (vehicle constructors: must be outside it, native drops their builds inside a
-// scouted gun's reach), then nearest the anchor.
+// scouted gun's reach, so for them outside every known enemy static ground gun's), then nearest the anchor.
 // Builder: with a 10 s minimum metal income > PorcClusterT2MinMetalIncome and a T2 seat of the group (members 0..2)
 // that can build a T2 gun: the nearest such seat within PorcClusterT2JoinRadius of the group centre. A T2 seat still
 // on its way holds the cluster PorcClusterT2WaitSeconds, then the T1 builds. Otherwise the group's T1 constructor
@@ -55,6 +55,11 @@ namespace FrontPorcClusterCounter {
     array<Turret@> turrets;
     array<Cluster@> clusters;
     array<AIFloat3> anchors;   // our group anchors (scan)
+    // every known enemy static ground gun (scan): native drops a vehicle constructor's build inside any of their
+    // reach (IBuilderTask::DropIfPorc, EnemyPorcClearance), not only the cluster's (headless 11-14: Persecutor
+    // orders of coracv died at once, 64 behind our static, outside every cluster turret's reach)
+    array<AIFloat3> gunPos;
+    array<float> gunReach;
     int standing = 0;          // our guns covering a current cluster
     int lastScan = -100000;
     bool defsDone = false;
@@ -121,6 +126,19 @@ namespace FrontPorcClusterCounter {
         turrets.insertLast(t);
     }
 
+    void AddGun(const AIFloat3 &in p, int defId) {
+        CCircuitDef@ d = ai.GetCircuitDef(defId);
+        if (d is null || d.IsMobile() || !d.HasSurfToLand()) return;
+        gunPos.insertLast(p); gunReach.insertLast(d.GetMaxRange());
+    }
+    // elmos outside the nearest known enemy static gun's reach (< 0 inside); only guns within `near` of `at`
+    float GunClear(const AIFloat3 &in p, const array<int>@ near) {
+        float clear = 1e9f;
+        for (uint i = 0; i < near.length(); ++i)
+            clear = AiMin(clear, Dist(p, gunPos[near[i]]) - gunReach[near[i]]);
+        return clear;
+    }
+
     // The commander group's centre: its commander, else a T2 seat, else its T1 constructor; x < 0 when none
     AIFloat3 GroupCentre() {
         CCircuitUnit@ c = ai.GetTeamUnit(aiBuilderMgr.FrontCommanderId());
@@ -136,13 +154,19 @@ namespace FrontPorcClusterCounter {
 
     void Scan() {
         lastScan = ai.frame;
-        turrets.resize(0); clusters.resize(0); anchors.resize(0); standing = 0;
+        turrets.resize(0); clusters.resize(0); anchors.resize(0); gunPos.resize(0); gunReach.resize(0); standing = 0;
         const int nc = aiBattle.GetGroundContactCount();
-        for (int i = 0; i < nc; ++i)
-            if (IsTargetDef(aiBattle.GetGroundContactDefId(i))) AddTurret(aiBattle.GetGroundContactPos(i), aiBattle.GetGroundContactDefId(i), false);
+        for (int i = 0; i < nc; ++i) {
+            const int id = aiBattle.GetGroundContactDefId(i);
+            if (IsTargetDef(id)) AddTurret(aiBattle.GetGroundContactPos(i), id, false);
+            AddGun(aiBattle.GetGroundContactPos(i), id);
+        }
         const int ng = aiBattle.GetGhostCount();
-        for (int i = 0; i < ng; ++i)
-            if (IsTargetDef(aiBattle.GetGhostDefId(i))) AddTurret(aiBattle.GetGhostPos(i), aiBattle.GetGhostDefId(i), true);
+        for (int i = 0; i < ng; ++i) {
+            const int id = aiBattle.GetGhostDefId(i);
+            if (IsTargetDef(id)) AddTurret(aiBattle.GetGhostPos(i), id, true);
+            AddGun(aiBattle.GetGhostPos(i), id);
+        }
         const int need = Global::RoleSettings::Front::PorcClusterMinCount;
         if (int(turrets.length()) < need) return;
         // neighbours within the radius
@@ -261,6 +285,12 @@ namespace FrontPorcClusterCounter {
         const float share = Global::RoleSettings::Front::PorcClusterReachShare;
         const bool vehicle = Global::RoleSettings::Front::PorcClusterVehicleUnits.find(u.circuitDef.GetName()) >= 0;
         const float vmargin = Global::RoleSettings::Front::PorcClusterVehicleMargin;
+        array<int> near;   // enemy guns that could reach the half disc (vehicles only)
+        if (vehicle)
+            for (uint i = 0; i < gunPos.length(); ++i) {
+                const float r = gunReach[i] + AiMax(back, side) + vmargin;
+                if (MapHelpers::SqDist(gunPos[i], anchor) <= r * r) near.insertLast(int(i));
+            }
         AIFloat3 best = none;
         float bestScore = -1e30f;
         for (float along = MinBack; along <= back + 0.5f; along += SiteStep) {
@@ -278,7 +308,7 @@ namespace FrontPorcClusterCounter {
                     clear = AiMin(clear, dist - RangeAt(ai.GetCircuitDef(t.defId), t.pos, p));
                 }
                 if (n == 0) continue;
-                if (vehicle && clear < vmargin) continue;
+                if (vehicle && (clear < vmargin || GunClear(p, near) < vmargin)) continue;
                 const float score = float(n) * 10000.0f + AiMin(clear, 300.0f) * 4.0f - (along * along + across * across) * 0.001f;
                 if (score <= bestScore) continue;
                 if (!aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) continue;
