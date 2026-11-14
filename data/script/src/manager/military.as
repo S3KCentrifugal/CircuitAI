@@ -3,6 +3,7 @@
 #include "../helpers/common/generic_helpers.as"
 #include "../systems/combat/porc_policy.as"
 #include "../systems/combat/spam.as"
+#include "../systems/combat/mass_mode.as"
 #include "../systems/combat/scout_raid.as"
 #include "../systems/combat/t3_unstick.as"
 #include "../systems/combat/gremlin_eco_fire.as"

@@ -261,6 +261,7 @@ namespace Main {
 		OvernukeRecon::Tick();      // owner, 2026-10-28: AIR scouts the overnuke target every 10 launches
 		NukeLaunchRecon::Tick();    // owner, 2026-10-31: AIR learns each nuke spot, scouts every 3rd below overnuke
 		Spam::Update();          // economy-gated spam: activation, focus rotation
+		MassMode::Update();      // owner 2026-11-13: 4,000 allied units -> fire at will, structures held, ground army down the edge lanes
 		FrontRadar::Update();    // owner, 2026-10-27: long-range radars at the front (census, allies' list)
 		AntiSpam::Update();      // owner, 2026-10-27: spot enemy spam lanes and hold them
 		Team::Ferry::Update();   // transport ferry: hand-over on arrival, run polling

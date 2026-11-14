@@ -42,6 +42,7 @@
 #include "util/Utils.h"
 #include "util/Performance.h"
 #include <algorithm>
+#include <climits>
 #include "util/WidgetState.h"
 
 #include "angelscript/include/angelscript.h"
@@ -762,6 +763,18 @@ static int CCircuitAI_AlliedFinishedCount(CCircuitAI* circuit, const CCircuitDef
     return (def == nullptr) ? 0 : circuit->GetAllyTeam()->FinishedCount(def->GetId());
 }
 
+// Owner 2026-11-13 (MassMode): units of every SMRTBARb on this AI's ally team
+// in this process, this one included. O(AIs), no allocation; the same team
+// lists the LagLoad throttle sums, restricted to allies.
+static int CCircuitAI_GetAlliedAIUnitCount(CCircuitAI* circuit)
+{
+    int units = 0;
+    for (const CCircuitAI* c : circuit->GetGameAttribute()->GetCircuits()) {
+        if (c != nullptr && c->GetAllyTeamId() == circuit->GetAllyTeamId()) units += int(c->GetTeamUnits().size());
+    }
+    return units;
+}
+
 static int CCircuitAI_GetFriendlyUnitTeam(CCircuitAI* circuit, int unitId)
 {
     auto* unit = circuit->GetFriendlyUnit(unitId);
@@ -1040,6 +1053,29 @@ static void CCircuitUnit_CmdClearBuildQueue(CCircuitUnit* unit)
 static void CCircuitUnit_CmdMoveTo(CCircuitUnit* unit, const AIFloat3& pos)
 {
 	unit->CmdMoveTo(pos);
+}
+
+// Owner 2026-11-13 (MassMode): STOP, then one order with all its waypoints: the
+// first point replaces the queue, the rest are shift-queued behind it (MOVE, or
+// FIGHT when `fight`). The script puts the unit under a player task first, so
+// the AI sends it nothing more. Sent straight to the engine, not through
+// CmdMoveTo/CmdFightTo: the LagLoad move floor (30 s at 3,500+ AI units) would
+// drop it, and a dropped order leaves the unit idle under its player task. Once
+// per unit per mass-mode entry. O(points).
+static void CCircuitUnit_CmdOrderOnce(CCircuitUnit* unit, const CScriptArray* route, bool fight)
+{
+	if (unit == nullptr || route == nullptr || route->GetSize() == 0 || unit->GetUnit() == nullptr
+		|| unit->GetManager() == nullptr) return;
+	TRY_UNIT(unit->GetManager()->GetCircuit(), unit,
+		unit->GetUnit()->Stop(0, INT_MAX);
+		for (asUINT i = 0; i < route->GetSize(); ++i) {
+			AIFloat3 p = *static_cast<const AIFloat3*>(route->At(i));
+			CTerrainManager::CorrectPosition(p);
+			const short options = (i == 0) ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY;
+			if (fight) unit->GetUnit()->Fight(p, options, INT_MAX);
+			else unit->GetUnit()->MoveTo(p, options, INT_MAX);
+		}
+	)
 }
 
 // D-111: a factory's repeat flag (a spam lab keeps its one build cycling)
@@ -1343,6 +1379,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitAI", "void GiveUnits(const array<CCircuitUnit@>@+, int)", asFUNCTION(CCircuitAI_GiveUnits), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CCircuitAI", "int GetFriendlyUnitTeam(int) const", asFUNCTION(CCircuitAI_GetFriendlyUnitTeam), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CCircuitAI", "int AlliedFinishedCount(const CCircuitDef@) const", asFUNCTION(CCircuitAI_AlliedFinishedCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-493
+    r = engine->RegisterObjectMethod("CCircuitAI", "int GetAlliedAIUnitCount() const", asFUNCTION(CCircuitAI_GetAlliedAIUnitCount), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // MassMode
     r = engine->RegisterObjectMethod("CCircuitAI", "AIFloat3 GetFriendlyUnitPosition(int, int) const", asFUNCTION(CCircuitAI_GetFriendlyUnitPosition), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool UnitControl(CCircuitUnit@, bool)", asMETHODPR(CCircuitAI, UnitControl, (CCircuitUnit*, bool), bool), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool UnitControl(Id, bool)", asMETHODPR(CCircuitAI, UnitControl, (ICoreUnit::Id, bool), bool), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1416,6 +1453,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitDef", "bool CanTransport(const CCircuitDef@) const", asFUNCTION(CCircuitDef_CanTransport), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetSpeed() const", asMETHOD(CCircuitDef, GetSpeed), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetBuildTime() const", asMETHOD(CCircuitDef, GetBuildTime), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CCircuitDef", "float GetTechLevel() const", asMETHOD(CCircuitDef, GetTechLevel), asCALL_THISCALL); ASSERT(r >= 0);  // MassMode: customParams.techlevel, 1 when absent
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetExtractsMetal() const", asMETHOD(CCircuitDef, GetExtractsM), asCALL_THISCALL); ASSERT(r >= 0);
 	// Physical engine work/second, before JSON build_speed policy overrides.
 	r = engine->RegisterObjectMethod("CCircuitDef", "float GetBuildSpeed() const", asMETHOD(CCircuitDef, GetWorkerTime), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1462,6 +1500,7 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdClearBuildQueue()", asFUNCTION(CCircuitUnit_CmdClearBuildQueue), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetBuildPriorityOverride(int)", asMETHOD(CCircuitUnit, SetBuildPriorityOverride), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdMoveTo(const AIFloat3& in)", asFUNCTION(CCircuitUnit_CmdMoveTo), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-112
+	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdOrderOnce(const array<AIFloat3>@+, bool)", asFUNCTION(CCircuitUnit_CmdOrderOnce), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // MassMode
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdRepeat(bool)", asFUNCTION(CCircuitUnit_CmdRepeat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-111
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void CmdFactoryRoute(const array<AIFloat3>@+)", asFUNCTION(CCircuitUnit_CmdFactoryRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);  // D-111
 	r = engine->RegisterObjectMethod("CCircuitUnit", "void SetLagRepeat(bool)", asFUNCTION(CCircuitUnit_SetLagRepeat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
