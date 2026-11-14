@@ -1,5 +1,6 @@
 #include "front_constructors.as"
 #include "defense_planner.as"
+#include "commander_group_air_aa.as"
 #include "../../helpers/math/commander_group_math.as"
 // Stable FRONT roster. Lifecycle admission/removal is O(7); no army scans.
 // Layout keys survive load; pending recruit handles cover framed production.
@@ -111,6 +112,7 @@ namespace CommanderGroup {
             if(agit !is null && con.task !is agit) aiBuilderMgr.AssignTask(con,agit);
         }
         PublishUnit(false);
+        CommanderGroupAirAA::Update();   // owner 2026-11-14: bomber raids switch on the T1.5 AA row
     }
     void PublishUnit(bool detached) {   // native resets its group state only when the value changes
         CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);

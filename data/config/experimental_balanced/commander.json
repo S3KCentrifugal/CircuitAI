@@ -41,7 +41,16 @@
             "lrpc": {"metal": 200, "energy": 5000, "seconds": 240, "value_ratio": 1, "limit": 2},
             "antinuke": {"metal": 50, "energy": 1000, "seconds": 240, "limit": 2},
             "shield": {"metal": 100, "energy": 2500, "seconds": 150, "limit": 2}
-        }
+        },
+        // Owner 2026-11-14 (commander_group_air_aa.as): armed enemy air worth
+        // trigger_metal within radius of the FRONT commander switches on planner
+        // slot 17, a T1.5 AA turret (Ferret/Chainsaw, SAM/Eradicator, Rhapsis/Lupara,
+        // 50% each, re-rolled per turret) at band 4, for hold_seconds after the last
+        // such sighting. trigger_metal: Pyroglacious's T1 raid on Entrenched Plains
+        // 2026-11-14 (6-7 Shadows, 900-1050 metal, over two FRONT commanders)
+        // less 1-2 bombers = 5 Shadows. Armed fighters count too (no def per contact).
+        "air_t15": {"enabled": 1, "radius": 1800, "trigger_metal": 750, "hold_seconds": 60,
+            "priority": 3}   // band and limit: rules/aa_t15 (defaults 4 and 3)
     },
 	// Shared commander micro; role policy supplies advance and operating leash.
 	"combat": {

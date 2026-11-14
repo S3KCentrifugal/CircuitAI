@@ -4,6 +4,7 @@ namespace DefensePlanner {
     bool loaded=false;
     int loadedRole=-1;
     bool loadedAdvancedOnly=false;
+    int generation=0; // bumped on every (re)load; CommanderGroupAirAA restates slot 17 after one
     void Option(int slot,const string& in key,float fallback,const string& in path) {
         aiBuilderMgr.SetDefenseRule(slot,key,aiSetupMgr.ConfigFloat(path+key,fallback));
     }
@@ -35,7 +36,7 @@ namespace DefensePlanner {
         // Reconfigure on ownership/mode changes; never retain the T1 catalog or
         // zero startup defense caps when engineers are released (D-419).
         if(loaded && loadedRole==int(Global::AISettings::Role) && loadedAdvancedOnly==advancedOnly) return;
-        loaded=true;loadedRole=int(Global::AISettings::Role);loadedAdvancedOnly=advancedOnly;
+        loaded=true;loadedRole=int(Global::AISettings::Role);loadedAdvancedOnly=advancedOnly;++generation;
         const string path="commander/defense/";
         Option(-1,"surplus_metal",0,path); Option(-1,"surplus_energy_margin",100,path);
         Option(-1,"surplus_income",0,path); // D-476: spare metal/s that also admits surplus (0: bank only)
@@ -69,6 +70,10 @@ namespace DefensePlanner {
         Rule(7,cor?"corfmd":leg?"legabm":"armamd","antinuke",3,2,50,1000,240,1,0,0,0,0,0,1,0);
         Rule(8,cor?"corgate":leg?"legdeflector":"armgate","shield",3,2,100,2500,150,1,0,0,0,0,0,0,1);
         Rule(15,UnitHelpers::GetStaticAALightNameForSide(side),"aa_light",2,3,0,0,60,1,0,0,0,1,0,0,0);
+        // Owner 2026-11-14: T1.5 AA (Ferret/Chainsaw, SAM/Eradicator, Rhapsis/Lupara,
+        // 50% each) at the urgent band, off (priority 0) until CommanderGroupAirAA sees
+        // a bomber raid near the commander; it switches the priority and the pick.
+        Rule(17,cor?"cormadsam":leg?"legrhapsis":"armferret","aa_t15",4,3,0,0,90,0,0,0,0,1,0,0,0);
         Rule(16,UnitHelpers::GetStaticLLTNameForSide(side),"llt",2,2,0,0,60,1,0,1,.15f,0,0,0,0);
         Option(16,"fallback_for",0,"commander/defense/rules/llt/");
         // Read coverage from every faction. A captured builder can be supported
