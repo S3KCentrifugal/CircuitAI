@@ -734,6 +734,13 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             int AirEmergencyDefenseTimeoutSeconds = 240;
             int AirEmergencyDefenseCooldownSeconds = 120;
             float AirEmergencyDefenseCooldownRadius = 1500.0f;
+            // Reach (owner, 2026-11-14): a FRONT whose labs' fast-defense units cannot reach the spot (static movement
+            // area test of the spot and a 300-elmo ring round it), or whose AirEmergencyDefenseStuckUnits+ units sent got
+            // none to the spot in AirEmergencyDefenseStuckSeconds, or that is cooling down there, passes the emergency
+            // on ("airemg|pass"); every FRONT re-ranks without it and the next nearest FRONT answers.
+            // Vehicle labs that cannot reach are skipped while the same FRONT's bot labs still answer.
+            int AirEmergencyDefenseStuckUnits = 3;
+            int AirEmergencyDefenseStuckSeconds = 150;
             float AirEmergencyDefenseGroupMetal = 500.0f;
             int AirEmergencyDefenseGroupMin = 5;
             float AirEmergencyDefenseGroupCostRatio = 0.5f;

@@ -65,6 +65,11 @@ namespace AirEmergencyDefense {
         bool over = false;
         int started = -1;          // owner 2026-11-14: this FRONT stops after TimeoutSeconds of constant emergency
         bool timedOut = false;
+        // owner 2026-11-14: FRONTs that cannot reach the spot pass it on; every FRONT
+        // re-ranks without them, so the next nearest takes it (same list on every FRONT)
+        array<int> passed;
+        dictionary reach;          // unit def name -> bool, from this FRONT's labs to the spot (static, once per def)
+        bool handedOver = false;   // this FRONT passed it on
     }
     // Cooldown zones (owner 2026-11-14): after this FRONT's response ends (or times
     // out), it ignores new emergencies within CooldownRadius of the spot for
@@ -162,6 +167,16 @@ namespace AirEmergencyDefense {
         return !e.over;
     }
 
+    Emergency@ EmergencyBySerial(int serial)
+    {
+        array<string>@ keys = emergencies.getKeys();
+        for (uint i = 0; i < keys.length(); ++i) {
+            Emergency@ e = null;
+            if (emergencies.get(keys[i], @e) && e !is null && e.serial == serial) return e;
+        }
+        return null;
+    }
+
     Squad@ SquadBySerial(int serial)
     {
         for (uint i = 0; i < squads.length(); ++i)
@@ -170,7 +185,7 @@ namespace AirEmergencyDefense {
     }
 
     // Is this FRONT among the nearest AirEmergencyDefenseFronts FRONT starts to the spot?
-    bool Nearest(const AIFloat3 &in site, string &out picked)
+    bool Nearest(const AIFloat3 &in site, string &out picked, const array<int> &in excluded)
     {
         picked = "";
         if (Global::AISettings::Role != AiRole::FRONT) return false;
@@ -180,7 +195,7 @@ namespace AirEmergencyDefense {
         array<Team::Roster::Entry@>@ fronts = Team::Roster::WithRole(AiRole::FRONT);
         for (uint i = 0; fronts !is null && i < fronts.length(); ++i) {
             Team::Roster::Entry@ e = fronts[i];
-            if (e is null || e.teamId == ai.teamId || teams.find(e.teamId) >= 0) continue;
+            if (e is null || e.teamId == ai.teamId || teams.find(e.teamId) >= 0 || excluded.find(e.teamId) >= 0) continue;
             if (!TeamEconomy::Alive(e.teamId)) continue;
             teams.insertLast(e.teamId); dists.insertLast(MapHelpers::SqDist(site, e.startPos));
         }
@@ -204,11 +219,108 @@ namespace AirEmergencyDefense {
         return rank < want;
     }
 
+    // This FRONT was picked (first, or after another FRONT passed): answer, or pass
+    // it on when it is cooling down here or none of its labs' units can reach the spot.
+    void Answer(Emergency@ e, const string &in takeover)
+    {
+        const int cooling = CoolingFor(e.site);
+        if (cooling > 0) { Decline(e, "cooling down here (" + cooling + " s left)"); return; }
+        string why;
+        if (!CanHelp(e, why)) { Decline(e, why); return; }
+        GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + ": this FRONT's labs switch to fast defense"
+            + (takeover == "" ? "" : " (" + takeover + ")") + "; " + why, 1);
+        Join(e);
+    }
+
+    // Stop answering and tell every FRONT; the next nearest one takes it.
+    void Decline(Emergency@ e, const string &in why)
+    {
+        e.mine = false; e.handedOver = true;
+        if (e.passed.find(ai.teamId) < 0) e.passed.insertLast(ai.teamId);
+        Squad@ s = SquadBySerial(e.serial);
+        if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
+        AiSendMessage(MSG + "|pass|" + e.airTeam + "|" + int(e.site.x) + "|" + int(e.site.z));
+        GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + " at (" + int(e.site.x) + "," + int(e.site.z)
+            + ") passed on: " + why + (s is null ? "" : "; squad " + s.members.length() + " units left on patrol"), 1);
+    }
+
+    // airemg|pass|<air team>|x|z from a FRONT that cannot answer
+    void Passed(const array<string>@ p, int fromTeamId)
+    {
+        if (p.length() < 5) return;
+        Emergency@ e = null;
+        if (!emergencies.get(p[2], @e) || e is null || !Live(e)) return;
+        const AIFloat3 site(float(parseInt(p[3])), 0.0f, float(parseInt(p[4])));
+        const float far = Global::RoleSettings::Front::AirEmergencyDefenseNewSite;
+        if (MapHelpers::SqDist(site, e.site) > far * far) return;   // an older spot of that AIR
+        if (e.passed.find(fromTeamId) < 0) e.passed.insertLast(fromTeamId);
+        if (fromTeamId == ai.teamId || e.mine || e.handedOver || e.timedOut) return;
+        string picked;
+        if (!Nearest(e.site, picked, e.passed)) return;
+        e.mine = true; e.started = ai.frame;
+        Answer(e, "team " + fromTeamId + " passed it on; nearest now " + picked);
+    }
+
+    // Can a fast-defense unit from one of this FRONT's labs get to the spot?
+    // Static movement-area test per unit def (cached on the emergency): the spot,
+    // or a point ReachRadius around it, in the same area as the lab. O(labs x
+    // defs x 9) area lookups once per emergency, no path query.
+    const float ReachRadius = 300.0f;
+    bool Reachable(Emergency@ e, CCircuitUnit@ lab, CCircuitDef@ d)
+    {
+        bool ok = false;
+        if (e.reach.get(d.GetName(), ok)) return ok;
+        const AIFloat3 from = lab.GetPos(ai.frame);
+        ok = aiTerrainMgr.CanTraverse(d, from, e.site);
+        for (int k = 0; k < 8 && !ok; ++k) {
+            const float a = float(k) * 0.785398f;
+            AIFloat3 p = e.site;
+            p.x = AiMax(16.0f, AiMin(float(AiTerrainWidth()) - 16.0f, p.x + cos(a) * ReachRadius));
+            p.z = AiMax(16.0f, AiMin(float(AiTerrainHeight()) - 16.0f, p.z + sin(a) * ReachRadius));
+            ok = aiTerrainMgr.CanTraverse(d, from, p);
+        }
+        e.reach.set(d.GetName(), ok);
+        return ok;
+    }
+
+    bool EmergencyLab(CCircuitUnit@ f)
+    {
+        if (f is null || f.circuitDef is null || Lifecycle::IsRetiring(f) || EdgeLanes::IsEdgeLab(f)) return false;
+        const string n = f.circuitDef.GetName();
+        return UnitHelpers::IsT1BotLab(n) || UnitHelpers::IsT1VehicleLab(n) || UnitHelpers::IsT2BotLab(n) || UnitHelpers::IsT2VehicleLab(n);
+    }
+
+    bool CanHelp(Emergency@ e, string &out why)
+    {
+        const array<string>@ names = @Global::RoleSettings::Front::AirEmergencyDefenseUnits;
+        int labs = 0, cant = 0;
+        string ok = "";
+        for (uint i = 0; i < Factory::factoryList.length(); ++i) {
+            CCircuitUnit@ f = Factory::factoryList[i];
+            if (!EmergencyLab(f)) continue;
+            bool any = false, buildable = false;
+            for (uint n = 0; n < names.length() && !any; ++n) {
+                CCircuitDef@ d = ai.GetCircuitDef(names[n]);
+                if (d is null || !f.circuitDef.CanBuild(d)) continue;
+                buildable = true;
+                any = Reachable(e, f, d);
+            }
+            if (!buildable) continue;
+            ++labs;
+            if (any) ok += (ok == "" ? "" : ",") + f.circuitDef.GetName(); else ++cant;
+        }
+        if (labs == 0) { why = "no T1/T2 land lab"; return false; }
+        if (ok == "") { why = "no unit from its " + labs + " lab(s) can reach the spot"; return false; }
+        why = "reach from " + ok + (cant > 0 ? " (" + cant + " lab(s) cannot reach)" : "");
+        return true;
+    }
+
     bool HandleMessage(const string &in msg, int fromTeamId)
     {
         array<string>@ p = msg.split("|");
         if (p.length() < 2 || p[0] != MSG) return false;
         if (!Enabled() || Global::AISettings::Role != AiRole::FRONT) return true;
+        if (p[1] == "pass") { Passed(p, fromTeamId); return true; }
         const string key = "" + fromTeamId;
         Emergency@ e = null;
         emergencies.get(key, @e);
@@ -227,15 +339,12 @@ namespace AirEmergencyDefense {
             @e = Emergency();
             e.airTeam = fromTeamId; e.serial = nextSerial++; e.site = site; e.lastOn = ai.frame; e.started = ai.frame;
             string picked;
-            e.mine = Nearest(site, picked);
-            const int cooling = e.mine ? CoolingFor(site) : 0;
-            if (cooling > 0) e.mine = false;
+            e.mine = Nearest(site, picked, e.passed);
             emergencies.set(key, @e);
             GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + fromTeamId + " emergency " + e.serial + " at ("
                 + int(site.x) + "," + int(site.z) + "): nearest FRONTs " + picked
-                + (e.mine ? " - this FRONT's labs switch to fast defense"
-                    : (cooling > 0 ? " - this FRONT is cooling down here (" + cooling + " s left)" : " - not this FRONT")), 1);
-            if (e.mine) Join(e);
+                + (e.mine ? " - this FRONT answers" : " - not this FRONT"), 1);
+            if (e.mine) Answer(e, "");
             return true;
         }
         e.lastOn = ai.frame;
@@ -356,6 +465,13 @@ namespace AirEmergencyDefense {
                 if (ai.GetTeamUnit(s.members[k]) is null) { memberOf.delete("" + s.members[k]); s.members.removeAt(k); ++s.lost; }
             Sample(s);
             ReleaseGroup(s);
+            // owner 2026-11-14: units out but none ever got to the spot (terrain the static test missed): pass it on
+            if (!s.patrolOnly && s.firstArrival < 0 && s.joined >= Global::RoleSettings::Front::AirEmergencyDefenseStuckUnits
+                && ai.frame - s.startFrame >= AiMax(1, Global::RoleSettings::Front::AirEmergencyDefenseStuckSeconds) * SECOND) {
+                Emergency@ e = EmergencyBySerial(s.serial);
+                if (e !is null && e.mine && !e.over)
+                    Decline(e, s.joined + " units sent, none reached the spot in " + (ai.frame - s.startFrame) / SECOND + " s");
+            }
             if (s.endFrame >= 0 && ai.frame - s.endFrame >= ReportAfterSeconds * SECOND) { Final(s); continue; }
             if (s.endFrame < 0 && ai.frame - s.lastReport >= ReportEverySeconds * SECOND) {
                 s.lastReport = ai.frame;
@@ -490,6 +606,7 @@ namespace AirEmergencyDefense {
             const uint i = (uint(AiMax(0, start)) + n) % names.length();
             CCircuitDef@ d = ai.GetCircuitDef(names[i]);
             if (d is null || !f.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame)) continue;
+            if (!Reachable(e, f, d)) continue;   // owner 2026-11-14: e.g. vehicles below a bot-only plateau
             @def = d;
             turn.set(key, int((i + 1) % names.length()));
         }
