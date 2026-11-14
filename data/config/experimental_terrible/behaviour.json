@@ -1702,8 +1702,12 @@
 				"retreat": 0
 			},
 			"armart": {
+				"fire_state": 2,
 				"role": ["artillery"],
-				"attribute": ["siege"],
+				// Owner 2026-11-14: Shellshocker joins the ranged artillery controller (Inferno/Barrage procedure): firing sites at 99% of its own range (from its def), kites back, always fires at will;
+				// static porc (live or ghost) counts its reach + 16, mobiles + 48. Ghost images (last seen / radar ghosts) get at most 3 blind volleys each, heavy or not, only when nothing seen or on radar is in range; then it leaves that ghost until seen again.
+				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				"attribute": ["siege", "ranged"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2255,8 +2259,12 @@
 				"power": 1.0
 			},
 			"corwolv": {
+				"fire_state": 2,
 				"role": ["artillery"],
-				"attribute": ["siege"],
+				// Owner 2026-11-14: Wolverine joins the ranged artillery controller (Inferno/Barrage procedure): firing sites at 99% of its own range (from its def), kites back, always fires at will;
+				// static porc (live or ghost) counts its reach + 16, mobiles + 48. Ghost images (last seen / radar ghosts) get at most 3 blind volleys each, heavy or not, only when nothing seen or on radar is in range; then it leaves that ghost until seen again.
+				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				"attribute": ["siege", "ranged"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

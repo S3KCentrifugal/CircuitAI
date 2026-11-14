@@ -32,6 +32,7 @@ namespace ThugFireAtWill {
         // left this list; the DLL's assault micro keeps them at fire at will.
         return name == "legbar" || name == "legmed" || name == "legrail"   // owner 2026-11-13: Lance joins the Barrage controller
             || name == "leghrk" || name == "leginf"
+            || name == "armart" || name == "corwolv"   // owner 2026-11-14: Shellshocker + Wolverine join the ranged artillery controller
             || name == "armmanni";   // owner 2026-11-02: Starlight fires at will always (Tremor: hold fire, Ambassador rules since 2026-11-07)
     }
 
