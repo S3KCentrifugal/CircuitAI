@@ -97,12 +97,16 @@ namespace CommanderGroup {
         // owner 2026-11-12: a T2 seat drops a heavy pop-up artillery + pop-up against an enemy agitator on our porc
         // (front_agitator_counter.as); while on that job it is published as -1 so native group work cannot take it back
         FrontAgitatorCounter::Update();
+        // owner 2026-11-14: a seat (T2 or the T1 constructor) drops artillery behind our forward T1.5 static
+        // against an enemy T1.5 porc cluster (front_porc_cluster_counter.as); unpublished while on that job
+        FrontPorcClusterCounter::Update();
         for(uint i=0;i<members.length();++i)
-            aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,float(FrontAgitatorCounter::Holds(members[i])?-1:members[i]));
+            aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,
+                float((FrontAgitatorCounter::Holds(members[i]) || FrontPorcClusterCounter::Holds(members[i]))?-1:members[i]));
         // owner 2026-11-01: the group's T1 constructor also builds forward agitators (front_agitator.as GroupPull);
         // while it is on one, native group work must not take it back, so it is unpublished meanwhile
         CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);
-        if(Eligible(con)) {
+        if(Eligible(con) && !FrontPorcClusterCounter::Holds(con.id)) {
             IUnitTask@ agit=FrontAgitator::GroupPull(con);
             if(agit !is null && con.task !is agit) aiBuilderMgr.AssignTask(con,agit);
         }
@@ -110,7 +114,7 @@ namespace CommanderGroup {
     }
     void PublishUnit(bool detached) {   // native resets its group state only when the value changes
         CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);
-        const int id=(!detached && Eligible(con) && !FrontAgitator::OnOrder(con))?FrontConstructors::seats[2]:-1;
+        const int id=(!detached && Eligible(con) && !FrontAgitator::OnOrder(con) && !FrontPorcClusterCounter::Holds(con.id))?FrontConstructors::seats[2]:-1;
         aiBuilderMgr.SetCommanderCombatOption("commander_group_unit",float(id));
     }
     bool Owns(int id) {
@@ -206,6 +210,8 @@ namespace CommanderGroup {
         if(!Owns(unit.id)) return null;
         IUnitTask@ counter=FrontAgitatorCounter::Work(unit);   // owner 2026-11-12: the agitator counter job, then its old task
         if(counter !is null) return counter;
+        IUnitTask@ cluster=FrontPorcClusterCounter::Work(unit);   // owner 2026-11-14: the T1.5 porc cluster counter job
+        if(cluster !is null) return cluster;
         if(FrontConstructors::seats[2]==unit.id) {
             IUnitTask@ agit=FrontAgitator::GroupPull(unit);
             PublishUnit(agit !is null);

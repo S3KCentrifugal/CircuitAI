@@ -633,6 +633,39 @@ namespace Front {
             // T2 vehicle constructors: native drops their builds inside a scouted enemy gun's reach (conPorcSafety),
             // so they only take a site outside the agitator's reach; T2 bots take any site
             array<string> AgitatorCounterVehicleUnits = { "armacv", "coracv", "legacv" };
+            // Enemy T1.5 porc cluster counter (owner, 2026-11-14; systems/construction/front_porc_cluster_counter.as).
+            // More than PorcClusterMinCount - 1 known enemy PorcClusterTargets (seen or ghost) standing within
+            // PorcClusterRadius of one turret of them make a cluster. The commander group answers it with one
+            // artillery placed in the half disc PorcClusterBack deep / PorcClusterSide wide behind its most forward
+            // T1.5 static (PorcClusterAnchors within PorcClusterGroupRadius of the group, nearest the cluster); with
+            // none, behind the group's centre (its commander, else a seat). A T2 seat at the group (within
+            // PorcClusterT2JoinRadius) with a 10 s minimum metal income above PorcClusterT2MinMetalIncome builds
+            // PorcClusterT2Guns; else the group's T1 constructor builds PorcClusterT1Guns. Log [FRONT][PorcCluster].
+            bool PorcClusterCounter = true;
+            array<string> PorcClusterTargets = { "armbeamer", "armhlt",     // Beamer, Overwatch
+                "corhllt", "corhlt",                                         // Twin Guard, Warden
+                "legmg", "leghive" };                                        // Cacophony, Hive (Legion's HLT slot)
+            array<string> PorcClusterAnchors = { "armbeamer", "armhlt", "corhllt", "corhlt", "legmg", "leghive" };
+            array<string> PorcClusterT1Guns = { "armguard", "corpun", "legcluster" };     // Gauntlet, Agitator, Amputator
+            array<string> PorcClusterT2Guns = { "armamb", "cortoast", "legacluster" };    // Rattlesnake, Persecutor, Eviscerator
+            int PorcClusterMinCount = 4;                  // "more than 3"
+            float PorcClusterRadius = 350.0f;
+            float PorcClusterBack = 300.0f;               // the half disc behind the anchor: this deep
+            float PorcClusterSide = 300.0f;               // and this far to either side
+            float PorcClusterGroupRadius = 1800.0f;       // our T1.5 statics this near the group centre are the group's
+            float PorcClusterT2JoinRadius = 1200.0f;      // a T2 seat this near the group centre has reached it
+            float PorcClusterT2MinMetalIncome = 65.0f;    // 10 s minimum, exclusive ("> 65")
+            int PorcClusterT2WaitSeconds = 60;            // T2 seat on its way: the T1 waits this long, then builds
+            float PorcClusterReachShare = 0.95f;          // the gun's height-aware range share that must hold a cluster turret
+            float PorcClusterCoverShare = 1.0f;           // a gun of ours (any system) whose range x this holds one of its turrets covers it
+            float PorcClusterShake = 32.0f;
+            float PorcClusterReach = 3000.0f;             // a constructor this near the site is asked
+            int PorcClusterMax = 6;                       // jobs of this counter standing at most
+            int PorcClusterScanSeconds = 5;
+            // vehicle constructors: native drops their builds inside a scouted enemy gun's reach, so they only
+            // take a site outside every cluster turret's reach (+ margin)
+            array<string> PorcClusterVehicleUnits = { "armcv", "corcv", "legcv", "armacv", "coracv", "legacv" };
+            float PorcClusterVehicleMargin = 48.0f;
             // Tactical launchers against enemy heavy turret clusters (owner, 2026-11-02; systems/construction/front_tactical.as).
             // While two known Pulsars / Bulwarks / Bastions (seen now or ghost images) stand within TacticalClusterRadius
             // of each other, every such turret with one of our mexes / static land guns within TacticalFrontRadius gets

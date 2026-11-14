@@ -38,7 +38,7 @@ namespace EarlyMexUpgraders {
     bool OwnedElsewhere(CCircuitUnit@ u) {
         const int id = u.id;
         if (LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id) || CommanderGroup::Owns(id) || TechAirFoundry::Owns(id)) return true;
-        if (FrontAgitatorCounter::Owns(u) || FrontTactical::Owns(u) || TechFlank::Owns(u)) return true;
+        if (FrontAgitatorCounter::Owns(u) || FrontPorcClusterCounter::Owns(u) || FrontTactical::Owns(u) || TechFlank::Owns(u)) return true;
         if (Team::CatalystTrade::IsGift(id) || Team::CatalystTrade::IsTraded(id)) return true;
         if (Team::Ferry::IsGift(id) || Team::Recovery::IsGift(id)) return true;
         // TECH's first two T2 air constructors are dedicated to converters and fusions (D-107)
