@@ -48,6 +48,9 @@ public:
 
 	CSetupManager(CCircuitAI* circuit, CSetupData* setupData);
 	~CSetupManager();
+	// Owns its script and configs by raw pointer: never copied.
+	CSetupManager(const CSetupManager&) = delete;
+	CSetupManager& operator=(const CSetupManager&) = delete;
 	void DisabledUnits();
 
 	bool OpenConfig(const std::string& profile, const std::vector<std::string>& parts);
