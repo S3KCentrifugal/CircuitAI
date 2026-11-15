@@ -1508,8 +1508,8 @@
 				"attribute": ["ranged"],
 				// Owner 2026-11-14: Shellshocker joins the ranged artillery controller (Inferno/Barrage procedure): firing sites at 99% of its own range (from its def), kites back, always fires at will;
 				// static porc (live or ghost) counts its reach + 16, mobiles + 48. Ghost images (last seen / radar ghosts) get at most 3 blind volleys each, heavy or not, only when nothing seen or on radar is in range; then it leaves that ghost until seen again.
-				// Owner 2026-11-15: buildings before commanders (too weak to hurt a commander's health pool): commander_priority 0.01 (was 100). Values below 1 need the DLL from this change; older DLLs clamp it to 1.
-				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				// Owner 2026-11-15: buildings before commanders (too weak to hurt a commander's health pool): commander_priority 0.01 (was 100). Owner 2026-11-15 later: buildings before any unit in range that is not moving quickly (structures_over_slow 12: slow = at most min(25% of its top speed, 12) elmos/s); quick movers keep the normal score. Both keys need the DLL from these changes (older DLLs clamp 0.01 to 1 and skip the new key).
+				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "structures_over_slow": 12, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1957,8 +1957,8 @@
 				"attribute": ["ranged"],
 				// Owner 2026-11-14: Wolverine joins the ranged artillery controller (Inferno/Barrage procedure): firing sites at 99% of its own range (from its def), kites back, always fires at will;
 				// static porc (live or ghost) counts its reach + 16, mobiles + 48. Ghost images (last seen / radar ghosts) get at most 3 blind volleys each, heavy or not, only when nothing seen or on radar is in range; then it leaves that ghost until seen again.
-				// Owner 2026-11-15: buildings before commanders (too weak to hurt a commander's health pool): commander_priority 0.01 (was 100). Values below 1 need the DLL from this change; older DLLs clamp it to 1.
-				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				// Owner 2026-11-15: buildings before commanders (too weak to hurt a commander's health pool): commander_priority 0.01 (was 100). Owner 2026-11-15 later: buildings before any unit in range that is not moving quickly (structures_over_slow 12: slow = at most min(25% of its top speed, 12) elmos/s); quick movers keep the normal score. Both keys need the DLL from these changes (older DLLs clamp 0.01 to 1 and skip the new key).
+				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "structures_over_slow": 12, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

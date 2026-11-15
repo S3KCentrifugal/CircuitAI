@@ -645,6 +645,7 @@ void CFactoryManager::ReadConfig()
 			boolean("spam_radar_dots", policy.spamRadarDots);
 			number("spam_dot_speed", policy.spamDotSpeed, 0.f, 200.f);
             number("commander_priority", policy.commanderPriority, 0.001f, 100.f);   // owner 2026-11-15: below 1 = commanders after buildings (Wolverine/Shellshocker 0.01)
+            number("structures_over_slow", policy.structuresOverSlow, 0.f, 200.f);   // owner 2026-11-15 (Wolverine/Shellshocker 12)
 			boolean("coordinated", policy.coordinated);
             // Fireline holding is an individual forward-arc doctrine. Reject
             // unsupported cohort ownership instead of silently allowing retreats.

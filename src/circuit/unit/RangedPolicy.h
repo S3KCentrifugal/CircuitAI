@@ -61,6 +61,7 @@ struct RangedPolicy {
     bool allowStatic = true;
     bool preferHeavy = false;
     float commanderPriority = 1.f; // multiplier after shot geometry/admission, never a second owner
+    float structuresOverSlow = 0.f; // owner 2026-11-15: >0 = structures before units moving <= min(25% top speed, this) elmos/s
     bool preferScreen = true;
     bool allowRadar = true;
     bool advanceUnknownRadar = true;

@@ -31,6 +31,16 @@ constexpr float PRESSED_STATIC_TARGET_MULTIPLIER = 2.f;
 // Owner 2026-11-07 (priority_min_tech): far above any value/HP score (those are
 // ~0.01-1000 even with commander_priority 100), so the tier always wins.
 constexpr float PRIORITY_TIER_OFFSET = 1.e6f;
+// Owner 2026-11-15 (structures_over_slow, Wolverine/Shellshocker): structures and quickly moving
+// units sit one tier above slow or parked units (commanders included) when both are in range; inside
+// a tier the normal score decides. Below PRIORITY_TIER_OFFSET, above any score.
+constexpr float STRUCTURE_TIER_OFFSET = 1.e5f;
+// Slow = moving at most min(25% of its own top speed, cap) elmos/s (the Ambassador rule).
+template<class C> bool SlowMobile(const C& c, float cap) {
+    if(!c.mobile || !c.def) return false;
+    const float limit=std::min(c.def->GetSpeed()*.25f,cap);
+    return c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z<=limit*limit;
+}
 }
 using springai::AIFloat3;
 static ranged::Point P(const AIFloat3& p) { return {p.x,p.z}; }
@@ -589,6 +599,7 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if(world.Reserved(c.id,id)>=c.health) s*=.2f;
             if(c.def->IsEnemyRoleAny(CCircuitDef::COMM)) s*=policy.commanderPriority;
             if(def->IsPriorityTarget(c.def)) s+=PRIORITY_TIER_OFFSET;  // owner 2026-11-07, see Update
+            if(policy.structuresOverSlow>0.f && !SlowMobile(c,policy.structuresOverSlow)) s+=STRUCTURE_TIER_OFFSET;  // owner 2026-11-15
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
             // Commander focus is a tier, not a multiplier defeated by low HP
             // repairers or existing shot reservations. Geometry still vetoes.
@@ -1043,6 +1054,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // puts every structure / commander / T2+ contact above any T1 mobile
             // or dot, and lets SelectTarget's switch ratio leave a held T1 at once.
             if(def->IsPriorityTarget(c.def)) value+=PRIORITY_TIER_OFFSET;
+            // Owner 2026-11-15: structures_over_slow (see STRUCTURE_TIER_OFFSET); unidentified dots stay below.
+            if(c.def && policy.structuresOverSlow>0.f && !SlowMobile(c,policy.structuresOverSlow)) value+=STRUCTURE_TIER_OFFSET;
             if(c.id==target && (heldScoreFrame!=frame || value>heldScore)) { heldScore=value; heldScoreFrame=frame; }
             if(value>bestScore || (value==bestScore && (best<0 || c.id<contacts[best].id))) {
                 best=i; bestWeapon=int(wi); bestScore=value; bestDamage=damage;
