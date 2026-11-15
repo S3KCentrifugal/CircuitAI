@@ -19,7 +19,7 @@ class CEnemyInfo;
 
 class IFighterTask: public IUnitTask {
 public:
-	enum class FightType: char {RALLY = 0, GUARD, DEFEND, SCOUT, RAID, ATTACK, BOMB, MELEE, ARTY, AA, AH, SUPPORT, SUPER, ROUTE, FERRY, WAVE, _SIZE_};
+	enum class FightType: char {RALLY = 0, GUARD, DEFEND, SCOUT, RAID, ATTACK, BOMB, MELEE, ARTY, AA, AH, SUPPORT, SUPER, ROUTE, FERRY, WAVE, ENGAGE, _SIZE_};  // ENGAGE: D-440 CEngagementTask, mirrored in data/script/src/task.as
 	using FT = std::underlying_type<FightType>::type;
 
 protected:

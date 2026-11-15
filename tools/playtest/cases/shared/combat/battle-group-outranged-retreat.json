@@ -1,0 +1,172 @@
+{
+  "name": "battle-group-outranged-retreat",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "description": "D-507: 4 Thugs and 2 Aggravators against three HLTs and three Beamers: outranged and outmatched. Expected: the battle group withdraws (stands off outside the towers) and loses at most one unit.",
+  "storage_scenario": "bg-outranged-retreat",
+  "groups": [
+    {
+      "unit": "corrad",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3800,
+        3940
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corrad",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4200,
+        3940
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corrad",
+      "count": 1,
+      "team": 0,
+      "position": [
+        4000,
+        3990
+      ],
+      "after_seconds": 1
+    },
+    {
+      "unit": "corthud",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 4,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 2,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 2,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "armhlt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3800,
+        4600
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armhlt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4000,
+        4650
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armhlt",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4200,
+        4600
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armbeamer",
+      "count": 1,
+      "team": 1,
+      "position": [
+        3700,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armbeamer",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4000,
+        4500
+      ],
+      "after_seconds": 5
+    },
+    {
+      "unit": "armbeamer",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4300,
+        4500
+      ],
+      "after_seconds": 5
+    }
+  ],
+  "waves": [
+    {
+      "name": "fortress",
+      "after_seconds": 5,
+      "units": [
+        "armhlt",
+        "armbeamer"
+      ]
+    }
+  ],
+  "assertions": {
+    "max_losses": 1,
+    "min_withdraw_orders": 1,
+    "min_kills": 0,
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_types_assigned": 2
+  }
+}

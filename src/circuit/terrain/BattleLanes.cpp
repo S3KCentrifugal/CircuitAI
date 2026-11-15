@@ -175,7 +175,7 @@ bool CBattleAnalysis::StartLaneAnalysis(bool background, int alternatives, float
             result->solveMs = LaneMilliseconds(start);
             return complete;
         };
-        if (background) circuit->GetScheduler()->RunBackgroundJob(CScheduler::WorkJob(std::move(work)));
+        if (background) circuit->GetScheduler()->RunBackgroundJob(CScheduler::WorkJob(std::move(work)), "lanes");
         else work()->Run(); // profiling/reference mode uses exactly the same solver and publication
         return true;
     } catch (const std::exception& e) {

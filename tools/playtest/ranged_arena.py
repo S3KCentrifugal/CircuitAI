@@ -72,6 +72,8 @@ def prepare(args):
         '--modoption','startenergystorage='+str(case.get('start_energy_storage',1000000)),
         '--extra-widget',str(HERE/'widgets/ranged_arena.lua'),
         '--extra-widget',str(HERE/'widgets/workforce_perf_watch.lua')]
+    if getattr(args,'opponent_dll',None):
+        stage += ['--enemies','prod','--opponent-dll',str(args.opponent_dll),'--opponent-data',str(args.opponent_data or args.data)]
     # Declared per-case mod options (e.g. the Legion faction for legscout).
     for key, value in case.get('modoptions', {}).items():
         stage += ['--modoption', f'{key}={value}']
@@ -123,6 +125,14 @@ def prepare(args):
         if name=='builder' and case.get('commander_repair_only'):
             repair+='\n if (ai.teamId==0 && u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)) { aiBuilderMgr.SetCommanderCombatOption("front_ready",1.f); IUnitTask@ repair=aiBuilderMgr.CommanderFrontWork(u,21,null,0.f); if(repair !is null) return repair; return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); } // stationary repair isolation fixture\n'
         path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
+    # KI-785: with every builder and factory frozen no first factory can
+    # appear, so D-494's first-factory check (INV-267) cannot judge the arena.
+    # Only that check is skipped; every other invariant stays forbidden.
+    first_factory_skipped = not (case.get('builders') or case.get('commander_front_work') or case.get('production'))
+    if first_factory_skipped:
+        path = staged/'script/src/systems/construction/front_layout.as'
+        source = path.read_text(); start = source.index('{', source.index('void CheckFirstFactory()'))+1
+        path.write_text(source[:start]+'\n if (ai.frame>=0) return; // supplied arena: builders and factories frozen (KI-785)\n'+source[start:])
     path = staged/'script/src/manager/military.as'
     source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
     # Normal combat cases leave friendly commands to the AI. Production-only
@@ -362,6 +372,8 @@ def prepare(args):
                if args.profile.startswith('experimental_') else ['native legacy economy remains active'])}
     if case.get('commander_trace'):
         pins['diagnostics']['CIRCUIT_COMMANDER_TRACE']='1'
+    if first_factory_skipped:
+        pins['overrides'] += ['FRONT first-factory check (INV-267) skipped: no builder or factory can act (KI-785)']
     if case.get('production'):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
     if case.get('commander_repair_only'):
@@ -395,7 +407,11 @@ def main():
     parser.add_argument('--mode',choices=['fast','visual','performance'],default='fast')
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--stage-only',action='store_true')
-    parser.add_argument('--keep-going',action='store_true',help='Bounded diagnostic continuation after a recorded failure; the FAIL verdict is kept')
+    parser.add_argument('--keep-going',action='store_true',help='bounded diagnostic (KI-734): the watch runs to --minutes after a forbidden line; the verdict stays FAIL')
+    # D-432: head-to-head. The enemy side plays this pinned build with its own, unpatched data
+    # (its units are under its own controllers, not the fixture's route), staged as BARbBase/base.
+    parser.add_argument('--opponent-dll',type=Path,default=None)
+    parser.add_argument('--opponent-data',type=Path,default=None)
     args=parser.parse_args();directory,command=prepare(args)
     if args.stage_only: return 0
     launch=command+['launch','--dir',str(directory),'--engine','recoil_2026.07.04']
@@ -404,7 +420,8 @@ def main():
     case=json.loads((directory/'ranged-arena.json').read_text())
     playtest.validate_checks(case.get('checks','ranged-arena'))
     watch=command+['watch','--dir',str(directory),'--role',case.get('role','FRONT'),'--checks',case.get('checks','ranged-arena'),
-        '--play-decided','--minutes',str(args.minutes),'--wall-minutes','8']+(['--keep-going'] if args.keep_going else [])
+        '--play-decided','--minutes',str(args.minutes),'--wall-minutes','8']
+    if args.keep_going: watch+=['--keep-going']
     # Supplied arenas can temporarily have no enemies between waves. Their
     # completion/grace contract (or fixed performance horizon) owns the end.
     try:

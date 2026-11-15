@@ -1,0 +1,37 @@
+{
+  "name": "thug-commander-snipe",
+  "description": "Opportunistic commander shots: a Cortex line (6 Thugs, 2 Aggravators) is busy with a Pawn wave when an enemy Armada commander walks with the second wave under its own AI's commander controller (it may cloak, ambush or D-gun). The report reads every Thug shot and hit on the commander, the frame it was first seen, and whether it cloaked.",
+  "unit": "corthud",
+  "units": ["corthud", "corstorm"],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "thug-commander-snipe",
+  "starts": [[4000, 1800], [4000, 7000]],
+  "camera": [4000, 4050, 950],
+  "camera_angle": 1.15,
+  "photos": [50, 64, 100, 114, 128],
+  "groups": [
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3550, 4200]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [4450, 4200]},
+    {"unit": "corthud", "count": 6, "team": 0, "position": [3800, 3700], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 2, "team": 0, "position": [3900, 3480], "columns": 2, "spacing": 90, "after_seconds": 15},
+    {"unit": "armpw", "count": 6, "team": 1, "position": [3800, 5000], "columns": 6, "spacing": 80, "after_seconds": 35},
+    {"unit": "armcom", "count": 1, "team": 1, "position": [3950, 5150], "after_seconds": 80},
+    {"unit": "armpw", "count": 4, "team": 1, "position": [3750, 5250], "columns": 4, "spacing": 90, "after_seconds": 80}
+  ],
+  "waves": [
+    {"name": "raiders 6 Pawns", "after_seconds": 35, "units": ["armpw"]},
+    {"name": "commander with 4 Pawns", "after_seconds": 80, "units": ["armcom", "armpw"]}
+  ],
+  "enemy_destination": [3900, 3300],
+  "assertions": {
+    "min_shooters": 3,
+    "min_types_assigned": 2,
+    "min_kills": 4,
+    "max_losses": 8,
+    "min_damage": 1000
+  },
+  "min_spawn_spacing": 64,
+  "checks": "thug-commander-snipe"
+}

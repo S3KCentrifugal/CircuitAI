@@ -16,6 +16,11 @@
 #include "map/ThreatMap.h"
 #include "module/BuilderManager.h"
 #include "control/core/ControllerRegistry.h"
+#include "control/unit/skirmisher/SkirmisherController.h"
+#include "control/unit/support/SupportController.h"
+#include "control/unit/escort/EscortController.h"
+#include "control/unit/rezzer/RezzerController.h"
+#include "control/group/BattleGroupController.h"
 #include "control/unit/artillery/ArtilleryController.h"
 #include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
@@ -398,6 +403,9 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			struct SEnemyDestroyedEvent* evt = (struct SEnemyDestroyedEvent*)data;
 			CEnemyInfo* enemy = GetEnemyInfo(evt->enemy);
 			if (enemy != nullptr) {
+				// D-512: a kill by a battle group member books its metal to the group.
+				if (battleGroupController != nullptr && evt->attacker >= 0)
+					battleGroupController->RecordKill(evt->attacker, enemy->GetCost(), lastFrame);
 				allyTeam->DyingEnemy(enemy->GetData(), lastFrame);
 				ret = 0;
 			} else {
@@ -614,7 +622,7 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
 
 	CreateGameAttribute();
 	scheduler = std::make_shared<CScheduler>();
-	scheduler->Init(scheduler);
+	scheduler->Init(scheduler, this);  // D-441: joins the worker pool now
 
 	InitRoles();  // core c++ implemented roles
 	const std::string profile = InitOptions();  // Inits GameAttribute
@@ -692,6 +700,11 @@ int CCircuitAI::Init(int skirmishAIId, const struct SSkirmishAICallback* sAICall
     // per-type assignment (after the managers: roles are read by then).
     controllers=std::make_unique<CControllerRegistry>(this);
     commanderController=controllers->Add(std::make_unique<CCommanderController>(this));
+    skirmisherController=controllers->Add(std::make_unique<CSkirmisherController>(this));
+    supportController=controllers->Add(std::make_unique<CSupportController>(this));
+    escortController=controllers->Add(std::make_unique<CEscortController>(this));  // D-509
+    rezzerController=controllers->Add(std::make_unique<CRezzerController>(this));  // D-514
+    battleGroupController=controllers->AddGroup(std::make_unique<CBattleGroupController>(this));
     artilleryCensus=controllers->Add(std::make_unique<CArtilleryController>(this));  // D-493
     controllers->ReadConfig(setupManager->GetConfig());
     // D-300: before script init, so AiMain can already publish widget state.
@@ -921,6 +934,7 @@ int CCircuitAI::Update(int frame)
 	FlushDrawQueue();  // D-118
 	if (performance::enabled && frame % (60 * FRAMES_PER_SEC) == 0) {
 		performance::Flush(this);
+		scheduler->FlushWorkerStats(this);  // D-431
 		unsigned current = 0, destroyedObjects = 0, detected = 0;
 		scriptManager->GetEngine()->GetGCStatistics(&current, &destroyedObjects, &detected);
 		performance::Garbage(this, current, destroyedObjects, detected);
@@ -1329,6 +1343,8 @@ int CCircuitAI::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 	unit->MarkDestroying();
 	destroyed.insert(unit->GetId());
 	const int lostId = unit->GetId();
+	// D-512: before its membership is erased, a member's loss books to its group.
+	if (battleGroupController != nullptr) battleGroupController->RecordLoss(lostId, unit->GetCircuitDef()->GetCostM(), lastFrame);
 	allyTeam->GetNuclearHistory().Prune(lastFrame, [lostId](int owner) { return owner != lostId; });
 	allyTeam->GetPulseClaims().ReleasePending(lostId);
 	if (battle != nullptr) {
@@ -1644,8 +1660,9 @@ CCircuitUnit* CCircuitAI::RegisterTeamUnit(ICoreUnit::Id unitId, Unit* u)
 	unit->SetArea(area);
 
 	teamUnits[unitId] = unit;
-    if (controllers) controllers->UnitAdded(unit);
+    ownedDefinitions.Insert(cdef->GetId(), unitId);
     ++ownedUnitRevision;
+    if (controllers) controllers->UnitAdded(unit);
 	cdef->Inc();
 
 	// FIXME: Sometimes area where factory is placed is not suitable for its units.
@@ -1661,6 +1678,7 @@ void CCircuitAI::UnregisterTeamUnit(CCircuitUnit* unit)
     if (controllers) controllers->UnitRemoved(unit->GetId());
     builderManager->ForgetUnfinishedCount(unit);
 	teamUnits.erase(unit->GetId());
+    ownedDefinitions.Erase(unit->GetCircuitDef()->GetId(), unit->GetId());
     ++ownedUnitRevision;
 	unit->GetCircuitDef()->Dec();
 

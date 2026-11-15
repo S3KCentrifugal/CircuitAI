@@ -1,0 +1,38 @@
+{
+  "name": "support-vs-beamers",
+  "description": "D-499: the support-vs-sentries battle group (6 Thugs screen, 6 Aggravators on the support controller) against two Armada Beamers (490 reach, beyond the rockets' 475) with a Mace picket, then four Pawns walking in. The rockets cannot besiege a Beamer from range: the screen commits against it beside its rockets (static_support_loss_fraction) and the rockets follow its assault (follow_screen_assault), or the line holds back. ranged_benchmark --summarize reads every corstorm shot and its target; compare against support-vs-sentries, where the rockets besiege from range.",
+  "unit": "corstorm",
+  "units": ["corthud", "corstorm"],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "storage_scenario": "support-vs-beamers",
+  "starts": [[4000, 1800], [4000, 7000]],
+  "camera": [3950, 4000, 1150],
+  "photos": [40, 70, 100, 150],
+  "groups": [
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [3550, 4200]},
+    {"unit": "armeyes", "count": 1, "team": 0, "position": [4450, 4200]},
+    {"unit": "corthud", "count": 6, "team": 0, "position": [3800, 3700], "columns": 6, "spacing": 70, "after_seconds": 15},
+    {"unit": "corstorm", "count": 6, "team": 0, "position": [3870, 3480], "columns": 6, "spacing": 80, "after_seconds": 15},
+    {"unit": "armbeamer", "count": 1, "team": 1, "position": [3850, 4450], "after_seconds": 20},
+    {"unit": "armbeamer", "count": 1, "team": 1, "position": [4050, 4450], "after_seconds": 20},
+    {"unit": "armham", "count": 3, "team": 1, "position": [3950, 4600], "columns": 3, "spacing": 90, "after_seconds": 20},
+    {"unit": "armpw", "count": 4, "team": 1, "position": [3800, 5000], "columns": 4, "spacing": 80, "after_seconds": 90}
+  ],
+  "waves": [
+    {"name": "beamers with a Mace picket", "after_seconds": 20, "units": ["armbeamer", "armham"]},
+    {"name": "raiders 4 Pawns", "after_seconds": 90, "units": ["armpw"]}
+  ],
+  "enemy_destination": [3900, 3300],
+  "assertions": {
+    "min_shooters": 4,
+    "min_types_assigned": 2,
+    "min_kills": 3,
+    "max_losses": 8,
+    "min_damage": 2500
+  },
+  "camera_angle": 1.35,
+  "min_spawn_spacing": 64,
+  "checks": "support"
+}

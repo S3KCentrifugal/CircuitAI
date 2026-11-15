@@ -32,7 +32,6 @@ using namespace terrain;
 
 CThreatMap::CThreatMap(CMapManager* manager, float decloakRadius)
 		: manager(manager)
-		, pThreatData(&threatData0)
 		, defRole(ROLE_TYPE(BUILDER))
 		, isUpdating(false)
 		, cloakThreat(nullptr)
@@ -98,7 +97,7 @@ void CThreatMap::Init(const int roleSize, std::set<CCircuitDef::RoleT>&& modRole
 	}
 
 	for (CCircuitDef::RoleT role : modRoles) {
-		for (SThreatData* threatData : {&threatData0, &threatData1}) {
+		for (SThreatData* threatData : {&threat.At(0), &threat.At(1)}) {
 			SRoleThreat& roleThreat = threatData->roleThreats[role];
 			roleThreat.airThreat.resize(mapSize, THREAT_BASE);
 			roleThreat.surfThreat.resize(mapSize, THREAT_BASE);
@@ -107,6 +106,8 @@ void CThreatMap::Init(const int roleSize, std::set<CCircuitDef::RoleT>&& modRole
 		}
 	}
 
+	SThreatData& threatData0 = threat.At(0);
+	SThreatData& threatData1 = threat.At(1);
 	threatData0.defThreat = &threatData0.roleThreats[defRole];
 	threatData1.defThreat = &threatData1.roleThreats[defRole];
 
@@ -157,7 +158,8 @@ void CThreatMap::EnqueueUpdate()
 	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
 	CScheduler* scheduler = circuit->GetScheduler().get();
 	rangeScale = circuit->GetMilitaryManager()->GetRangeUnitCountCompensatorScale();
-	scheduler->RunPriorityJob(CScheduler::WorkJob(&CThreatMap::Update, this, enemyMgr, scheduler));
+	// D-431: at most one queued update per AI; a slow pool shortens the rate instead of queueing.
+	scheduler->RunPriorityJob(CScheduler::WorkJob(&CThreatMap::Update, this, enemyMgr, scheduler), "threat", jobs::Key("threat"));
 }
 
 void CThreatMap::SetEnemyUnitRange(CEnemyUnit* e) const
@@ -238,7 +240,7 @@ float CThreatMap::GetBuilderThreatAt(const AIFloat3& position) const
 	PosToXZ(position, x, z);
 	const int index = z * width + x;
 //	float air = airThreat[index] - THREAT_BASE;
-	float land = pThreatData.load()->roleThreatPtrs[ROLE_TYPE(BUILDER)]->surfThreat[index] - THREAT_BASE;
+	float land = threat.Front().roleThreatPtrs[ROLE_TYPE(BUILDER)]->surfThreat[index] - THREAT_BASE;
 //	float water = amphThreat[index] - THREAT_BASE;
 	return /*air + */land/* + water*/;
 }
@@ -248,13 +250,13 @@ void CThreatMap::SetThreatType(CCircuitUnit* unit)
 	assert(unit != nullptr);
 	CCircuitDef::RoleT role = unit->GetCircuitDef()->GetMainRole();
 	if (unit->GetCircuitDef()->IsAbleToFly()) {
-		threatArray = pThreatData.load()->roleThreatPtrs[role]->airThreat.data();
+		threatArray = threat.Front().roleThreatPtrs[role]->airThreat.data();
 	} else if (unit->GetCircuitDef()->IsAbleToDive()) {
-		threatArray = pThreatData.load()->roleThreatPtrs[role]->amphThreat.data();
+		threatArray = threat.Front().roleThreatPtrs[role]->amphThreat.data();
 	} else if (unit->GetCircuitDef()->IsAbleToSwim()) {
-		threatArray = pThreatData.load()->roleThreatPtrs[role]->swimThreat.data();
+		threatArray = threat.Front().roleThreatPtrs[role]->swimThreat.data();
 	} else {
-		threatArray = pThreatData.load()->roleThreatPtrs[role]->surfThreat.data();
+		threatArray = threat.Front().roleThreatPtrs[role]->surfThreat.data();
 	}
 }
 
@@ -264,7 +266,7 @@ float CThreatMap::GetSurfThreatAtPos(const AIFloat3& position) const
 	PosToXZ(position, x, z);
 	x = std::max(0, std::min(width - 1, x));
 	z = std::max(0, std::min(height - 1, z));
-	return pThreatData.load()->defThreat->surfThreat[z * width + x] - THREAT_BASE;
+	return threat.Front().defThreat->surfThreat[z * width + x] - THREAT_BASE;
 }
 
 float CThreatMap::GetAmphThreatAtPos(const AIFloat3& position) const
@@ -273,7 +275,7 @@ float CThreatMap::GetAmphThreatAtPos(const AIFloat3& position) const
     PosToXZ(position, x, z);
     x = std::clamp(x, 0, width - 1);
     z = std::clamp(z, 0, height - 1);
-    return pThreatData.load()->defThreat->amphThreat[z * width + x] - THREAT_BASE;
+    return threat.Front().defThreat->amphThreat[z * width + x] - THREAT_BASE;
 }
 
 float CThreatMap::GetAirThreatAtPos(const AIFloat3& position) const
@@ -282,7 +284,7 @@ float CThreatMap::GetAirThreatAtPos(const AIFloat3& position) const
 	PosToXZ(position, x, z);
 	x = std::max(0, std::min(width - 1, x));
 	z = std::max(0, std::min(height - 1, z));
-	return pThreatData.load()->defThreat->airThreat[z * width + x] - THREAT_BASE;
+	return threat.Front().defThreat->airThreat[z * width + x] - THREAT_BASE;
 }
 
 float CThreatMap::GetThreatAt(const AIFloat3& position) const
@@ -303,15 +305,15 @@ float CThreatMap::GetThreatAt(CCircuitUnit* unit, const AIFloat3& position) cons
 	PosToXZ(position, x, z);
 	CCircuitDef::RoleT role = unit->GetCircuitDef()->GetMainRole();
 	if (unit->GetCircuitDef()->IsAbleToFly()) {
-		return pThreatData.load()->roleThreatPtrs[role]->airThreat[z * width + x] - THREAT_BASE;
+		return threat.Front().roleThreatPtrs[role]->airThreat[z * width + x] - THREAT_BASE;
 	}
 	if (unit->GetCircuitDef()->IsAbleToDive()) {
-		return pThreatData.load()->roleThreatPtrs[role]->amphThreat[z * width + x] - THREAT_BASE;
+		return threat.Front().roleThreatPtrs[role]->amphThreat[z * width + x] - THREAT_BASE;
 	}
 	if (unit->GetCircuitDef()->IsAbleToSwim()) {
-		return pThreatData.load()->roleThreatPtrs[role]->swimThreat[z * width + x] - THREAT_BASE;
+		return threat.Front().roleThreatPtrs[role]->swimThreat[z * width + x] - THREAT_BASE;
 	}
-	return pThreatData.load()->roleThreatPtrs[role]->surfThreat[z * width + x] - THREAT_BASE;
+	return threat.Front().roleThreatPtrs[role]->surfThreat[z * width + x] - THREAT_BASE;
 }
 
 float CThreatMap::GetUnitPower(CCircuitUnit* unit) const
@@ -696,8 +698,8 @@ std::shared_ptr<IMainJob> CThreatMap::Update(CEnemyManager* enemyMgr, CScheduler
 	SThreatData& threatData = *GetNextThreatData();
 	numThreadDraws = 1 + 2 * threatData.roleThreats.size();
 	for (auto& kv : threatData.roleThreats) {
-		scheduler->RunPriorityJob(CScheduler::WorkJob(&CThreatMap::AirDrawer, this, kv.first));
-		scheduler->RunPriorityJob(CScheduler::WorkJob(&CThreatMap::AmphDrawer, this, kv.first));
+		scheduler->RunPriorityJob(CScheduler::WorkJob(&CThreatMap::AirDrawer, this, kv.first), "threat-draw");
+		scheduler->RunPriorityJob(CScheduler::WorkJob(&CThreatMap::AmphDrawer, this, kv.first), "threat-draw");
 	}
 
 	std::fill(threatData.cloakThreat.begin(), threatData.cloakThreat.end(), THREAT_BASE);
@@ -736,8 +738,8 @@ void CThreatMap::Apply()
 
 void CThreatMap::SwapBuffers()
 {
-	pThreatData = GetNextThreatData();
-	SThreatData& threatData = *pThreatData.load();
+	threat.Publish();
+	SThreatData& threatData = threat.Front();
 	cloakThreat = threatData.cloakThreat.data();
 	shieldArray = threatData.shield.data();
 	threatArray = threatData.defThreat->surfThreat.data();
@@ -754,17 +756,17 @@ void CThreatMap::UpdateVis()
 		float* threatArray;
 		switch (layerDbg) {
 			case 0: {
-				threatArray = pThreatData.load()->roleThreats[0].airThreat.data();
+				threatArray = threat.Front().roleThreats[0].airThreat.data();
 			} break;
 			default:
 			case 1: {
-				threatArray = pThreatData.load()->roleThreats[0].surfThreat.data();
+				threatArray = threat.Front().roleThreats[0].surfThreat.data();
 			} break;
 			case 2: {
-				threatArray = pThreatData.load()->roleThreats[0].amphThreat.data();
+				threatArray = threat.Front().roleThreats[0].amphThreat.data();
 			} break;
 			case 3: {
-				threatArray = pThreatData.load()->roleThreats[0].swimThreat.data();
+				threatArray = threat.Front().roleThreats[0].swimThreat.data();
 			} break;
 		}
 		cmd.write(reinterpret_cast<const char*>(threatArray), mapSize * sizeof(float));
@@ -779,21 +781,21 @@ void CThreatMap::UpdateVis()
 	Uint32 sdlWindowId;
 	float* dbgMap;
 	std::tie(sdlWindowId, dbgMap) = sdlWindows[0];
-	float* airThreat = pThreatData.load()->roleThreats[0].airThreat.data();
+	float* airThreat = threat.Front().roleThreats[0].airThreat.data();
 	for (int i = 0; i < mapSize; ++i) {
 		dbgMap[i] = std::min<float>((airThreat[i] - THREAT_BASE) / 40.0f /*currMaxThreat*/, 1.0f);
 	}
 	circuit->GetDebugDrawer()->DrawMap(sdlWindowId, dbgMap);
 
 	std::tie(sdlWindowId, dbgMap) = sdlWindows[1];
-	float* surfThreat = pThreatData.load()->roleThreats[0].surfThreat.data();
+	float* surfThreat = threat.Front().roleThreats[0].surfThreat.data();
 	for (int i = 0; i < mapSize; ++i) {
 		dbgMap[i] = std::min<float>((surfThreat[i] - THREAT_BASE) / 40.0f, 1.0f);
 	}
 	circuit->GetDebugDrawer()->DrawMap(sdlWindowId, dbgMap);
 
 	std::tie(sdlWindowId, dbgMap) = sdlWindows[2];
-	float* amphThreat = pThreatData.load()->roleThreats[0].amphThreat.data();
+	float* amphThreat = threat.Front().roleThreats[0].amphThreat.data();
 	for (int i = 0; i < mapSize; ++i) {
 		dbgMap[i] = std::min<float>((amphThreat[i] - THREAT_BASE) / 40.0f, 1.0f);
 	}

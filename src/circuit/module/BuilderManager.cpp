@@ -42,12 +42,13 @@
 #include "task/builder/RepairTask.h"
 #include "task/builder/ReclaimTask.h"
 #include "task/builder/ResurrectTask.h"
+#include "control/unit/rezzer/RezzerController.h"
 #include "task/builder/PatrolTask.h"
 #include "task/builder/GuardTask.h"
 #include "task/builder/CombatTask.h"
 #include "task/builder/BraceTask.h"
 #include "control/kernel/ConstructorBrace.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/ControllerRegistry.h"
 #include "control/unit/commander/CommanderController.h"
 #include "task/builder/BuildChain.h"
@@ -854,7 +855,7 @@ void CBuilderManager::BraceTrigger(CCircuitUnit* unit, const AIFloat3* threat, c
 		state.threat = (threat != nullptr) ? *threat : AIFloat3();
 		return;
 	}
-	if (dynamic_cast<CControlledTask*>(task) != nullptr) {
+	if (dynamic_cast<CLeaseTask*>(task) != nullptr) {
 		return;  // another unit controller owns it (D-388)
 	}
 	StartBrace(unit, threat != nullptr, (threat != nullptr) ? *threat : AIFloat3(), reason);
@@ -1269,6 +1270,42 @@ IBuilderTask* CBuilderManager::EnqueueVetoed(const TaskB::SBuildTask& ti)
 
 IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 {
+    return EnqueueBuild(ti, -1);
+}
+
+IBuilderTask* CBuilderManager::EnqueueReserved(const TaskB::SBuildTask& ti, int facing, int& rejection)
+{
+    // Only direct positional construction: factory/geo/mex constructors may
+    // choose a different site. No shared last-error or pending-slot state can
+    // leak into a synchronous TaskAdded callback's nested enqueue.
+    using BT = IBuilderTask::BuildType;
+    rejection = 1; // unsupported request
+    if (ti.type != BT::NANO && ti.type != BT::STORE && ti.type != BT::DEFENCE && ti.type != BT::BUNKER
+        && ti.type != BT::BIG_GUN && ti.type != BT::RADAR && ti.type != BT::SONAR) return nullptr;
+    rejection = 2; // definition veto; checked before reserving any ground
+    if (!ti.buildDef || !ti.buildDef->IsBuildAllowed()
+        || circuit->GetEconomyManager()->IsMetalConverter(ti.buildDef)) return nullptr;
+    auto* terrain = circuit->GetTerrainManager();
+    rejection = 3; // live placement admission
+    const int slot = terrain->ReserveBuilding(ti.buildDef, ti.position, facing);
+    if (slot < 0) return nullptr;
+    terrain->SetLayoutInt("native.transient." + std::to_string(slot), 1);
+    auto request = ti;
+    request.position = terrain->GetReservationPos(slot);
+    IBuilderTask* task = EnqueueBuild(request, slot);
+    if (!task) {
+        // This call created this exact ID. Never release an existing/foreign
+        // slot; AbortTask has already returned any temporary claim.
+        terrain->ReleaseReservation(slot);
+        rejection = 4; // pin failed or synchronous callback cancelled task
+        return nullptr;
+    }
+    rejection = 0;
+    return task;
+}
+
+IBuilderTask* CBuilderManager::EnqueueBuild(const TaskB::SBuildTask& ti, int reservation)
+{
 	// Positional requests from older role helpers still enter the field claim
 	// lifecycle. They may never fall back to nearest synthetic spot ownership.
 	if (circuit->GetEconomyManager()->IsMetalMap()
@@ -1424,6 +1461,14 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 		} break;
 	}
 
+    // A failed pin has never been published: do not send TaskRemoved without
+    // a matching TaskAdded (script pending counters depend on paired events).
+    if (reservation >= 0 && !task->PinReservation(reservation)) {
+        task->Dead();
+        task->Stop(false);
+        task->ClearRelease();
+        return nullptr;
+    }
 	if (ti.isActive) {
 		buildTasks[static_cast<IBuilderTask::BT>(ti.type)].insert(task);
 		buildTasksCount++;
@@ -1432,7 +1477,12 @@ IBuilderTask* CBuilderManager::Enqueue(const TaskB::SBuildTask& ti)
 		task->Deactivate();
 	}
 	lastEnqueued = task;
+	// Pin before exposing the task to script. Retain through callbacks: they may
+	// synchronously abort it and release the manager's owning reference.
+    task->AddRef();
+    struct Retain { IBuilderTask* task; ~Retain() { task->Release(); } } retain{task};
 	TaskAdded(task);
+    if (task->IsDead()) return nullptr;
 	if ((ti.type == IBuilderTask::BuildType::MEX && ti.i.spotId == metal_field::SiteTagV1 && !static_cast<CBMexTask*>(task)->HasFieldClaim())
 		|| (ti.type == IBuilderTask::BuildType::MEXUP && ti.i.spotId == metal_field::SiteTagV1 && !static_cast<CBMexUpTask*>(task)->HasFieldClaim())) {
 		AbortTask(task);
@@ -1485,8 +1535,8 @@ IUnitTask* CBuilderManager::EnqueueCommanderGroupFollow(CCircuitUnit* leader,flo
     auto* task=new CCommanderGroupFollowTask(this,leader->GetId(),radius);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
-CControlledTask* CBuilderManager::EnqueueControlled(IUnitController* controller,IUnitTask* previous) {
-    auto* task=new CControlledTask(this,controller,previous);
+CLeaseTask* CBuilderManager::EnqueueLease(IUnitController* controller,IUnitTask* previous) {
+    auto* task=new CLeaseTask(this,controller,previous);
     updateTasks.push_back(task); lastEnqueued=task; TaskAdded(task); return task;
 }
 bool CBuilderManager::SetCommanderCombatOption(const std::string& name,float value) {
@@ -1890,6 +1940,11 @@ IUnitTask* CBuilderManager::MakeTask(CCircuitUnit* unit)
 {
 	freshDefaults.clear();
 	freshMade = nullptr;
+	// D-514: a battle group short of its repair crew leases a bound
+	// resurrection bot before any script policy; O(1) when none is short.
+	if (CRezzerController* crew = circuit->GetRezzerController()) {
+		if (IUnitTask* lease = crew->MakeLease(unit)) return lease;
+	}
 	IUnitTask* task = ITaskModule::MakeTask(unit);  // script policy, DefaultMakeTask inside
 	for (IUnitTask* def : freshDefaults) {
 		if (def == task) {
@@ -2213,7 +2268,7 @@ bool CBuilderManager::ReceiveResurrectionClaim(const char* message)
         else ++entry;
     }
     if (count == 0) { relayedResurrections.erase(unitId); return true; }
-    float parameters[5];
+    float parameters[5]{};
     for (int index = 0; index < count; ++index) if (!(input >> parameters[index])) return true;
     ResurrectionClaim claim;
     if (claim.Decode(parameters, count, callback->Unit_Maximum()))

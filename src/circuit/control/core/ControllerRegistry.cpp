@@ -17,6 +17,10 @@ IUnitController* CControllerRegistry::ByName(const std::string& type) const {
 	for (const auto& c : controllers) if (type == c->Name()) return c.get();
 	return nullptr;
 }
+IGroupController* CControllerRegistry::GroupByName(const std::string& type) const {
+	for (const auto& g : groups) if (type == g->Name()) return g.get();
+	return nullptr;
+}
 
 void CControllerRegistry::Bind(int defId, const std::string& preset, const char* source) {
 	const auto owner = presetOwner.find(preset);
@@ -51,6 +55,30 @@ void CControllerRegistry::ReadConfig(const Json::Value& root) {
 			for (const auto& p : problems) ai->LOG("CONFIG controllers: preset '%s': %s", name.c_str(), p.c_str());
 			if (index < 0) continue;
 			for (std::size_t i = 0; i < controllers.size(); ++i) if (controllers[i].get() == c) presetOwner[name] = int(i);
+		}
+	}
+
+	// D-430: formation templates, resolved like presets, owned by a group controller.
+	const Json::Value& formations = root["formations"];
+	if (formations.isObject()) {
+		for (const std::string& name : formations.getMemberNames()) {
+			Json::Value resolved;
+			std::string error;
+			if (!control::ResolvePreset(formations, name, resolved, error)) {
+				ai->LOG("CONFIG formations: %s", error.c_str());
+				continue;
+			}
+			const std::string type = resolved.get("type", "").asString();
+			IGroupController* g = GroupByName(type);
+			if (g == nullptr) {
+				ai->LOG("CONFIG formations: template '%s' has unknown type '%s'", name.c_str(), type.c_str());
+				continue;
+			}
+			std::vector<std::string> problems;
+			const int index = g->ParseTemplate(name, resolved, problems);
+			for (const auto& p : problems) ai->LOG("CONFIG formations: template '%s': %s", name.c_str(), p.c_str());
+			if (index < 0) continue;
+			for (std::size_t i = 0; i < groups.size(); ++i) if (groups[i].get() == g) templateOwner[name] = int(i);
 		}
 	}
 
@@ -133,10 +161,12 @@ void CControllerRegistry::UnitRemoved(int unitId) {
 		c->TeamUnitRemoved(unitId);
 		if (c->Controls(unitId)) c->Detach(unitId);
 	}
+	for (auto& g : groups) g->UnitRemoved(unitId);
 }
 
 void CControllerRegistry::Update() {
 	for (auto& c : controllers) c->Update();
+	for (auto& g : groups) g->Update();  // D-430: after the members decided this frame
 }
 
 void CControllerRegistry::Damaged(CCircuitUnit* unit) {
@@ -155,6 +185,9 @@ bool CControllerRegistry::ReceiveMessage(const char* message) {
 bool CControllerRegistry::SetPresetOption(const std::string& preset, const std::string& key, float value) {
 	const auto owner = presetOwner.find(preset);
 	if (owner == presetOwner.end()) {
+		// D-430: a formation template's lever shares this entry point.
+		const auto tmpl = templateOwner.find(preset);
+		if (tmpl != templateOwner.end()) return groups[tmpl->second]->SetTemplateOption(preset, key, value);
 		// "default" names each controller's built-in preset; the first that takes the key wins.
 		for (auto& c : controllers) if (c->SetPresetOption(preset, key, value)) return true;
 		return false;
@@ -170,6 +203,12 @@ bool CControllerRegistry::AssignPreset(int defId, const std::string& preset) {
 std::string CControllerRegistry::PresetOf(int defId) const {
 	IUnitController* c = ForDef(defId);
 	return c == nullptr ? std::string() : c->PresetName(c->PresetForDef(defId));
+}
+
+bool CControllerRegistry::Order(const std::string& formation, const std::string& kind, const springai::AIFloat3& pos) {
+	const auto tmpl = templateOwner.find(formation);
+	if (tmpl == templateOwner.end()) return false;
+	return groups[tmpl->second]->Order(formation, kind, pos);
 }
 
 } // namespace circuit

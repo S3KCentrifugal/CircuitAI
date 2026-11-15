@@ -59,7 +59,10 @@ namespace TechLayoutProbe {
             Check("distant_support_bound",anchor>=0
                 && ai.GetTeamUnit(anchor).GetPos(ai.frame).distance2D(site)>1200);
 
-            Layout::PrepareEconomySupport(site);
+            // The supplied home worker is an aircraft. The default helper
+            // selects a primary land constructor, which this fixture does not
+            // supply locally. Exercise admission with the actual assigned unit.
+            Layout::PrepareEconomySupport(site,ai.GetTeamUnit(worker));
             @work=Layout::EconomySupport(ai.GetTeamUnit(worker));
             Check("support_ordered",work !is null && cast<IBuilderTask>(work).buildDef is Layout::nano);
             if(work !is null) aiBuilderMgr.AssignTask(ai.GetTeamUnit(worker),work);

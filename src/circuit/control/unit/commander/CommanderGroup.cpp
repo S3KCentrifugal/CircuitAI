@@ -1,6 +1,6 @@
 #include "task/builder/CommanderGroupFollowTask.h"
 #include "task/builder/BraceTask.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "control/core/Ownership.h"
 #include "control/kernel/CommanderGroupWork.h"
 #include "control/unit/commander/CommanderController.h"

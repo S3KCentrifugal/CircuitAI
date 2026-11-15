@@ -107,6 +107,19 @@ class StorageTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'changed after recording'):
                 storage.publish(archive,store=Path(tmp)/'records')
 
+    def test_compressed_diagnostics_are_hashed_and_republish_identically(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, archive = archived_game(tmp)
+            diagnostic = archive / 'infolog.txt.gz'
+            import gzip
+            diagnostic.write_bytes(gzip.compress(b'original failure log', mtime=0))
+            store = Path(tmp) / 'records'
+            published = storage.publish(archive, store=store)
+            manifest = storage.read_json(published / 'publication.json')
+            self.assertEqual(manifest['files'][diagnostic.name], storage.file_hash(diagnostic))
+            self.assertEqual(gzip.decompress((published / diagnostic.name).read_bytes()), b'original failure log')
+            self.assertEqual(storage.publish(archive, store=store), published)
+
     def test_publish_retries_transient_rename_without_changing_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             _, archive = archived_game(tmp)

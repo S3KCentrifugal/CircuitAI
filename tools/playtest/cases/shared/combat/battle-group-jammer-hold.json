@@ -1,0 +1,161 @@
+{
+  "name": "battle-group-jammer-hold",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    4200,
+    1300
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    90,
+    150,
+    240
+  ],
+  "min_spawn_spacing": 64,
+  "checks": "battle-group-siege",
+  "judge_to_completion": true,
+  "enemy_destination": [
+    3900,
+    3400
+  ],
+  "waves": [
+    {
+      "name": "12 Rocketeers",
+      "after_seconds": 18,
+      "units": [
+        "armrock"
+      ]
+    }
+  ],
+  "description": "D-507: the same fight under Castro jammers (360) along the lane covering the group's ground (D-505 jammer_hold). Expected: the battle group never withdraws while a jammer covers it (an order line with cover=1); the Rocketeers may kill the jammers, after which an ordinary withdraw is allowed.",
+  "storage_scenario": "bg-jammer-hold",
+  "groups": [
+    {
+      "unit": "corthud",
+      "count": 4,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 4,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 2,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 2,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        3400
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        3750
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        4100
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        4450
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        4800
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        5150
+      ]
+    },
+    {
+      "unit": "corjamt",
+      "count": 1,
+      "team": 0,
+      "position": [
+        3900,
+        5500
+      ]
+    },
+    {
+      "unit": "armrock",
+      "count": 12,
+      "team": 1,
+      "position": [
+        3900,
+        5000
+      ],
+      "columns": 4,
+      "spacing": 80,
+      "after_seconds": 18
+    }
+  ],
+  "assertions": {
+    "max_withdraw_in_cover": 0,
+    "min_cover_orders": 1,
+    "max_losses": 6,
+    "min_kills": 0,
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_types_assigned": 2
+  }
+}

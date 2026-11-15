@@ -183,6 +183,12 @@ public:
 	// commander target owns the unit's priority list; restored on its release.
 	void SendTaskTarget(int targetId);
 	void CancelTaskTarget(int targetId);
+	// D-511: a ground priority target for a task (a remembered structure out of
+	// sight and radar, which BAR would drop as a unit target). Held back the
+	// same way during a commander lock; a STOP clears it (HasTaskGround false).
+	void SendTaskGroundTarget(const springai::AIFloat3& pos);
+	void CancelTaskGroundTarget();
+	bool HasTaskGround() const { return taskGround; }
 	// Commander snipe (D-352): a scouted enemy commander in range replaces the
 	// priority list; the unit keeps its move and other orders. -1 releases.
 	void SetCommanderTarget(int commId, int frame);
@@ -307,6 +313,8 @@ private:
 	int targetTile;
 	int priorityTarget = -1; // ID only: never retain a dead enemy wrapper.
 	int taskTarget = -1;      // last SET_TARGET a task asked for (any path)
+	bool taskGround = false;  // D-511: a task's ground SET_TARGET is live (at taskGroundPos)
+	springai::AIFloat3 taskGroundPos;
 	int commanderTarget = -1; // D-352 commander lock; owns BAR's priority list
 	int commanderFrame = -1;  // frame the commander SET_TARGET was last sent
     bool destroying = false; // set before destruction callbacks; IsDead keeps its existing unregister semantics

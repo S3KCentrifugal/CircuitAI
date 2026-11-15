@@ -162,6 +162,10 @@ namespace Factory {
 		// Emergency AIR production must reach its role before optional spam.
 		if (AirBaseResponse::Emergency() && (UnitHelpers::IsT1AircraftPlant(u.circuitDef.GetName())
 			|| UnitHelpers::IsT2AircraftPlant(u.circuitDef.GetName()))) return AirProduction::MakeTask(u);
+		@t = BattleGroupAir::Produce(u);   // D-509: the anti-air escort a battle group is short of
+		if (t !is null) return t;
+		@t = BattleGroupCrew::Produce(u);  // D-514: the repair bot a battle group is short of
+		if (t !is null) return t;
 		@t = RezReplenish::FactoryMakeTask(u);   // owner, 2026-10-26: T1 bot labs keep rez bots up once the army is big
 		if (t !is null) return t;
 		@t = SeaCoast::Produce(u);

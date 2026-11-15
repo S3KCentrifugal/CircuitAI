@@ -14,6 +14,7 @@
 #include "terrain/BaseLayoutGeometry.h"
 #include "terrain/FactoryCorridors.h"
 #include "terrain/LayoutRanking.h"
+#include "util/BoundedVectorCache.h"
 #include "unit/CoreUnit.h"
 #include "unit/CircuitDef.h"
 
@@ -173,6 +174,7 @@ public:
 	int ReserveNanoBlock(CCircuitUnit* factory, CCircuitDef* nanoDef, int cols, int rows, int gap);
 	// Dry run of ReserveBuilding: would it be accepted? No marks, no log.
 	bool CanReserveBuilding(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing);
+    springai::AIFloat3 CanonicalBuildPosition(const CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
     bool IsAlliedSpaceFree(const CCircuitDef* cdef, const springai::AIFloat3& pos, int facing) const;
     bool StrictReservationAllowed(int id) const;
     int NextSupportSlot(CCircuitUnit* builder, const CCircuitDef* def, int group, const springai::AIFloat3& seed, int budget);
@@ -582,13 +584,24 @@ private:
 		float nanoSq;    // squared distance to the nearest slot of the nano group
 		float anchorSq;  // squared distance to the tie-break anchor
 		float sameSq;    // squared distance to the nearest standing or planned structure of the same def (max when none)
+        bool operator==(const SPackCandidate& other) const {
+            return pos.x == other.pos.x && pos.y == other.pos.y && pos.z == other.pos.z
+                && nanoSq == other.nanoSq && anchorSq == other.anchorSq && sameSq == other.sameSq;
+        }
 	};
-	std::vector<SPackCandidate> PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup, int facing,
+    using PackLease = VectorLease<SPackCandidate>;
+	PackLease PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup, int facing,
 			const springai::AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing = false) const;  // D-104: alwaysRing scans the ring round the zone too
 	std::vector<SPackCandidate> ComputePackCandidates(int zone, CCircuitDef* cdef, int nanoGroup, int facing,
-			const springai::AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing) const;
-	using EmptyPackKey = std::tuple<int,int,int,int,float,float,bool>;
+			const springai::AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing, bool indexed = true) const;
+	using EmptyPackKey = std::tuple<int,int,int,int,float,float,bool,bool>;
 	mutable std::set<EmptyPackKey> emptyPackQueries;
+    using PackKey = std::tuple<EmptyPackKey, float, float, bool>;
+    mutable BoundedVectorCache<PackKey, SPackCandidate, 32, 65536> packQueries;
+    bool RefreshPackFacings() const;
+    mutable bool packFacingDefsReady = false;
+    mutable std::vector<CCircuitDef*> packFacingDefs;
+    mutable std::vector<std::pair<int, int>> packFacings, packFacingScratch;
 	uint64_t packingRevision = 0;
 	mutable uint64_t emptyPackRevision = 0, emptyPackAllyRevision = 0;
 	mutable unsigned int emptyPackOwnedRevision = 0;
@@ -645,6 +658,8 @@ private:
     using SlotScope = std::pair<int, int>; // positive zone / negative group, def ID
     struct SlotCandidates { std::set<int> ids; int after = -1, visited = 0; bool sawFree = false; };
     std::map<SlotScope, SlotCandidates> scopedSlots;
+    // All definitions, ordered by reservation ID, including group zero.
+    std::map<int, std::set<int>> groupSlots;
     std::map<int, SlotCandidates> lostSlots;
     void ClearLostReservation(int id);
     void IndexReservation(int id);
@@ -712,6 +727,10 @@ public:
 	std::pair<terrain::SArea*, bool> GetCurrentMapArea(CCircuitDef* cdef, const int indexSector);
 	int GetSectorIndex(const springai::AIFloat3& position) const { return terrainData->GetSectorIndex(position); }
 	bool CanMoveToPos(terrain::SArea* area, const springai::AIFloat3& destination);
+	// D-501: every sector on the straight line from `from` to `to` belongs to
+	// `area` (no obstacle on the way, so a unit walks there directly rather than
+	// round a mountain). Half-sector steps, O(length / 32) sector reads.
+	bool IsDirectPassable(terrain::SArea* area, const springai::AIFloat3& from, const springai::AIFloat3& to);
 	bool IsMovementDestinationFree(CCircuitDef* def, const springai::AIFloat3& destination) const;
 	springai::AIFloat3 GetBuildPosition(CCircuitDef* cdef, const springai::AIFloat3& position);
 	springai::AIFloat3 GetMovePosition(terrain::SArea* sourceArea, const springai::AIFloat3& position);

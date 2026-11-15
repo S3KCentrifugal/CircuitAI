@@ -1,0 +1,96 @@
+{
+  "name": "battle-group-rush-lane",
+  "unit": "corstorm",
+  "units": [
+    "corthud",
+    "corstorm"
+  ],
+  "side": "cortex",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      1800
+    ],
+    [
+      4000,
+      7000
+    ]
+  ],
+  "camera": [
+    3950,
+    3600,
+    1500
+  ],
+  "camera_angle": 1.35,
+  "photos": [
+    40,
+    60,
+    80,
+    120
+  ],
+  "min_spawn_spacing": 64,
+  "judge_to_completion": true,
+  "enemy_destination": [
+    3900,
+    3000
+  ],
+  "description": "D-510: 16 Grunts (215 range) rush 6 Thugs and 6 Aggravators with no help near. Expected: the rush is detected and the group stands and fires (COHORT: rush kite=0); a kite here lost a Thug more (the D-510 arenas).",
+  "storage_scenario": "bg-rush-lane",
+  "checks": "battle-group-rush-stand",
+  "groups": [
+    {
+      "unit": "corthud",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3800,
+        3500
+      ],
+      "columns": 6,
+      "spacing": 70,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corstorm",
+      "count": 6,
+      "team": 0,
+      "position": [
+        3870,
+        3250
+      ],
+      "columns": 6,
+      "spacing": 80,
+      "after_seconds": 15
+    },
+    {
+      "unit": "corak",
+      "count": 16,
+      "team": 1,
+      "position": [
+        3900,
+        5000
+      ],
+      "columns": 7,
+      "spacing": 60,
+      "after_seconds": 20
+    }
+  ],
+  "waves": [
+    {
+      "name": "16 Grunts",
+      "after_seconds": 20,
+      "units": [
+        "corak"
+      ]
+    }
+  ],
+  "assertions": {
+    "min_kills": 10,
+    "max_losses": 8,
+    "min_shooters": 1,
+    "min_damage": 2000,
+    "min_types_assigned": 2
+  }
+}

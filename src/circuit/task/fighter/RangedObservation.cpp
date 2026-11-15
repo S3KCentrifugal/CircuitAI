@@ -9,6 +9,7 @@
 #include "spring/SpringUnit.h"
 #include "util/Performance.h"
 #include "Damage.h"
+#include "WeaponMount.h"
 #include "Log.h"
 #include "unit/CircuitWDef.h"
 #include "unit/CircuitUnit.h"
@@ -89,6 +90,13 @@ const CRangedObservation::Metadata& CRangedObservation::MetadataFor(CCircuitDef*
 		const auto& params = ud->GetCustomParams();
 		const auto level = params.find("techlevel");
 		if (level != params.end()) it->second.tech = float(std::atof(level->second.c_str()));
+		it->second.dps = def->GetSurfaceDps();  // D-433
+		// D-430: the largest splash of any mount, for the line's spacing.
+		for (auto* raw : ud->GetWeaponMounts()) {
+			const std::unique_ptr<springai::WeaponMount> mount(raw);
+			const std::unique_ptr<springai::WeaponDef> wd(mount->GetWeaponDef());
+			if (wd && !wd->IsShield()) it->second.maxSplash = std::max(it->second.maxSplash, wd->GetAreaOfEffect());
+		}
 		const std::unique_ptr<springai::WeaponDef> explosion(ud->GetDeathExplosion());
 		if(explosion) {
 			const std::unique_ptr<springai::Damage> damage(explosion->GetDamage());
@@ -125,7 +133,11 @@ void CRangedObservation::BuildContacts(CCircuitAI* ai, std::vector<Contact>& out
 	// Profile threat suppression must not erase an actual weapon's coverage.
 	// Respect true fog, neutral/dying contacts and BAR's explicit ignoredByAI.
 	for (const auto& [id,e]:ai->GetEnemyManager()->GetEnemyUnits()) {
-		if (!e || !e->IsInRadarOrLOS()) continue;
+		// D-507: an identified structure seen before stays a contact out of
+		// sight (it cannot move; a player remembers its ghost): its reach keeps
+		// guarding moves and assessments. Shots still need sight or radar.
+		const bool remembered=e && !e->IsInRadarOrLOS() && e->GetCircuitDef() && !e->GetCircuitDef()->IsMobile();
+		if (!e || (!e->IsInRadarOrLOS() && !remembered)) continue;
 		const auto& data=e->GetData();
 		if (data.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN)) continue;
 		if (e->IsIgnore() && (!e->GetCircuitDef() || !e->GetCircuitDef()->IsIgnore()
@@ -162,7 +174,7 @@ void CRangedObservation::BuildContacts(CCircuitAI* ai, std::vector<Contact>& out
 		// Definition facts are immutable for this game load. Resolve once
 		// per type, not once per candidate mount in every shooter's hot loop.
 		const auto& meta=MetadataFor(c.def);
-		c.armor=meta.armor; c.explosionRadius=meta.explosionRadius; c.tech=meta.tech;
+		c.armor=meta.armor; c.explosionRadius=meta.explosionRadius; c.tech=meta.tech; c.dps=meta.dps;
 		c.hazardRadius=std::max(c.armed ? c.groundRange+c.radius : 0.f,c.explosionRadius);
 		outBounds.largestRange=std::max(outBounds.largestRange,c.hazardRadius);
 		// Reclaimers can be unarmed and exceed 600 elmos (including the
@@ -237,11 +249,11 @@ const CRangedObservation::Friend* CRangedObservation::PrototypeFor(int definitio
 		if(prototype.def) {
 			const auto& meta=MetadataFor(definition);
 			prototype.radius=definition->GetRadius();
-			prototype.screen=definition->IsAttacker() && (!definition->IsAttrRanged() || definition->GetRangedPolicy().coordinated);
+			prototype.screen=definition->IsAttacker() && (!definition->HasEngagementPolicy() || definition->GetRangedPolicy().coordinated);
 			prototype.radar=meta.radar; prototype.jammer=meta.jammer; prototype.los=meta.los;
 			// D-295: O(D) per frame with the existing prototype; never per unit.
 			prototype.range=prototype.screen ? definition->GetMaxRange(CCircuitDef::RangeType::LAND) : 0.f;
-			prototype.assist=definition->IsAttrRanged() && definition->GetRangedPolicy().assistRadius>0.f;
+			prototype.assist=definition->HasEngagementPolicy() && definition->GetRangedPolicy().assistRadius>0.f;
 		}
 	}
 	return prototype.def ? &prototype : nullptr;
@@ -402,11 +414,11 @@ void CRangedObservation::CaptureLegacyFriends()
 		float raw[3]; reader->GetUnitAPI()->GetPosition(id,raw);
 		AIFloat3 position(raw[0],raw[1],raw[2]); terrain::CTerrainData::CorrectPosition(position);
 		Friend f; f.id=id; f.pos=position; f.def=definition; f.radius=definition->GetRadius();
-		f.screen=definition->IsAttacker() && (!definition->IsAttrRanged() || definition->GetRangedPolicy().coordinated);
+		f.screen=definition->IsAttacker() && (!definition->HasEngagementPolicy() || definition->GetRangedPolicy().coordinated);
 		const auto& meta=MetadataFor(definition);
 		f.radar=meta.radar; f.jammer=meta.jammer; f.los=meta.los;
 		f.range=f.screen ? definition->GetMaxRange(CCircuitDef::RangeType::LAND) : 0.f;
-		f.assist=definition->IsAttrRanged() && definition->GetRangedPolicy().assistRadius>0.f;
+		f.assist=definition->HasEngagementPolicy() && definition->GetRangedPolicy().assistRadius>0.f;
 		legacyRadius=std::max(legacyRadius,f.radius);
 		if(f.screen && !f.assist) legacyScreenRange=std::max(legacyScreenRange,f.range);
 		legacyCells.Add(P(f.pos),int(legacyFriends.size()));

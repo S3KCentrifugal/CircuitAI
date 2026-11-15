@@ -34,7 +34,7 @@ class CQueryCostMap;
 class CBRepairTask;
 class CBReclaimTask;
 class CCombatTask;
-class CControlledTask;
+class CLeaseTask;
 class IUnitController;
 
 struct SBuildChain;
@@ -322,7 +322,7 @@ public:
 	unsigned int GetWorkerCount() const { return workers.size(); }
     IUnitTask* EnqueueCommanderGroupFollow(CCircuitUnit* leader,float radius);
     // D-388: the task a unit controller holds its unit with (formerly EnqueueCommander).
-    CControlledTask* EnqueueControlled(IUnitController* controller,IUnitTask* previous);
+    CLeaseTask* EnqueueLease(IUnitController* controller,IUnitTask* previous);
     bool SetCommanderCombatOption(const std::string& name,float value);
     bool SetDefenseRule(int slot,const std::string& key,float value);
     IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
@@ -409,6 +409,8 @@ public:
 	void ActivateTask(IBuilderTask* task);
 
 	IBuilderTask* Enqueue(const TaskB::SBuildTask& ti);
+    // Atomic ownership of a new positional reservation; rejection is call-local.
+    IBuilderTask* EnqueueReserved(const TaskB::SBuildTask& ti, int facing, int& rejection);
 	// D-495: Enqueue past the profile's construction veto. Only the FRONT
 	// commander group's gated T1 artillery (CommanderArtilleryT1.cpp) calls it.
 	IBuilderTask* EnqueueVetoed(const TaskB::SBuildTask& ti);
@@ -426,6 +428,7 @@ public:
 	virtual void AssignTask(CCircuitUnit* unit) override;
 private:
 	virtual void DequeueTask(IUnitTask* task, bool done = false) override;
+    IBuilderTask* EnqueueBuild(const TaskB::SBuildTask& ti, int reservation);
 
 public:
 	virtual void FallbackTask(CCircuitUnit* unit) override;

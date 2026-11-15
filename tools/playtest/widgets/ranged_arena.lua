@@ -287,7 +287,27 @@ function widget:UnitDestroyed(id,def,team,attacker,attackerDef,attackerTeam)
             if attackerDef and UnitDefs[attackerDef] and (UnitDefs[attackerDef].speed or 0)==0 then killTally.static_losses=killTally.static_losses+1 end
         end
     end
-    if tracked[id] then log("death id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost);tracked[id]=nil end
+    if tracked[id] then
+        log("death id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost);tracked[id]=nil
+        -- D-507: the last fixture structure of the enemy (team 1) is gone; a
+        -- check's complete_on can end a siege arena here. O(tracked) per death.
+        if team==1 and (UnitDefs[def].speed or 0)==0 then
+            local left=0
+            for _,u in pairs(tracked) do if u.team==1 and (UnitDefs[u.def].speed or 0)==0 then left=left+1 end end
+            if left==0 then log("enemy_statics_cleared") end
+        end
+        -- D-510: likewise the last enemy mobile other than its commander (a
+        -- rush arena ends here; the commander stands at its start).
+        local function fighter(d)
+            local ud=UnitDefs[d]
+            return ud and (ud.speed or 0)>0 and not (ud.customParams and ud.customParams.iscommander)
+        end
+        if team==1 and fighter(def) then
+            local left=0
+            for _,u in pairs(tracked) do if u.team==1 and fighter(u.def) then left=left+1 end end
+            if left==0 then log("enemy_mobiles_cleared") end
+        end
+    end
 end
 function widget:UnitFinished(id,def,team)
     if (cfg.production or cfg.natural or cfg.commander_front_work or cfg.expansion_mex_observation) and tracked[id] then

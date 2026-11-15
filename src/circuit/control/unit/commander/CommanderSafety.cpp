@@ -1,7 +1,7 @@
 #include "control/unit/commander/CommanderController.h"
 #include "module/BuilderManager.h"
 #include "module/EconomyManager.h"
-#include "control/core/ControlledTask.h"
+#include "control/core/LeaseTask.h"
 #include "task/RetreatTask.h"
 #include "terrain/BattleAnalysis.h"
 #include "terrain/TerrainManager.h"
@@ -56,9 +56,9 @@ bool CCommanderController::HealthControl(CCircuitUnit* unit,State& s,int frame) 
             auto line=commander::ScoreLine(contacts,P(pos),lead-P(pos),range,speed,width,
                 cfg->combat.killReward,cfg->combat.friendlyMargin,c.id);
             if(!line.requiredHit || line.blocked || unit->GetDGunReloadFrame()>frame+int(window*FRAMES_PER_SEC)) continue;
-            auto* task=dynamic_cast<CControlledTask*>(unit->GetTask());
+            auto* task=dynamic_cast<CLeaseTask*>(unit->GetTask());
             if(!task) {
-                task=ai->GetBuilderManager()->EnqueueControlled(this,nullptr);
+                task=ai->GetBuilderManager()->EnqueueLease(this,nullptr);
                 ai->GetBuilderManager()->AssignTask(unit,task);
                 if(unit->GetTask()!=task) {ai->GetBuilderManager()->AbortTask(task);break;}
             }

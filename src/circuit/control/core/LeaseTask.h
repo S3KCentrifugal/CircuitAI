@@ -1,6 +1,6 @@
 #pragma once
-// D-388: the task a controlled unit holds while its controller acts on it
-// directly (combat, withdrawal, front deployment). Formerly CCommanderTask.
+// D-388, D-440: the lease a controlled unit holds while its controller acts on it
+// directly (combat, withdrawal, front deployment). Formerly CCommanderTask, then CControlledTask.
 // Owns one retained resume token. Removal never resumes implicitly: player,
 // capture, death and retreat takeovers must remain authoritative. Restoring
 // fire, move and cloak state on removal goes through the owning controller's
@@ -10,17 +10,17 @@
 namespace circuit {
 class IUnitController;
 
-class CControlledTask final : public IFighterTask {
+class CLeaseTask final : public IFighterTask {
 public:
-    CControlledTask(ITaskModule* manager,IUnitController* controller,IUnitTask* previous);
-    ~CControlledTask() override;
+    CLeaseTask(ITaskModule* manager,IUnitController* controller,IUnitTask* previous);
+    ~CLeaseTask() override;
     void AssignTo(CCircuitUnit* unit) override;
     void RemoveAssignee(CCircuitUnit* unit) override;
     bool ForgetUnit(CCircuitUnit* unit) override;
     void Start(CCircuitUnit*) override {}
     void Update() override {}
     void Stop(bool done) override;
-    void OnUnitIdle(CCircuitUnit*) override {}
+    void OnUnitIdle(CCircuitUnit* unit) override;
     void OnUnitDamaged(CCircuitUnit*,CEnemyInfo*) override {}
     void OnUnitDestroyed(CCircuitUnit* unit,CEnemyInfo*) override;
     void OnUnitMoveFailed(CCircuitUnit* unit) override;

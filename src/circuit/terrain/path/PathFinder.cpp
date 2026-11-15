@@ -39,7 +39,6 @@ std::vector<CPathFinder::SBlockCount> CPathFinder::blockArray;
 
 CPathFinder::CPathFinder(CTerrainData* terrainData, int numThreads)
 		: terrainData(terrainData)
-		, pMoveData(&moveData0)
 		, airMoveArray(nullptr)
 		, isAreaUpdated(true)
 		, queryId(0)
@@ -65,8 +64,10 @@ CPathFinder::CPathFinder(CTerrainData* terrainData, int numThreads)
 		micropathers.push_back(micropather);
 	}
 
-	areaData = terrainData->pAreaData.load();
+	areaData = terrainData->GetAreaData();
 	const std::vector<SMobileType>& moveTypes = areaData->mobileType;
+	SMoveData& moveData0 = moves.At(0);
+	SMoveData& moveData1 = moves.At(1);
 	moveData0.moveArrays.reserve(moveTypes.size());
 	moveData1.moveArrays.reserve(moveTypes.size());
 
@@ -123,10 +124,10 @@ CPathFinder::CPathFinder(CTerrainData* terrainData, int numThreads)
 
 CPathFinder::~CPathFinder()
 {
-	for (float* ma : moveData0.moveArrays) {
+	for (float* ma : moves.At(0).moveArrays) {
 		delete[] ma;
 	}
-	for (float* ma : moveData1.moveArrays) {
+	for (float* ma : moves.At(1).moveArrays) {
 		delete[] ma;
 	}
 	delete[] airMoveArray;
@@ -181,7 +182,7 @@ void CPathFinder::UpdateAreaUsers(CTerrainManager* terrainMgr)
 	}
 //	micropather->Reset();
 
-	pMoveData = GetNextMoveData();
+	moves.Publish();
 }
 
 void* CPathFinder::MoveXY2MoveNode(int x, int y) const
@@ -400,7 +401,7 @@ CostFunc CPathFinder::GetMoveFun(MoveType mt, const CCircuitDef* cdef, float*& o
 		moveArray = airMoveArray;
 		maxSlope = 1.f;
 	} else {
-		moveArray = pMoveData.load()->moveArrays[mobileTypeId];
+		moveArray = moves.Front().moveArrays[mobileTypeId];
 		maxSlope = std::max(areaData->mobileType[mobileTypeId].maxSlope, 1e-3f);
 	}
 
@@ -557,7 +558,7 @@ void CPathFinder::RunPathSingle(CScheduler* scheduler, const std::shared_ptr<IPa
 
 		this->MakePath(query, micropathers[threadNum]);
 		return finish;
-	}));
+	}), "path-single");
 }
 
 void CPathFinder::RunPathMulti(CScheduler* scheduler, const std::shared_ptr<IPathQuery>& query, PathCallback&& onComplete)
@@ -581,7 +582,7 @@ void CPathFinder::RunPathMulti(CScheduler* scheduler, const std::shared_ptr<IPat
 
 		this->FindBestPath(query, micropathers[threadNum]);
 		return finish;
-	}));
+	}), "path-multi");
 }
 
 void CPathFinder::RunPathWide(CScheduler* scheduler, const std::shared_ptr<IPathQuery>& query, PathCallback&& onComplete)
@@ -605,7 +606,7 @@ void CPathFinder::RunPathWide(CScheduler* scheduler, const std::shared_ptr<IPath
 
 		this->MakePathWide(query, micropathers[threadNum]);
 		return finish;
-	}));
+	}), "path-wide");
 }
 
 void CPathFinder::RunCostMap(CScheduler* scheduler, const std::shared_ptr<IPathQuery>& query, PathCallback&& onComplete)
@@ -623,7 +624,7 @@ void CPathFinder::RunCostMap(CScheduler* scheduler, const std::shared_ptr<IPathQ
 
 		this->MakeCostMap(query, micropathers[threadNum]);
 		return finish;
-	}));
+	}), "path-cost");
 }
 
 void CPathFinder::MakePath(IPathQuery* query, NSMicroPather::CMicroPather* micropather)
@@ -892,7 +893,7 @@ std::shared_ptr<IPathQuery> CPathFinder::CreateDbgPathQuery(CThreatMap* threatMa
 
 	SMobileType::Id mobileTypeId = dbgDef->GetMobileId();
 	const float maxSlope = (mobileTypeId < 0) ? 1.f : areaData->mobileType[mobileTypeId].maxSlope;
-	const float* moveArray = (mobileTypeId < 0) ? airMoveArray : pMoveData.load()->moveArrays[mobileTypeId];
+	const float* moveArray = (mobileTypeId < 0) ? airMoveArray : moves.Front().moveArrays[mobileTypeId];
 	const float* costArray[] = {
 			threatMap->GetAirThreatArray(dbgDef->GetMainRole()),
 			threatMap->GetSurfThreatArray(dbgDef->GetMainRole()),
