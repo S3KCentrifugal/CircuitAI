@@ -211,7 +211,17 @@ namespace SiloAntiNukes {
     string gridDef = "";
     IUnitTask@ pending = null;
     int pendingSlot = -1, pendingFrame = 0;
-    int nextSearch = 0, searchFails = 0, nextHeld = -1000000;
+    int nextSearch = 0, searchFails = 0, nextHeld = -1000000, nextCantBuild = -1000000, nearFrom = -1;
+
+    // The builder on our antinuke order keeps it when native re-asks (played: orders swapped off
+    // and dropped unframed after 120 s). FRONT asks this first.
+    IUnitTask@ Keep(CCircuitUnit@ u)
+    {
+        if (u is null || u.task is null) return null;
+        if (pending !is null && !pending.IsDead() && u.task is pending) return pending;
+        if (padPending !is null && !padPending.IsDead() && u.task is padPending) return padPending;
+        return null;
+    }
 
     void Held(const string &in why)
     {
@@ -272,7 +282,7 @@ namespace SiloAntiNukes {
             return false;
         }
         array<AIFloat3> candC; array<int> candF; array<float> candScore, candLane;
-        int offMap = 0, uncovered = 0, unreachable = 0, refused = 0, unbuildable = 0, onLane = 0;
+        int offMap = 0, uncovered = 0, unreachable = 0, refused = 0, unbuildable = 0, onLane = 0, forwardCut = 0, hazard = 0;
         const float step = centre.x >= 0.0f ? Global::SiloAntiNukes::SearchStep * 0.75f : Global::SiloAntiNukes::SearchStep;
         for (int turn = 0; turn < 2; ++turn) {
             const int f = (f0 + turn) % 4;
@@ -288,10 +298,15 @@ namespace SiloAntiNukes {
                     const float dHome = Dist(c, home), dFront = Dist(c, front);
                     // the main base is always inside the cover
                     if (dHome > share * R) { ++uncovered; continue; }
+                    // played (v1): blocks 1.1-1.5 km out toward the enemy; half-built frames shot down.
+                    // Not past ForwardShare x coverage along the enemy axis, never in observed enemy reach.
+                    const float along = (c.x - home.x) * axis.x + (c.z - home.z) * axis.z;
+                    if (along > Global::SiloAntiNukes::ForwardShare * R) { ++forwardCut; continue; }
+                    if (aiBattle.GroundHazard(c, Global::SiloAntiNukes::HazardMargin) > 0.0f) { ++hazard; continue; }
                     float laneD = 1e9f;
                     for (uint l = 0; l < laneA.length(); ++l) laneD = AiMin(laneD, sqrt(SqDistSegment(c, laneA[l], laneB[l])));
                     if (laneD < own) { ++onLane; continue; }   // the block itself would stand on a lane line
-                    float score = AiMax(dHome, dFront) + dHome * 0.1f;   // a little nearer home on a tie
+                    float score = AiMax(dHome, dFront * Global::SiloAntiNukes::FrontWeight) + dHome * Global::SiloAntiNukes::HomeWeight;
                     if (laneD < own + Global::SiloAntiNukes::LaneClear) score += Global::SiloAntiNukes::LanePenalty;
                     if (!aiTerrainMgr.CanReachAt(u, c, u.circuitDef.GetBuildDistance() + halfAcross)) { ++unreachable; continue; }
                     if (!aiTerrainMgr.CanReserveArea(c, f, halfAcross, halfAlong)) { ++refused; continue; }
@@ -335,13 +350,13 @@ namespace SiloAntiNukes {
                 + int(candC[i].x) + ", " + int(candC[i].z) + ") facing " + f + ": " + int(Dist(candC[i], home)) + " from start, "
                 + int(Dist(candC[i], front)) + " from the front point (" + int(front.x) + ", " + int(front.z) + "), coverage " + int(R)
                 + ", " + int(candLane[i]) + " from the nearest allied lane; " + candC.length() + " candidates (skipped " + offMap
-                + " off map, " + uncovered + " not covering the base, " + onLane + " on lanes, " + unreachable + " unreachable, "
+                + " off map, " + uncovered + " not covering the base, " + forwardCut + " too far forward, " + hazard + " in enemy reach, " + onLane + " on lanes, " + unreachable + " unreachable, "
                 + refused + " refused by layouts, " + unbuildable + " unbuildable), " + tried + " tried", 1);
         }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
         if (!found)
             GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] no " + cols + "x" + rows + " site: " + candC.length() + " candidates (skipped " + offMap
-                + " off map, " + uncovered + " not covering the base, " + onLane + " on lanes, " + unreachable + " unreachable, "
+                + " off map, " + uncovered + " not covering the base, " + forwardCut + " too far forward, " + hazard + " in enemy reach, " + onLane + " on lanes, " + unreachable + " unreachable, "
                 + refused + " refused by layouts, " + unbuildable + " unbuildable), " + tried + " tried", 2);
         return found;
     }
@@ -353,12 +368,22 @@ namespace SiloAntiNukes {
         const int want = Wanted();
         if (want <= 0) return null;
         CCircuitDef@ d = gridDef.length() > 0 ? ai.GetCircuitDef(gridDef) : AntiNukeFor(u);
-        if (d is null || !u.circuitDef.CanBuild(d)) return null;
+        if (d is null || !u.circuitDef.CanBuild(d)) {
+            if (UnitHelpers::IsCommander(u.circuitDef) || ai.frame - nextCantBuild < 60 * SECOND) return null;
+            nextCantBuild = ai.frame;
+            GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] " + u.circuitDef.GetName() + " " + u.id + " cannot build an antinuke ("
+                + EconomyHelpers::GetAntiNukeCount() + " of " + want + " owed)", 1);
+            return null;
+        }
         // one order at a time, pinned to its slot
         const bool tracked = pendingSlot >= 0 && pendingSlot < int(slots.length());
         if (pending !is null && !pending.IsDead()) {
             if (!tracked || ai.frame - pendingFrame < Global::SiloAntiNukes::SlotStallSeconds * SECOND
-                    || aiTerrainMgr.GetReservationState(slots[pendingSlot]) >= 2) return null;
+                    || aiTerrainMgr.GetReservationState(slots[pendingSlot]) >= 2) {
+                Held("antinuke order on slot " + pendingSlot + " in flight " + ((ai.frame - pendingFrame) / SECOND) + " s, builders "
+                    + pending.GetUnits().length());
+                return null;
+            }
             aiBuilderMgr.AbortTask(pending);
             Park(pendingSlot, "no frame after " + ((ai.frame - pendingFrame) / SECOND) + " s; order aborted");
         } else if (pending !is null && tracked) {
@@ -369,7 +394,10 @@ namespace SiloAntiNukes {
         pendingSlot = -1;
         const int have = EconomyHelpers::GetAntiNukeCount();
         if (have >= want) return null;
-        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) return null;
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) {
+            Held(d.GetName() + " already queued (another rule's order); " + have + " of " + want);
+            return null;
+        }
         const float mi = Economy::GetMinMetalIncomeLast10s(), ei = Economy::GetMinEnergyIncomeLast10s();
         float gm = have == 0 ? Global::SiloAntiNukes::FirstMetalIncome : Global::SiloAntiNukes::ExtraMetalIncome;
         float ge = have == 0 ? Global::SiloAntiNukes::FirstEnergyIncome : Global::SiloAntiNukes::ExtraEnergyIncome;
@@ -385,7 +413,7 @@ namespace SiloAntiNukes {
         bool freeSlot = false;
         for (uint s = 0; s < slots.length() && !freeSlot; ++s) freeSlot = aiTerrainMgr.GetReservationState(slots[s]) == 0;
         if (!freeSlot && int(slots.length()) < Global::SiloAntiNukes::Max) {
-            if (ai.frame < nextSearch) return null;
+            if (ai.frame < nextSearch) { Held("block site search backing off " + ((nextSearch - ai.frame) / SECOND) + " s"); return null; }
             bool reserved = false;
             const array<int>@ shapes = @Global::SiloAntiNukes::Shapes;
             const int room = Global::SiloAntiNukes::Max - int(slots.length());
@@ -408,9 +436,16 @@ namespace SiloAntiNukes {
             if (s < slotWait.length() && ai.frame < slotWait[s]) continue;
             const AIFloat3 at = aiTerrainMgr.GetReservationPos(slots[s]);
             if (!aiTerrainMgr.CanReachAt(u, at, u.circuitDef.GetBuildDistance())) continue;
+            // played (v1): far builders' orders died unframed after 120 s; a near one first
+            // (nearFrom: the first frame this slot was offered), any after NearOnlySeconds
+            if (nearFrom < 0) nearFrom = ai.frame;
+            const float near = Global::SiloAntiNukes::OrderRadius;
+            if (ai.frame - nearFrom < Global::SiloAntiNukes::NearOnlySeconds * SECOND
+                && MapHelpers::SqDist(u.GetPos(ai.frame), at) > near * near) return null;
             IUnitTask@ t = Order(u, d, slots[s]);
             if (t is null) { Park(int(s), "could not pin " + d.GetName()); return null; }
             @pending = t;
+            nearFrom = -1;
             pendingSlot = int(s); pendingFrame = ai.frame;
             GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
                 + " silos known) on block slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
@@ -426,7 +461,13 @@ namespace SiloAntiNukes {
     **************************************************************************/
     array<int> padSlots;
     IUnitTask@ padPending = null;
-    int padNextSearch = 0;
+    int padNextSearch = 0, padHeldAt = -1000000;
+    void PadHeld(const string &in why)
+    {
+        if (ai.frame - padHeldAt < 60 * SECOND) return;
+        padHeldAt = ai.frame;
+        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] periphery held: " + why, 1);
+    }
 
     // The best periphery pad for d, or -1. Never off the map; every pad covers the core.
     int ReservePeriphery(CCircuitUnit@ u, CCircuitDef@ d, float maxRadius, float coreRadius)
@@ -493,20 +534,24 @@ namespace SiloAntiNukes {
         const int want = Wanted();
         if (want <= 1) return null;           // the first is the role's own rule
         const int have = EconomyHelpers::GetAntiNukeCount();
-        if (have < 1 || have >= want) return null;
+        if (have >= want) return null;
+        if (have < 1) { PadHeld("waiting for the role's own first antinuke (" + want + " owed)"); return null; }
         if (padPending !is null && !padPending.IsDead()) return null;
         @padPending = null;
         CCircuitDef@ d = AntiNukeFor(u);
-        if (d is null || !d.IsAvailable(ai.frame)) return null;
-        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) return null;
-        if (mi < metalGate || ei < energyGate) return null;
+        if (d is null || !d.IsAvailable(ai.frame)) { PadHeld(u.circuitDef.GetName() + " cannot build an available antinuke"); return null; }
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) { PadHeld(d.GetName() + " already queued"); return null; }
+        if (mi < metalGate || ei < energyGate) {
+            PadHeld("antinuke " + (have + 1) + " of " + want + ": income +" + int(mi) + "/+" + int(ei) + " below +" + int(metalGate) + "/+" + int(energyGate));
+            return null;
+        }
         RaiseCaps(want);
         int slot = -1;
         for (uint s = 0; s < padSlots.length() && slot < 0; ++s)
             if (aiTerrainMgr.GetReservationState(padSlots[s]) == 0
                 && aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(padSlots[s]), u.circuitDef.GetBuildDistance())) slot = padSlots[s];
         if (slot < 0) {
-            if (ai.frame < padNextSearch) return null;
+            if (ai.frame < padNextSearch) { PadHeld("periphery search backing off"); return null; }
             padNextSearch = ai.frame + 15 * SECOND;
             slot = ReservePeriphery(u, d, maxRadius, coreRadius);
             if (slot < 0) return null;
