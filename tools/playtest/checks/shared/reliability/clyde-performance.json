@@ -1,0 +1,17 @@
+{
+  "stop_minute": 2,
+  "complete_on": {"key": "complete", "pattern": "\\[ClydePerfProbe\\] complete", "scope": "any"},
+  "completion_grace_seconds": 8,
+  "expect": [
+    {"key": "owned-index", "pattern": "\\[ClydePerfProbe\\] PASS owned-index", "scope": "any", "by_minute": 1},
+    {"key": "fixture", "pattern": "\\[ClydePerfProbe\\] PASS fixture", "scope": "any", "by_minute": 1},
+    {"key": "commit", "pattern": "\\[ClydePerfProbe\\] PASS commit", "scope": "any", "by_minute": 1},
+    {"key": "cancel-release", "pattern": "\\[ClydePerfProbe\\] PASS cancel-release", "scope": "any", "by_minute": 1},
+    {"key": "nested", "pattern": "\\[ClydePerfProbe\\] PASS nested-rejection", "scope": "any", "by_minute": 1},
+    {"key": "callback", "pattern": "\\[ClydePerfProbe\\] PASS callback-rollback", "scope": "any", "by_minute": 1}
+  ],
+  "forbid": [
+    {"key": "script", "pattern": ": ERR\\s+:|: WARN\\s+:|SCRIPT CRASH|Lib exception|Access violation|Fatal:", "scope": "any"},
+    {"key": "probe", "pattern": "\\[ClydePerfProbe\\] FAIL|\\[INVARIANT\\]", "scope": "any"}
+  ]
+}

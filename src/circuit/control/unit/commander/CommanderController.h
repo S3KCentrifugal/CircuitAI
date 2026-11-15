@@ -419,6 +419,8 @@ public:
     bool SetDefenseRule(int slot,const std::string& key,float value);
     IUnitTask* SupportDefenseWork(CCircuitUnit* unit,int anchor,int first,int second,int third);
     IUnitTask* SupportConstruction(CCircuitUnit* unit);
+    // Callers may retain diagnostic text across controller state changes.
+    // cppcheck-suppress returnByReference
     std::string DescribeDefense() const { return defenseReason; }
     void SyncDefenseClaim(IBuilderTask* task,int& token);
     bool PendingProtection(CCircuitDef* def,const springai::AIFloat3& at);

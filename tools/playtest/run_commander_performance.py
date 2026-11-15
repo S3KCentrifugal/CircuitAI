@@ -17,6 +17,7 @@ from analyze_full_match_performance import analyze, summary
 from ranged_benchmark import summarize
 from run_commander_regression import run_record
 import storage
+from validation_cleanup import publish_and_prune
 
 HERE=Path(__file__).resolve().parent
 
@@ -107,6 +108,7 @@ def main():
             row['telemetry_summary']=summary(telemetry)
             if spec['kind']=='arena' and 'arena_measurement' not in row:row['arena_measurement']=summarize(directory)
         environment(prefix.with_name(prefix.name+'-after.json'),args.allow_lobby)
+        if row['report']: row['publication'] = publish_and_prune(row['report'], row['diagnostic'], failed=not row['pass'])
         record['results'].append(row)
         record['complete']=len(record['results'])==len(plan)
         record['checks_pass']=record['complete'] and all(r['pass'] for r in record['results'])

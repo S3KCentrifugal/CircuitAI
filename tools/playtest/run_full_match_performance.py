@@ -65,7 +65,7 @@ def main():
     # Reject contaminated timing rather than silently unsetting user intent.
     oracles=('CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_VERIFY_GUARD',
              'CIRCUIT_VERIFY_ECONOMY_INDEX','CIRCUIT_VERIFY_POINT_ROUTES',
-             'CIRCUIT_VERIFY_EMPTY_PACK','CIRCUIT_VERIFY_SEA_STATIC_INDEX')
+             'CIRCUIT_VERIFY_EMPTY_PACK','CIRCUIT_VERIFY_PACK_CANDIDATES','CIRCUIT_VERIFY_SEA_STATIC_INDEX')
     if any(name in os.environ for name in oracles) and not a.verify_indexes:
         p.error('Unset verification oracles for timing runs: '+', '.join(oracles))
     traces=('CIRCUIT_COMMANDER_TRACE','CIRCUIT_RANGED_TRACE')
@@ -233,7 +233,7 @@ def main():
     env.pop('CIRCUIT_PERF_PHASES',None)
     if a.native_phases:env['CIRCUIT_PERF_PHASES']='1'
     if a.verify_indexes:env.update(CIRCUIT_VERIFY_ECONOMY_INDEX='1',CIRCUIT_VERIFY_POINT_ROUTES='1',
-                                  CIRCUIT_VERIFY_EMPTY_PACK='1',CIRCUIT_VERIFY_SEA_STATIC_INDEX='1')
+                                  CIRCUIT_VERIFY_EMPTY_PACK='1',CIRCUIT_VERIFY_PACK_CANDIDATES='1',CIRCUIT_VERIFY_SEA_STATIC_INDEX='1')
     playtest.validate_checks(d/'full-match-checks.json')
     try:
         subprocess.run(cli+['launch','--dir',str(d),'--engine','recoil_2026.07.04']+(['--headless'] if a.headless else []),env=env,check=True)

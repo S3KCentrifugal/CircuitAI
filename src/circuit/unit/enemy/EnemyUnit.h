@@ -183,6 +183,8 @@ public:
 	bool IsDying()          const { return data.IsDying(); }
 	bool IsDead()           const { return data.IsDead(); }
 
+	// Return an owned snapshot for threat/worker inputs, not a live mutable view.
+	// cppcheck-suppress returnByReference
 	const SEnemyData GetData() const { return data; }
 };
 

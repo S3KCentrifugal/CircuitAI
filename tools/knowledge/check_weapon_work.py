@@ -17,7 +17,7 @@ class AIFloat3 { int x; float distance2D(const AIFloat3 &in p) const { return fl
 // Dedicated economy flak admission is outside the cache-equivalence domain.
 // Its enabled behavior is checked by the physical eco-flak arena.
 namespace EcoFlak { bool OwnsArea(const AIFloat3 &in p) { return false; } }
-class CCircuitDef { int id; float costM; bool air; bool CanBuild(CCircuitDef@ d) { return d.id!=4; } }
+class CCircuitDef { int id; float costM; bool air; bool CanBuild(CCircuitDef@ d) { return d.id!=4; } bool IsBuildAllowed() { return true; } }
 class CCircuitUnit { CCircuitDef@ circuitDef; AIFloat3 GetPos(int f) { return AIFloat3(); } }
 class IUnitTask { int id; }
 namespace Task { enum BuildType { GEO } }
@@ -32,6 +32,8 @@ class WCluster { int kind; bool stale; AIFloat3 pos; array<Slot@> slots; }
 class AI { int frame=12000; } AI ai;
 class Eco { bool isMetalFull; } Eco aiEconomyMgr;
 array<WCluster@> clusters;
+array<Slot@> outstanding;
+bool outstandingDirty = true;
 array<CCircuitDef@> defs;
 array<bool> unfinished64, unfinished96, siteOK, orderOK, mutate;
 array<int> trace;
@@ -60,7 +62,10 @@ bool Site(Slot@ s, CCircuitDef@ d, AIFloat3 &out at) {
     trace.insertLast(10000+s.pos.x); at=s.pos; return siteOK[s.pos.x];
 }
 void RecordBudgetLog() { trace.insertLast(-2); }
+// Veto diagnostics are outside this pending-order equivalence domain.
+void Rejected(Slot@ s, CCircuitDef@ d, int reason) {}
 IUnitTask@ Order(CCircuitUnit@ u,WCluster@ c,Slot@ s,CCircuitDef@ d,const AIFloat3 &in at) {
+    outstandingDirty = true;
     trace.insertLast(20000+s.pos.x);
     if (orderOK[s.pos.x]) { IUnitTask t; t.id=s.pos.x; s.orderedFrame=ai.frame; return t; }
     if (mutate[s.pos.x]) {
@@ -74,6 +79,7 @@ IUnitTask@ Order(CCircuitUnit@ u,WCluster@ c,Slot@ s,CCircuitDef@ d,const AIFloa
 uint seed;
 uint R() { seed=1664525*seed+1013904223; return seed^(seed>>16); }
 void Prepare(uint input, bool bench=false) {
+    outstandingDirty = true;
     seed=input; ai.frame=12000; clusters.resize(0); defs.resize(6); trace.resize(0); countCalls=0;
     for(uint k=0;k<defs.length();++k) { CCircuitDef d; d.id=int(k); d.costM=float(k*10); @defs[k]=d; }
     @unit.circuitDef=defs[1]; defs[1].air=(R()%2)==0;
@@ -103,6 +109,7 @@ array<int>@ Snapshot(IUnitTask@ result) {
     a.insertLast(-3);for(uint i=0;i<trace.length();++i)a.insertLast(trace[i]);return a;
 }
 void Advance() {
+    outstandingDirty = true;
     ai.frame+=31*SECOND;
     Slot@ s=clusters[clusters.length()-1].slots[0];
     s.dead=false; s.standFrame=-1; s.orderedFrame=-100000;
@@ -117,6 +124,8 @@ def generate():
     for name, path in (("Old", ROOT/'tests/fixtures/performance/weapon_work_before.as'),
                        ("New", ROOT/'data/script/src/roles/tech/tech_weapons.as')):
         source = path.read_text(encoding='utf-8')
+        if name == 'New':
+            result += '\n' + function(source, 'void RefreshOutstanding()')
         body = function(source, 'int OutstandingOrders()') + '\n' + function(source, 'IUnitTask@ Work(')
         body = re.sub(r'if \(AiPerfEnabled\) AiPerf\w+\([^;]*\);', '', body)
         body = re.sub(r'GenericHelpers::LogUtil\([^;]*;', 'RecordBudgetLog();', body)
@@ -166,14 +175,42 @@ void bench_3_old() { bench_0_old(); }
 '''
 
 
+def ledger_benchmark(before, after):
+    """Compare exact pinned censuses, separately from the historical Work fix."""
+    policy = COMMON + '\n' + function(after.read_text(), 'void RefreshOutstanding()')
+    for name, source in (('Old', before), ('New', after)):
+        policy += '\n' + function(source.read_text(), 'int OutstandingOrders()').replace(
+            'OutstandingOrders()', name+'OutstandingOrders()')
+    tests = r'''
+void PrepareLedger() {
+    outstanding.resize(0);
+    Prepare(1,true);
+    for(uint i=0;i<clusters.length();++i) clusters[i].slots[0].orderedFrame=ai.frame;
+}
+'''
+    for number, (name, mutate) in enumerate((('Old',False),('New',False),('New',False),('Old',False),
+                                            ('Old',True),('New',True),('New',True),('Old',True))):
+        mutation = ('clusters[i%clusters.length()].slots[0].orderedFrame=ai.frame; '
+                    'outstandingDirty=true; ') if mutate else ''
+        tests += (f'void bench_{number}_{name}_{"orders" if mutate else "stable"}() {{ PrepareLedger(); '
+                  f'for(uint i=0;i<1000;++i) {{ {mutation}Check({name}OutstandingOrders()==32); }} }}\n')
+    return policy, tests
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--benchmark',action='store_true')
+    parser.add_argument('--ledger-baseline',type=Path,help='Pinned tech_weapons.as; benchmark just the order ledger')
+    parser.add_argument('--ledger-candidate',type=Path,help='Matching pinned candidate tech_weapons.as')
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
+    if bool(args.ledger_baseline) != bool(args.ledger_candidate) or (args.ledger_baseline and not args.benchmark):
+        parser.error('Ledger comparison requires --benchmark and both pinned source paths')
     policy,tests=args.output/'policy.as',args.output/'tests.as'
-    policy.write_text(generate(),encoding='utf-8');tests.write_text(BENCH if args.benchmark else TESTS,encoding='utf-8')
+    source,cases = (ledger_benchmark(args.ledger_baseline,args.ledger_candidate) if args.ledger_baseline
+                    else (generate(),BENCH if args.benchmark else TESTS))
+    policy.write_text(source,encoding='utf-8');tests.write_text(cases,encoding='utf-8')
     return subprocess.run([str(args.runner),str(policy),str(tests)]+(['--benchmark'] if args.benchmark else [])).returncode
 
 

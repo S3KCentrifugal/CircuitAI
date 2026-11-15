@@ -977,6 +977,17 @@ void CTerrainManager::MarkReservation(const int2& c1, const int2& c2, bool mark)
 	}
 }
 
+AIFloat3 CTerrainManager::CanonicalBuildPosition(const CCircuitDef* cdef, const AIFloat3& position, int facing) const
+{
+    if (!cdef || !cdef->GetDef() || !std::isfinite(position.x) || !std::isfinite(position.z)) return -RgtVector;
+    if (facing < 0 || facing > 3) facing = UNIT_FACING_SOUTH;
+    AIFloat3 pos = position;
+    CorrectPosition(pos);
+    pos = Pos2BuildPos(const_cast<CCircuitDef*>(cdef), pos, facing);
+    pos.y = circuit->GetMap()->GetElevationAt(pos.x, pos.z);
+    return pos;
+}
+
 int CTerrainManager::ReserveBuilding(CCircuitDef* cdef, const AIFloat3& position, int facing, int ttlFrames, int group)
 {
 	return ReserveBuildingEx(cdef, position, facing, ttlFrames, group, true, false, false, 0, false);
@@ -2299,6 +2310,8 @@ int CTerrainManager::GetReservationCount(CCircuitDef* cdef) const
 
 void CTerrainManager::RestoreReservation(int id)
 {
+    // Restore is also used by a live task retrying its pinned footprint.
+    // Temporary ownership ends on UnclaimReservation, never on retry restore.
     ++packingRevision; // invalidate exact empty-geometry reuse on mutation
 	auto it = reservations.find(id);
 	if (it == reservations.end()) {
@@ -2517,6 +2530,13 @@ bool CTerrainManager::ClaimReservation(int id)
 
 void CTerrainManager::UnclaimReservation(int id)
 {
+    // A direct task owns this new footprint, unlike a persistent layout slot.
+    // Cancel/replacement returns it completely; saved named state preserves
+    // the distinction across load without changing the reservation wire format.
+    if (GetLayoutInt("native.transient." + std::to_string(id), 0)) {
+        ReleaseReservation(id);
+        return;
+    }
 	auto it = reservations.find(id);
 	if ((it != reservations.end()) && !it->second.consumed) {
 		it->second.claimed = false;
@@ -2946,7 +2966,7 @@ bool CTerrainManager::PickFlushSite(int zone, CCircuitDef* cdef, int nanoGroup, 
 	// the factory line, lies there); economy sets stay in the zone, so the front
 	// is left to the factories (played: the sets took it, the rebuilt lab found
 	// no ground against a built turret)
-	const std::vector<SPackCandidate> cands = PackCandidates(zone, cdef, nanoGroup, facing, anchor, 0.f, 0.f, ring);
+	const auto cands = PackCandidates(zone, cdef, nanoGroup, facing, anchor, 0.f, 0.f, ring);
 	if (cands.empty()) {
 		return false;
 	}
@@ -3273,6 +3293,7 @@ void CTerrainManager::IndexReservation(int id)
 {
     ++packingRevision; // invalidate exact empty-geometry reuse on mutation
     const auto& r = reservations.at(id);
+    groupSlots[r.group].insert(id);
     // Persist in the existing named-int section: no binary layout change.
     // Load reads that section before indexing slots; the index itself is derived.
     if (GetLayoutInt("native.lost." + std::to_string(id), 0) != 0)
@@ -3286,11 +3307,17 @@ void CTerrainManager::IndexReservation(int id)
 
 void CTerrainManager::EraseReservation(int id)
 {
+    layoutInts.erase("native.transient." + std::to_string(id));
     ++packingRevision; // invalidate exact empty-geometry reuse on mutation
     auto found = reservations.find(id);
     if (found == reservations.end()) return;
     const auto& r = found->second;
     ClearLostReservation(id);
+    auto group = groupSlots.find(r.group);
+    if (group != groupSlots.end()) {
+        group->second.erase(id);
+        if (group->second.empty()) groupSlots.erase(group);
+    }
     for (int scope : {r.zone, -r.group}) {
         if (!scope) continue;
         auto bucket = scopedSlots.find({scope, r.def->GetId()});
@@ -4190,45 +4217,96 @@ int CTerrainManager::NextSlotAny(int group, const AIFloat3& anchor) const
  * nearest to the turret rows first, so the base grows outward from its
  * construction turrets and never beyond their reach.
  */
-std::vector<CTerrainManager::SPackCandidate> CTerrainManager::PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup,
+bool CTerrainManager::RefreshPackFacings() const
+{
+    // Recoil MobileCAI::AllowedCommand can rotate transported buildings during
+    // an unload command. Match FactoryExitLanes' nonempty-build-options filter.
+    // Live facing is not covered by frame or membership. Definition metadata stays
+    // fixed for this AI lifetime; only these T units need callbacks per query.
+    // O(D) once, then O(D_t log D + T log U) reads, reused O(T) scratch.
+    if (!packFacingDefsReady) {
+        for (auto& def : circuit->GetCircuitDefs()) {
+            if (!def.IsMobile() && def.IsBuilder() && def.GetDef() && !def.GetDef()->IsNotTransportable())
+                packFacingDefs.push_back(&def);
+        }
+        packFacingDefsReady = true;
+    }
+    packFacingScratch.clear();
+    for (const auto* def : packFacingDefs) {
+        for (int id : circuit->GetOwnedUnitIdsForDef(def)) {
+            const auto* unit = circuit->GetTeamUnit(id);
+            if (unit && !unit->IsDead()) packFacingScratch.emplace_back(id, unit->GetUnit()->GetBuildingFacing());
+        }
+    }
+    const bool changed = packFacings != packFacingScratch;
+    packFacings.swap(packFacingScratch);
+    return changed;
+}
+
+CTerrainManager::PackLease CTerrainManager::PackCandidates(int zone, CCircuitDef* cdef, int nanoGroup,
         int facing, const AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing) const
 {
-    // Cache ONLY empty pure geometry results, never engine terrain/threat or
-    // builder admission. Same-frame scope covers moving positions; all local
-    // blocker/reservation writers, allied writes and team membership invalidate.
-    // Positive ordering and every engine buildability check remain untouched.
+    // Reuse ranked geometry, never terrain/threat, pocket or builder admission.
+    // Positions are frame-cached; transportable static-builder facings are live.
+    // Reservation/blocking/zone writes, allies and membership invalidate.
+    // Each caller retains an immutable lease across callbacks and cache clears.
+    // Max retained candidate capacity is 65536 (~1.5 MiB), at most 32 queries/AI.
     const auto allyRevision = circuit->GetAllyTeam()->GetLayoutReservations().Revision();
     const auto ownedRevision = circuit->GetOwnedUnitRevision();
     const int frame = circuit->GetLastFrame();
-    if (emptyPackFrame != frame || emptyPackRevision != packingRevision
+    const bool facingChanged = RefreshPackFacings();
+    if (facingChanged || emptyPackFrame != frame || emptyPackRevision != packingRevision
         || emptyPackAllyRevision != allyRevision || emptyPackOwnedRevision != ownedRevision) {
-        emptyPackQueries.clear(); emptyPackFrame=frame; emptyPackRevision=packingRevision;
+        packQueries.Clear(); emptyPackQueries.clear(); emptyPackFrame=frame; emptyPackRevision=packingRevision;
         emptyPackAllyRevision=allyRevision; emptyPackOwnedRevision=ownedRevision;
     }
-    if (!cdef || !std::isfinite(maxReach) || !std::isfinite(minNanoDist))
+    if (!cdef || !std::isfinite(maxReach) || !std::isfinite(minNanoDist)
+        || !std::isfinite(anchor.x) || !std::isfinite(anchor.z))
         return ComputePackCandidates(zone,cdef,nanoGroup,facing,anchor,maxReach,minNanoDist,alwaysRing);
     // Anchor only sorts nonempty results and cannot affect emptiness.
-    const EmptyPackKey key{zone,cdef->GetId(),nanoGroup,facing,maxReach,minNanoDist,alwaysRing};
+    const EmptyPackKey key{zone,cdef->GetId(),nanoGroup,facing,maxReach,minNanoDist,alwaysRing,layoutEnabled};
     if (emptyPackQueries.count(key)) {
         static const bool verify = std::getenv("CIRCUIT_VERIFY_EMPTY_PACK") != nullptr;
         // Correctness runs re-evaluate cache hits against the original search.
         // Never enable this oracle in timing runs: it deliberately repeats work.
         if (verify) {
-            auto oracle = ComputePackCandidates(zone,cdef,nanoGroup,facing,anchor,maxReach,minNanoDist,alwaysRing);
+            auto oracle = ComputePackCandidates(zone,cdef,nanoGroup,facing,anchor,maxReach,minNanoDist,alwaysRing,false);
             if (!oracle.empty()) {
                 circuit->LOG("[INVARIANT] empty packing cache diverged");
-                return oracle;
+                return PackLease(std::move(oracle));
             }
         }
         return {};
     }
+    const PackKey rankedKey{key, anchor.x, anchor.z, layoutEnabled};
+    static const bool verifyRanked = std::getenv("CIRCUIT_VERIFY_PACK_CANDIDATES") != nullptr;
+    if (auto hit = packQueries.Find(rankedKey)) {
+        if (verifyRanked) {
+            auto oracle = ComputePackCandidates(zone,cdef,nanoGroup,facing,anchor,maxReach,minNanoDist,alwaysRing,false);
+            if (oracle != *hit) {
+                circuit->LOG("[INVARIANT] ranked packing cache diverged");
+                return PackLease(std::move(oracle));
+            }
+        }
+        return PackLease(std::move(hit));
+    }
     auto result=ComputePackCandidates(zone,cdef,nanoGroup,facing,anchor,maxReach,minNanoDist,alwaysRing);
-    if (result.empty()) emptyPackQueries.insert(key);
-    return result;
+    if (verifyRanked) {
+        auto oracle = ComputePackCandidates(zone,cdef,nanoGroup,facing,anchor,maxReach,minNanoDist,alwaysRing,false);
+        if (oracle != result) {
+            circuit->LOG("[INVARIANT] indexed packing candidates diverged");
+            return PackLease(std::move(oracle));
+        }
+    }
+    if (result.empty()) {
+        if (emptyPackQueries.size() >= 256) emptyPackQueries.clear();
+        emptyPackQueries.insert(key);
+    }
+    return PackLease(packQueries.Insert(rankedKey, std::move(result)));
 }
 
 std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandidates(int zone, CCircuitDef* cdef, int nanoGroup,
-		int facing, const AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing) const
+		int facing, const AIFloat3& anchor, float maxReach, float minNanoDist, bool alwaysRing, bool indexed) const
 {
 	performance::Scope measured(circuit, performance::PACK_CANDIDATES);
 	std::vector<SPackCandidate> out;
@@ -4248,18 +4326,20 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandida
 	constexpr float PLANNED_SLOT_PENALTY = 256.f;
 	std::vector<std::pair<AIFloat3, bool>> nanos;  // slot position, served (consumed)
 	float reach = maxReach;
-	for (const auto& kv : reservations) {
-		const SReservation& r = kv.second;
-		if (r.group != nanoGroup) {
-			continue;
-		}
+    auto addNano = [&](const SReservation& r) {
 		nanos.emplace_back(r.pos, r.consumed);
 		if ((maxReach <= 0.f) && (r.def != nullptr)) {
             // Mixed land/naval support groups use the conservative shared reach.
             // Never promise a land project a longer radius than its support has.
 			reach = reach <= 0.f ? r.def->GetBuildDistance() : std::min(reach,r.def->GetBuildDistance());
 		}
-	}
+	};
+    if (indexed) {
+        const auto group = groupSlots.find(nanoGroup);
+        if (group != groupSlots.end()) for (int id : group->second) addNano(reservations.at(id));
+    } else {
+        for (const auto& [id, r] : reservations) if (r.group == nanoGroup) addNano(r);
+    }
 	if (nanos.empty() || (reach <= 0.f)) {
 		return out;
 	}
@@ -4277,23 +4357,27 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandida
 	// converters next to the converters. The group's members are the standing
 	// structures of this def and its planned slots inside the zone.
 	std::vector<AIFloat3> same;
-	for (const auto& kv : reservations) {
-		const SReservation& r = kv.second;
-		if ((r.def == cdef) && (r.zone == zone)) {
-			same.push_back(r.pos);
-		}
-	}
+    if (indexed) {
+        const auto scope = scopedSlots.find({zone, cdef->GetId()});
+        if (scope != scopedSlots.end()) for (int id : scope->second.ids) same.push_back(reservations.at(id).pos);
+    } else {
+        for (const auto& [id, r] : reservations) if (r.def == cdef && r.zone == zone) same.push_back(r.pos);
+    }
 	{
 		const int frame = circuit->GetLastFrame();
-		for (const auto& kv : circuit->GetTeamUnits()) {
-			CCircuitUnit* unit = kv.second;
+        auto addUnit = [&](CCircuitUnit* unit) {
 			if ((unit != nullptr) && !unit->IsDead() && (unit->GetCircuitDef() == cdef)) {
 				const AIFloat3& p = unit->GetPos(frame);
 				if (ZoneAt(int(p.x) / (SQUARE_SIZE * 2), int(p.z) / (SQUARE_SIZE * 2)) == zone) {
 					same.push_back(p);
 				}
 			}
-		}
+		};
+        if (indexed) {
+            for (int id : circuit->GetOwnedUnitIdsForDef(cdef)) addUnit(circuit->GetTeamUnit(id));
+        } else {
+            for (const auto& [id, unit] : circuit->GetTeamUnits()) addUnit(unit);
+        }
 	}
 	std::vector<layout_rank::Pt> samePts;  // D-088 via D-094
 	for (const AIFloat3& s : same) {
@@ -4787,7 +4871,7 @@ int CTerrainManager::PickMost(int zone, CCircuitDef* cdef, int nanoGroup, int fa
 	const float half = base_layout::HALF_CELL_ELMOS;
 	const AIFloat3 centre((z.c1.x + z.c2.x) * half, 0.f, (z.c1.y + z.c2.y) * half);
 	// every free footprint in the zone within a slot's reach of some slot: the candidates the packer would consider
-	const std::vector<SPackCandidate> cands = PackCandidates(zone, cdef, nanoGroup, facing, centre, 0.f, 0.f);
+	const auto cands = PackCandidates(zone, cdef, nanoGroup, facing, centre, 0.f, 0.f);
 	if (cands.empty()) {
 		return -1;
 	}
@@ -4909,7 +4993,7 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 	SSlowCall slow("PackNearGroup", circuit);
 	constexpr int POCKET_TESTS_MAX = 40;  // D-090
 	int pocketTests = 0;
-	const std::vector<SPackCandidate> candidates = PackCandidates(zone, cdef, nanoGroup, facing, anchor, maxReach, minNanoDist);
+	const auto candidates = PackCandidates(zone, cdef, nanoGroup, facing, anchor, maxReach, minNanoDist);
 	int tried = 0;
 	for (const SPackCandidate& c : candidates) {
 		if (++tried > 400) {
@@ -4942,7 +5026,7 @@ bool CTerrainManager::CanPackNearGroup(int zone, CCircuitDef* cdef, int nanoGrou
 {
 	performance::Scope measured(circuit, performance::CAN_PACK);
 	SSlowCall slow("CanPackNearGroup", circuit);
-	const std::vector<SPackCandidate> candidates = PackCandidates(zone, cdef, nanoGroup, facing, ZeroVector, maxReach, minNanoDist);
+	const auto candidates = PackCandidates(zone, cdef, nanoGroup, facing, ZeroVector, maxReach, minNanoDist);
 	int tried = 0;
 	for (const SPackCandidate& c : candidates) {
 		if (++tried > 40) {  // D-083: a yes/no asked many times a second; forty tries answer it
@@ -5200,6 +5284,7 @@ void CTerrainManager::LoadLayout(std::istream& is)
 	zones.clear();
 	reservations.clear();
 	scopedSlots.clear();
+    groupSlots.clear();
     activeLayoutZones.clear();
     lostSlots.clear();
 	localReservations.Clear();

@@ -1660,8 +1660,9 @@ CCircuitUnit* CCircuitAI::RegisterTeamUnit(ICoreUnit::Id unitId, Unit* u)
 	unit->SetArea(area);
 
 	teamUnits[unitId] = unit;
-    if (controllers) controllers->UnitAdded(unit);
+    ownedDefinitions.Insert(cdef->GetId(), unitId);
     ++ownedUnitRevision;
+    if (controllers) controllers->UnitAdded(unit);
 	cdef->Inc();
 
 	// FIXME: Sometimes area where factory is placed is not suitable for its units.
@@ -1677,6 +1678,7 @@ void CCircuitAI::UnregisterTeamUnit(CCircuitUnit* unit)
     if (controllers) controllers->UnitRemoved(unit->GetId());
     builderManager->ForgetUnfinishedCount(unit);
 	teamUnits.erase(unit->GetId());
+    ownedDefinitions.Erase(unit->GetCircuitDef()->GetId(), unit->GetId());
     ++ownedUnitRevision;
 	unit->GetCircuitDef()->Dec();
 

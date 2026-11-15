@@ -96,7 +96,7 @@ public:
     void Release(int team,int owner) {
         claims.erase(std::remove_if(claims.begin(),claims.end(),[=](const auto& c){return c.team==team && c.owner==owner;}),claims.end());
     }
-    void Reserve(ShotClaim claim) { claims.push_back(claim); }
+    void Reserve(const ShotClaim& claim) { claims.push_back(claim); }
     float Reserved(int target,int team,int owner) const {
         float sum=0; for(const auto& c:claims)
             if(c.target==target && (c.team!=team || c.owner!=owner)) sum+=c.damage;
