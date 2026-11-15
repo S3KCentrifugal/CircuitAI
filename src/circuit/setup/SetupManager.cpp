@@ -188,7 +188,7 @@ void CSetupManager::ParseScriptStarts()
 	// Direct fields: [team0] { startposx=...; allyteam=...; }, [ai1] { team=1; },
 	// [player0] { team=2; spectator=1; }. A plain scan: std::regex threw on this
 	// compiler ("Invalid range in '{}'") and the AI failed to start.
-	auto trim = [](std::string s) {
+	auto trim = [](const std::string& s) {
 		const size_t b = s.find_first_not_of(" \t\r\n");
 		const size_t e = s.find_last_not_of(" \t\r\n");
 		return (b == std::string::npos) ? std::string() : s.substr(b, e - b + 1);
@@ -494,7 +494,7 @@ bool CSetupManager::PickCommander()
 	if (commChoice == nullptr) {
 		for (CCircuitDef& cdef : circuit->GetCircuitDefs()) {
 			std::string lvl1 = cdef.GetDef()->GetName();
-			if ((lvl1.find(commPrefix) != 0) || (lvl1.find(commSuffix) != lvl1.size() - 5)) {
+			if (!lvl1.starts_with(commPrefix) ||(lvl1.find(commSuffix) != lvl1.size() - 5)) {
 				continue;
 			}
 
