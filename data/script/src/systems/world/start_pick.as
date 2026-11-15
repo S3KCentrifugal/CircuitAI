@@ -21,7 +21,8 @@
 // the map's default box set (StartBoxes, start_boxes.as), not the script's startrect
 // that FriendlyStartBoxAt reads; they can differ by hundreds of elmos (King's Assault:
 // startrect 0.7, real box 0.79). With those polygons known, an out-of-box spot is
-// clamped to the nearest point BoxInset inside its box, slid along the edge to keep
+// clamped to the nearest point BoxInset inside its box on footing the commander can
+// stand on (no slope over FootMaxSlope within FootHalf), slid along the edge to keep
 // StartSpacing from the side's other spots (the game rejects a start within 350 of
 // another). The old pull toward the nearest in-box spot moved Forge P15 332 elmos up
 // the edge onto ground the game rejected; the clamp moves it 70 straight in.
@@ -56,7 +57,11 @@ namespace StartPick {
 	}
 
 	bool InPolyM(const array<AIFloat3>& in poly, const AIFloat3& in p) {
-		const float m = Global::StartPick::BoxMargin;
+		return InPolyD(poly, p, Global::StartPick::BoxMargin);
+	}
+
+	// p and the 4 points m elmos away along the axes are inside poly
+	bool InPolyD(const array<AIFloat3>& in poly, const AIFloat3& in p, float m) {
 		return StartBoxes::InPoly(poly, p.x, p.z)
 			&& StartBoxes::InPoly(poly, p.x - m, p.z) && StartBoxes::InPoly(poly, p.x + m, p.z)
 			&& StartBoxes::InPoly(poly, p.x, p.z - m) && StartBoxes::InPoly(poly, p.x, p.z + m);
@@ -73,12 +78,11 @@ namespace StartPick {
 		return false;
 	}
 
-	// Nearest point BoxInset inside our polygon, StartSpacing from every point in others;
+	// Nearest point inset elmos inside our polygon, StartSpacing from every point in others;
 	// false when none (box too thin, or every edge point crowded).
-	bool Clamp(const AIFloat3& in p, const array<AIFloat3>& in others, AIFloat3& out res) {
+	bool Clamp(const AIFloat3& in p, const array<AIFloat3>& in others, float inset, AIFloat3& out res) {
 		const array<AIFloat3>@ poly = StartBoxes::boxes[ai.allyTeamId];
 		const uint n = poly.length();
-		const float inset = Global::StartPick::BoxInset;
 		const float sp2 = Global::StartPick::StartSpacing * Global::StartPick::StartSpacing;
 		float cx = 0, cz = 0;
 		for (uint i = 0; i < n; ++i) { cx += poly[i].x; cz += poly[i].z; }
@@ -110,7 +114,9 @@ namespace StartPick {
 		bool found = false;
 		for (uint c = 0; c < cands.length(); ++c) {
 			const AIFloat3 q = cands[c];
-			if (!InPolyM(poly, q)) continue;
+			if (!InPolyD(poly, q, (inset * 0.75f > Global::StartPick::BoxMargin) ? inset * 0.75f : Global::StartPick::BoxMargin)) continue;
+			// footing: the game drops a start the commander cannot stand on (TestMoveOrder)
+			if (aiTerrainMgr.FlatFraction(q, 0, Global::StartPick::FootHalf, Global::StartPick::FootHalf, Global::StartPick::FootMaxSlope) < 1.0f) continue;
 			bool crowded = false;
 			for (uint o = 0; o < others.length() && !crowded; ++o) crowded = SqDist2(q, others[o]) < sp2;
 			if (crowded) continue;
@@ -193,22 +199,29 @@ namespace StartPick {
 			side[i] = (near >= 0) && (boxed[near] == 1);
 		}
 		// pull our side's out-of-box spots into the box
-		array<AIFloat3> placed;  // our side's points so far (clamp keeps StartSpacing from them)
+		array<AIFloat3> placed;
+		array<AIFloat3> backup(n);
+		array<bool> hasBackup(n, false);  // our side's points so far (clamp keeps StartSpacing from them)
 		for (uint i = 0; i < n; ++i) if (side[i] && inBox[i]) placed.insertLast(at[i]);
 		for (uint i = 0; i < n; ++i) {
 			if (!side[i] || inBox[i]) continue;
 			if (HasOwnPoly()) {
 				AIFloat3 q;
-				const bool ok = Clamp(cfg.StartSpots[i].pos, placed, q);
+				const bool ok = Clamp(cfg.StartSpots[i].pos, placed, Global::StartPick::BoxInset, q);
 				const float pull = ok ? sqrt(SqDist2(q, cfg.StartSpots[i].pos)) : -1.0f;
 				if (!ok || pull > Global::StartPick::MaxPull) {
 					Log("P" + (i + 1) + " cannot be clamped into our box" + (ok ? " within " + int(Global::StartPick::MaxPull) + " (" + int(pull) + ")" : "") + "; skipped");
 					side[i] = false;
 					continue;
 				}
+				// a backup point deeper in, sent first: the game keeps it if it rejects the
+				// clamp point (a blocking feature: rocks there are invisible to the script)
+				AIFloat3 q2;
+				if (Clamp(cfg.StartSpots[i].pos, placed, Global::StartPick::BackupInset, q2)) { backup[i] = q2; hasBackup[i] = true; }
 				at[i] = q;
 				placed.insertLast(q);
-				Log("P" + (i + 1) + " clamped " + int(pull) + " elmos into our box at (" + int(q.x) + "," + int(q.z) + ")");
+				Log("P" + (i + 1) + " clamped " + int(pull) + " elmos into our box at (" + int(q.x) + "," + int(q.z) + "), flat "
+					+ int(100.0f * aiTerrainMgr.FlatFraction(q, 0, 64.0f, 64.0f, Global::StartPick::FootMaxSlope)) + "% of 128x128");
 				continue;
 			}
 			int ref = -1; float best = 1e30f;
@@ -266,6 +279,10 @@ namespace StartPick {
 		}
 		const int idx = cand[rank];
 		StartSpot@ spot = cfg.StartSpots[idx];
+		if (hasBackup[idx]) {
+			aiSetupMgr.SendStartPos(backup[idx]);
+			Log("backup point for P" + (idx + 1) + " sent first at (" + int(backup[idx].x) + "," + int(backup[idx].z) + ")");
+		}
 		const bool sent = aiSetupMgr.SendStartPos(at[idx]);
 		if (sent) { pickedIdx = idx; pickedPos = at[idx]; }
 		Log("team " + ai.teamId + " takes P" + (idx + 1) + " role=" + int(spot.aiRole)

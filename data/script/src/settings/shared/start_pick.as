@@ -13,4 +13,12 @@ namespace Global { namespace StartPick {
 	float BoxInset = 48.0f;
 	// A clamped point keeps this far from the side's other spots (game rejects < 350).
 	float StartSpacing = 360.0f;
+	// A clamped spot also gets a backup point this deep, sent before the clamp point: the
+	// game keeps the last accepted point, so a clamp point on a rock (Sector 318C P5,
+	// 2026-11-15) still lands near the spot instead of the game's own guess.
+	float BackupInset = 200.0f;
+	// Footing of a clamped point: every slope-map cell within FootHalf elmos at most
+	// FootMaxSlope (engine slope 1 - cos; commanders climb 54 degrees = 0.41).
+	float FootHalf = 32.0f;
+	float FootMaxSlope = 0.3f;
 }}
