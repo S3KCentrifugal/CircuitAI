@@ -35,6 +35,8 @@ public:
         int category = 0, index = 0;
         float range = 0.f, arc = -1.f, reload = 1.f, burst = 0.f;
         float heightMod = 1.f, cylinder = 0.f, speed = 0.f, gravity = 0.f;
+        float heightBoost = -1.f;  // heightBoostFactor (cannon downhill reach; < 0 engine formula)
+        bool starburst = false;
         float splash = 0.f, alphaScale = 1.f;
         float beamMinIntensity = 1.f, beamTargetBorder = 0.f;
         bool ballistic = false, high = false, forward = false, fake = false, guided = false, instant = false, continuous = false;
@@ -102,6 +104,11 @@ public:
     // allies.Any per first call. Ally receives the engaging friend's unit id.
     bool Engaged(int contact, float margin, int* ally=nullptr) const;
     float Range(const Weapon& weapon, const springai::AIFloat3& from, const springai::AIFloat3& to) const;
+    // Owner 2026-11-15: the 2-D radius r from `to`, along the 2-D unit vector `dir`, at
+    // which the stand point to+dir*r on the ground keeps r <= Range(point, to) * fraction:
+    // a stand on lower ground is pulled in, one on a hilltop may stand further out.
+    // At most 4 elevation lookups.
+    float StandoffRange(const Weapon& w, const springai::AIFloat3& to, const springai::AIFloat3& dir, float fraction) const;
     bool Trajectory(const Weapon& weapon, const springai::AIFloat3& from, const springai::AIFloat3& to) const;
     void ReserveShot(int owner, int target, float damage, int until);
     float Reserved(int target, int owner) const;

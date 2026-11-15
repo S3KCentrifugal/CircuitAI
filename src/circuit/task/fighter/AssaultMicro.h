@@ -38,6 +38,8 @@ private:
         float blast = 0.f;    // its death explosion area of effect (commanders only)
         bool counts = false;  // in the metal census (finished army / static defence)
         bool target = false;  // may be the nearest-enemy anchor
+        float groundY = 0.f;  // owner 2026-11-15: ground (water surface) under it, for height-aware reach
+        const CCircuitDef* def = nullptr;   // borrowed, immutable for the game
     };
     struct Friend { springai::AIFloat3 pos; float cost; };
     struct State {
@@ -51,6 +53,8 @@ private:
     void Snapshot(int frame);
     void Release(CCircuitUnit* unit, State& s, int frame);
     bool InPorc(const springai::AIFloat3& p, float margin) const;
+    float Ground(const springai::AIFloat3& p) const;
+    float PorcReach(const Enemy& h, float y) const;
     void Issue(CCircuitUnit* unit, State& s, const springai::AIFloat3& goal, int frame, bool urgent);
 
     CCircuitAI* circuit;

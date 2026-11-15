@@ -680,9 +680,10 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
         const float fraction=cohort::PokeFraction(regime,reloading,health,paused,
             policy.pokeIn,policy.pokeInDominant,policy.pokeOut,policy.pokeHealth,policy.pokePressHealth);
         phase=fraction<1.f?1:0;
-        const float reach=world.Range(caps.weapons.front(),pos,closest->pos)*fraction;
         AIFloat3 away=pos-closest->pos; away.Normalize2D();
         if(away.SqLength2D()<POKE_DIRECTION_MIN_LENGTH_SQ) away=group.back;
+        // Owner 2026-11-15: reach measured from the poke point's ground, not ours.
+        const float reach=world.StandoffRange(caps.weapons.front(),closest->pos,away,fraction);
         point=closest->pos+away*reach;
     }
     if(group.sustainedRush) { danger=nullptr; incoming=nullptr; withdrawalUntil=0; }
@@ -1208,12 +1209,18 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     int terrainRejected=0,slotRejected=0,coverageRejected=0,fireRejected=0;
     for(const auto& w:caps.weapons) {
         if(c.def && !(w.category&c.def->GetCategory())) continue;
-        const float range=world.Range(w,pos,c.pos)*policy.rangeFraction;
+        // Owner 2026-11-15: the ring radius is the reach from each stand point's own
+        // ground (WeaponReach), not from where the hull stands now: a valley stand
+        // firing uphill is pulled in, a hilltop stand keeps its longer reach.
+        const float flatRange=w.range*policy.rangeFraction;   // angle spacing only
         for(int k=0;k<17;++k) {
             const int slot=(k+failures)%17;
             const int side=slot==0?0:((slot%2)?(slot+1)/2:-slot/2);
-            const float angle=baseAngle+side*std::max(.12f,spacing/std::max(1.f,range));
-            AIFloat3 point(c.pos.x+std::cos(angle)*range,0.f,c.pos.z+std::sin(angle)*range);
+            const float angle=baseAngle+side*std::max(.12f,spacing/std::max(1.f,flatRange));
+            const AIFloat3 dir(std::cos(angle),0.f,std::sin(angle));
+            const float range=world.StandoffRange(w,c.pos,dir,policy.rangeFraction);
+            if(range<=0.f) { ++fireRejected; continue; }
+            AIFloat3 point(c.pos.x+dir.x*range,0.f,c.pos.z+dir.z*range);
             CTerrainManager::CorrectPosition(point);
             point.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x,point.z);
             if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) { ++terrainRejected; continue; }

@@ -1,4 +1,5 @@
 #include "task/fighter/RangedWorld.h"
+#include "util/WeaponReach.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "Log.h"
@@ -109,6 +110,8 @@ const CRangedWorld::Capabilities& CRangedWorld::CapabilitiesFor(CCircuitDef* def
             && !(def->GetRangedPolicy().lowTrajectory && w.ballistic && wd->GetHighTrajectory()==2);
         w.speed=wd->GetProjectileSpeed();
         w.gravity=wd->GetMyGravity()>0.f ? wd->GetMyGravity() : -circuit->GetMap()->GetGravity();
+        w.heightBoost=wd->GetHeightBoostFactor();
+        w.starburst=weaponType=="StarburstLauncher";
         c.weapons.push_back(std::move(w));
     }
     return c;
@@ -525,11 +528,36 @@ float CRangedWorld::Range(const Weapon& w,const AIFloat3& from,const AIFloat3& t
     // difference to the ground under the target, not to its mid point: a 90-tall
     // Twin Guard cut the Barrage ring from 530 to 507, inside Beamer reach.
     const float toY=exactStatic ? std::min(to.y,circuit->GetTerrainManager()->GetAreaData()->GetElevationAt(to.x,to.z)) : to.y;
-    const float h=(toY-from.y)*w.heightMod;
-    if(w.cylinder>0.f) return std::fabs(h)<w.cylinder*w.range ? w.range : 0.f;
-    // Conservative uphill correction; do not assume bonus downhill reach.
-    // The engine remains authoritative for actual firing reach and aim.
-    return w.ballistic ? std::max(0.f,w.range-std::max(0.f,h)) : std::sqrt(std::max(0.f,w.range*w.range-h*h));
+    // Owner 2026-11-15 (Kolmogorov: Fatboys and Myrmidons misjudged hills): the
+    // engine's own reach (util/WeaponReach.h: TestRange + Cannon GetStaticRange2D),
+    // shorter firing uphill, longer from a hilltop. The old ballistic estimate,
+    // range minus the rise, never granted the downhill boost and under-cut uphill.
+    weapon_reach::Ballistics b;
+    b.range=w.range; b.heightMod=w.heightMod; b.cylinder=w.cylinder;
+    if(w.ballistic) { b.kind=weapon_reach::Kind::CANNON; b.speed=w.speed; b.gravity=w.gravity; b.heightBoost=w.heightBoost; }
+    else if(w.starburst) b.kind=weapon_reach::Kind::STARBURST;
+    return weapon_reach::Reach2D(b,from.y,toY);
+}
+float CRangedWorld::StandoffRange(const Weapon& w,const AIFloat3& to,const AIFloat3& dir,float fraction) const
+{
+    const auto* area=circuit->GetTerrainManager()->GetAreaData();
+    auto standAt=[&](float r) {
+        AIFloat3 p(to.x+dir.x*r,0.f,to.z+dir.z*r);
+        CTerrainManager::CorrectPosition(p);
+        p.y=area->GetElevationAt(p.x,p.z);
+        return p;
+    };
+    // Fixed point of r = Range(stand(r), to) * fraction from the flat guess; the
+    // reach changes slowly with r, so two or three steps settle within 8 elmos.
+    float r=w.range*fraction;
+    for(int i=0;i<3;++i) {
+        const float next=Range(w,standAt(r),to)*fraction;
+        if(std::fabs(next-r)<8.f) return std::min(r,next);
+        r=next;
+        if(r<=0.f) return 0.f;
+    }
+    // not settled: never stand where the last test says the shot falls short
+    return std::min(r,Range(w,standAt(r),to)*fraction);
 }
 bool CRangedWorld::Trajectory(const Weapon& w,const AIFloat3& from,const AIFloat3& to) const
 {

@@ -5,6 +5,8 @@
 #include "unit/enemy/EnemyManager.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
+#include "util/WeaponReach.h"
 #include "spring/SpringMap.h"
 #include "util/GameAttribute.h"
 #include "util/Utils.h"
@@ -52,11 +54,28 @@ const char* ModeName(int m)
 
 CAssaultMicro::CAssaultMicro(CCircuitAI* circuit) : circuit(circuit) {}
 
+float CAssaultMicro::Ground(const AIFloat3& p) const
+{
+    AIFloat3 q = p;
+    CTerrainManager::CorrectPosition(q);
+    return std::max(0.f, circuit->GetMap()->GetElevationAt(q.x, q.z));   // a weapon over water aims at the surface
+}
+
+// Owner 2026-11-15: a heavy porc's reach onto ground at height y (hilltop Pulsars
+// reach further down than up); the flat reach when its weapon is unknown.
+float CAssaultMicro::PorcReach(const Enemy& h, float y) const
+{
+    const float r = (h.def != nullptr) ? circuit->GetBattle()->ReachAt(h.def, h.groundY, y) : 0.f;
+    return r > 0.f ? r : h.reach;
+}
+
 bool CAssaultMicro::InPorc(const AIFloat3& p, float margin) const
 {
+    if (heavy.empty()) return false;
+    const float y = Ground(p);
     for (int i : heavy) {
         const Enemy& h = enemies[i];
-        if (Dist2(p, h.pos) < SQUARE(h.reach + margin)) return true;
+        if (Dist2(p, h.pos) < SQUARE(PorcReach(h, y) + margin)) return true;
     }
     return false;
 }
@@ -101,6 +120,7 @@ void CAssaultMicro::Snapshot(int frame)
         if (!mobile && reach <= 0.f) continue;
         Enemy en;
         en.pos = at; en.cost = def->GetCostM(); en.reach = reach; en.radius = e->GetRadius();
+        en.def = def; en.groundY = Ground(at);
         en.heavy = !mobile && heavyDefs.count(def->GetId()) > 0;
         en.comm = mobile && def->IsRoleComm();
         if (en.comm) en.blast = BlastOf(def);
@@ -189,6 +209,23 @@ void CAssaultMicro::Update()
         ++cntUnits;
         const AIFloat3 pos = unit->GetPos(frame);
         const float radiusSq = SQUARE(p.radius);
+        const float posY = Ground(pos);
+        // Owner 2026-11-15 (Kolmogorov: Thugs/Maces/Satyrs fired short uphill): the
+        // main weapon's engine reach between the stand and the target (WeaponReach),
+        // cached per def by the battle analysis.
+        const weapon_reach::Ballistics& ballistics = circuit->GetBattle()->MainBallistics(def);
+        // r with r <= reach(stand at target + dir * r, target) * frac: 2-3 steps, at most 4 elevation reads
+        auto standoff = [&](const Enemy& e, const AIFloat3& dir, float frac) {
+            if (ballistics.range <= 0.f) return frac * range;
+            float r = frac * range;
+            for (int k = 0; k < 3; ++k) {
+                const float next = weapon_reach::Reach2D(ballistics, Ground(e.pos + dir * r), e.groundY) * frac;
+                if (std::fabs(next - r) < 8.f) return std::min(r, next);
+                r = next;
+                if (r <= 0.f) return 0.f;
+            }
+            return std::min(r, weapon_reach::Reach2D(ballistics, Ground(e.pos + dir * r), e.groundY) * frac);
+        };
 
         float ally = 0.f, enemy = 0.f;
         for (const Friend& f : friends) if (Dist2(pos, f.pos) <= radiusSq) ally += f.cost;
@@ -205,7 +242,7 @@ void CAssaultMicro::Update()
         int deepest = -1; float depth = 0.f;
         for (int i : heavy) {
             const Enemy& h = enemies[i];
-            const float edge = h.reach + p.porcMargin;
+            const float edge = PorcReach(h, posY) + p.porcMargin;
             const float d = std::sqrt(Dist2(pos, h.pos));
             if (d < edge && edge - d > depth) { depth = edge - d; deepest = i; }
         }
@@ -226,7 +263,7 @@ void CAssaultMicro::Update()
         };
         if (deepest >= 0) {
             const Enemy& h = enemies[deepest];
-            AIFloat3 goal = h.pos + Away(h.pos, pos) * (h.reach + p.porcMargin + 32.f);
+            AIFloat3 goal = h.pos + Away(h.pos, pos) * (PorcReach(h, posY) + p.porcMargin + 32.f);
             // Out of one disc into another: step further along the same line.
             for (int k = 0; k < 3 && InPorc(goal, p.porcMargin); ++k) goal += Away(h.pos, pos) * 128.f;
             take(Mode::PORC);
@@ -240,7 +277,7 @@ void CAssaultMicro::Update()
             bool edge = false;
             for (int i : heavy) {
                 const Enemy& h = enemies[i];
-                if (Dist2(pos, h.pos) < SQUARE(h.reach + p.porcMargin + range)) { edge = true; break; }
+                if (Dist2(pos, h.pos) < SQUARE(PorcReach(h, posY) + p.porcMargin + range)) { edge = true; break; }
             }
             if (edge && s.owned && s.mode == Mode::PORC && frame - s.holdSince < EDGE_HOLD_FRAMES) {
                 take(Mode::PORC);
@@ -273,14 +310,16 @@ void CAssaultMicro::Update()
         AIFloat3 goal;
         for (const auto& [d2, i] : local) {
             const Enemy& e = enemies[i];
-            float dist = frac * range;
+            const AIFloat3 dir = Away(e.pos, pos);
+            float dist = standoff(e, dir, frac);
             if (e.comm) {
                 // Owner 2026-11-08: Mace/Thug/Satyr stand and shoot a commander
                 // (no back-out) but never inside its death blast.
-                if (p.commanderNoRetreat) dist = inF * range;
+                if (p.commanderNoRetreat && frac != inF) dist = standoff(e, dir, inF);
                 if (p.commanderBlast) dist = std::max(dist, e.blast + p.commanderMargin);
             }
-            AIFloat3 g = e.pos + Away(e.pos, pos) * dist;
+            if (dist <= 0.f) continue;   // the stand ground cannot reach it at all (a cliff top)
+            AIFloat3 g = e.pos + dir * dist;
             if (p.commanderBlast) {
                 // Any other local commander's blast pushes the goal out radially.
                 for (const auto& [d2c, ci] : local) {
