@@ -217,14 +217,24 @@ void CAssaultMicro::Update()
         // r with r <= reach(stand at target + dir * r, target) * frac: 2-3 steps, at most 4 elevation reads
         auto standoff = [&](const Enemy& e, const AIFloat3& dir, float frac) {
             if (ballistics.range <= 0.f) return frac * range;
+            auto reachAt = [&](float q) { return weapon_reach::Reach2D(ballistics, Ground(e.pos + dir * q), e.groundY) * frac; };
             float r = frac * range;
             for (int k = 0; k < 3; ++k) {
-                const float next = weapon_reach::Reach2D(ballistics, Ground(e.pos + dir * r), e.groundY) * frac;
+                const float next = reachAt(r);
                 if (std::fabs(next - r) < 8.f) return std::min(r, next);
                 r = next;
-                if (r <= 0.f) return 0.f;
+                if (r <= 0.f) break;
             }
-            return std::min(r, weapon_reach::Reach2D(ballistics, Ground(e.pos + dir * r), e.groundY) * frac);
+            if (r > 0.f) {
+                r = std::min(r, reachAt(r));
+                if (r > 0.f) return r;
+            }
+            // a target on a plateau out of reach from the foot: the first inner radius whose stand reaches it
+            for (const float k : {.85f, .7f, .55f, .4f, .25f}) {
+                const float q = frac * range * k;
+                if (reachAt(q) >= q) return q;
+            }
+            return 0.f;
         };
 
         float ally = 0.f, enemy = 0.f;

@@ -554,10 +554,23 @@ float CRangedWorld::StandoffRange(const Weapon& w,const AIFloat3& to,const AIFlo
         const float next=Range(w,standAt(r),to)*fraction;
         if(std::fabs(next-r)<8.f) return std::min(r,next);
         r=next;
-        if(r<=0.f) return 0.f;
+        if(r<=0.f) break;
     }
-    // not settled: never stand where the last test says the shot falls short
-    return std::min(r,Range(w,standAt(r),to)*fraction);
+    if(r>0.f) {
+        // not settled: never stand where the last test says the shot falls short
+        r=std::min(r,Range(w,standAt(r),to)*fraction);
+        if(r>0.f) return r;
+    }
+    // Kolmogorov 2026-11-15 replay: a target on a plateau 300+ above is out of a
+    // Fatboy's reach from any foot of the slope (the shell cannot climb that high).
+    // Walk the ring inwards: the first radius whose own stand reaches is taken,
+    // which puts the stand up on the plateau. At most 5 more elevation reads.
+    static constexpr float steps[]={.85f,.7f,.55f,.4f,.25f};
+    for(const float k:steps) {
+        const float q=w.range*fraction*k;
+        if(Range(w,standAt(q),to)*fraction>=q) return q;
+    }
+    return 0.f;
 }
 bool CRangedWorld::Trajectory(const Weapon& w,const AIFloat3& from,const AIFloat3& to) const
 {
