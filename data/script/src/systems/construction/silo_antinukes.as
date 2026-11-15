@@ -211,7 +211,34 @@ namespace SiloAntiNukes {
     string gridDef = "";
     IUnitTask@ pending = null;
     int pendingSlot = -1, pendingFrame = 0;
-    int nextSearch = 0, searchFails = 0, nextHeld = -1000000, nextCantBuild = -1000000, nearFrom = -1;
+    int nextSearch = 0, searchFails = 0, nextHeld = -1000000, nextRecruit = -1000000, nearFrom = -1;
+
+    // The nearest finished builder of ours (no commander, no player-held unit, none on a factory,
+    // silo or antinuke order) that can build d and reach `near`; null when there is none.
+    CCircuitUnit@ Capable(CCircuitDef@ d, const AIFloat3 &in near)
+    {
+        if (d is null) return null;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        if (ids is null) return null;
+        CCircuitUnit@ best = null;
+        float bestD = 1e30f;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ w = ai.GetTeamUnit(ids[i]);
+            if (w is null || w.circuitDef is null || w.GetBuildProgress() < 1.0f) continue;
+            if (UnitHelpers::IsCommander(w.circuitDef) || !w.circuitDef.CanBuild(d)) continue;
+            if (w.task !is null) {
+                if (w.task.GetType() == int(Task::Type::PLAYER)) continue;
+                if (w.task is pending || w.task is padPending) continue;
+                IBuilderTask@ bt = cast<IBuilderTask>(w.task);
+                if (bt !is null && (bt.GetBuildType() == int(Task::BuildType::FACTORY) || bt.GetBuildType() == int(Task::BuildType::BIG_GUN)
+                    || (bt.buildDef !is null && bt.buildDef is d))) continue;
+            }
+            const float dd = MapHelpers::SqDist(w.GetPos(ai.frame), near);
+            if (dd >= bestD || !aiTerrainMgr.CanReachAt(w, near, w.circuitDef.GetBuildDistance())) continue;
+            bestD = dd; @best = w;
+        }
+        return best;
+    }
 
     // The builder on our antinuke order keeps it when native re-asks (played: orders swapped off
     // and dropped unframed after 120 s). FRONT asks this first.
@@ -368,18 +395,37 @@ namespace SiloAntiNukes {
         const int want = Wanted();
         if (want <= 0) return null;
         CCircuitDef@ d = gridDef.length() > 0 ? ai.GetCircuitDef(gridDef) : AntiNukeFor(u);
-        if (d is null || !u.circuitDef.CanBuild(d)) {
-            if (UnitHelpers::IsCommander(u.circuitDef) || ai.frame - nextCantBuild < 60 * SECOND) return null;
-            nextCantBuild = ai.frame;
-            GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] " + u.circuitDef.GetName() + " " + u.id + " cannot build an antinuke ("
-                + EconomyHelpers::GetAntiNukeCount() + " of " + want + " owed)", 1);
-            return null;
+        if (d is null) @d = ai.GetCircuitDef(UnitHelpers::GetAntiNukeNameForSide(Global::AISettings::Side));
+        if (d is null) return null;
+        // played (v2): on some FRONTs only rez bots and T1 constructors ever asked (their T2
+        // constructors stayed on long jobs); the asker then recruits the nearest capable builder
+        CCircuitUnit@ b = u;
+        if (!u.circuitDef.CanBuild(d)) {
+            if (UnitHelpers::IsCommander(u.circuitDef) || ai.frame < nextRecruit) return null;
+            nextRecruit = ai.frame + Global::SiloAntiNukes::RecruitSeconds * SECOND;
+            @b = Capable(d, centre.x >= 0.0f ? centre : Global::Map::StartPos);
+            if (b is null) {
+                GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] " + u.circuitDef.GetName() + " " + u.id + " cannot build an antinuke and no free builder can ("
+                    + EconomyHelpers::GetAntiNukeCount() + " of " + want + " owed)", 1);
+                return null;
+            }
         }
         // one order at a time, pinned to its slot
         const bool tracked = pendingSlot >= 0 && pendingSlot < int(slots.length());
         if (pending !is null && !pending.IsDead()) {
             if (!tracked || ai.frame - pendingFrame < Global::SiloAntiNukes::SlotStallSeconds * SECOND
                     || aiTerrainMgr.GetReservationState(slots[pendingSlot]) >= 2) {
+                // nobody on it for RecruitSeconds: the nearest capable builder joins
+                if (pending.GetUnits().length() == 0 && tracked && ai.frame - pendingFrame >= Global::SiloAntiNukes::RecruitSeconds * SECOND
+                        && ai.frame >= nextRecruit) {
+                    nextRecruit = ai.frame + Global::SiloAntiNukes::RecruitSeconds * SECOND;
+                    CCircuitUnit@ w = Capable(d, aiTerrainMgr.GetReservationPos(slots[pendingSlot]));
+                    if (w !is null) {
+                        aiBuilderMgr.AssignTask(w, pending);
+                        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] unattended order on slot " + pendingSlot + ": recruited "
+                            + w.circuitDef.GetName() + " " + w.id, 1);
+                    }
+                }
                 Held("antinuke order on slot " + pendingSlot + " in flight " + ((ai.frame - pendingFrame) / SECOND) + " s, builders "
                     + pending.GetUnits().length());
                 return null;
@@ -394,10 +440,11 @@ namespace SiloAntiNukes {
         pendingSlot = -1;
         const int have = EconomyHelpers::GetAntiNukeCount();
         if (have >= want) return null;
-        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) {
-            Held(d.GetName() + " already queued (another rule's order); " + have + " of " + want);
-            return null;
-        }
+        // played (v2): another rule's antinuke order sat queued for minutes and held this one
+        // (first antinuke 25 min after the silo). Ours goes ahead; a late finish of the other
+        // overshoots by at most one.
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0)
+            Held(d.GetName() + " also queued by another rule; ordering ours anyway (" + have + " of " + want + ")");
         const float mi = Economy::GetMinMetalIncomeLast10s(), ei = Economy::GetMinEnergyIncomeLast10s();
         float gm = have == 0 ? Global::SiloAntiNukes::FirstMetalIncome : Global::SiloAntiNukes::ExtraMetalIncome;
         float ge = have == 0 ? Global::SiloAntiNukes::FirstEnergyIncome : Global::SiloAntiNukes::ExtraEnergyIncome;
@@ -419,7 +466,7 @@ namespace SiloAntiNukes {
             const int room = Global::SiloAntiNukes::Max - int(slots.length());
             for (uint k = 0; k + 1 < shapes.length() && !reserved; k += 2) {
                 if (shapes[k] * shapes[k + 1] > room) continue;
-                reserved = Reserve(u, d, shapes[k], shapes[k + 1]);
+                reserved = Reserve(b, d, shapes[k], shapes[k + 1]);
             }
             if (!reserved) {
                 nextSearch = ai.frame + AiMin(Global::SiloAntiNukes::RetryMaxSeconds,
@@ -435,22 +482,24 @@ namespace SiloAntiNukes {
             if (aiTerrainMgr.GetReservationState(slots[s]) != 0) continue;
             if (s < slotWait.length() && ai.frame < slotWait[s]) continue;
             const AIFloat3 at = aiTerrainMgr.GetReservationPos(slots[s]);
-            if (!aiTerrainMgr.CanReachAt(u, at, u.circuitDef.GetBuildDistance())) continue;
+            if (!aiTerrainMgr.CanReachAt(b, at, b.circuitDef.GetBuildDistance())) continue;
             // played (v1): far builders' orders died unframed after 120 s; a near one first
             // (nearFrom: the first frame this slot was offered), any after NearOnlySeconds
             if (nearFrom < 0) nearFrom = ai.frame;
             const float near = Global::SiloAntiNukes::OrderRadius;
             if (ai.frame - nearFrom < Global::SiloAntiNukes::NearOnlySeconds * SECOND
-                && MapHelpers::SqDist(u.GetPos(ai.frame), at) > near * near) return null;
-            IUnitTask@ t = Order(u, d, slots[s]);
+                && MapHelpers::SqDist(b.GetPos(ai.frame), at) > near * near) return null;
+            IUnitTask@ t = Order(b, d, slots[s]);
             if (t is null) { Park(int(s), "could not pin " + d.GetName()); return null; }
             @pending = t;
             nearFrom = -1;
             pendingSlot = int(s); pendingFrame = ai.frame;
             GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
                 + " silos known) on block slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
-                + (relaxed ? " (relaxed gate)" : ""), 1);
-            return t;
+                + (relaxed ? " (relaxed gate)" : "") + (b is u ? "" : "; recruited " + b.circuitDef.GetName() + " " + b.id), 1);
+            if (b is u) return t;
+            aiBuilderMgr.AssignTask(b, t);
+            return null;
         }
         Held("no free block slot the constructor can reach (" + slots.length() + " slots)");
         return null;
@@ -461,7 +510,7 @@ namespace SiloAntiNukes {
     **************************************************************************/
     array<int> padSlots;
     IUnitTask@ padPending = null;
-    int padNextSearch = 0, padHeldAt = -1000000;
+    int padNextSearch = 0, padHeldAt = -1000000, padNextRecruit = -1000000;
     void PadHeld(const string &in why)
     {
         if (ai.frame - padHeldAt < 60 * SECOND) return;
@@ -539,29 +588,41 @@ namespace SiloAntiNukes {
         if (padPending !is null && !padPending.IsDead()) return null;
         @padPending = null;
         CCircuitDef@ d = AntiNukeFor(u);
-        if (d is null || !d.IsAvailable(ai.frame)) { PadHeld(u.circuitDef.GetName() + " cannot build an available antinuke"); return null; }
-        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) { PadHeld(d.GetName() + " already queued"); return null; }
+        if (d is null) @d = ai.GetCircuitDef(UnitHelpers::GetAntiNukeNameForSide(Global::AISettings::Side));
+        if (d is null || !d.IsAvailable(ai.frame)) { PadHeld("no available antinuke"); return null; }
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0)
+            PadHeld(d.GetName() + " also queued by another rule; ordering ours anyway");
         if (mi < metalGate || ei < energyGate) {
             PadHeld("antinuke " + (have + 1) + " of " + want + ": income +" + int(mi) + "/+" + int(ei) + " below +" + int(metalGate) + "/+" + int(energyGate));
             return null;
+        }
+        CCircuitUnit@ b = u;
+        if (!u.circuitDef.CanBuild(d)) {
+            if (UnitHelpers::IsCommander(u.circuitDef) || ai.frame < padNextRecruit) return null;
+            padNextRecruit = ai.frame + Global::SiloAntiNukes::RecruitSeconds * SECOND;
+            @b = Capable(d, Global::Map::StartPos);
+            if (b is null) { PadHeld(u.circuitDef.GetName() + " cannot build an antinuke and no free builder can"); return null; }
         }
         RaiseCaps(want);
         int slot = -1;
         for (uint s = 0; s < padSlots.length() && slot < 0; ++s)
             if (aiTerrainMgr.GetReservationState(padSlots[s]) == 0
-                && aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(padSlots[s]), u.circuitDef.GetBuildDistance())) slot = padSlots[s];
+                && aiTerrainMgr.CanReachAt(b, aiTerrainMgr.GetReservationPos(padSlots[s]), b.circuitDef.GetBuildDistance())) slot = padSlots[s];
         if (slot < 0) {
             if (ai.frame < padNextSearch) { PadHeld("periphery search backing off"); return null; }
             padNextSearch = ai.frame + 15 * SECOND;
-            slot = ReservePeriphery(u, d, maxRadius, coreRadius);
+            slot = ReservePeriphery(b, d, maxRadius, coreRadius);
             if (slot < 0) return null;
         }
-        IUnitTask@ t = Order(u, d, slot);
+        IUnitTask@ t = Order(b, d, slot);
         if (t is null) return null;
         @padPending = t;
         const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
         GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
-            + " silos known) on periphery pad " + slot + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei), 1);
-        return t;
+            + " silos known) on periphery pad " + slot + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
+            + (b is u ? "" : "; recruited " + b.circuitDef.GetName() + " " + b.id), 1);
+        if (b is u) return t;
+        aiBuilderMgr.AssignTask(b, t);
+        return null;
     }
 }
