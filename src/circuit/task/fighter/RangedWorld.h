@@ -48,6 +48,10 @@ public:
         float turnRate = 1.f, acceleration = 0.f, speed = 0.f, blastRadius = 0.f;
         float radius = 16.f, cloakCost = 0.f, cloakMoving = 0.f;
         bool cloak = false;
+        // Owner 2026-11-15: a BAR carrier weapon (customparams carried_unit, e.g. the
+        // Myrmidon's drone_controller, damage 0) launches its drones on the unit's
+        // weapon target; its range opens fire and picks drone-only targets.
+        float droneRange = 0.f;
     };
     using Contact = CRangedObservation::Contact;
     using Friend = CRangedObservation::Friend;

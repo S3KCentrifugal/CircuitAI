@@ -85,6 +85,7 @@ const CRangedWorld::Capabilities& CRangedWorld::CapabilitiesFor(CCircuitDef* def
         w.def=circuit->GetWeaponDef(wd->GetWeaponDefId());
         const std::unique_ptr<springai::Damage> damage(wd->GetDamage());
         if (damage) w.damage=damage->GetTypes();
+        if(params.find("carried_unit")!=params.end()) c.droneRange=std::max(c.droneRange,wd->GetRange());
         const bool carrier=def->GetRangedPolicy().mode==RangedPolicy::Mode::CARRIER;
         if (!carrier && (w.fake || w.damage.empty() || w.damage[0]<=0.f || wd->IsParalyzer())) continue;
         w.index=raw->GetWeaponMountId(); w.category=raw->GetOnlyTargetCategory();

@@ -1076,9 +1076,40 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             return;
         }
     }
+    // Owner 2026-11-15 (Kolmogorov replay: AI 15's Myrmidons sat on HOLD in all 136
+    // samples, drones docked, scouted targets 1,100-1,300 away): a carrier hull with no
+    // gun target takes the nearest scouted non-spam ground contact inside its drone
+    // weapon's reach that no gun can reach from here. The set target is the drone
+    // weapon's target, so BAR's carrier gadget launches the drones; the guns, out of
+    // reach of it, stay silent, and with spam in reach the hull stays on HOLD, so the
+    // plasma still never autofires at spam. O(nearby) only for carrier hulls.
+    int droneTarget=-1;
+    if(best<0 && caps.droneRange>0.f) {
+        float nearestDrone=std::numeric_limits<float>::max();
+        for(int i:nearby) {
+            const auto& c=contacts[i];
+            if(!c.def || !c.los || Spam(policy,c) || c.def->IsAbleToFly() || c.pos.y< -20.f) continue;
+            if(c.def->GetCategory()&policy.avoidCategory) continue;
+            const float d2=pos.SqDistance2D(c.pos);
+            if(d2>SQUARE(caps.droneRange+c.radius) || d2>=nearestDrone) continue;
+            bool gunReach=false;
+            for(const auto& w:caps.weapons) {
+                if(!(w.category&c.def->GetCategory())) continue;
+                const float r=world.Range(w,pos,c.pos);
+                if(d2<=SQUARE(r+c.radius)) { gunReach=true; break; }
+            }
+            if(gunReach) continue;   // filtered gun shot (splash, line, trajectory): never forced
+            nearestDrone=d2; droneTarget=i;
+        }
+    }
     // A priority target still fires on HOLD, so spam in reach always holds:
     // an unreachable priority target would otherwise hand the volley to spam.
-    if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && (best>=0 || otherInRange));
+    if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && (best>=0 || otherInRange || droneTarget>=0));
+    if(best<0 && droneTarget>=0) {
+        const auto& c=contacts[droneTarget];
+        if(report) ai->LOG("RANGED: drone target unit=%d target=%d dist=%.0f spam=%d",id,c.id,std::sqrt(pos.SqDistance2D(c.pos)),int(spamInRange));
+        SelectTarget(unit,c.id,-1,0.f,0.f);
+    }
     if(best>=0) {
         const auto& c=contacts[best];
         SelectTarget(unit,c.id,bestWeapon,bestDamage,bestScore);
@@ -1118,7 +1149,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         }
         if(stalled) { ++failures; lastShotFrame=frame; }
         if(frame<burstUntil) return;
-    } else SelectTarget(unit,-1,-1,0.f);
+    } else if(droneTarget<0) SelectTarget(unit,-1,-1,0.f);
     if (policy.holdFireline && closing) {
         world.SetSlot(id,pos,policy.spacing,def->GetCostM());
         return; // A facing gun remains useful; turning away cannot create fire.
