@@ -706,6 +706,10 @@ namespace TechRules {
                     || r.key == "weapons.super" || r.key == "weapons.cluster" || r.key == "flank.factory"
                     || r.key == "air.dedicated" || r.key == "air.flex" || r.key == "fwd.t1" || r.key == "fwd.t2.defend"
                     || r.key == "energy.convert.float" || r.key == "energy.float" || r.key == "storage.metal") continue;
+                // D-489's surplus seats and D-492's Pinpointers came after this list (11-07):
+                // until the silo stands the chain's NukeRushTurrets are the turrets, and the
+                // T2 constructors and energy go to the fusion and silo
+                if (r.key == "seat.turret" || r.key == "seat.converter" || r.key == "pinpointer") continue;
             }
             if (MetalEconomy::Active()) {
                 // Keep lab reclaim/rebuild precedence, then protect the two

@@ -43,6 +43,9 @@ namespace EarlyMexUpgraders {
         if (Team::Ferry::IsGift(id) || Team::Recovery::IsGift(id)) return true;
         // TECH's first two T2 air constructors are dedicated to converters and fusions (D-107)
         if (Global::AISettings::Role == AiRole::TECH && IsAir(u.circuitDef.GetName())) return true;
+        // A nuke rush TECH's chain owns its T2 constructors until the silo stands (its own
+        // NukeRushMexUpgrades are the upgrades); played 11-15: both taken, fusion at 23:50
+        if (Global::AISettings::Role == AiRole::TECH && TechChain::NukeRush()) return true;
         if ((Builder::primaryT2AirConstructor !is null && Builder::primaryT2AirConstructor.id == id)
             || (Builder::secondaryT2AirConstructor !is null && Builder::secondaryT2AirConstructor.id == id)) return true;
         IUnitTask@ t = u.task;
