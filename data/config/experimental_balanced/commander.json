@@ -50,7 +50,11 @@
         // 2026-11-14 (6-7 Shadows, 900-1050 metal, over two FRONT commanders)
         // less 1-2 bombers = 5 Shadows. Armed fighters count too (no def per contact).
         "air_t15": {"enabled": 1, "radius": 1800, "trigger_metal": 750, "hold_seconds": 60,
-            "priority": 3}   // band and limit: rules/aa_t15 (defaults 4 and 3)
+            "priority": 3,   // band and limit: rules/aa_t15 (defaults 4 and 3)
+            // No turret of the pair started fallback_seconds after a raid: the nearest
+            // free T1 constructor within fallback_reach gets a direct order fallback_back
+            // elmos behind the commander (order_seconds timeout), once per raid.
+            "fallback_seconds": 10, "fallback_reach": 3000, "fallback_back": 150, "order_seconds": 180}
     },
 	// Shared commander micro; role policy supplies advance and operating leash.
 	"combat": {

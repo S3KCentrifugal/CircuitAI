@@ -708,6 +708,10 @@ namespace RoleFront {
             if(frontWork !is null) return frontWork;
         }
 
+        // Owner (2026-11-14): T1.5 AA by a free T1 constructor when the commander group did not start one after a bomber raid (urgent: ahead of every other rung)
+        IUnitTask@ raidAA=CommanderGroupAirAA::Work(builder);
+        if (raidAA !is null) return raidAA;
+
         // Owner (2026-10-19): after losing the base, retake the mexes first (Front::Recovery)
         IUnitTask@ recovery=FrontRecovery::Work(builder);
         if (recovery !is null) return recovery;
@@ -976,6 +980,7 @@ namespace RoleFront {
         FrontAgitatorCounter::TaskRemoved(task, done);
         FrontPorcClusterCounter::TaskRemoved(task, done);
         FrontLongAA::TaskRemoved(task, done);
+        CommanderGroupAirAA::TaskRemoved(task, done);
         FrontOverflow::TaskRemoved(task, done);
         Front_GantryTaskRemoved(task);
     }

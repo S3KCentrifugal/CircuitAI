@@ -73,7 +73,7 @@ namespace DefensePlanner {
         // Owner 2026-11-14: T1.5 AA (Ferret/Chainsaw, SAM/Eradicator, Rhapsis/Lupara,
         // 50% each) at the urgent band, off (priority 0) until CommanderGroupAirAA sees
         // a bomber raid near the commander; it switches the priority and the pick.
-        Rule(17,cor?"cormadsam":leg?"legrhapsis":"armferret","aa_t15",4,3,0,0,90,0,0,0,0,1,0,0,0);
+        Rule(17,cor?"cormadsam":leg?"legrhapsis":"armferret","aa_t15",4,3,0,0,180,0,0,0,0,1,0,0,0);
         Rule(16,UnitHelpers::GetStaticLLTNameForSide(side),"llt",2,2,0,0,60,1,0,1,.15f,0,0,0,0);
         Option(16,"fallback_for",0,"commander/defense/rules/llt/");
         // Read coverage from every faction. A captured builder can be supported
