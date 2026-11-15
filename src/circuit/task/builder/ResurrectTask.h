@@ -46,6 +46,8 @@ private:
 	// Executors given reclaim instead of resurrect (enemy short porc reach).
 	std::set<CCircuitUnit*> reclaimOnly;
 	bool IsPorcReclaim(CCircuitUnit* unit, const springai::AIFloat3& target) const;
+	// Rez bot keep-out (owner 2026-11-15): target inside, or the leg there cuts one.
+	bool InKeepout(CCircuitUnit* unit, const springai::AIFloat3& from, const springai::AIFloat3& at) const;
 };
 
 } // namespace circuit

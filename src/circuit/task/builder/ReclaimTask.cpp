@@ -127,6 +127,13 @@ bool CBReclaimTask::Execute(CCircuitUnit* unit)
 	return true;
 }
 
+static bool EnemyInKeepout(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& from, const AIFloat3& at)
+{
+	CEconomyManager* economyMgr = circuit->GetEconomyManager();
+	return economyMgr->IsPorcGuarded(unit)
+		&& ((economyMgr->EnemyPorcClearance(unit, at) < 0.f) || economyMgr->IsPorcPathBlocked(unit, from, at));
+}
+
 bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 {
 	if (enemyWallId >= 0) {
@@ -170,6 +177,9 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 			if (enemy == nullptr) {
 				continue;
 			}
+			if (EnemyInKeepout(circuit, unit, pos, enemy->GetPos())) {
+				continue;  // owner 2026-11-15: rez bots, no target inside a keep-out
+			}
 			CCircuitDef* edef = enemy->GetCircuitDef();
 			if ((edef == nullptr) || (edef->IsReclaimable()
 				&& (!edef->IsAttacker() || unit->GetCircuitDef()->IsAttrVampire())
@@ -187,7 +197,7 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 		if (!features.empty()) {
 			CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 			CEconomyManager* economyMgr = circuit->GetEconomyManager();
-			const bool porcGuarded = economyMgr->IsConPorcGuarded(unit);  // owner 2026-11-04
+			const bool porcGuarded = economyMgr->IsPorcGuarded(unit);  // owner 2026-11-04; rez bots 2026-11-15
 			circuit->GetThreatMap()->SetThreatType(unit);
 			float minSqDist = std::numeric_limits<float>::max();
 			Resource* metalRes = circuit->GetEconomyManager()->GetMetalRes();
@@ -197,8 +207,10 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 				if (!terrainMgr->CanReachAtSafe2(unit, featPos, unit->GetCircuitDef()->GetBuildDistance())) {
 					continue;
 				}
-				if (porcGuarded && (economyMgr->EnemyPorcClearance(featPos) < 0.f)) {
-					continue;  // a wreck in porc reach is no target for a construction vehicle
+				if (porcGuarded && ((economyMgr->EnemyPorcClearance(unit, featPos) < 0.f)
+					|| economyMgr->IsPorcPathBlocked(unit, pos, featPos)))
+				{
+					continue;  // a wreck in porc reach is no target for a construction vehicle or rez bot
 				}
 				FeatureDef* featDef = feature->GetDef();
 				if (!featDef->IsReclaimable()) {

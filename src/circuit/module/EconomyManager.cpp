@@ -456,6 +456,19 @@ void CEconomyManager::ReadConfig(float& outMinEInc)
 				"armacv", "coracv", "legacv"};
 		}
 	}
+	{	// Rez bot porc keep-out (owner 2026-11-15): economy.rez_porc_keepout {enabled, range_fraction, units}
+		const Json::Value& rk = econ["rez_porc_keepout"];
+		rezPorcKeepout.enabled = rk.get("enabled", true).asBool();
+		rezPorcKeepout.fraction = std::max(0.f, rk.get("range_fraction", .9f).asFloat());
+		const Json::Value& units = rk["units"];
+		if (units.isArray()) {
+			for (const Json::Value& name : units) {
+				if (name.isString()) rezPorcKeepout.units.insert(name.asString());
+			}
+		} else {
+			rezPorcKeepout.units = {"armrectr", "cornecro", "legrezbot"};
+		}
+	}
 
 	{
 		const Json::Value& bd = econ["build_delay"];
@@ -1820,10 +1833,18 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 	AIFloat3 pos;
 	float cost = .0f;
 	float minSqDist = std::numeric_limits<float>::max();
+	const bool porcGuarded = IsPorcGuarded(unit);
+	const AIFloat3 unitPos = unit->GetPos(circuit->GetLastFrame());
 	for (Feature* feature : features) {
 		AIFloat3 featPos = feature->GetPosition();
 		CTerrainManager::CorrectPosition(featPos);  // Impulsed flying feature
 		if (!terrainMgr->CanReachAtSafe2(unit, featPos, unit->GetCircuitDef()->GetBuildDistance())) {
+			continue;
+		}
+		// Owner 2026-11-04 / 2026-11-15: no wreck in porc reach for a construction
+		// vehicle, none inside (or past) a 90% keep-out for a rez bot - the
+		// nearest such wreck would be offered again and again and never taken.
+		if (porcGuarded && ((EnemyPorcClearance(unit, featPos) < 0.f) || IsPorcPathBlocked(unit, unitPos, featPos))) {
 			continue;
 		}
 		FeatureDef* featDef;

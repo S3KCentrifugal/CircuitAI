@@ -127,7 +127,7 @@ void CEconomyManager::RefreshMexPorc() {
         const float range = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
         if (!(range > 0.f) || range > mexSafety.porcMaxRange) continue;
         const float reach = range + mexSafety.porcMargin;
-        mexPorc.push_back({p, reach * reach, reach, edef});
+        mexPorc.push_back({p, reach * reach, reach, edef, range});
     }
 }
 
@@ -192,6 +192,85 @@ float CEconomyManager::EnemyPorcClearance(const AIFloat3& pos, const std::functi
         best = std::min(best, std::sqrt(porc.pos.SqDistance2D(pos)) - porc.reach);
     }
     return best;
+}
+
+bool CEconomyManager::IsRezPorcGuarded(const CCircuitUnit* unit) {
+    if (!rezPorcKeepout.enabled || (unit == nullptr) || unit->IsDead()) return false;
+    const CCircuitDef* def = unit->GetCircuitDef();
+    if ((def == nullptr) || def->IsRoleComm() || def->IsAbleToFly()) return false;
+    auto it = rezPorcKeepout.byDef.find(def->GetId());
+    if (it == rezPorcKeepout.byDef.end()) {
+        const bool listed = rezPorcKeepout.units.count(def->GetDef()->GetName()) > 0;
+        it = rezPorcKeepout.byDef.emplace(def->GetId(), listed).first;
+    }
+    return it->second;
+}
+
+bool CEconomyManager::IsPorcGuarded(const CCircuitUnit* unit) {
+    return IsConPorcGuarded(unit) || IsRezPorcGuarded(unit);
+}
+
+float CEconomyManager::EnemyPorcClearance(const CCircuitUnit* unit, const AIFloat3& pos) {
+    if (IsRezPorcGuarded(unit)) {
+        // Owner 2026-11-15: rez bots keep out of 90% of the weapon range.
+        float best = std::numeric_limits<float>::infinity();
+        if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return best;
+        RefreshMexPorc();
+        for (const SMexPorc& porc : mexPorc) {
+            best = std::min(best, std::sqrt(porc.pos.SqDistance2D(pos)) - porc.range * rezPorcKeepout.fraction);
+        }
+        return best;
+    }
+    if (IsConPorcGuarded(unit)) return EnemyPorcClearance(pos);
+    return std::numeric_limits<float>::infinity();
+}
+
+bool CEconomyManager::IsPorcPathBlocked(const CCircuitUnit* unit, const AIFloat3& from, const AIFloat3& to) {
+    if (!IsRezPorcGuarded(unit)) return false;
+    if (!std::isfinite(from.x) || !std::isfinite(from.z) || !std::isfinite(to.x) || !std::isfinite(to.z)) return false;
+    RefreshMexPorc();
+    const float dx = to.x - from.x, dz = to.z - from.z;
+    const float lenSq = dx * dx + dz * dz;
+    for (const SMexPorc& porc : mexPorc) {
+        const float keep = porc.range * rezPorcKeepout.fraction;
+        const float keepSq = keep * keep;
+        if (porc.pos.SqDistance2D(from) < keepSq) continue;  // already inside: walking out is allowed
+        // Nearest point of the leg to the porc
+        float t = (lenSq > 1.f) ? ((porc.pos.x - from.x) * dx + (porc.pos.z - from.z) * dz) / lenSq : 0.f;
+        t = std::max(0.f, std::min(1.f, t));
+        const float px = from.x + dx * t - porc.pos.x, pz = from.z + dz * t - porc.pos.z;
+        if (px * px + pz * pz < keepSq) return true;
+    }
+    return false;
+}
+
+bool CEconomyManager::MoveOutOfPorc(CCircuitUnit* unit) {
+    if (!IsRezPorcGuarded(unit)) return false;
+    const AIFloat3 pos = unit->GetPos(circuit->GetLastFrame());
+    if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return false;
+    RefreshMexPorc();
+    const SMexPorc* deepest = nullptr;
+    float worst = 0.f;
+    for (const SMexPorc& porc : mexPorc) {
+        const float c = std::sqrt(porc.pos.SqDistance2D(pos)) - porc.range * rezPorcKeepout.fraction;
+        if (c < worst) { worst = c; deepest = &porc; }
+    }
+    if (deepest == nullptr) return false;
+    float dx = pos.x - deepest->pos.x, dz = pos.z - deepest->pos.z;
+    float len = std::sqrt(dx * dx + dz * dz);
+    if (len < 1.f) {  // on top of it: head for our start
+        const AIFloat3 home = circuit->GetSetupManager()->GetBasePos();
+        dx = home.x - deepest->pos.x; dz = home.z - deepest->pos.z;
+        len = std::max(1.f, std::sqrt(dx * dx + dz * dz));
+    }
+    const float out = deepest->range * rezPorcKeepout.fraction + 150.f;
+    AIFloat3 to(deepest->pos.x + dx / len * out, pos.y, deepest->pos.z + dz / len * out);
+    CTerrainManager::CorrectPosition(to);
+    TRY_UNIT(circuit, unit,
+        unit->CmdMoveTo(to, UNIT_CMD_OPTION, circuit->GetLastFrame() + FRAMES_PER_SEC * 30);
+    )
+    LogConPorc(unit, pos, "move out", "rez keep-out");
+    return true;
 }
 
 void CEconomyManager::LogConPorc(const CCircuitUnit* unit, const AIFloat3& pos, const char* where, const char* what) {

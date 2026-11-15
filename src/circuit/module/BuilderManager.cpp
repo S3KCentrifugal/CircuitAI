@@ -2529,6 +2529,11 @@ IBuilderTask* CBuilderManager::FindRecoveryTask(CCircuitUnit* unit, int mode, fl
             && (groupLimit == 1 || !matching->recoveryControlled || matching->IsDead()
                 || matching->GetAssignees().size() >= static_cast<size_t>(groupLimit))) continue;
         if (!terrain->CanReachAtSafe2(unit, f.pos, reach)) continue;
+        {   // Owner 2026-11-15: rez bot keep-out (no-op for other units)
+            CEconomyManager* economyMgr = circuit->GetEconomyManager();
+            if (economyMgr->IsPorcGuarded(unit) && ((economyMgr->EnemyPorcClearance(unit, f.pos) < 0.f)
+                || economyMgr->IsPorcPathBlocked(unit, pos, f.pos))) continue;
+        }
         if (continuing) {
             old->recoveryControlled = true; // re-adopt a restored native task after load
             return old;

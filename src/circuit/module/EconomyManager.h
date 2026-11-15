@@ -183,6 +183,25 @@ public:
 	float EnemyPorcClearance(const springai::AIFloat3& pos);
 	// Same, skipping the porc whose definition `skip` accepts (drone AA: carriers).
 	float EnemyPorcClearance(const springai::AIFloat3& pos, const std::function<bool (CCircuitDef*)>& skip);
+	// Rez bot porc keep-out (owner 2026-11-15): a rez bot
+	// (economy.rez_porc_keepout.units, default armrectr cornecro legrezbot)
+	// takes no reclaim or resurrect target, and walks no straight path to one,
+	// deeper than range_fraction (0.9) of the weapon range of a known enemy
+	// armed structure (seen, or a ghost not yet seen empty). Rez bots count as
+	// porc guarded, so every construction vehicle check applies to them too,
+	// with this keep-out in place of reach + porc_margin.
+	bool IsRezPorcGuarded(const CCircuitUnit* unit);
+	// IsConPorcGuarded || IsRezPorcGuarded
+	bool IsPorcGuarded(const CCircuitUnit* unit);
+	// The clearance for this unit: the rez keep-out for a rez bot, the porc
+	// reach for a construction vehicle, +inf for any other unit.
+	float EnemyPorcClearance(const CCircuitUnit* unit, const springai::AIFloat3& pos);
+	// Rez bots only: the straight leg from `from` to `to` cuts a keep-out disc.
+	// A disc that already holds `from` is skipped (the bot may walk out of it).
+	bool IsPorcPathBlocked(const CCircuitUnit* unit, const springai::AIFloat3& from, const springai::AIFloat3& to);
+	// Rez bots only: the unit stands inside a keep-out disc; moves it out
+	// (150 past the edge, away from the porc whose disc it is deepest in).
+	bool MoveOutOfPorc(CCircuitUnit* unit);
 	void LogConPorc(const CCircuitUnit* unit, const springai::AIFloat3& pos, const char* where, const char* what);
 	// D-465: a geothermal vent no claimant ground start reaches (build stance, 3D).
 	bool IsGeoAirOnly(const springai::AIFloat3& pos);
@@ -528,7 +547,13 @@ private:
 		float porcMaxRange = 1800.f; // longer-ranged structures (LRPC) are not counted
 		float threat = 1.f;          // THREAT_MIN; builder's threat layer at the spot above this is unsafe
 	} mexSafety;
-	struct SMexPorc { springai::AIFloat3 pos; float reachSq; float reach; CCircuitDef* def; };
+	struct SMexPorc { springai::AIFloat3 pos; float reachSq; float reach; CCircuitDef* def; float range; };
+	struct SRezPorcKeepout {
+		bool enabled = true;
+		float fraction = .9f;  // of the porc's weapon range
+		std::unordered_set<std::string> units;
+		std::unordered_map<int, bool> byDef;  // circuit def id -> listed (cache)
+	} rezPorcKeepout;
 	struct SConPorcSafety {
 		bool enabled = true;
 		std::unordered_set<std::string> units;

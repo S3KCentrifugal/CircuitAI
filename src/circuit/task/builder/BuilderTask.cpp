@@ -944,12 +944,16 @@ bool IBuilderTask::IsPorcBlocked(CCircuitUnit* unit) const
 	if ((buildType == BuildType::PATROL) || (buildType == BuildType::COMBAT) || (buildType == BuildType::WAIT)) return false;
 	if (IsDead() || (manager == nullptr)) return false;
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
-	if ((economyMgr == nullptr) || !economyMgr->IsConPorcGuarded(unit)) return false;
+	if ((economyMgr == nullptr) || !economyMgr->IsPorcGuarded(unit)) return false;
 	// buildPos: the site, or the frame / reclaim target where one is set;
 	// position: the order's place (area reclaim centre, guard spot)
 	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;
 	if (!geom::is_valid(spot)) return false;
-	return economyMgr->EnemyPorcClearance(spot) < 0.f;
+	if (economyMgr->EnemyPorcClearance(unit, spot) < 0.f) return true;
+	// Owner 2026-11-15: rez bots don't walk through a keep-out to reach the job
+	// either (the straight leg from where the bot stands; checked again on
+	// every Update, so a bot whose path bends into porc leaves the job).
+	return economyMgr->IsPorcPathBlocked(unit, unit->GetPos(manager->GetCircuit()->GetLastFrame()), spot);
 }
 
 bool IBuilderTask::DropIfPorc(CCircuitUnit* unit, const char* where)
@@ -962,7 +966,16 @@ bool IBuilderTask::DropIfPorc(CCircuitUnit* unit, const char* where)
 	// move order); nothing is touched then.
 	if ((unit == nullptr) || unit->IsDead() || IsDead()) return false;
 	if (unit->GetTask() != this) return false;  // reassigned: not ours to drop
-	if (!IsPorcBlocked(unit)) return false;
+	if (!IsPorcBlocked(unit)) {
+		// Owner 2026-11-15: a rez bot standing inside a keep-out (porc seen
+		// since it set out) leaves the job and walks out.
+		CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
+		if ((buildType == BuildType::PATROL) || (buildType == BuildType::COMBAT) || (buildType == BuildType::WAIT)
+			|| !economyMgr->IsRezPorcGuarded(unit)) return false;
+		const AIFloat3 at = unit->GetPos(manager->GetCircuit()->GetLastFrame());
+		if (!(economyMgr->EnemyPorcClearance(unit, at) < 0.f)) return false;
+		return LeavePorc(unit, at, where);
+	}
 	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;  // copy: Abort resets buildPos
 	return LeavePorc(unit, spot, where);
 }
@@ -976,10 +989,18 @@ bool IBuilderTask::LeavePorc(CCircuitUnit* unit, const AIFloat3& spot, const cha
 			: (buildType == BuildType::GUARD) ? "guard" : "task";
 	circuit->GetEconomyManager()->LogConPorc(unit, spot, where, what);
 	CBuilderManager* builderMgr = dynamic_cast<CBuilderManager*>(manager);
+	CEconomyManager* economyMgr = circuit->GetEconomyManager();
 	if ((units.size() > 1) && (builderMgr != nullptr)) {
 		builderMgr->LeaveTask(unit);  // others keep the job
 	} else {
 		manager->FallbackTask(unit);  // its own job: dropped, the unit patrols where it is
+	}
+	// Owner 2026-11-15: a rez bot inside a keep-out walks out of it (after the
+	// fallback, so its patrol order does not hold it there).
+	if (!unit->IsDead() && economyMgr->IsRezPorcGuarded(unit)
+		&& (economyMgr->EnemyPorcClearance(unit, unit->GetPos(circuit->GetLastFrame())) < 0.f))
+	{
+		economyMgr->MoveOutOfPorc(unit);
 	}
 	return true;  // the task may be dead now: callers must not touch it again
 }

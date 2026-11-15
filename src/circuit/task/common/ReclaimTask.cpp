@@ -65,15 +65,15 @@ bool IReclaimTask::PorcSafeArea(CCircuitUnit* unit, AIFloat3& pos, float& reclRa
 	// it shrinks to the clearance of its centre. A map-wide reclaim (no radius)
 	// is centred on the unit instead. No safe circle left: the unit leaves.
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
-	if (!economyMgr->IsConPorcGuarded(unit)) return true;
-	if (!std::isfinite(economyMgr->EnemyPorcClearance(pos))) {  // no porc known: as given, watched
+	if (!economyMgr->IsPorcGuarded(unit)) return true;  // owner 2026-11-15: rez bots too (90% keep-out)
+	if (!std::isfinite(economyMgr->EnemyPorcClearance(unit, pos))) {  // no porc known: as given, watched
 		porcAreas[unit] = std::make_pair(pos, reclRadius);
 		return true;
 	}
 	if ((radius == .0f) || !geom::is_valid(position)) {
 		pos = unit->GetPos(manager->GetCircuit()->GetLastFrame());
 	}
-	const float clearance = economyMgr->EnemyPorcClearance(pos);
+	const float clearance = economyMgr->EnemyPorcClearance(unit, pos);
 	if (clearance < SQUARE_SIZE * 4) {
 		LeavePorc(unit, pos, "reclaim");
 		return false;
@@ -87,7 +87,7 @@ bool IReclaimTask::IsPorcAreaStale(CCircuitUnit* unit)
 {
 	auto it = porcAreas.find(unit);
 	if (it == porcAreas.end()) return false;
-	const float clearance = manager->GetCircuit()->GetEconomyManager()->EnemyPorcClearance(it->second.first);
+	const float clearance = manager->GetCircuit()->GetEconomyManager()->EnemyPorcClearance(unit, it->second.first);
 	return clearance < it->second.second - SQUARE_SIZE;
 }
 

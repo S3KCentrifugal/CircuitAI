@@ -90,6 +90,23 @@ bool CBResurrectTask::Execute(CCircuitUnit* unit)
 		pos = position;
 		rezzRadius = radius;
 	}
+	// Owner 2026-11-15: a rez bot's area order must not reach into a keep-out
+	// (90% of a known porc's range): the engine walks wreck to wreck inside
+	// the circle. A map-wide order is centred on the bot; the circle shrinks
+	// to its centre's clearance; none left: the bot leaves the job.
+	CEconomyManager* economyMgr = circuit->GetEconomyManager();
+	if (economyMgr->IsRezPorcGuarded(unit)) {
+		const AIFloat3 centre = ((radius == .0f) || !geom::is_valid(position)) ? unit->GetPos(frame) : pos;
+		const float clearance = economyMgr->EnemyPorcClearance(unit, centre);
+		if (std::isfinite(clearance)) {  // no porc known: the order as given
+			pos = centre;
+			if (clearance < 0.f) {
+				LeavePorc(unit, pos, "resurrect");
+				return false;  // the task may be dead now
+			}
+			rezzRadius = std::max(8.f, std::min(rezzRadius, clearance));
+		}
+	}
 	// Owner rule: inside the reach of enemy short-ranged porc (LLT, Beamer,
 	// HLT, Twin Guard, pop-ups...; seen or ghost) the wreck is reclaimed, not
 	// resurrected - a rez takes far longer under fire and the new unit spawns
@@ -109,6 +126,13 @@ bool CBResurrectTask::Execute(CCircuitUnit* unit)
 		unit->CmdResurrectInArea(pos, rezzRadius, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 60);
 	)
 	return true;
+}
+
+bool CBResurrectTask::InKeepout(CCircuitUnit* unit, const AIFloat3& from, const AIFloat3& at) const
+{
+	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
+	return economyMgr->IsPorcGuarded(unit)
+		&& ((economyMgr->EnemyPorcClearance(unit, at) < 0.f) || economyMgr->IsPorcPathBlocked(unit, from, at));
 }
 
 bool CBResurrectTask::IsPorcReclaim(CCircuitUnit* unit, const AIFloat3& target) const
@@ -147,6 +171,9 @@ bool CBResurrectTask::Reevaluate(CCircuitUnit* unit)
 		if (enemy == nullptr) {
 			continue;
 		}
+		if (InKeepout(unit, pos, enemy->GetPos())) {
+			continue;  // owner 2026-11-15: no target inside a keep-out
+		}
 		CCircuitDef* edef = enemy->GetCircuitDef();
 		if ((edef == nullptr) || (edef->IsReclaimable()
 			&& (!edef->IsAttacker() || unit->GetCircuitDef()->IsAttrVampire())
@@ -175,6 +202,9 @@ bool CBResurrectTask::Reevaluate(CCircuitUnit* unit)
 			}
 			if (!clb->Feature_IsResurrectable(feature->GetFeatureId())) {
 				continue;
+			}
+			if (InKeepout(unit, pos, featPos)) {
+				continue;  // owner 2026-11-15: no wreck inside a keep-out, nor past one
 			}
 			FeatureDef* featDef = feature->GetDef();
 			float reclaimValue = featDef->GetContainedResource(metalRes)/* * feature->GetReclaimLeft()*/;
