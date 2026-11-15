@@ -30,6 +30,7 @@
 #include "../../systems/construction/front_agitator_counter.as"
 #include "../../systems/construction/front_porc_cluster_counter.as"
 #include "../../systems/construction/front_silo_grid.as"
+#include "../../systems/construction/silo_antinukes.as"
 #include "../../systems/construction/front_long_aa.as"
 #include "../../systems/construction/front_layout.as"
 #include "../../systems/production/front_factory_support.as"
@@ -715,6 +716,9 @@ namespace RoleFront {
         // Owner (2026-10-19): after losing the base, retake the mexes first (Front::Recovery)
         IUnitTask@ recovery=FrontRecovery::Work(builder);
         if (recovery !is null) return recovery;
+        // Owner (2026-11-15): one antinuke per scouted enemy silo, the first covering the main base and the front, the rest in a tight block beside it (silo_antinukes.as)
+        IUnitTask@ antiNuke=SiloAntiNukes::FrontWork(builder);
+        if (antiNuke !is null) return antiNuke;
         // Owner (2026-10-25): a T2 lab's turrets from the moment it is framed (front_factory_nanos.as)
         IUnitTask@ labNano=FrontFactoryNanos::Work(builder);
         if (labNano !is null) return labNano;
