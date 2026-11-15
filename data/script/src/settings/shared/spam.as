@@ -73,12 +73,23 @@ namespace Spam {
         // edge pulled straight in, up to RimDepth, to ground the spam unit can reach;
         // the back edge is the rim behind the median enemy start, nearer an enemy start
         // than any allied one and within RimBackReach of an enemy start. The walk along
-        // it steps over RimGapSamples unplayable samples. Off: the rectangle corners.
+        // it steps over RimGapSamples unplayable samples, or playable ones off the back
+        // that are not an ally's (a map corner past RimBackReach). Off: the rectangle corners.
         bool RimEnabled = true;
         float RimStep = 256.0f;
         float RimDepth = 1536.0f;
         float RimBackReach = 2000.0f;
         int RimGapSamples = 3;
+        // owner, 2026-11-08 (The Tartar Steppe): past RimGapSamples the walk still
+        // bridges a pocket of up to RimBridgeSamples to a back sample within
+        // RimBridgeReach of its last one (an unreachable corner, the rim either side
+        // pulled in close together). A long sea or cliff run stays a stop.
+        int RimBridgeSamples = 8;
+        float RimBridgeReach = 1600.0f;
+        // owner, 2026-10-26: after the jackknife to the back edge's far corner, every
+        // lane (edge lanes, gantries, FRONT and TECH pumps) runs back along the same
+        // edge: its middle, then its other corner (nearest where the lane reached it).
+        bool RimReturnEnabled = true;
         // owner, 2026-10-26 (host lag delays AI orders): every T3 gantry, any role, is
         // a lag fallback (systems/production/gantry_fallback.as). GantryLagRepeat: the
         // engine repeats its last product until the AI's next order arrives (each order

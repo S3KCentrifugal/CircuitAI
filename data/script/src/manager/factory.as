@@ -8,6 +8,7 @@
 #include "builder.as"
 #include "../systems/team/ferry.as"
 #include "../systems/production/gantry_fallback.as"
+#include "../systems/production/rez_replenish.as"
 
 namespace Factory {
 
@@ -164,6 +165,8 @@ namespace Factory {
 		@t = BattleGroupAir::Produce(u);   // D-509: the anti-air escort a battle group is short of
 		if (t !is null) return t;
 		@t = BattleGroupCrew::Produce(u);  // D-514: the repair bot a battle group is short of
+		if (t !is null) return t;
+		@t = RezReplenish::FactoryMakeTask(u);   // owner, 2026-10-26: T1 bot labs keep rez bots up once the army is big
 		if (t !is null) return t;
 		@t = SeaCoast::Produce(u);
 		if (t is null) @t = Spam::FactoryMakeTask(u);   // coastal recovery owns its land labs
