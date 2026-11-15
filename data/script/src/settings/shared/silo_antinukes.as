@@ -25,6 +25,9 @@ namespace SiloAntiNukes {
         // Order: only a builder within OrderRadius of the slot for NearOnlySeconds, then any.
         float OrderRadius = 1500.0f;
         int NearOnlySeconds = 45;
+        // A builder that cannot build the antinuke (rez bot, T1 constructor) recruits the nearest
+        // capable one at most this often; an order with nobody on it this long gets one too.
+        int RecruitSeconds = 20;
         // First antinuke: 10 s minimum income. After RelaxSeconds with a silo known and
         // no antinuke, the gate halves so a FRONT short of energy is never left bare.
         float FirstMetalIncome = 25.0f;
