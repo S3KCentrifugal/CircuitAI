@@ -62,6 +62,7 @@ namespace SiloAntiNukes {
         float AirCoreRadius = 800.0f;            // = Air::AntiNukeCoreRadius (INV-094)
         float MapEdgeMargin = 96.0f;             // beyond half the footprint
         int PeripherySpokes = 24;
+        float PeripheryMaxForward = 0.25f;       // cos of the angle to the enemy axis; enemy-facing pads only as a last resort
         float PeripheryStep = 128.0f;
     }
 }

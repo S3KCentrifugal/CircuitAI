@@ -212,6 +212,14 @@ namespace SiloAntiNukes {
     IUnitTask@ pending = null;
     int pendingSlot = -1, pendingFrame = 0;
     int nextSearch = 0, searchFails = 0, nextHeld = -1000000, nextRecruit = -1000000, nearFrom = -1;
+    int recruitId = -1, recruitTries = 0, nextNote = -1000000;
+    // a note with its own rate limit, so it never hides the Held reason that follows
+    void Note(const string &in why)
+    {
+        if (ai.frame - nextNote < 120 * SECOND) return;
+        nextNote = ai.frame;
+        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] note: " + why, 1);
+    }
 
     // The nearest finished builder of ours (no commander, no player-held unit, none on a factory,
     // silo or antinuke order) that can build d and reach `near`; null when there is none.
@@ -230,8 +238,9 @@ namespace SiloAntiNukes {
                 if (w.task.GetType() == int(Task::Type::PLAYER)) continue;
                 if (w.task is pending || w.task is padPending) continue;
                 IBuilderTask@ bt = cast<IBuilderTask>(w.task);
+                // played (v3): a builder taken off a frame went straight back to it
                 if (bt !is null && (bt.GetBuildType() == int(Task::BuildType::FACTORY) || bt.GetBuildType() == int(Task::BuildType::BIG_GUN)
-                    || (bt.buildDef !is null && bt.buildDef is d))) continue;
+                    || (bt.buildDef !is null && bt.buildDef is d) || bt.target !is null)) continue;
             }
             const float dd = MapHelpers::SqDist(w.GetPos(ai.frame), near);
             if (dd >= bestD || !aiTerrainMgr.CanReachAt(w, near, w.circuitDef.GetBuildDistance())) continue;
@@ -244,9 +253,11 @@ namespace SiloAntiNukes {
     // and dropped unframed after 120 s). FRONT asks this first.
     IUnitTask@ Keep(CCircuitUnit@ u)
     {
-        if (u is null || u.task is null) return null;
-        if (pending !is null && !pending.IsDead() && u.task is pending) return pending;
-        if (padPending !is null && !padPending.IsDead() && u.task is padPending) return padPending;
+        if (u is null) return null;
+        // played (v3): a recruit was handed back by native within 20 s (77 recruits, 21 started);
+        // a recruit returns to its order whatever native gave it meanwhile
+        if (pending !is null && !pending.IsDead() && ((u.task !is null && u.task is pending) || u.id == recruitId)) return pending;
+        if (padPending !is null && !padPending.IsDead() && ((u.task !is null && u.task is padPending) || u.id == padRecruitId)) return padPending;
         return null;
     }
 
@@ -419,8 +430,10 @@ namespace SiloAntiNukes {
                 if (pending.GetUnits().length() == 0 && tracked && ai.frame - pendingFrame >= Global::SiloAntiNukes::RecruitSeconds * SECOND
                         && ai.frame >= nextRecruit) {
                     nextRecruit = ai.frame + Global::SiloAntiNukes::RecruitSeconds * SECOND;
-                    CCircuitUnit@ w = Capable(d, aiTerrainMgr.GetReservationPos(slots[pendingSlot]));
+                    CCircuitUnit@ w = recruitId >= 0 ? ai.GetTeamUnit(recruitId) : null;
+                    if (w is null || ++recruitTries > 3) { @w = Capable(d, aiTerrainMgr.GetReservationPos(slots[pendingSlot])); recruitTries = 0; }
                     if (w !is null) {
+                        recruitId = w.id;
                         aiBuilderMgr.AssignTask(w, pending);
                         GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] unattended order on slot " + pendingSlot + ": recruited "
                             + w.circuitDef.GetName() + " " + w.id, 1);
@@ -444,7 +457,7 @@ namespace SiloAntiNukes {
         // (first antinuke 25 min after the silo). Ours goes ahead; a late finish of the other
         // overshoots by at most one.
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0)
-            Held(d.GetName() + " also queued by another rule; ordering ours anyway (" + have + " of " + want + ")");
+            Note(d.GetName() + " also queued by another rule; ordering ours anyway (" + have + " of " + want + ")");
         const float mi = Economy::GetMinMetalIncomeLast10s(), ei = Economy::GetMinEnergyIncomeLast10s();
         float gm = have == 0 ? Global::SiloAntiNukes::FirstMetalIncome : Global::SiloAntiNukes::ExtraMetalIncome;
         float ge = have == 0 ? Global::SiloAntiNukes::FirstEnergyIncome : Global::SiloAntiNukes::ExtraEnergyIncome;
@@ -493,6 +506,7 @@ namespace SiloAntiNukes {
             if (t is null) { Park(int(s), "could not pin " + d.GetName()); return null; }
             @pending = t;
             nearFrom = -1;
+            recruitId = b is u ? -1 : b.id; recruitTries = 0;
             pendingSlot = int(s); pendingFrame = ai.frame;
             GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
                 + " silos known) on block slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
@@ -510,7 +524,7 @@ namespace SiloAntiNukes {
     **************************************************************************/
     array<int> padSlots;
     IUnitTask@ padPending = null;
-    int padNextSearch = 0, padHeldAt = -1000000, padNextRecruit = -1000000;
+    int padNextSearch = 0, padHeldAt = -1000000, padNextRecruit = -1000000, padRecruitId = -1;
     void PadHeld(const string &in why)
     {
         if (ai.frame - padHeldAt < 60 * SECOND) return;
@@ -536,6 +550,9 @@ namespace SiloAntiNukes {
         float bestScore = -1e30f;
         int offMap = 0, ally = 0, refused = 0;
         const int spokes = AiMax(8, Global::SiloAntiNukes::PeripherySpokes);
+        // played (v3): an AIR pad 1,081 straight toward the enemy lost its frames for 10 min.
+        // First pass: no pad on the enemy-facing side (forward share above PeripheryMaxForward).
+        for (int pass = 0; pass < 2 && best.x < 0.0f; ++pass)
         for (float r = outer; r >= inner - 1.0f; r -= Global::SiloAntiNukes::PeripheryStep) {
             for (int k = 0; k < spokes; ++k) {
                 const float ang = 6.2831853f * float(k) / float(spokes);
@@ -548,6 +565,7 @@ namespace SiloAntiNukes {
                 for (uint i = 0; i < others.length(); ++i) spread = AiMin(spread, Dist(c, others[i]));
                 // away from the enemy: a pad on the rear or flank lives longer
                 const float forward = cx * axis.x + cz * axis.z;
+                if (pass == 0 && forward > Global::SiloAntiNukes::PeripheryMaxForward) continue;
                 const float score = spread - forward * 400.0f + r * 0.1f;
                 if (score <= bestScore) continue;
                 if (!aiTerrainMgr.CanReserveArea(c, 0, half + 32.0f, half + 32.0f)
@@ -591,7 +609,7 @@ namespace SiloAntiNukes {
         if (d is null) @d = ai.GetCircuitDef(UnitHelpers::GetAntiNukeNameForSide(Global::AISettings::Side));
         if (d is null || !d.IsAvailable(ai.frame)) { PadHeld("no available antinuke"); return null; }
         if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0)
-            PadHeld(d.GetName() + " also queued by another rule; ordering ours anyway");
+            Note(d.GetName() + " also queued by another rule; ordering ours anyway (periphery)");
         if (mi < metalGate || ei < energyGate) {
             PadHeld("antinuke " + (have + 1) + " of " + want + ": income +" + int(mi) + "/+" + int(ei) + " below +" + int(metalGate) + "/+" + int(energyGate));
             return null;
@@ -617,6 +635,7 @@ namespace SiloAntiNukes {
         IUnitTask@ t = Order(b, d, slot);
         if (t is null) return null;
         @padPending = t;
+        padRecruitId = b is u ? -1 : b.id;
         const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
         GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
             + " silos known) on periphery pad " + slot + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
