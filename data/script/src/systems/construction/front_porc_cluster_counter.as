@@ -312,7 +312,12 @@ namespace FrontPorcClusterCounter {
                 }
                 if (n == 0) continue;
                 if (vehicle && (clear < vmargin || GunClear(p, near) < vmargin)) continue;
-                const float score = float(n) * 10000.0f + AiMin(clear, 300.0f) * 4.0f - (along * along + across * across) * 0.001f;
+                // vehicles: the most clearance from enemy guns first, since native's site search can move the build
+                // ~200 elmos (headless 11-14: corcv corpun ordered at (5832,5967), native placed it at (5872,5776)
+                // inside an enemy gun's reach and dropped it); others: most cluster turrets held first
+                const float gclear = vehicle ? AiMin(GunClear(p, near), 600.0f) : 0.0f;
+                const float score = vehicle ? (gclear * 100.0f + float(n) * 10.0f)
+                    : (float(n) * 10000.0f + AiMin(clear, 300.0f) * 4.0f - (along * along + across * across) * 0.001f);
                 if (score <= bestScore) continue;
                 if (!aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) continue;
                 bestScore = score; best = p; held = n;
