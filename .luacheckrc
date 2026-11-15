@@ -33,6 +33,8 @@ files["tools/widgets/*.lua"] = { read_globals = luaui, globals = { "widget" } }
 files["tools/widgets/include/*.lua"] = { read_globals = luaui, globals = { "isPermittedTeam", "field", "dialogUI", "territory" } }
 -- Watchers carry __NAME__ placeholders the playtest runner replaces when it stages them.
 files["tools/playtest/widgets/*.lua"] = { read_globals = luaui, globals = { "widget" }, ignore = { "113/__.+__" } }
+-- The spam lane runner's watcher (#64) is a staged playtest widget like the ones above.
+files["tools/playtest/spam_lanes/*.lua"] = { read_globals = luaui, globals = { "widget" }, ignore = { "113/__.+__" } }
 -- The offline lane UI harness builds the widget environment itself.
 files["tools/playtest/fixtures/*.lua"] = { allow_defined_top = true, globals = luaui }
 -- The upstream debug gadgets share functions through file-level globals.

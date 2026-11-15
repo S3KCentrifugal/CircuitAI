@@ -143,7 +143,10 @@ namespace Lanes {
             if (b >= 0) known = true;
             if (b == 1) boxed.insertLast(all[i]);
         }
-        return (known && boxed.length() > 0) ? boxed : all;
+        // owner, 2026-11-07: a box that keeps fewer spots than the enemy has teams
+        // does not fit the map (Spam::EnemyStartSpots already chose for it)
+        const bool fits = int(boxed.length()) >= ai.GetEnemyTeamSize();
+        return (known && boxed.length() > 0 && fits) ? boxed : all;
     }
 
     // D-459/D-460: the point a district role's factories face before a lane
@@ -158,6 +161,9 @@ namespace Lanes {
             const array<AIFloat3> spots = Spam::EnemyStartSpots();
             for (uint i = 0; i < spots.length(); ++i)
                 if (aiSetupMgr.EnemyStartBoxAt(spots[i]) == 1) enemies.insertLast(spots[i]);
+            // owner, 2026-11-07: a box that does not fit the map's spots (fewer
+            // than the enemy's teams) - EnemyStartSpots' furthest-spot choice
+            if (int(enemies.length()) < ai.GetEnemyTeamSize()) enemies = spots;
         }
         AIFloat3 goal(float(AiTerrainWidth()) * 0.5f, 0.f, float(AiTerrainHeight()) * 0.5f);
         float best = -1.f;

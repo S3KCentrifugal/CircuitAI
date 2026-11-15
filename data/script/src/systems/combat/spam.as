@@ -102,6 +102,21 @@ namespace Spam {
     // asks every few seconds produces one line, not hundreds.
     dictionary rejectByFactory;    // factory id string -> last reason logged
     int lastIdleReportFrame = -1;
+    // owner, 2026-10-28: the rez lab (RezReplenish SecondLab) fills in with spam on the lane of the
+    // AI's first pump, "repeat order, same calculated path": follower factory id -> lead factory id.
+    // A follower gets no spread lane of its own; its units join the lead's route task and its factory
+    // route is the lead's lane drawn from the follower. Set by RezReplenish only.
+    dictionary laneLead;
+
+    // The lane key a factory's pump runs: the lead's while it lives and has a route, else its own.
+    string _LaneKey(const string &in key)
+    {
+        int lead = -1;
+        if (laneLead.getSize() == 0 || !laneLead.get(key, lead)) return key;
+        const string lk = "" + lead;
+        if (ai.GetTeamUnit(lead) is null || !routeByFactory.exists(lk)) return key;
+        return lk;
+    }
 
     bool IsEnabled()
     {
@@ -288,6 +303,7 @@ namespace Spam {
     {
         array<string>@ keys = repeatTask.getKeys();
         array<CCircuitUnit@> labs;
+        array<CCircuitUnit@> followers;   // laneLead: they run their lead's lane, no spread lane of their own
         for (uint i = 0; i < keys.length(); ++i) {
             CCircuitUnit@ f = ai.GetTeamUnit(int(parseInt(keys[i])));
             IUnitTask@ task;
@@ -298,12 +314,19 @@ namespace Spam {
             if (!enabled || Lifecycle::IsRetiring(f) || Team::Recovery::WantsFactory(f)) {
                 repeatTask.delete(keys[i]); task.Abort(); continue;
             }
+            const string lk = _LaneKey(keys[i]);
+            if (lk == keys[i] && laneLead.exists(keys[i])) {
+                // its lead is gone: stop it; asked again, it pumps on a lane of its own
+                laneLead.delete(keys[i]);
+                repeatTask.delete(keys[i]); task.Abort(); continue;
+            }
             CRouteTask@ route;
-            if (!routeByFactory.get(keys[i], @route) || route is null || route.GetRouteSize() == 0)
+            if (!routeByFactory.get(lk, @route) || route is null || route.GetRouteSize() == 0)
                 Invariants::Violation("INV-157", keys[i], "repeating spam factory lacks a reachable MOVE route");
             CCircuitDef@ d = ai.GetCircuitDef(SpamUnitFor(f.circuitDef));
             if (d !is null && d.maxThisUnit < d.count + 50) d.maxThisUnit = d.count + 50;
-            labs.insertLast(f);
+            if (lk == keys[i]) labs.insertLast(f);
+            else followers.insertLast(f);
         }
         // O(F^2) stable ordering is bounded by MaxLabs (6), never unit count.
         // Geometry only changes on new labs/front displacement; equality in
@@ -314,6 +337,14 @@ namespace Spam {
             int previous = -1;
             if (!factoryVersion.get(key, previous) || previous != routesVersion) {
                 labs[i].CmdFactoryRoute(RouteOf(labs[i]));
+                factoryVersion.set(key, routesVersion);
+            }
+        }
+        for (uint i = 0; i < followers.length(); ++i) {
+            const string key = "" + followers[i].id;
+            int previous = -1;
+            if (!factoryVersion.get(key, previous) || previous != routesVersion) {
+                followers[i].CmdFactoryRoute(_RouteOfKey(_LaneKey(key), followers[i].GetPos(ai.frame)));
                 factoryVersion.set(key, routesVersion);
             }
         }
@@ -361,18 +392,54 @@ namespace Spam {
         for (uint i = 0; i < allies.length(); ++i) {
             if (allies[i].spotIndex >= 0) taken.set("" + allies[i].spotIndex, true);
         }
-        array<float> dist;
+        // Owner, 2026-11-07 (All That Glitters, live): the lobby's start boxes
+        // need not fit the map's spots - left/right half boxes on a top/bottom
+        // map kept 2 of the 8 enemy spots, so the back-edge rim walk (needs an
+        // enemy start within RimBackReach) stopped a third of the way along and
+        // the return leg's "far corner" was planned at x 2248 of 6144. When the
+        // box keeps fewer spots than the enemy has teams, it does not describe
+        // where they start: take the untaken spots furthest from our team instead.
+        array<int> free, boxed;
         for (uint i = 0; i < spots.length(); ++i) {
             if (taken.exists("" + i)) continue;
-            if (aiSetupMgr.EnemyStartBoxAt(spots[i].pos) == 0) continue;
-            const float d = MapHelpers::SqDist(Global::Map::StartPos, spots[i].pos);
+            free.insertLast(int(i));
+            if (aiSetupMgr.EnemyStartBoxAt(spots[i].pos) != 0) boxed.insertLast(int(i));
+        }
+        const int enemies = ai.GetEnemyTeamSize();
+        array<int>@ pick = @boxed;
+        if (enemies > 0 && int(boxed.length()) < enemies && int(free.length()) > int(boxed.length())) {
+            float cx = Global::Map::StartPos.x, cz = Global::Map::StartPos.z;
+            for (uint i = 0; i < allies.length(); ++i) { cx += allies[i].startPos.x; cz += allies[i].startPos.z; }
+            const AIFloat3 c(cx / float(allies.length() + 1), 0.0f, cz / float(allies.length() + 1));
+            array<float> far;
+            array<int> order;
+            for (uint i = 0; i < free.length(); ++i) {
+                const float d = MapHelpers::SqDist(c, spots[free[i]].pos);
+                uint pos = 0;
+                while (pos < far.length() && far[pos] >= d) ++pos;
+                order.insertAt(pos, free[i]);
+                far.insertAt(pos, d);
+            }
+            if (int(order.length()) > enemies) order.resize(uint(enemies));
+            @pick = @order;
+            if (!boxMismatchLogged) {
+                boxMismatchLogged = true;
+                GenericHelpers::LogUtil("[Spam] enemy start box holds " + boxed.length() + " of " + free.length()
+                    + " free map spots for " + enemies + " enemy team(s): using the " + order.length() + " spots furthest from us", 1);
+            }
+        }
+        array<float> dist;
+        for (uint k = 0; k < pick.length(); ++k) {
+            const AIFloat3 q = spots[pick[k]].pos;
+            const float d = MapHelpers::SqDist(Global::Map::StartPos, q);
             uint pos = 0;
             while (pos < dist.length() && dist[pos] <= d) ++pos;
-            result.insertAt(pos, spots[i].pos);
+            result.insertAt(pos, q);
             dist.insertAt(pos, d);
         }
         return result;
     }
+    bool boxMismatchLogged = false;
 
     AIFloat3 _MirrorOfStart()
     {
@@ -596,8 +663,8 @@ namespace Spam {
     bool RimFinish(array<AIFloat3>@ route, CCircuitDef@ d, const AIFloat3 &in from, const string &in key, const AIFloat3 &in lanePoint)
     {
         if (!Global::Spam::EnemyCornerEnabled || route is null || route.length() == 0) return false;
-        AIFloat3 end, turn, s, e;
-        if (!EdgeLanes::Ends(s, e) || !EdgeLanes::RimEnds(d, from, lanePoint, 0, key, end, turn)) return false;
+        AIFloat3 end, turn, mid, home, s, e;
+        if (!EdgeLanes::Ends(s, e) || !EdgeLanes::RimEnds(d, from, lanePoint, 0, key, end, turn, mid, home)) return false;
         const float ax = e.x - s.x, az = e.z - s.z;
         const float endAlong = (end.x - s.x) * ax + (end.z - s.z) * az;
         const AIFloat3 last = route[route.length() - 1];
@@ -608,13 +675,16 @@ namespace Spam {
         }
         route.insertLast(end);
         if (turn.x >= 0.0f) route.insertLast(turn);
+        if (mid.x >= 0.0f) route.insertLast(mid);      // owner, 2026-10-26: back along the back edge
+        if (home.x >= 0.0f) route.insertLast(home);
         const AIFloat3 c = (turn.x >= 0.0f) ? turn : end;
-        const string text = "" + int(end.x) + "," + int(end.z) + "|" + int(c.x) + "," + int(c.z);
+        const string text = "" + int(end.x) + "," + int(end.z) + "|" + int(c.x) + "," + int(c.z) + "|" + int(home.x) + "," + int(home.z);
         string was = "";
         if (key.length() == 0 || !rimLogged.get(key, was) || was != text) {
             if (key.length() > 0) rimLogged.set(key, text);
             GenericHelpers::LogUtil("[Spam] lane " + (key.length() > 0 ? key : "edge") + " ends at (" + int(end.x) + "," + int(end.z)
-                + "); enemy corner (" + int(c.x) + "," + int(c.z) + ") on the playable rim (was (" + int(last.x) + "," + int(last.z) + "))", 1);
+                + "); enemy corner (" + int(c.x) + "," + int(c.z) + ") on the playable rim (was (" + int(last.x) + "," + int(last.z) + "))"
+                + ((home.x >= 0.0f) ? ("; back via (" + int(mid.x) + "," + int(mid.z) + ") to (" + int(home.x) + "," + int(home.z) + ")") : ""), 1);
         }
         return true;
     }
@@ -656,37 +726,56 @@ namespace Spam {
                 if (key.length() > 0) cornerPick.set(key, pick);
             }
         }
-        const string ck = key + "|" + pick;
-        float cx = 0.0f, cz = 0.0f;
-        AIFloat3 c;
-        if (key.length() > 0 && cornerX.get(ck, cx) && cornerZ.get(ck, cz)) {
-            c = AIFloat3(cx, 0.0f, cz);
-        } else {
-            const float along = (pick == 1) ? size - m : m;
-            const AIFloat3 raw = acrossX ? AIFloat3(back, 0.0f, along) : AIFloat3(along, 0.0f, back);
-            // In from the corner three ways - along the back edge, along the side
-            // edge toward our side, and toward the map centre - and keep the
-            // playable point nearest the corner. Played 2026-10-24 (Kings Assault):
-            // the centre ray alone stopped 2400 elmos short of an unplayable corner
-            const float other = (pick == 1) ? m : size - m;
-            const float home = (back > (acrossX ? w : h) * 0.5f) ? m : (acrossX ? w : h) - m;
-            array<AIFloat3> toward = {
-                acrossX ? AIFloat3(back, 0.0f, other) : AIFloat3(other, 0.0f, back),
-                acrossX ? AIFloat3(home, 0.0f, along) : AIFloat3(along, 0.0f, home),
-                AIFloat3(w * 0.5f, 0.0f, h * 0.5f) };
-            c = AIFloat3(-1.0f, 0.0f, -1.0f);
-            for (uint i = 0; i < toward.length(); ++i) {
-                const AIFloat3 q = EdgeLanes::PullIn(d, from, raw, toward[i]);
-                if (q.x >= 0.0f && (c.x < 0.0f || MapHelpers::SqDist(q, raw) < MapHelpers::SqDist(c, raw))) c = q;
-            }
-            if (key.length() > 0) { cornerX.set(ck, c.x); cornerZ.set(ck, c.z); }
+        bool fresh = false;
+        const AIFloat3 c = BackCorner(d, from, key, pick, acrossX, back, size, fresh);
+        if (fresh)
             GenericHelpers::LogUtil("[Spam] lane " + (key.length() > 0 ? key : "edge") + " ends at (" + int(last.x) + "," + int(last.z)
                 + "); enemy corner (" + int(c.x) + "," + int(c.z) + ")" + (random ? " picked at random (lane ends mid-map)" : "")
                 + (c.x < 0.0f ? ": no playable ground, lane unchanged" : ""), 1);
-        }
         // no playable ground there, or the lane already ends at that corner
         if (c.x < 0.0f || MapHelpers::SqDist(c, last) < 400.0f * 400.0f) return;
         route.insertLast(c);
+        // owner, 2026-10-26: then back along the back edge, its middle pulled in toward
+        // the map centre, to its other corner (the one nearest where the lane reached it)
+        if (!Global::Spam::RimReturnEnabled) return;
+        const AIFloat3 o = BackCorner(d, from, key, 1 - pick, acrossX, back, size, fresh);
+        if (o.x < 0.0f || MapHelpers::SqDist(o, c) < 400.0f * 400.0f) return;
+        const AIFloat3 rawMid = acrossX ? AIFloat3(back, 0.0f, size * 0.5f) : AIFloat3(size * 0.5f, 0.0f, back);
+        const AIFloat3 mid = EdgeLanes::PullIn(d, from, rawMid, AIFloat3(w * 0.5f, 0.0f, h * 0.5f));
+        if (mid.x >= 0.0f && MapHelpers::SqDist(mid, c) > 400.0f * 400.0f && MapHelpers::SqDist(mid, o) > 400.0f * 400.0f)
+            route.insertLast(mid);
+        route.insertLast(o);
+    }
+    // The enemy back edge's corner `pick` (0 low, 1 high), pulled in until playable and
+    // reachable from `from`; cached by the lab's key (`fresh`: just computed). x < 0: none.
+    AIFloat3 BackCorner(CCircuitDef@ d, const AIFloat3 &in from, const string &in key, int pick, bool acrossX, float back, float size, bool &out fresh)
+    {
+        fresh = false;
+        const string ck = key + "|" + pick;
+        float cx = 0.0f, cz = 0.0f;
+        if (key.length() > 0 && cornerX.get(ck, cx) && cornerZ.get(ck, cz)) return AIFloat3(cx, 0.0f, cz);
+        fresh = true;
+        const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
+        const float m = Global::Spam::MapMargin;
+        const float along = (pick == 1) ? size - m : m;
+        const AIFloat3 raw = acrossX ? AIFloat3(back, 0.0f, along) : AIFloat3(along, 0.0f, back);
+        // In from the corner three ways - along the back edge, along the side
+        // edge toward our side, and toward the map centre - and keep the
+        // playable point nearest the corner. Played 2026-10-24 (Kings Assault):
+        // the centre ray alone stopped 2400 elmos short of an unplayable corner
+        const float other = (pick == 1) ? m : size - m;
+        const float home = (back > (acrossX ? w : h) * 0.5f) ? m : (acrossX ? w : h) - m;
+        array<AIFloat3> toward = {
+            acrossX ? AIFloat3(back, 0.0f, other) : AIFloat3(other, 0.0f, back),
+            acrossX ? AIFloat3(home, 0.0f, along) : AIFloat3(along, 0.0f, home),
+            AIFloat3(w * 0.5f, 0.0f, h * 0.5f) };
+        AIFloat3 c(-1.0f, 0.0f, -1.0f);
+        for (uint i = 0; i < toward.length(); ++i) {
+            const AIFloat3 q = EdgeLanes::PullIn(d, from, raw, toward[i]);
+            if (q.x >= 0.0f && (c.x < 0.0f || MapHelpers::SqDist(q, raw) < MapHelpers::SqDist(c, raw))) c = q;
+        }
+        if (key.length() > 0) { cornerX.set(ck, c.x); cornerZ.set(ck, c.z); }
+        return c;
     }
 
     AIFloat3 ReachableNear(CCircuitDef@ def, const AIFloat3 &in from, const AIFloat3 &in desired)
@@ -769,7 +858,7 @@ namespace Spam {
         if (factory is null) return null;
         const string key = "" + factory.id;
         CRouteTask@ task = null;
-        if (routeByFactory.get(key, @task) && task !is null) return task;
+        if (routeByFactory.get(_LaneKey(key), @task) && task !is null) return task;   // a follower: its lead's
 
         _EnsureFocus();
         array<AIFloat3> points = _RouteOfKey(key, factory.GetPos(ai.frame));
@@ -917,6 +1006,7 @@ namespace Spam {
         CCircuitUnit@ factory = null;
         int saved = -1;
         if (producerOf.get(ukey, saved)) fid = saved;
+        if (laneLead.getSize() > 0) fid = int(parseInt(_LaneKey("" + fid)));   // a follower's units run its lead's lane
         if (routeByFactory.exists("" + fid)) @factory = ai.GetTeamUnit(fid);
         if (factory is null) {
             // A known non-spam producer's raiders remain ordinary combat.
@@ -973,6 +1063,7 @@ namespace Spam {
         for (int i = 0; i < 2; ++i) { cornerX.delete(key + "|" + i); cornerZ.delete(key + "|" + i); }
         repeatTask.delete(key);
         factoryVersion.delete(key);
+        laneLead.delete(key);
     }
 
     void OnTaskRemoved(IUnitTask@ task)

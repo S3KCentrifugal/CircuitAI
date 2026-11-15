@@ -37,6 +37,7 @@
 
 #include <regex>
 #include <random>
+#include <cmath>
 
 namespace circuit {
 
@@ -187,7 +188,7 @@ void CSetupManager::ParseScriptStarts()
 	// Direct fields: [team0] { startposx=...; allyteam=...; }, [ai1] { team=1; },
 	// [player0] { team=2; spectator=1; }. A plain scan: std::regex threw on this
 	// compiler ("Invalid range in '{}'") and the AI failed to start.
-	auto trim = [](std::string s) {
+	auto trim = [](const std::string& s) {
 		const size_t b = s.find_first_not_of(" \t\r\n");
 		const size_t e = s.find_last_not_of(" \t\r\n");
 		return (b == std::string::npos) ? std::string() : s.substr(b, e - b + 1);
@@ -255,6 +256,11 @@ void CSetupManager::ParseScriptStarts()
 			unplaced[id] = st;
 		} else if ((name.rfind("ai", 0) == 0) && vals.count("team")) {
 			playing.insert(std::atoi(vals["team"].c_str()));
+			if (vals.count("shortname")) {
+				std::string sn = vals["shortname"];
+				std::transform(sn.begin(), sn.end(), sn.begin(), ::tolower);
+				scriptAIShortNames[std::atoi(vals["team"].c_str())] = sn;
+			}
 		} else if ((name.rfind("player", 0) == 0) && vals.count("team")
 			&& !(vals.count("spectator") && (std::atoi(vals["spectator"].c_str()) != 0)))
 		{
@@ -301,6 +307,49 @@ bool CSetupManager::IsScriptStartEnemy(int i)
 bool CSetupManager::CanChooseStartPos() const
 {
 	return setupData->CanChooseStartPos();
+}
+
+bool CSetupManager::IsChooseInGame() const
+{
+	return setupData->IsInitialized() && setupData->IsChooseInGame();
+}
+
+std::vector<int> CSetupManager::GetAllySameAITeams()
+{
+	ParseScriptStarts();
+	std::string own;
+	springai::SkirmishAI* skirm = circuit->GetSkirmishAI();
+	if (skirm != nullptr) {
+		springai::Info* info = skirm->GetInfo();
+		const char* sn = info->GetValueByKey("shortName");
+		own = (sn != nullptr) ? sn : "";
+		delete info;
+	}
+	std::transform(own.begin(), own.end(), own.begin(), ::tolower);
+	std::vector<int> result;  // scriptTeams is in team id order
+	for (const SScriptTeam& t : scriptTeams) {
+		if (t.allyTeam != circuit->GetAllyTeamId()) {
+			continue;
+		}
+		auto it = scriptAIShortNames.find(t.team);
+		if ((it != scriptAIShortNames.end()) && (it->second == own)) {
+			result.push_back(t.team);
+		}
+	}
+	return result;
+}
+
+bool CSetupManager::SendStartPos(const AIFloat3& pos)
+{
+	if (!IsChooseInGame() || !std::isfinite(pos.x) || !std::isfinite(pos.z)) {
+		return false;
+	}
+	AIFloat3 p = pos;
+	CTerrainManager::CorrectPosition(p);
+	p.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
+	circuit->GetGame()->SendStartPosition(false, p);
+	circuit->LOG("START PICK: sent start position (%.0f, %.0f)", p.x, p.z);
+	return true;
 }
 
 void CSetupManager::PickStartPos(StartPosType type)
@@ -445,7 +494,7 @@ bool CSetupManager::PickCommander()
 	if (commChoice == nullptr) {
 		for (CCircuitDef& cdef : circuit->GetCircuitDefs()) {
 			std::string lvl1 = cdef.GetDef()->GetName();
-			if ((lvl1.find(commPrefix) != 0) || (lvl1.find(commSuffix) != lvl1.size() - 5)) {
+			if (!lvl1.starts_with(commPrefix) ||(lvl1.find(commSuffix) != lvl1.size() - 5)) {
 				continue;
 			}
 
