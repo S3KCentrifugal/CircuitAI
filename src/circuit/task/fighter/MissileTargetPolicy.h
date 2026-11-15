@@ -4,11 +4,8 @@
 namespace circuit {
 // 2026-11-07 (@Barscrewl): Tremor (cortrem) runs the Ambassador rules too
 // (except the snipe sequence: it outranges those threats; ghost fire is timed).
-// 2026-11-14 (@Barscrewl): Wolverine (corwolv) and Shellshocker (armart) too: Ambassador
-// priorities and picks; 3 blind volleys at any ghost image (IsThreeGhostLauncher).
 inline bool IsSlowMissileLauncher(const std::string& name) {
-    return name == "armmerl" || name == "corvroc" || name == "legavroc" || name == "cortrem"
-        || name == "corwolv" || name == "armart";
+    return name == "armmerl" || name == "corvroc" || name == "legavroc" || name == "cortrem";
 }
 // 2026-11-06: launchers that leave identified, idle or slow T1 mobiles alone
 // (Ambassador, Negotiator, Boreas, Arbiter).
@@ -29,10 +26,6 @@ inline bool IsGhostPickLauncher(const std::string& name) {
 }
 // 2026-11-07: Tremor fires on a ghost for a time, not a volley count (it fires
 // continuously, 0.5 s reload): heavy porc 105 s, anything else 45 s.
-// 2026-11-14: Wolverine / Shellshocker give every ghost (heavy or not) 3 volleys, then leave it until seen.
-inline bool IsThreeGhostLauncher(const std::string& name) {
-    return name == "corwolv" || name == "armart";
-}
 inline bool IsTimedGhostLauncher(const std::string& name) {
     return name == "cortrem";
 }

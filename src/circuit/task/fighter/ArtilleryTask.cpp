@@ -94,7 +94,6 @@ static int GhostNeedFor(const CMilitaryManager::SArtySnipeInfo& si, const CCircu
 	const std::string ln = (launcher != nullptr) ? launcher->GetDef()->GetName() : std::string();
 	if (IsTimedGhostLauncher(ln)) return FRAMES_PER_SEC * (heavy ? 105 : 45);
 	if (ln == "armvang") return heavy ? 5 : 1;
-	if (IsThreeGhostLauncher(ln)) return 3;   // 2026-11-14: Wolverine / Shellshocker
 	return heavy ? si.volleys : si.ghostVolleysOther;
 }
 // 2026-11-07: a unit that gives ghost structures blind fire in its default pick:
