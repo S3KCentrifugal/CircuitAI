@@ -1,5 +1,6 @@
 #include "air_build.as"
 #include "../../systems/air/air_defence.as"
+#include "../../systems/construction/silo_antinukes.as"
 #include "../../systems/air/air_growth.as"
 
 // Ordered, total dispatcher. Each action rechecks mutable claims before enqueue.
@@ -40,6 +41,11 @@ namespace AirRules {
         if (t !is null) return AirBuild::Record(t, "transition.turrets", u);
         @t = AirDefence::MakeTask(u, true);
         if (t !is null) return AirBuild::Record(t, "defence.antinuke", u);
+        // Owner 2026-11-15: one more antinuke per scouted enemy silo beyond the first, at the base periphery
+        if (!AirEconomy::recovery)
+            @t = SiloAntiNukes::PeripheryWork(u, AirEconomy::metal, AirEconomy::energy, Global::RoleSettings::Air::AntiNukeMetalIncome,
+                Global::RoleSettings::Air::AntiNukeEnergyIncome, Global::SiloAntiNukes::AirPeripheryMaxRadius, Global::SiloAntiNukes::AirCoreRadius);
+        if (t !is null) return AirBuild::Record(t, "defence.antinuke.extra", u);
         // Home spots precede the starter. Recovery never repeats a paid opening.
         if (AirEconomy::t1 + AirEconomy::t2 == 0 && aiTerrainMgr.GetLayoutInt("air.starter.retired",0) == 0) {
             // maxSpots limits native search candidates, not owned extractors.

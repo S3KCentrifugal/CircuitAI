@@ -9,6 +9,7 @@
 #include "../../helpers/spatial/map_helpers.as"
 #include "../../manager/builder.as"
 #include "../../manager/factory.as"
+#include "../../systems/construction/silo_antinukes.as"
 #include "../../systems/construction/layout.as"
 #include "../../systems/construction/eco_planner.as"
 #include "../../systems/combat/spam.as"
@@ -357,6 +358,13 @@ namespace TechRules {
         if (t !is null) GenericHelpers::LogUtil("[TECH][AntiNuke] ordered income=" + c.mi + "/" + c.ei + " slot=" + slot, 1);
         return t;
     }
+    // Owner 2026-11-15: after the first antinuke, one more per scouted enemy silo at the base periphery.
+    IUnitTask@ DoAntiNukeExtra(Ctx@ c)
+    {
+        return SiloAntiNukes::PeripheryWork(c.u, c.mi, c.ei, Global::RoleSettings::Tech::FirstAntiNukeMetalIncome,
+            Global::RoleSettings::Tech::FirstAntiNukeEnergyIncome, Global::SiloAntiNukes::TechPeripheryMaxRadius,
+            Global::SiloAntiNukes::TechCoreRadius);
+    }
     IUnitTask@ DoCompactSupport(Ctx@ c) { return c.draining ? null : CompactEco::SupportTask(c.u); }
     IUnitTask@ DoLocalGeo(Ctx@ c) {
         // Keep the committed silo/first-stockpile budget intact. Geothermal
@@ -578,6 +586,7 @@ namespace TechRules {
         table.insertLast(Rule("eco.cluster.batch", CON_T1, W0(), @DoClusterBatch, "funded local economy cluster: up to ten distinct turret projects, nearby T1 aircraft only"));
         table.insertLast(Rule("eco.growth", CONSTRUCTORS, W0(), @DoGrowth, "T1 energy retirement: one turret, AFUS and converter worker; air takes over without aborting construction"));
         table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved pad on the economy box periphery (2026-11-02); free T2 constructors assist its frame; armed by fourteen minutes"));
+        table.insertLast(Rule("defence.antinuke.extra", CON_T2, W0(), @DoAntiNukeExtra, "owner 2026-11-15: one more antinuke per scouted enemy silo beyond the first, on a base periphery pad (never off the map, still covering the core)"));
         table.insertLast(Rule("mex.upgrade", CON_T2, W0(), @DoMexUpgrade, "reachable owned mex upgrades before discretionary assistance"));
         table.insertLast(Rule("eco.support", CONSTRUCTORS, W0(), @DoEconomySupport, "build support for an admitted economy site before its reactor or converter"));
         table.insertLast(Rule("air.reactor", CONSTRUCTORS, W0(), @DoAirReactor, "idle air constructors prioritize the shared advanced fusion while energy is short; a floating bank yields to conversion and bounded build power"));
