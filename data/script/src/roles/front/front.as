@@ -702,6 +702,10 @@ namespace RoleFront {
         if (g_frontLadderGantryTask !is null && !g_frontLadderGantryTask.IsDead() && builder.task is g_frontLadderGantryTask)
             return g_frontLadderGantryTask;
 
+        // Owner 2026-11-15: the builder on our antinuke order keeps it (silo_antinukes.as)
+        IUnitTask@ keepAntiNuke=SiloAntiNukes::Keep(builder);
+        if (keepAntiNuke !is null) return keepAntiNuke;
+
         if(UnitHelpers::IsCommander(builder.circuitDef)) {
             IUnitTask@ startFactory=Front_StartFactoryTakeover(builder);
             if(startFactory !is null) return startFactory;

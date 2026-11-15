@@ -15,8 +15,16 @@ namespace SiloAntiNukes {
         // within CoverShare x coverage of our start (the main base is always covered)
         // and is scored on its larger distance to start and front point.
         bool Front = true;
-        float FrontFraction = 0.45f;
+        float FrontFraction = 0.30f;   // v1 0.45: blocks stood 1.1-1.5 km out and were shot down
         float CoverShare = 0.80f;
+        // score = max(start distance, FrontWeight x front distance) + HomeWeight x start distance
+        float FrontWeight = 0.6f;
+        float HomeWeight = 0.35f;
+        float ForwardShare = 0.40f;    // a block centre at most this x coverage toward the enemy from start
+        float HazardMargin = 400.0f;   // no block within observed enemy weapon reach + this
+        // Order: only a builder within OrderRadius of the slot for NearOnlySeconds, then any.
+        float OrderRadius = 1500.0f;
+        int NearOnlySeconds = 45;
         // First antinuke: 10 s minimum income. After RelaxSeconds with a silo known and
         // no antinuke, the gate halves so a FRONT short of energy is never left bare.
         float FirstMetalIncome = 25.0f;
