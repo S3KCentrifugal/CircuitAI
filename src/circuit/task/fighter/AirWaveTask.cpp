@@ -19,6 +19,7 @@
 #include "CircuitAI.h"
 #include "spring/SpringCallback.h"
 #include "util/Utils.h"
+#include "util/Performance.h"
 
 #include "AISCommands.h"
 #include "Log.h"
@@ -447,6 +448,7 @@ void CAirWaveTask::ExcludeStrikeRegion(const AIFloat3& centre, float radius)
 bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float minStaticCost, bool includeHeavy)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
+    performance::Scope measured(circuit, performance::AIR_STRIKE_TARGET);
 	const AIFloat3 base = circuit->GetSetupManager()->GetBasePos();
 	const SEnemyData* best = nullptr;
 	float bestScore = -1.f;

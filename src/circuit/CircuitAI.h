@@ -10,6 +10,7 @@
 
 #include "unit/CircuitDef.h"
 #include "unit/CircuitWDef.h"
+#include "unit/OwnedDefinitionIndex.h"
 #include "unit/ally/AllyTeam.h"
 #include "util/Defines.h"
 
@@ -170,6 +171,12 @@ public:
 	CCircuitUnit* GetTeamUnit(ICoreUnit::Id unitId) const;
 	const Units& GetTeamUnits() const { return teamUnits; }
     unsigned int GetOwnedUnitRevision() const { return ownedUnitRevision; }
+    const std::set<int>& GetOwnedUnitIdsForDef(const CCircuitDef* def) const {
+        return ownedDefinitions.Ids(def == nullptr ? -1 : def->GetId());
+    }
+    std::uint64_t GetOwnedDefinitionRevision(const CCircuitDef* def) const {
+        return ownedDefinitions.Revision(def == nullptr ? -1 : def->GetId());
+    }
 
 	void UpdateFriendlyUnits() { allyTeam->UpdateFriendlyUnits(); }
 	CAllyUnit* GetFriendlyUnit(springai::Unit* u) const;
@@ -199,6 +206,7 @@ private:
 	void UpdateActions();
 
 	Units teamUnits;  // owner
+    OwnedDefinitionIndex ownedDefinitions;
     unsigned int ownedUnitRevision = 0;
 	EnemyInfos enemyInfos;  // owner
 	CAllyTeam* allyTeam;
