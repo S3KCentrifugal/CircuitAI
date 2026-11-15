@@ -26,6 +26,7 @@
 #include "terrain/LaneSolver.h"
 #include "terrain/LanePath.h"
 #include "terrain/LaneFront.h"
+#include "util/WeaponReach.h"
 
 #include <algorithm>
 #include <cmath>
@@ -67,6 +68,15 @@ public:
 	float Height(const springai::AIFloat3& pos) const;
 	float Depth(const springai::AIFloat3& pos) const { return -Height(pos); }
 	float EffectiveRange(const CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to) const;
+	// Owner 2026-11-15: the main weapon's height-aware 2-D reach between two heights
+	// (callers that already know the heights: assault micro, porc checks).
+	float ReachAt(const CCircuitDef* cdef, float fromY, float toY) const;
+	const weapon_reach::Ballistics& MainBallistics(const CCircuitDef* cdef) const;
+	// Owner 2026-11-15: the id of a seen or ghost enemy armed structure (flat range
+	// at most maxRange) whose height-aware reach plus margin covers pos, else -1.
+	// O(enemy infos); for rare site searches, not per-frame loops.
+	int EnemyStaticCovering(const springai::AIFloat3& pos, float margin, float maxRange) const;
+	std::string DescribeEnemy(int enemyId) const;   // "corpun at (x, z)", for logs
 	float MainRange(const CCircuitDef* cdef) const;   // the longest-range weapon's range
 	float InterceptorCoverage(const CCircuitDef* cdef) const;
 	float ShotEnergy(const CCircuitDef* cdef) const;   // energy one shot (salvo) takes from storage
@@ -397,6 +407,7 @@ private:
         float highGroundRise, float highGroundDetour, int highGroundRoutes);
 	CWeaponDef* MainWeapon(const CCircuitDef* cdef) const;
 	mutable std::unordered_map<int, CWeaponDef*> mainWeapon;   // def id -> its longest-range weapon
+	mutable std::unordered_map<int, weapon_reach::Ballistics> mainBallistics;   // def id -> its main weapon's range constants (immutable defs)
 
 	void EnsureGrid();
 	void BuildWater();

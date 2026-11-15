@@ -49,6 +49,16 @@ namespace LolCannon {
                                     // 4 x SiteProbes nearest; ones whose cannon footprint sits on a metal/geo spot or
                                     // an ally layout, reservation or structure are skipped before they count
     float SiteMinScore = 0.7f;
+    // enemy porc (owner 2026-11-15, Kolmogorov: Agitators on a hilltop out-ranged their
+    // flat range onto the site): no site, nor its turret block, within the height-aware
+    // reach (aiBattle.EnemyStaticCovering: the engine's cannon/beam formulas, downhill
+    // boost included) plus SitePorcMargin of a seen or ghost enemy armed structure whose
+    // flat range is at most SitePorcMaxRange (long-range plasma batteries excluded).
+    // While the cannon is not framed yet, the site is re-checked every SitePorcCheckSeconds
+    // and moved (another ring or another enemy start) once such porc covers it. 0 = off.
+    float SitePorcMargin = 120.0f;
+    float SitePorcMaxRange = 2000.0f;
+    int SitePorcCheckSeconds = 5;
     // further back (owner 2026-10-27): every BackOffAfter failures for one cannon (a site
     // search that found nothing, or a cannon order that came to nothing) move the rings
     // SiteBackStep further out from the enemy start, past the cannon's reach if need be,

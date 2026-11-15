@@ -229,6 +229,7 @@ namespace LolCannon {
     int quickEnds = 0;               // orders of this try that ended with no frame
     int unsafeFrom = -1;             // the frame the site was first found unsafe for an order, -1 safe
     int nextUnsafeLog = 0;
+    int nextPorcCheck = 0;           // owner 2026-11-15: next height-aware enemy porc check of an unframed site
     array<AIFloat3> badStoreSpots;   // storage spots whose orders kept failing: not chosen again
     array<AIFloat3> failedSites;     // sites this cannon moved back from: later searches keep SiteAvoidRadius off them
 
@@ -898,6 +899,13 @@ namespace LolCannon {
         return fronts.length() > 0 ? fronts : all;
     }
 
+    // owner 2026-11-15: the enemy armed structure whose height-aware reach covers p, else -1
+    int PorcOver(const AIFloat3 &in p)
+    {
+        if (Global::LolCannon::SitePorcCheckSeconds <= 0 || p.x < 0.0f) return -1;
+        return aiBattle.EnemyStaticCovering(p, Global::LolCannon::SitePorcMargin, Global::LolCannon::SitePorcMaxRange);
+    }
+
     bool Plan()
     {
         CCircuitDef@ gun = Gun();
@@ -954,14 +962,28 @@ namespace LolCannon {
         refusedGun = 0; shortTurrets = 0; bestTurrets = 0;
         bool found = false;
         skipResource = 0; skipLayout = 0; skipFailed = 0;
+        int skipPorc = 0, firstPorc = -1;
         for (uint i = 0; i < best.length() && !found && tried < Global::LolCannon::SiteProbes; ++i) {
             if (NearFailed(best[i])) { ++skipFailed; continue; }
+            const int porcAt = PorcOver(best[i]);
+            if (porcAt >= 0) { if (skipPorc++ == 0) firstPorc = porcAt; continue; }
             if (aiTerrainMgr.IsZoneAlly(best[i]) || !GunGroundFree(gun, best[i], bestF[i])) continue;
             ++scored;
             const float score = GroundScore(gun, nano, st, best[i], bestF[i]);
             if (score < Global::LolCannon::SiteMinScore) continue;
             ++tried;
             found = TrySite(gun, nano, st, best[i], bestF[i], layoutOn);
+            if (found) {
+                // the turret block and the storage strip stand beside the cannon: under porc they die first
+                const int blockPorc = AiMax(PorcOver(blockCentre), PorcOver(stripCentre));
+                if (blockPorc >= 0) {
+                    if (skipPorc++ == 0) firstPorc = blockPorc;
+                    aiTerrainMgr.ReleaseReservation(gunRes); gunRes = -1;
+                    ReleaseAll(turretRes); ReleaseAll(storeRes);
+                    turretRes.resize(0); storeRes.resize(0);
+                    found = false;
+                }
+            }
             if (found) { siteTarget = starts[bestS[i]]; siteLevel = level; }
             if (found)
                 GenericHelpers::LogUtil("[LolCannon] site for " + gun.GetName() + " (range " + int(range) + ") at (" + int(site.x) + ", " + int(site.z)
@@ -969,7 +991,8 @@ namespace LolCannon {
                     + turretPos.length() + " turrets and " + storePos.length() + " " + st.GetName() + " beside it ("
                     + storesReserved + " storage slots reserved)"
                     + (layoutOn ? " (reserved)" : " (FRONT: cannon, turret block and storage strip held, orders unpinned)") + "; against the enemy spawn at (" + int(siteTarget.x) + ", "
-                    + int(siteTarget.z) + "), " + int(sqrt(MapHelpers::SqDist(site, siteTarget))) + " away: " + targetWhy + backWhy, 1);
+                    + int(siteTarget.z) + "), " + int(sqrt(MapHelpers::SqDist(site, siteTarget))) + " away: " + targetWhy + backWhy
+                    + (skipPorc > 0 ? "; " + skipPorc + " nearer candidate(s) under enemy porc (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : ""), 1);
         }
         if (!found && refusedGun > 0) {
             // one non-quiet try: native logs "RESERVE: refused <def> ...: <why>" (terrain, a blocked cell, the engine's ground test)
@@ -984,7 +1007,8 @@ namespace LolCannon {
                 + starts.length() + " enemy start(s): " + best.length() + " candidates, " + scored + " scored, " + tried
                 + " tried (cannon refused " + refusedGun + ", turrets short " + shortTurrets + ", best " + bestTurrets + "/"
                 + Global::LolCannon::MinTurrets + "); skipped: " + skipResource + " on metal/geo spots, " + skipLayout
-                + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site" + backWhy + "; retry in 30 s", 1);
+                + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site, " + skipPorc + " under enemy porc"
+                + (firstPorc >= 0 ? " (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "") + backWhy + "; retry in 30 s", 1);
         return found;
     }
 
@@ -2560,6 +2584,18 @@ namespace LolCannon {
             GenericHelpers::LogUtil("[LolCannon] gates open: " + why, 1);
             Begin(false);
             return;
+        }
+        if (phase == BUILD && !moveBack && Global::LolCannon::SitePorcCheckSeconds > 0 && ai.frame >= nextPorcCheck) {
+            nextPorcCheck = ai.frame + Global::LolCannon::SitePorcCheckSeconds * SECOND;
+            if (ProjectGun() is null) {
+                int over = PorcOver(site);
+                if (over < 0) over = PorcOver(blockCentre);
+                if (over >= 0) {
+                    GenericHelpers::LogUtil("[LolCannon] site (" + int(site.x) + ", " + int(site.z) + ") is under enemy porc: "
+                        + aiBattle.DescribeEnemy(over) + " reaches it (height-aware range); moving the site", 1);
+                    moveBack = true;
+                }
+            }
         }
         if (moveBack && phase == BUILD) {
             MoveBack();

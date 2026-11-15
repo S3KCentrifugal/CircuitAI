@@ -222,52 +222,73 @@ float CBattleAnalysis::GetArmedAirCost() const
     return value;
 }
 
+const weapon_reach::Ballistics& CBattleAnalysis::MainBallistics(const CCircuitDef* cdef) const
+{
+	static const weapon_reach::Ballistics none;
+	if (cdef == nullptr) return none;
+	auto it = mainBallistics.find(cdef->GetId());
+	if (it != mainBallistics.end()) return it->second;
+	weapon_reach::Ballistics b;
+	CWeaponDef* main = MainWeapon(cdef);
+	if (main != nullptr && main->GetDef() != nullptr) {
+		WeaponDef* wd = main->GetDef();
+		b.range = wd->GetRange();
+		b.heightMod = wd->GetHeightMod();
+		b.cylinder = wd->GetCylinderTargetting();
+		const std::string type = wd->GetType();
+		if (type == "Cannon") {
+			b.kind = weapon_reach::Kind::CANNON;
+			b.speed = wd->GetProjectileSpeed();   // elmos per frame
+			const float g = wd->GetMyGravity();
+			b.gravity = (g > 0.f) ? g : -circuit->GetMap()->GetGravity();
+			b.heightBoost = wd->GetHeightBoostFactor();
+		} else if (type == "StarburstLauncher") {
+			b.kind = weapon_reach::Kind::STARBURST;
+		}
+	}
+	return mainBallistics.emplace(cdef->GetId(), b).first->second;
+}
+
+float CBattleAnalysis::ReachAt(const CCircuitDef* cdef, float fromY, float toY) const
+{
+	return weapon_reach::Reach2D(MainBallistics(cdef), fromY, toY);
+}
+
 float CBattleAnalysis::EffectiveRange(const CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& to) const
 {
-	CWeaponDef* main = MainWeapon(cdef);
-	if (main == nullptr) {
-		return 0.f;
-	}
-	WeaponDef* wd = main->GetDef();
-	const float range = wd->GetRange();
 	// a weapon on or over water stands, and aims, at the surface
-	const float heightDiff = (std::max(0.f, Height(to)) - std::max(0.f, Height(from))) * wd->GetHeightMod();   // negative: firing downhill
-	const float cyl = wd->GetCylinderTargetting();
-	if (cyl > 0.f) {
-		return (cyl * range > std::fabs(heightDiff)) ? range : 0.f;
+	return ReachAt(cdef, std::max(0.f, Height(from)), std::max(0.f, Height(to)));
+}
+
+int CBattleAnalysis::EnemyStaticCovering(const AIFloat3& pos, float margin, float maxRange) const
+{
+	if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return -1;
+	const float toY = std::max(0.f, Height(pos));
+	// Ghosts count: an enemy structure stays in the enemy infos at its last seen
+	// spot until that spot is seen empty (then it is hidden or dead).
+	for (const auto& kv : circuit->GetEnemyInfos()) {
+		const CEnemyInfo* enemy = kv.second;
+		const CCircuitDef* edef = (enemy != nullptr) ? enemy->GetCircuitDef() : nullptr;
+		if (edef == nullptr || edef->IsMobile() || enemy->IsHidden() || !edef->IsAttacker()) continue;
+		const float flat = edef->GetMaxRange(CCircuitDef::RangeType::LAND);
+		if (flat <= 0.f || (maxRange > 0.f && flat > maxRange)) continue;
+		const AIFloat3& at = enemy->GetPos();
+		const float d2 = pos.SqDistance2D(at);
+		// a hilltop cannon reaches well past its flat range: bound loosely, then test exactly
+		if (d2 > SQUARE(2.f * flat + margin)) continue;
+		const float reach = ReachAt(edef, std::max(0.f, Height(at)), toY);
+		if (reach > 0.f && d2 <= SQUARE(reach + margin)) return kv.first;
 	}
-	const std::string type = wd->GetType();
-	if (type != "Cannon") {
-		return std::sqrt(std::max(0.f, range * range - heightDiff * heightDiff));
-	}
-	const float speed = wd->GetProjectileSpeed();   // elmos per frame
-	float grav = wd->GetMyGravity();
-	grav = (grav > 0.f) ? -grav : circuit->GetMap()->GetGravity();
-	if ((speed <= 0.f) || (grav >= 0.f)) {
-		return range;
-	}
-	auto calc = [speed, grav](float hd, float rbf, float hbf) {
-		const float speed2D = speed * 0.7071067f;
-		const float sq = speed2D * speed2D;
-		if (hd < -100.f) {
-			hd *= hbf;
-		} else if (hd < 0.f) {
-			hd *= (1.f + (hbf - 1.f) * -hd / 100.f);
-		}
-		const float root = sq + 2.f * grav * hd;
-		if (root < 0.f) {
-			return 0.f;
-		}
-		return rbf * (sq + speed2D * std::sqrt(root)) / -grav;
-	};
-	const float hbfDef = wd->GetHeightBoostFactor();
-	const float base = calc(0.f, 1.f, hbfDef);
-	const float rbf = (base > 0.f) ? std::max(0.f, std::min(1.f, range / base)) : 0.f;
-	float hbf = hbfDef;
-	if ((hbf < 0.f) && (rbf > 0.f)) {
-		hbf = (2.f - rbf) / std::sqrt(rbf);
-	}
-	return calc(heightDiff, rbf, hbf);
+	return -1;
+}
+
+std::string CBattleAnalysis::DescribeEnemy(int enemyId) const
+{
+	const CEnemyInfo* enemy = circuit->GetEnemyInfo(enemyId);
+	const CCircuitDef* edef = (enemy != nullptr) ? enemy->GetCircuitDef() : nullptr;
+	if (edef == nullptr) return "enemy " + std::to_string(enemyId);
+	const AIFloat3& at = enemy->GetPos();
+	return std::string(edef->GetDef()->GetName()) + " " + std::to_string(enemyId) + " at (" + std::to_string(int(at.x)) + ", " + std::to_string(int(at.z)) + ")";
 }
 
 float CBattleAnalysis::ShotEnergy(const CCircuitDef* cdef) const
