@@ -2268,7 +2268,7 @@ bool CBuilderManager::ReceiveResurrectionClaim(const char* message)
         else ++entry;
     }
     if (count == 0) { relayedResurrections.erase(unitId); return true; }
-    float parameters[5];
+    float parameters[5]{};
     for (int index = 0; index < count; ++index) if (!(input >> parameters[index])) return true;
     ResurrectionClaim claim;
     if (claim.Decode(parameters, count, callback->Unit_Maximum()))
