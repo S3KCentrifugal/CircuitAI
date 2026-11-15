@@ -13,7 +13,10 @@
 // turret with PorcClusterMinCount - 1 or more others within PorcClusterRadius seeds a cluster of itself and those
 // others (most neighbours first, each turret in one cluster). Every allied SMRTBARb FRONT runs this over its own
 // turrets: script has no def-aware view of an ally's units, so a cluster made of two allies' turrets is not seen.
-// Forward turret: the cluster turret nearest an enemy start (Lanes::EnemyStarts).
+// Owner 2026-11-15: "Also count any combination of t2 pitbulls/scorpions/chimeras in range of any of the t1.5 ...
+// always drop a persecutor/rattlesnake/eviscerator": our finished PorcClusterPopups count as cluster members (a cluster
+// still needs one T1.5 turret), and a cluster holding one only takes a T2 gun from a T2 seat (no income gate).
+// Forward turret: the cluster member nearest an enemy start (Lanes::EnemyStarts).
 // Covered: a gun of ours (T1 or T2 list; finished or framed, from any system) within PorcClusterCoverRadius of the
 // forward turret.
 // Site: the half disc behind the forward turret (away from that enemy start), PorcClusterBack deep and
@@ -42,6 +45,7 @@ namespace FrontPorcClusterCounter {
     class Turret {
         AIFloat3 pos;
         string name;
+        bool popup = false;    // a T2 pop-up (Pit Bull / Scorpion / Chimera)
         int cluster = -1;
         int near = 0;
     }
@@ -51,10 +55,11 @@ namespace FrontPorcClusterCounter {
         AIFloat3 enemy;        // that enemy start
         array<int> members;    // indices into turrets
         bool covered = false;
+        bool popup = false;    // holds a T2 pop-up: always a T2 gun (owner 2026-11-15)
         string names;
     }
 
-    array<CCircuitDef@> turretDefs, t1Defs, t2Defs;
+    array<CCircuitDef@> turretDefs, popupDefs, t1Defs, t2Defs;
     array<Turret@> turrets;
     array<Cluster@> clusters;
     array<AIFloat3> gunPos;    // known enemy static ground guns (scan)
@@ -79,7 +84,7 @@ namespace FrontPorcClusterCounter {
     bool On() { return Global::RoleSettings::Front::PorcClusterCounter && Global::AISettings::Role == AiRole::FRONT; }
 
     void Reset() {
-        turretDefs.resize(0); t1Defs.resize(0); t2Defs.resize(0);
+        turretDefs.resize(0); popupDefs.resize(0); t1Defs.resize(0); t2Defs.resize(0);
         turrets.resize(0); clusters.resize(0); gunPos.resize(0); gunReach.resize(0); guns.resize(0);
         standing = 0; lastScan = -100000; defsDone = false;
         holds.deleteAll(); waits.deleteAll();
@@ -94,6 +99,7 @@ namespace FrontPorcClusterCounter {
         if (defsDone) return;
         defsDone = true;
         AddDefs(Global::RoleSettings::Front::PorcClusterTurrets, turretDefs);
+        AddDefs(Global::RoleSettings::Front::PorcClusterPopups, popupDefs);
         AddDefs(Global::RoleSettings::Front::PorcClusterT1Guns, t1Defs);
         AddDefs(Global::RoleSettings::Front::PorcClusterT2Guns, t2Defs);
     }
@@ -150,9 +156,11 @@ namespace FrontPorcClusterCounter {
             if (u is null || u.circuitDef is null) continue;
             const CCircuitDef@ d = u.circuitDef;
             if (In(t1Defs, d) || In(t2Defs, d)) { guns.insertLast(u.GetPos(ai.frame)); continue; }
-            if (u.GetBuildProgress() < 1.0f || !In(turretDefs, d)) continue;
+            if (u.GetBuildProgress() < 1.0f) continue;
+            const bool pop = In(popupDefs, d);
+            if (!pop && !In(turretDefs, d)) continue;
             Turret@ t = Turret();
-            t.pos = u.GetPos(ai.frame); t.name = d.GetName();
+            t.pos = u.GetPos(ai.frame); t.name = d.GetName(); t.popup = pop;
             turrets.insertLast(t);
         }
         const int need = Global::RoleSettings::Front::PorcClusterMinCount;
@@ -177,11 +185,16 @@ namespace FrontPorcClusterCounter {
                     c.members.insertLast(int(j));
             turrets[seed].near = -1;   // consumed as a seed
             if (int(c.members.length()) < need) continue;   // its neighbours already went to an earlier cluster
+            // owner 2026-11-15: pop-ups count only in range of one of the T1.5 turrets: a cluster needs one
+            int t15 = 0;
+            for (uint k = 0; k < c.members.length(); ++k) if (!turrets[c.members[k]].popup) ++t15;
+            if (t15 == 0) continue;
             // the forward turret: nearest an enemy start
             float best = 1e30f;
             for (uint k = 0; k < c.members.length(); ++k) {
                 Turret@ t = turrets[c.members[k]];
                 t.cluster = int(clusters.length());
+                if (t.popup) c.popup = true;
                 c.names += ((k == 0) ? "" : " ") + t.name;
                 for (uint e = 0; e < enemies.length(); ++e) {
                     const float sq = MapHelpers::SqDist(t.pos, enemies[e]);
@@ -410,10 +423,20 @@ namespace FrontPorcClusterCounter {
             if (c is null) continue;
             int until = -1;
             if (holds.get(c.key, until) && ai.frame < until) continue;
-            // the builder: a T2 seat at the group (income gate), else the group's T1 constructor
+            // the builder: a T2 seat at the group (income gate), else the group's T1 constructor. A cluster holding a
+            // T2 pop-up always gets a T2 gun (owner 2026-11-15): no income gate, no T1 fallback; it waits for a T2
+            // seat to reach the group, and is skipped while the group has none
             CCircuitUnit@ b = null;
             bool t2 = false;
-            if (t2Gate) {
+            if (c.popup) {
+                bool anyT2 = false;
+                @b = T2Seat(centre, anyT2);
+                if (b is null) {
+                    if (anyT2 && !waits.exists(c.key)) { waits.set(c.key, ai.frame); Log("cluster " + c.key + " has a T2 pop-up: waiting for a T2 seat to reach the group"); }
+                    continue;
+                }
+                t2 = true; waits.delete(c.key);
+            } else if (t2Gate) {
                 bool anyT2 = false;
                 @b = T2Seat(centre, anyT2);
                 if (b !is null) { t2 = true; waits.delete(c.key); }

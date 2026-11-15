@@ -644,6 +644,9 @@ namespace Front {
             array<string> PorcClusterTurrets = { "armbeamer", "armhlt",     // Beamer, Overwatch
                 "corhllt", "corhlt",                                         // Twin Guard, Warden
                 "legmg", "leghive" };                                        // Cacophony, Hive (Legion's HLT slot)
+            // owner 2026-11-15: T2 pop-ups count too when in range (PorcClusterRadius) of one of the turrets above; a cluster
+            // holding one always gets a T2 gun (no income gate, no T1 fallback)
+            array<string> PorcClusterPopups = { "armpb", "corvipe", "legapopupdef" };      // Pit Bull, Scorpion, Chimera
             array<string> PorcClusterT1Guns = { "armguard", "corpun", "legcluster" };     // Gauntlet, Agitator, Amputator
             array<string> PorcClusterT2Guns = { "armamb", "cortoast", "legacluster" };    // Rattlesnake, Persecutor, Eviscerator
             int PorcClusterMinCount = 4;                  // "more than 3"
