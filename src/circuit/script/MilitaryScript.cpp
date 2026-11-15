@@ -107,6 +107,16 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "array<string>@ GetPorcChain(const string& in, bool) const", asFUNCTION(CMilitaryManager_GetPorcChain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetPorcChain(const string& in, bool, const array<string>@+)", asFUNCTION(CMilitaryManager_SetPorcChain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "uint GetGuardTaskNum() const", asMETHOD(CMilitaryManager, GetGuardTaskNum), asCALL_THISCALL); ASSERT(r >= 0);
+	// Nuke scouting (systems/team/nuke_recon.as): counters and positions the script watches
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetOvernukeScouts() const", asMETHOD(CMilitaryManager, GetOvernukeScouts), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetOvernukeRounds() const", asMETHOD(CMilitaryManager, GetOvernukeRounds), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetOvernukePos() const", asMETHOD(CMilitaryManager, GetOvernukePos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetOvernukeRadius() const", asMETHOD(CMilitaryManager, GetOvernukeRadius), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetNuclearAim() const", asMETHOD(CMilitaryManager, GetNuclearAim), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetNuclearAimRadius() const", asMETHOD(CMilitaryManager, GetNuclearAimRadius), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetNuclearLaunches() const", asMETHOD(CMilitaryManager, GetNuclearLaunches), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetNuclearLaunchPos() const", asMETHOD(CMilitaryManager, GetNuclearLaunchPos), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "float GetNuclearLaunchRadius() const", asMETHOD(CMilitaryManager, GetNuclearLaunchRadius), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CMilitaryManager", "const float armyCost", asOFFSET(CMilitaryManager, armyCost)); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CMilitaryManager", "void SetAggressionDelta(float)", asMETHOD(CMilitaryManager, SetAggressionDelta), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CMilitaryManager", "float GetAggressionDelta() const", asMETHOD(CMilitaryManager, GetAggressionDelta), asCALL_THISCALL); ASSERT(r >= 0);
