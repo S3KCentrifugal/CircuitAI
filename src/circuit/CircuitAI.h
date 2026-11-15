@@ -10,6 +10,7 @@
 
 #include "unit/CircuitDef.h"
 #include "unit/CircuitWDef.h"
+#include "unit/OwnedDefinitionIndex.h"
 #include "unit/ally/AllyTeam.h"
 #include "util/Defines.h"
 
@@ -167,6 +168,12 @@ public:
 	bool IsOwnedUnit(const CCircuitUnit* unit) const;
 	const Units& GetTeamUnits() const { return teamUnits; }
     unsigned int GetOwnedUnitRevision() const { return ownedUnitRevision; }
+    const std::set<int>& GetOwnedUnitIdsForDef(const CCircuitDef* def) const {
+        return ownedDefinitions.Ids(def == nullptr ? -1 : def->GetId());
+    }
+    std::uint64_t GetOwnedDefinitionRevision(const CCircuitDef* def) const {
+        return ownedDefinitions.Revision(def == nullptr ? -1 : def->GetId());
+    }
 
 	void UpdateFriendlyUnits() { allyTeam->UpdateFriendlyUnits(); }
 	CAllyUnit* GetFriendlyUnit(springai::Unit* u) const;
@@ -199,6 +206,7 @@ private:
 	// Simulation-thread pointer index: validate before dereferencing borrowed
 	// handles. Updated with teamUnits; O(U) memory and average O(1) checks.
 	std::unordered_set<const CCircuitUnit*> ownedUnits;
+    OwnedDefinitionIndex ownedDefinitions;
     unsigned int ownedUnitRevision = 0;
 	EnemyInfos enemyInfos;  // owner
 	CAllyTeam* allyTeam;

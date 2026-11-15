@@ -337,7 +337,12 @@ void IBuilderTask::Cancel()
 	}
 	if ((target == nullptr) && (reservationId >= 0)) {
 		// Never started: the planned site goes back on hold for the next task.
-		manager->GetCircuit()->GetTerrainManager()->RestoreReservation(reservationId);
+		auto* terrain = manager->GetCircuit()->GetTerrainManager();
+		terrain->RestoreReservation(reservationId);
+        // Cancellation relinquishes the claim; retry restoration must retain
+        // it. This releases transient task-owned footprints, while persistent
+        // layout slots remain available to the next task.
+        terrain->UnclaimReservation(reservationId);
 		reservationId = -1;
 	} else if ((target == nullptr) && pinRequired && (pinnedReservation >= 0)) {
 		manager->GetCircuit()->GetTerrainManager()->UnclaimReservation(pinnedReservation);

@@ -168,6 +168,11 @@ namespace AirBaseResponse {
         if (waiting.isEmpty()) waitingSince = -1;
     }
     void Tick() {
+        if (AiPerfEnabled) AiPerfBeginLabel("air-base-response");
+        TickNow();
+        if (AiPerfEnabled) AiPerfEndLabel();
+    }
+    void TickNow() {
         if (!Active() || ai.frame-updated < SECOND) return;
         updated = ai.frame;
         AirHome::Refresh(); AirOperations::InitHeavyRoster();
@@ -332,6 +337,8 @@ namespace AirBaseResponse {
         ReleaseReserve();
     }
     const array<string> lethal = {"armkam", "armbrawl", "corape", "legmos", "legstronghold", "corshad"};
+    AirInventory::Group lethalInventory;
+    bool lethalConfigured = false;
     int ProductionTarget() {
         CCircuitDef@ best = ai.GetCircuitDef(GunshipName(Global::AISettings::Side, AirEconomy::t2 > 0));
         const int target = AiMax(Global::RoleSettings::Air::BaseResponseGunships, Required(best is null ? 250.0f : best.costM));
@@ -341,7 +348,8 @@ namespace AirBaseResponse {
     }
     int Deficit() {
         int ready = 0, frames = 0, pending = 0;
-        array<Id>@ ids = ai.GetOwnedUnitIds();
+        if (!lethalConfigured) { lethalInventory.Configure(lethal); lethalConfigured = true; }
+        array<Id>@ ids = lethalInventory.Read();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || lethal.find(u.circuitDef.GetName()) < 0) continue;

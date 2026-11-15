@@ -209,6 +209,7 @@ namespace TechWeapons {
         bool dead = false;
         int orderedFrame = -100000;
         int standFrame = -1;
+        int lastReject = 0, rejectCount = 0, rejectLogFrame = -100000;
         Slot(const string &in r, const AIFloat3& in p) { role = r; pos = p; }
     }
 
@@ -765,6 +766,7 @@ namespace TechWeapons {
 
     void Replan()
     {
+        outstandingDirty = true;
         lastReplan = ai.frame;
         array<Candidate@> cand;
         Discover(cand);
@@ -952,22 +954,40 @@ namespace TechWeapons {
 
     // ---------------------------------------------------------------- work for a builder (rule weapons.cluster)
 
-    int OutstandingOrders()
+    array<Slot@> outstanding;
+    bool outstandingDirty = true;
+    void RefreshOutstanding()
     {
-        int n = 0;
+        if (!outstandingDirty) return;
+        outstanding.resize(0);
+        // Membership rebuild only on orders/replanning, in original traversal
+        // order. Live completion/death/unfinished checks remain per decision.
         for (uint i = 0; i < clusters.length(); ++i) {
             if (clusters[i].kind == SUPER) continue;
             for (uint j = 0; j < clusters[i].slots.length(); ++j) {
                 Slot@ s = clusters[i].slots[j];
+                if (ai.frame - s.orderedFrame < 300 * SECOND) outstanding.insertLast(s);
+            }
+        }
+        outstandingDirty = false;
+    }
+    int OutstandingOrders()
+    {
+        RefreshOutstanding();
+        int n = 0;
+        uint keep = 0;
+        for (uint i = 0; i < outstanding.length(); ++i) {
+                Slot@ s = outstanding[i];
+                if (ai.frame - s.orderedFrame >= 300 * SECOND) continue;
+                @outstanding[keep++] = s;
                 if (s.standFrame >= 0 || s.dead) continue;
                 // out: ordered in the last 30 s, or a frame going up (a failed order
                 // no longer holds a place for a minute)
                 if (ai.frame - s.orderedFrame < 30 * SECOND) { ++n; continue; }
-                if (ai.frame - s.orderedFrame >= 300 * SECOND) continue;
                 CCircuitDef@ d = Def(s.role);
                 if (d !is null && aiBuilderMgr.FindUnfinishedNear(s.pos, 96.0f, d) !is null) ++n;
-            }
         }
+        outstanding.resize(keep);
         return n;
     }
 
@@ -1012,6 +1032,9 @@ namespace TechWeapons {
                 CCircuitDef@ d = Def(s.role);
                 if (d is null) { s.dead = true; pending = -1; continue; }
                 if (!u.circuitDef.CanBuild(d)) continue;
+                // This native enqueue veto is live, not a permanent dead-slot
+                // result. Avoid reserve/release churn while a veto is active.
+                if (!d.IsBuildAllowed()) { Rejected(s, d, 2); continue; }
                 if (aiBuilderMgr.FindUnfinishedNear(s.pos, 64.0f, d) !is null) continue;   // going up: someone is on it
                 if (!escort && !flooded && tokens < d.costM) {
                     if (ai.frame - lastBudgetLog > 30 * SECOND) {
@@ -1024,6 +1047,7 @@ namespace TechWeapons {
                     IUnitTask@ geothermal=Team::GeoRelease::Work(u,s.pos);
                     if (geothermal !is null) {
                         s.orderedFrame=ai.frame;
+                        outstandingDirty = true;
                         IBuilderTask@ build=cast<IBuilderTask>(geothermal);
                         if (!escort && build !is null && Task::BuildType(build.GetBuildType())==Task::BuildType::GEO) tokens-=d.costM;
                         pending=-1;
@@ -1087,21 +1111,31 @@ namespace TechWeapons {
         return false;
     }
 
+    void Rejected(Slot@ s, CCircuitDef@ d, int reason)
+    {
+        ++s.rejectCount;
+        if (ai.frame - s.rejectLogFrame >= 30 * SECOND) {
+            GenericHelpers::LogUtil("[TECH][WeaponsReject] " + d.GetName() + " last_reason=" + reason
+                + " attempts_since_report=" + s.rejectCount + " at (" + int(s.pos.x) + ", " + int(s.pos.z) + ")", 1);
+            s.rejectLogFrame = ai.frame;
+            s.rejectCount = 0;
+        }
+        s.lastReject = reason;
+    }
+
     IUnitTask@ Order(CCircuitUnit@ u, WCluster@ c, Slot@ s, CCircuitDef@ d, const AIFloat3& in at)
     {
         if (TypeOf(s.role) == Task::BuildType::NANO && Layout::TurretsCapped()) return null;
         if (!TechForward::Buildable(u, d) || !WallHelpers::Allowed(d, at)) return null;
         if ((s.role=="shield" || s.role=="antinuke") && aiBuilderMgr.PendingProtection(d,at)) return null;
-        const int slot = aiTerrainMgr.ReserveBuilding(d, at, 0);
-        if (slot < 0) return null;
-        if (aiBattle.IsFriendlyLane(aiTerrainMgr.GetReservationPos(slot)) || !WallHelpers::Allowed(d, aiTerrainMgr.GetReservationPos(slot))) {
-            aiTerrainMgr.ReleaseReservation(slot); return null;
-        }
-        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(TypeOf(s.role), (c.kind == SUPER) ? Task::Priority::HIGH : Task::Priority::NORMAL,
-            d, aiTerrainMgr.GetReservationPos(slot), 0.0f, true, 120 * SECOND));
-        if (t is null) { aiTerrainMgr.ReleaseReservation(slot); return null; }
-        if (!AiPinReservation(t, slot)) { aiBuilderMgr.AbortTask(t); return null; }
+        if (aiBattle.IsFriendlyLane(at)) { Rejected(s, d, 5); return null; }
+        int rejection = 0;
+        IUnitTask@ t = aiBuilderMgr.EnqueueReserved(TaskB::Common(TypeOf(s.role), (c.kind == SUPER) ? Task::Priority::HIGH : Task::Priority::NORMAL,
+            d, at, 0.0f, true, 120 * SECOND), 0, rejection);
+        if (t is null) { Rejected(s, d, rejection); return null; }
+        s.lastReject = 0;
         s.orderedFrame = ai.frame;
+        outstandingDirty = true;
         if (MetalIncome() < Global::RoleSettings::Tech::WeaponStartMetalIncome)
             Invariants::Violation("INV-061", "" + c.id, "weapon cluster #" + c.id + " ordered " + d.GetName() + " at +" + int(MetalIncome()) + " metal, under +" + int(Global::RoleSettings::Tech::WeaponStartMetalIncome));
         GenericHelpers::LogUtil("[TECH][Weapons] " + KIND_NAMES[c.kind] + " #" + c.id + ": " + u.circuitDef.GetName() + " " + u.id + " orders " + d.GetName()

@@ -15,6 +15,7 @@ import time
 
 import playtest
 import storage
+from validation_cleanup import publish_and_prune
 from ranged_benchmark import summarize
 
 HERE=Path(__file__).resolve().parent
@@ -74,6 +75,7 @@ def main():
         print(f'[{index+1}/{len(selected)}] {name}',flush=True)
         row=run_record(command,args.out.with_name(args.out.stem+'-'+name+'.txt'))
         row.update(case=name,command=command);result['results'].append(row)
+        if row['report']: row['publication'] = publish_and_prune(row['report'], row['diagnostic'], failed=not row['pass'])
         result['complete']=len(result['results'])==len(selected)
         result['pass']=result['complete'] and all(r['pass'] for r in result['results'])
         args.out.write_text(json.dumps(result,indent=2)+'\n')

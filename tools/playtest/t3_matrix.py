@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from validation_cleanup import publish_and_prune
 
 HERE = Path(__file__).resolve().parent
 CASES = HERE / 'cases/shared/combat/t3'
@@ -271,6 +272,7 @@ def main():
             row['verdict'] = row.get('outcome', 'FAIL') if row['pass'] else 'FAIL'
             if not report:print('Runner failed before report: '+str(diagnostic),flush=True)
             results.append(row)
+            if row['report']: row['publication'] = publish_and_prune(row['report'], row['runner_log'], failed=not row['pass'])
             print(f"{unit:<20} {row['line']:<7} {row['verdict']}  dgun_kill={row.get('dgun_kill')} hits={row.get('dgun_hits')} "
                   f"survived={row.get('survived')} min_hp={row.get('commander_min_hp')} t={row.get('seconds_to_kill')} "
                   f"fallback={row.get('fallback')} plan={row.get('plan')}", flush=True)

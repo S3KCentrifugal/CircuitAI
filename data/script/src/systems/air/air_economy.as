@@ -3,6 +3,7 @@
 #include "../../helpers/math/air_math.as"
 #include "air_workforce.as"
 #include "air_thin_home.as"
+#include "air_inventory.as"
 
 namespace AirEconomy {
     float metal = 0.0f, energy = 0.0f, bankM = 0.0f, bankE = 0.0f;
@@ -13,6 +14,15 @@ namespace AirEconomy {
     int t1 = 0, t2 = 0;
     string state = "BOOTSTRAP";
     array<int> owned;
+    uint ownedRevision = 0;
+    bool ownedReady = false;
+    void RefreshOwned() {
+        const uint revision = ai.GetOwnedUnitRevision();
+        if (ownedReady && ownedRevision == revision) return;
+        owned = ai.GetOwnedUnitIds();
+        ownedRevision = revision;
+        ownedReady = true;
+    }
     dictionary nanoBay; // one primary bay per live assistant
     dictionary supportOwner; // snapped reserved position -> bay; rebuilt only after layout changes
     int supportRevision = -1;
@@ -36,7 +46,8 @@ namespace AirEconomy {
     }
     int CompletedAfus() {
         int count = 0;
-        array<Id>@ ids = ai.GetOwnedUnitIds();
+        AirInventory::Configure();
+        array<Id>@ ids = AirInventory::advancedFusions.Read();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ unit = ai.GetTeamUnit(ids[i]);
             if (unit !is null && unit.GetBuildProgress() >= 1.0f && unit.circuitDef.GetName()
@@ -141,7 +152,8 @@ namespace AirEconomy {
     int CompletedConstructors()
     {
         int count = 0;
-        array<Id>@ ids = ai.GetOwnedUnitIds();
+        AirInventory::Configure();
+        array<Id>@ ids = AirInventory::constructors.Read();
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.GetBuildProgress() < 1.0f) continue;
@@ -163,6 +175,7 @@ namespace AirEconomy {
         armedAirMemory = 0.0f; armedAirFrame = -1;
         t1 = 0; t2 = 0; state = "BOOTSTRAP";
         owned.resize(0); nanoBay.deleteAll(); power.resize(0); nanoCount.resize(0); nanoFuture.resize(0);
+        ownedReady = false;
         supportOwner.deleteAll(); supportRevision = -1;
     }
     string Fighter(bool advanced, const string &in faction = "")
@@ -250,7 +263,15 @@ namespace AirEconomy {
     }
     void RefreshSupport()
     {
-        owned = ai.GetOwnedUnitIds();
+        if (AiPerfEnabled) AiPerfBeginLabel("air-support");
+        RefreshSupportNow();
+        if (AiPerfEnabled) AiPerfEndLabel();
+    }
+    void RefreshSupportNow()
+    {
+        RefreshOwned();
+        AirInventory::Configure();
+        array<Id>@ support = AirInventory::nanos.Read();
         nanoBay.deleteAll();
         power.resize(AirLayout::bays.length()); nanoCount.resize(power.length()); nanoFuture.resize(power.length());
         for (uint b = 0; b < power.length(); ++b) {
@@ -258,8 +279,8 @@ namespace AirEconomy {
             power[b] = plant !is null && !Lifecycle::IsRetiring(plant) && plant.GetBuildProgress() >= 1.0f ? plant.circuitDef.GetBuildSpeed() : 0.0f;
             nanoCount[b] = 0; nanoFuture[b] = 0;
         }
-        for (uint i = 0; i < owned.length(); ++i) {
-            CCircuitUnit@ n = ai.GetTeamUnit(owned[i]);
+        for (uint i = 0; i < support.length(); ++i) {
+            CCircuitUnit@ n = ai.GetTeamUnit(support[i]);
             if (n is null || Lifecycle::IsRetiring(n)) continue;
             const string name = n.circuitDef.GetName();
             if (name != UnitHelpers::GetT1NanoNameForSide(UnitHelpers::GetSideForUnitName(name))) continue;
@@ -280,8 +301,9 @@ namespace AirEconomy {
         // Every standing plant must finish its support bank before another starts.
         // Framed and queued turrets must not unlock expansion early.
         int factories = 0, finished = 0, least = Global::RoleSettings::Air::T2PlantExpansionTurrets;
-        for (uint i = 0; i < owned.length(); ++i) {
-            CCircuitUnit@ plant = ai.GetTeamUnit(owned[i]);
+        array<Id>@ plants = AirInventory::advancedPlants.Read();
+        for (uint i = 0; i < plants.length(); ++i) {
+            CCircuitUnit@ plant = ai.GetTeamUnit(plants[i]);
             if (plant is null || !UnitHelpers::IsT2AircraftPlant(plant.circuitDef.GetName()) || Lifecycle::IsRetiring(plant)) continue;
             ++factories;
             if (plant.GetBuildProgress() >= 1.0f) ++finished;
@@ -310,7 +332,7 @@ namespace AirEconomy {
         goodSamples = !bad && bankE > aiEconomyMgr.energy.storage * 0.45f ? goodSamples + 1 : 0;
         if (badSamples >= 3) recovery = true;
         if (goodSamples >= 10) recovery = false;
-        owned = ai.GetOwnedUnitIds();
+        RefreshOwned();
         nanoBay.deleteAll();
         power.resize(AirLayout::bays.length()); nanoCount.resize(power.length()); nanoFuture.resize(power.length());
         for (uint b = 0; b < power.length(); ++b) {

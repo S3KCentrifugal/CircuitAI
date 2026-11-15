@@ -390,15 +390,27 @@ namespace RoleAir {
     ******************************************************************************/
 
     void Air_MainUpdate() {
-        if (AirEconomy::Active()) { AirBuild::Tick(); AirEconomy::Tick(); AirProduction::Tick(); AirLayout::Draw(); Lanes::Tick(); }
+        if (AirEconomy::Active()) {
+            if (AiPerfEnabled) AiPerfBeginLabel("air-build");
+            AirBuild::Tick();
+            if (AiPerfEnabled) { AiPerfEndLabel(); AiPerfBeginLabel("air-economy"); }
+            AirEconomy::Tick();
+            if (AiPerfEnabled) { AiPerfEndLabel(); AiPerfBeginLabel("air-production"); }
+            AirProduction::Tick();
+            if (AiPerfEnabled) { AiPerfEndLabel(); AiPerfBeginLabel("air-presentation"); }
+            AirLayout::Draw(); Lanes::Tick();
+            if (AiPerfEnabled) AiPerfEndLabel();
+        }
         // Periodically update dynamic military quotas once the configured delay has passed
         if (ai.frame >= AIR_DYNAMIC_QUOTA_DELAY_FRAMES) {
             Air_UpdateDynamicMilitaryQuotas();
         }
         // T2 bomber waves: launch when the hold reaches the target, size the next wave
+        if (AiPerfEnabled) AiPerfBeginLabel("air-waves");
         AirWaves::Update();
         AirLiches::Update(); // Liche runs: in-flight target hierarchy
         AirBomberTargets::Update(); // T2 bomber waves: the same hierarchy over economy targets
+        if (AiPerfEnabled) AiPerfEndLabel();
         //LogUtil("Air update logic executed", 5);
     }
 

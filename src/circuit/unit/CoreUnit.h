@@ -22,6 +22,9 @@ public:
 		, tempNum(-1)
 	{}
 
+	ICoreUnit(const ICoreUnit&) = delete;
+	ICoreUnit& operator=(const ICoreUnit&) = delete;
+
 	Id GetId() const { return id; }
 	springai::Unit* GetUnit() const { return unit; }
 

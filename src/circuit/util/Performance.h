@@ -24,6 +24,7 @@ enum Phase {
     FACTORY_CORRIDOR, // D-451: factory-corridor admission, cache checks, refresh and prune
     RANGED_HISTORY, // D-462: per-AI contact history pass, nested in RANGED_SNAPSHOT
     ARTILLERY_UPDATE, ARTILLERY_QUERY, // D-493: artillery controller pass, one gun's snapshot query
+    AIR_STRIKE_TARGET,
     PHASE_COUNT
 };
 extern const bool enabled;

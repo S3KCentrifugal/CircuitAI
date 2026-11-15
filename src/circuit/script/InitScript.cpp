@@ -378,6 +378,16 @@ static CScriptArray* CCircuitAI_GetOwnedUnitIds(CCircuitAI* circuit)
 	return arr;
 }
 
+// Fill caller-owned storage: allocation capacity is reused; membership is sorted
+// exactly like GetOwnedUnitIds. Dynamic state must still be read from each unit.
+static void CCircuitAI_GetOwnedUnitIdsForDef(CCircuitAI* circuit, const CCircuitDef* def, CScriptArray* out)
+{
+    const auto& ids = circuit->GetOwnedUnitIdsForDef(def);
+    out->Resize(static_cast<asUINT>(ids.size()));
+    asUINT index = 0;
+    for (int id : ids) *static_cast<ICoreUnit::Id*>(out->At(index++)) = id;
+}
+
 static int CTerrainManager_ReserveGrid(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& frontCentre,
 		int facing, int cols, int rows, int gap, int ttlFrames)
 {
@@ -1382,6 +1392,8 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool IsOwnedUnit(const CCircuitUnit@) const", asMETHOD(CCircuitAI, IsOwnedUnit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "array<Id>@ GetOwnedUnitIds() const", asFUNCTION(CCircuitAI_GetOwnedUnitIds), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CCircuitAI", "uint GetOwnedUnitRevision() const", asMETHOD(CCircuitAI, GetOwnedUnitRevision), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CCircuitAI", "void GetOwnedUnitIdsForDef(const CCircuitDef@, array<Id>& inout) const", asFUNCTION(CCircuitAI_GetOwnedUnitIdsForDef), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CCircuitAI", "uint64 GetOwnedDefinitionRevision(const CCircuitDef@) const", asMETHOD(CCircuitAI, GetOwnedDefinitionRevision), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "string GetMapName() const", asFUNCTION(CCircuitAI_GetMapName), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "int GetEnemyTeamSize() const", asMETHOD(CCircuitAI, GetEnemyTeamSize), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool IsLoadSave() const", asMETHOD(CCircuitAI, IsLoadSave), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1570,6 +1582,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanReserveNanoBlockAt(const CCircuitDef@ nanoDef, const CCircuitDef@ facDef, const AIFloat3& in facPos, int facing, int cols, int rows, int gap)", asFUNCTION(CTerrainManager_CanReserveNanoBlockAt), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveNanoBlock(CCircuitUnit@ factory, const CCircuitDef@ nanoDef, int cols, int rows, int gap)", asFUNCTION(CTerrainManager_ReserveNanoBlock), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanReserveBuilding(const CCircuitDef@, const AIFloat3& in, int facing)", asFUNCTION(CTerrainManager_CanReserveBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 CanonicalBuildPosition(const CCircuitDef@, const AIFloat3& in, int facing) const", asMETHOD(CTerrainManager, CanonicalBuildPosition), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "float BuildableFraction(const CCircuitDef@, const AIFloat3& in centre, float halfAcross, float halfAlong, int facing)", asFUNCTION(CTerrainManager_BuildableFraction), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleaseReservation(int)", asMETHOD(CTerrainManager, ReleaseReservation), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleaseGroup(int)", asMETHOD(CTerrainManager, ReleaseGroup), asCALL_THISCALL); ASSERT(r >= 0);
