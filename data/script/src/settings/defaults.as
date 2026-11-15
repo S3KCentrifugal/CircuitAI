@@ -14,3 +14,4 @@
 #include "roles/support.as"
 #include "roles/sea.as"
 #include "roles/tactical.as"
+#include "shared/start_pick.as"
