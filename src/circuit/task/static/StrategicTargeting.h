@@ -44,4 +44,154 @@ public:
 private:
     std::vector<Claim> claims;
 };
+// Nuke outcome (owner 2026-11-06). The engine adds experience to the silo for
+// every point of damage its missile deals (BAR modrules experienceMult; the
+// same experience raises its health and cuts its reload), so a launch is
+// pending until its silo's experience rises - the missile landed - or the
+// window closes with none - it was intercepted. A landing marks the area
+// (blast plus chain reach): every ghost in it last seen before the strike is
+// worth `factor` of its metal until it is seen again, i.e. until a scout
+// refreshes the ghosts (a destroyed one then vanishes). An interception
+// presumes an armed interceptor around that aim until one is seen there or
+// the presumption expires. Engine-free; marks and pendings are capped.
+class StrikeLedger {
+public:
+    struct Pending { int silo; Point aim; float radius; int launch, deadline; float exp; };
+    struct Mark { Point pos; float radius; int frame, expires; bool hit; };
+    enum class Outcome { HIT, INTERCEPTED };
+    void Launch(int silo, Point aim, float radius, int frame, int windowFrames, float exp)
+    {
+        if (!Valid(aim)) return;
+        if (pending.size() >= 64) pending.erase(pending.begin());
+        pending.push_back({silo, aim, std::max(0.f, radius), frame, frame + std::max(1, windowFrames), exp});
+    }
+    bool HasPending(int silo) const
+    {
+        return std::any_of(pending.begin(), pending.end(), [=](const Pending& p) { return p.silo == silo; });
+    }
+    // exp: the silo's experience now (exp < 0: the silo is gone, its launches are dropped).
+    // fn(const Pending&, Outcome) for each resolved launch, oldest first; a rise
+    // goes to the silo's oldest pending launch, the rest re-baseline on it.
+    template<class F> void Resolve(int silo, float exp, int frame, int presumeFrames, F&& fn)
+    {
+        for (size_t i = 0; i < pending.size();) {
+            Pending& p = pending[i];
+            if (p.silo != silo) { ++i; continue; }
+            if (exp < 0.f) { pending.erase(pending.begin() + i); continue; }
+            Outcome out;
+            if (exp > p.exp + 1e-7f) out = Outcome::HIT;
+            else if (frame >= p.deadline) out = Outcome::INTERCEPTED;
+            else break;  // the oldest is still in flight: later ones wait for it
+            const Pending done = p;
+            pending.erase(pending.begin() + i);
+            for (Pending& q : pending) if (q.silo == silo) q.exp = exp;
+            if (marks.size() >= 128) marks.erase(marks.begin());
+            marks.push_back({done.aim, done.radius, frame,
+                (out == Outcome::HIT) ? -1 : frame + std::max(1, presumeFrames), out == Outcome::HIT});
+            fn(done, out);
+            if (out == Outcome::HIT) break;  // one rise resolves one launch
+        }
+    }
+    // The ghost factor at p for a ghost last seen at lastSeen (1 outside every struck area).
+    float GhostFactor(Point p, int lastSeen, float factor) const
+    {
+        for (const Mark& m : marks) {
+            if (m.hit && lastSeen < m.frame && DistanceSq(p, m.pos) <= m.radius * m.radius) return factor;
+        }
+        return 1.f;
+    }
+    // A presumed interceptor whose last intercept lies within radius of p and has not expired.
+    bool PresumedCover(Point p, float radius, int frame) const
+    {
+        return std::any_of(marks.begin(), marks.end(), [&](const Mark& m) {
+            return !m.hit && m.expires > frame && DistanceSq(p, m.pos) <= radius * radius;
+        });
+    }
+    // A known interceptor now stands near a presumed one: the known one counts instead.
+    void ClearPresumed(Point p, float radius)
+    {
+        std::erase_if(marks, [&](const Mark& m) { return !m.hit && DistanceSq(p, m.pos) <= radius * radius; });
+    }
+    bool Empty() const { return marks.empty(); }
+private:
+    std::vector<Pending> pending;
+    std::vector<Mark> marks;
+};
+// Overnuke (owner 2026-10-28): with enough silos every one of them fires at
+// one target until `goal` launches have gone at it (the caller rolls the
+// launches), or no target is left there, then the next. Every `scoutEvery`
+// launches it counts a scout request; finished targets go to `done` so none is
+// picked again.
+// Salvo (owner 2026-10-30): a target begun with stock=true holds every silo
+// that reaches it until together they have stocked the roll (SalvoGate), then
+// Release() opens fire and every silo fires as fast as its reload allows.
+enum class SalvoGate { HOLD, STOCKED, TIMEOUT, HIT };
+// stocked: missiles in the reaching silos; need: the roll, capped by what they
+// can hold; hit: a reaching silo is damaged (use the stock before it is lost).
+inline SalvoGate SalvoRelease(int stocked, int need, int frame, int since, int maxFrames, bool hit)
+{
+    if (stocked >= std::max(1, need)) return SalvoGate::STOCKED;
+    if (stocked > 0 && hit) return SalvoGate::HIT;
+    if (stocked > 0 && maxFrames > 0 && frame - since >= maxFrames) return SalvoGate::TIMEOUT;
+    return SalvoGate::HOLD;
+}
+class Overnuke {
+public:
+    bool Active() const { return Valid(pos) && fired < goal; }
+    bool Covers(Point p) const { return Active() && DistanceSq(p, pos) <= radius*radius; }
+    void Begin(Point p, float r, int roll, int frame = 0, bool stock = false)
+    {
+        pos = p; radius = std::max(0.f, r); goal = std::max(1, roll); fired = 0;
+        stocking = stock; since = frame; ++begun; untilEmpty = false;
+    }
+    int Begun() const { return begun; }
+    bool Stocking() const { return Active() && stocking; }
+    bool Salvo() const { return Active() && !stocking; }
+    int Since() const { return since; }
+    // Open fire. A release short of the roll (timeout, a silo hit) fires only
+    // what is stocked: the goal drops to it.
+    // fireAll (owner 2026-11-04): the silos keep stocking while the salvo fires,
+    // so it has no fixed goal: every reaching silo fires until its stock is 0
+    // (the caller ends it with End() once their stock sums to 0), even past the
+    // roll - a salvo released at 8 may fire 12.
+    void Release(int stocked, bool fireAll = false)
+    {
+        stocking = false;
+        if (fireAll) { untilEmpty = true; goal = UNTIL_EMPTY; return; }
+        if (stocked > 0 && stocked < goal) goal = stocked;
+    }
+    bool UntilEmpty() const { return Active() && untilEmpty; }
+    static constexpr int UNTIL_EMPTY = 1000000;
+    // A better aim point found before the first launch (fresh scouting): the
+    // salvo goes there instead, same roll.
+    void Retarget(Point p) { if (Valid(p) && fired == 0) pos = p; }
+    // A launch at p. True when it counted against the target.
+    bool Count(Point p, int frame, int duration, int scoutEvery)
+    {
+        if (!Covers(p)) return false;
+        ++fired;
+        if (scoutEvery > 0 && fired % scoutEvery == 0) ++scouts;
+        if (fired >= goal) End(frame, duration);
+        return true;
+    }
+    void End(int frame, int duration)
+    {
+        if (!Valid(pos)) return;
+        if (fired < goal) goal = fired;
+        done.Add(-1, pos, radius, frame, duration, false);
+    }
+    bool Done(Point p, int frame) const { return done.Blocked(p, -1, frame, false); }
+    Point Pos() const { return pos; }
+    float Radius() const { return radius; }
+    int Fired() const { return fired; }
+    int Goal() const { return goal; }
+    int Scouts() const { return scouts; }  // every scout request so far, all targets
+private:
+    Point pos{-1.f, -1.f};
+    float radius = 0.f;
+    int goal = 0, fired = 0, scouts = 0, begun = 0;
+    bool stocking = false, untilEmpty = false;
+    int since = 0;  // frame the target began, for the stock timeout
+    Ledger done;
+};
 }
