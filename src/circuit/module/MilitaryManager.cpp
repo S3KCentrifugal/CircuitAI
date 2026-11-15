@@ -2779,4 +2779,15 @@ CMilitaryManager::SArtySnipeState& CMilitaryManager::GetArtySnipeState(int unitI
 	return artySnipeStates[unitId];
 }
 
+springai::AIFloat3 CMilitaryManager::GetOvernukePos() const
+{
+	const strategic::Overnuke& overnuke = circuit->GetAllyTeam()->GetOvernuke();
+	return springai::AIFloat3(overnuke.Pos().x, 0.f, overnuke.Pos().z);
+}
+
+float CMilitaryManager::GetOvernukeRadius() const
+{
+	return circuit->GetAllyTeam()->GetOvernuke().Radius();
+}
+
 } // namespace circuit
