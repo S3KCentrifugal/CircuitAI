@@ -10,6 +10,7 @@
 #include "commander_energy.as"
 #include "../world/coverage_lanes.as"
 #include "lolcannon_recon.as"
+#include "nuke_recon.as"
 #include "engineering_lanes.as"
 #include "../production/rez_replenish.as"
 
@@ -53,6 +54,7 @@ namespace Team {
         }
         if (SeaTech::Handle(msg, fromTeamId)) return;
         if (LolCannonRecon::Handle(msg, fromTeamId)) return;
+        if (NukeRecon::Handle(msg, fromTeamId)) return;   // nuke rush, launch and overnuke scout calls (nuke_recon.as)
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim
