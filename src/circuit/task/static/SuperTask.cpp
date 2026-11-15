@@ -870,6 +870,8 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 						interceptors.size(), (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(cover))));
 			}
 		}
+		// nuke rush scouting (team/nuke_recon.as) reads the latest aim
+		if (found) circuit->GetMilitaryManager()->SetNuclearAim(targetPos, cdef->GetAoe());
 		return found;
 	};
 	strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
@@ -939,6 +941,7 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 			frame, policy.overnukeStock);
 	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
 			over.Stocking() ? ", stocking the salvo first" : "");
+	circuit->GetMilitaryManager()->NoteOvernukeRound();  // our silo began it: we ask AIR (team/nuke_recon.as)
 	StopStraySilos("began");  // owner 2026-11-08: no allied silo keeps an older order of its own
 	if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
 		return false;
@@ -1386,6 +1389,7 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 	if (!CanAimStrategic(unit, aim)) circuit->LOG("[INVARIANT] INV-095 strategic launch violates target-area exclusion: unit=%i", unit->GetId());
 	lastStrategicLaunch = frame;
 	if (nuke) {
+		if (geom::is_valid(aim)) circuit->GetMilitaryManager()->NoteNuclearLaunch(aim, d->GetAoe());  // NukeLaunchRecon
 		const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
 		circuit->GetAllyTeam()->GetNuclearHistory().Add(unit->GetId(), {aim.x, aim.z},
 			policy.repeatRadius > 0.f ? policy.repeatRadius : d->GetAoe(), frame, policy.repeatFrames, false);
@@ -1399,10 +1403,12 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 					d->GetDef()->GetName(), unit->GetId(), aim.x, aim.z, reach, exp);
 		}
 		strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
+		const int scouts = over.Scouts();
 		const bool salvo = over.Salvo();
 		if (over.Count({aim.x, aim.z}, frame, policy.repeatFrames, policy.overnukeScoutEvery)) {
-			circuit->LOG("NUKE: overnuke launch %i of %i from %s(%i)", over.Fired(), over.Goal(),
-					d->GetDef()->GetName(), unit->GetId());
+			if (over.Scouts() > scouts) circuit->GetMilitaryManager()->NoteOvernukeScout();  // our launch: we ask AIR (OvernukeRecon)
+			circuit->LOG("NUKE: overnuke launch %i of %i from %s(%i)%s", over.Fired(), over.Goal(),
+					d->GetDef()->GetName(), unit->GetId(), (over.Scouts() > scouts) ? ": scouts asked" : "");
 			if (salvo && over.Active()) {
 				// Mid-salvo: the attack-ground order ends with the shot, so the
 				// next update re-aims the moment the reload (30 s, less with

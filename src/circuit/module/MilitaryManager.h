@@ -301,6 +301,23 @@ public:
 		int interceptPresumeFrames = 600 * FRAMES_PER_SEC;
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
+	// Nuke scouting (systems/team/nuke_recon.as). Counters the script watches: a rise
+	// is a new event. Only the AI whose silo raised it asks AIR, so one package each.
+	int GetOvernukeScouts() const { return overnukeScouts; }  // every overnuke_scout_every launches at the target
+	void NoteOvernukeScout() { ++overnukeScouts; }
+	int GetOvernukeRounds() const { return overnukeRounds; }  // overnuke targets begun by our silos
+	void NoteOvernukeRound() { ++overnukeRounds; }
+	springai::AIFloat3 GetOvernukePos() const;  // the ally team's overnuke target, x < 0 none yet
+	float GetOvernukeRadius() const;
+	// The latest aim point our nuclear scan chose and its blast radius; x < 0 before the first one
+	void SetNuclearAim(const springai::AIFloat3& pos, float radius) { nuclearAim = pos; nuclearAimRadius = radius; }
+	springai::AIFloat3 GetNuclearAim() const { return nuclearAim; }
+	float GetNuclearAimRadius() const { return nuclearAimRadius; }
+	// Our nuke launches: a rise in the count is a new launch at GetNuclearLaunchPos
+	void NoteNuclearLaunch(const springai::AIFloat3& pos, float radius) { ++nuclearLaunches; nuclearLaunchPos = pos; nuclearLaunchRadius = radius; }
+	int GetNuclearLaunches() const { return nuclearLaunches; }
+	springai::AIFloat3 GetNuclearLaunchPos() const { return nuclearLaunchPos; }
+	float GetNuclearLaunchRadius() const { return nuclearLaunchRadius; }
 
 	/*
 	 * Mobile sensor escort policy. Mobile radar and jammer units carry the
@@ -743,6 +760,13 @@ private:
 	SBomberInfo bomberInfo;
 	SStockInfo stockInfo;
 	SNuclearInfo nuclearInfo;
+	int overnukeScouts = 0;
+	int overnukeRounds = 0;
+	springai::AIFloat3 nuclearAim = springai::AIFloat3(-1.f, 0.f, -1.f);
+	float nuclearAimRadius = 0.f;
+	int nuclearLaunches = 0;
+	springai::AIFloat3 nuclearLaunchPos = springai::AIFloat3(-1.f, 0.f, -1.f);
+	float nuclearLaunchRadius = 0.f;
 	SSensorInfo sensorInfo;
 	SCommSnipeInfo commSnipeInfo;
 	std::unordered_map<int, std::pair<int, bool>> wreckCache;

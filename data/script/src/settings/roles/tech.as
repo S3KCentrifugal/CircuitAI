@@ -418,6 +418,7 @@ namespace Tech {
             int NukeRushStockpileBudgetSeconds = 300;       // spare-energy construction until first missile stocks; bounded recovery if silo stalls
             int NukeRushScouts = 2;                         // earn enemy-base vision before the first missile is ready
             int NukeRushScoutSeconds = 20 * 60;             // replenish cheap reconnaissance during the first-shot window
+            float NukeScoutSiloProgress = 2.0f;  // owner 2026-11-06: > 1 = off, AIR is called at silo completion (NukeRecon::Tick); 0..1: also an early call once the first silo frame is this far built
             // D-070: the commander's home mexes are the opening's (OpeningMexRadius / OpeningMexCap: the
             // spots within 700 of the start, at most 3 - three on Supreme Isthmus, one or none elsewhere),
             // the lab follows at once, and the constructors claim the rest within ChainMexFarRadius

@@ -38,6 +38,21 @@ namespace AirScoutSweep {
     AIFloat3 nukedAt(-1,0,-1);
     float nukedSpread = 0.0f;
     bool owedNuke = false;
+    // The early call's package is held (owner 2026-11-06, Rosetta): it forms at
+    // staging and waits for TECH's half-stockpile call, then flies with what it
+    // has (base contact or not), so it crosses ~1 min before the first missile
+    // instead of ~2 min before the silo stocks. heldUntil: the hold's expiry frame
+    // (-1 none); released: the hold ended, fly now with the members.
+    int heldUntil = -1;
+    bool released = false;
+    // A nuke wave (owner 2026-11-06, Wave): 10 T1 + 10 radar built first (no
+    // draft, no form timeout), flying when complete or when TECH's half-stockpile
+    // call releases it; each plane to the far buildable edge of its lane and
+    // back to its staging point (edges, turning).
+    bool pendFull = false, untilFull = false;
+    array<AIFloat3> edges;
+    dictionary turning;  // flying wave planes not yet at their edge point
+    bool Held() { return heldUntil >= 0 && ai.frame < heldUntil; }
     bool Flying(int id) { return flying.exists(""+id); }
     int Wanted(int kind) {
         if (kind == 0) return wantT1 >= 0 ? wantT1 : Global::RoleSettings::Air::ScoutSweepT1Count;
@@ -210,9 +225,28 @@ namespace AirScoutSweep {
         GenericHelpers::LogUtil("[AIR][ScoutSweep] emergency over: the owed package "+(forming ? "forms (T1="+Count(0)+"/"+Wanted(0)
             +" radar="+Count(1)+"/"+Wanted(1)+"), its clock runs again" : "is due"),1);
     }
-    void Urgent(const AIFloat3 &in at, float spread) {
+    void Urgent(const AIFloat3 &in at, float spread) { Urgent(at, spread, false); }
+    // early: TECH's silo-frame call. Nothing is drafted then (built aircraft would
+    // cross minutes early); the whole package is owed and held at staging.
+    void Urgent(const AIFloat3 &in at, float spread, bool early) {
         if (!Enabled() || !AirEconomy::Active()) return;
-        Draft(at, spread);
+        if (probeSince < 0) probeSince = ai.frame;
+        probeCall = ai.frame; probeCallBest = -1000.0f;
+        if (early) {
+            draftT1 = 0; draftRadar = 0;
+            // a second TECH's early call joins the hold already running, never extends it
+            if (!Held() && !(forming && released)) { heldUntil = ai.frame + Global::RoleSettings::Air::NukeScoutHoldSeconds * SECOND; released = false; }
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke early call: package built and held at staging until the half-stockpile call (max "
+                + Global::RoleSettings::Air::NukeScoutHoldSeconds + " s)", 1);
+        } else {
+            Draft(at, spread);
+            if (Held()) {
+                // a package not begun yet forms as an ordinary urgent one
+                heldUntil = -1; released = forming && !dispatching;
+                GenericHelpers::LogUtil("[AIR][ScoutSweep] held package released by the half-stockpile call T1="+Count(0)+"/"+Wanted(0)
+                    +" radar="+Count(1)+"/"+Wanted(1),1);
+            }
+        }
         // What the draft lacked is built and flown later: the whole 10 T1 when
         // short of them, 3 radar planes when short of those (only with a T2 plant).
         const int restT1 = draftT1 >= Global::RoleSettings::Air::ScoutSweepT1Count ? 0 : Global::RoleSettings::Air::ScoutSweepT1Count;
@@ -231,6 +265,34 @@ namespace AirScoutSweep {
         pendT1 = restT1; pendRadar = restRadar;
         pendAt = across ? AIFloat3(-1,0,-1) : at; pendSpread = spread; pendUrgent = true; requested = true;
         GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke package owed T1="+restT1+" radar="+restRadar+(across ? " across" : " to the latest nuke"),1);
+    }
+
+    void Wave(const string &in why) {
+        if (!Enabled() || !AirEconomy::Active()) return;
+        if (probeSince < 0) probeSince = ai.frame;
+        probeCall = ai.frame; probeCallBest = -1000.0f;
+        owedNuke = false;  // the wave flies across, never to the latest nuke
+        if (forming && !dispatching) {
+            wantUrgent = true; untilFull = !released;
+            if (wantT1 >= 0) wantT1 = AiMax(wantT1, Global::RoleSettings::Air::ScoutSweepT1Count);
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke wave ("+why+") joins the forming package T1="+Count(0)+"/"+Wanted(0)+" radar="+Count(1)+"/"+Wanted(1),1);
+            return;
+        }
+        pendT1 = Global::RoleSettings::Air::ScoutSweepT1Count; pendRadar = Global::RoleSettings::Air::NukeScoutRadarCount;
+        pendAt = AIFloat3(-1,0,-1); pendSpread = 0.0f; pendUrgent = true; pendFull = true; requested = true;
+        GenericHelpers::LogUtil("[AIR][ScoutSweep] nuke wave ("+why+"): T1="+pendT1+" radar="+(firstPlantFrame >= 0 ? pendRadar : 0)
+            +" across to the far edge and back"+(firstPlantFrame < 0 ? " (no T2 plant: no radar)" : ""),1);
+    }
+    // TECH's half-stockpile call: a package still forming flies now with what it has.
+    void Release() {
+        if (!Enabled() || !AirEconomy::Active()) return;
+        if (!forming || dispatching) {
+            pendFull = false;  // a wave not begun yet forms with the ordinary clock
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] half-stockpile call: no package forming"+(requested ? " (one is pending)" : ""),1);
+            return;
+        }
+        heldUntil = -1; untilFull = false; released = true;
+        GenericHelpers::LogUtil("[AIR][ScoutSweep] half-stockpile call releases the forming package T1="+Count(0)+"/"+Wanted(0)+" radar="+Count(1)+"/"+Wanted(1),1);
     }
 
     AIFloat3 Mean(const array<AIFloat3> &in points, const AIFloat3 &in fallback) {
@@ -253,7 +315,7 @@ namespace AirScoutSweep {
         CCircuitDef@ ground = ai.GetCircuitDef("armllt");
         CCircuitDef@ water = ai.GetCircuitDef("armtide");
         if (ground is null) return false;
-        array<AIFloat3> staging, targets;
+        array<AIFloat3> staging, targets, rims;
         // At most 56 * 12 terrain samples per side, once per package (not per
         // aircraft/tick). Quantiles of valid strips spread over buildable ground
         // without collapsing individual points onto the same map edge.
@@ -269,25 +331,35 @@ namespace AirScoutSweep {
                 if (goal.x < 0 && AirLayout::Inside(b,128) && !AirHome::Friendly(b)
                     && (aiTerrainMgr.CanUpgradeTerrain(ground,b) || (water !is null && aiTerrainMgr.CanUpgradeTerrain(water,b)))) goal=b;
             }
-            if (start.x >= 0 && (goal.x >= 0 || Targeted())) { staging.insertLast(start); targets.insertLast(goal); }
+            if (start.x < 0 || (goal.x < 0 && !Targeted())) continue;
+            // The far buildable edge of this lane (owner 2026-11-06): the last
+            // buildable sample walking on past the enemy starts, at most 40 per lane.
+            AIFloat3 rim = goal;
+            if (wantUrgent && !Targeted()) for (int step = 0; step < 40; ++step) {
+                const float along = float(step)*0.025f;
+                const AIFloat3 c(enemy.x+forward.x*length*along+across.x*offset,0,enemy.z+forward.z*length*along+across.z*offset);
+                if (!AirLayout::Inside(c,128)) break;
+                if (aiTerrainMgr.CanUpgradeTerrain(ground,c) || (water !is null && aiTerrainMgr.CanUpgradeTerrain(water,c))) rim = c;
+            }
+            staging.insertLast(start); targets.insertLast(goal); rims.insertLast(rim);
         }
         const int total = Wanted(0)+Wanted(1);
         if (total <= 0 || int(staging.length()) < total) return false;
-        starts.resize(0); goals.resize(0);
+        starts.resize(0); goals.resize(0); edges.resize(0);
         for (int i = 0; i < total; ++i) {
             const int index = AiMin(int(staging.length())-1,int((float(i)+0.5f)*float(staging.length())/float(total)));
-            starts.insertLast(staging[index]); goals.insertLast(targets[index]);
+            starts.insertLast(staging[index]); goals.insertLast(targets[index]); edges.insertLast(rims[index]);
         }
         return true;
     }
     void Begin() {
         if (ai.frame<planAfter) return;
-        wantT1=pendT1; wantRadar=pendRadar; wantAt=pendAt; wantSpread=pendSpread; wantUrgent=pendUrgent;
+        wantT1=pendT1; wantRadar=pendRadar; wantAt=pendAt; wantSpread=pendSpread; wantUrgent=pendUrgent; untilFull=pendFull;
         if (wantUrgent && firstPlantFrame<0) wantRadar=0;  // radar planes need the T2 plant
         if (Wanted(0)+Wanted(1)<=0) { pendT1=-1; pendRadar=-1; pendAt=AIFloat3(-1,0,-1); pendUrgent=false; requested=false; owedNuke=false;
             wantT1=-1; wantRadar=-1; wantAt=AIFloat3(-1,0,-1); wantUrgent=false; return; }
         if (!Plan()) { wantT1=-1; wantRadar=-1; wantAt=AIFloat3(-1,0,-1); wantUrgent=false; planAfter=ai.frame+10*SECOND; return; }
-        pendT1=-1; pendRadar=-1; pendAt=AIFloat3(-1,0,-1); pendUrgent=false;
+        pendT1=-1; pendRadar=-1; pendAt=AIFloat3(-1,0,-1); pendUrgent=false; pendFull=false; released=false;
         excluded.deleteAll(); members.deleteAll(); arrived.deleteAll();
         array<Id>@ ids = ai.GetOwnedUnitIds();
         for (uint i=0;i<ids.length();++i) {
@@ -344,9 +416,55 @@ namespace AirScoutSweep {
         def.maxThisUnit=2147483647;
         return AirProduction::Recruit(plant,def.GetName(),AirProduction::Projected(def)+missing,"scout.sweep",Task::Priority::HIGH);
     }
+    // A nuke wave under base contact (owner 2026-11-06): every other plant order
+    // goes to its scouts, the rest to the base's defence (AirProduction::MakeTask).
+    int underFireTurn = 0;
+    IUnitTask@ ProduceUnderFire(CCircuitUnit@ plant) {
+        if (!forming || dispatching || !wantUrgent) return null;
+        if ((underFireTurn++ % 2) != 0) return null;
+        return Produce(plant);
+    }
+    // Nuke scout probe (owner 2026-11-02): from TECH's first nuke request, the
+    // furthest any scout-sweep aircraft got toward the enemy starts
+    // (NukeScoutProbe::Progress) and when one first passed 80%.
+    // probeCall*: the same since TECH's latest call (the half-stockpile redraft)
+    int probeSince = -1, probe80 = -1, probeBestId = -1, probeCall = -1;
+    float probeBest = -1000.0f, probeCallBest = -1000.0f;
+    float ProbeNow(int &out count) {
+        float now = -1000.0f; count = 0;
+        array<string>@ ids = flying.getKeys();
+        array<string>@ staged = members.getKeys();
+        for (uint i = 0; i < staged.length(); ++i) ids.insertLast(staged[i]);
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(ids[i]));
+            if (u is null) continue;
+            ++count;
+            const float p = NukeScoutProbe::Progress(u.GetPos(ai.frame));
+            if (p > now) now = p;
+            if (p > probeBest) { probeBest = p; probeBestId = u.id; }
+            if (p > probeCallBest) probeCallBest = p;
+        }
+        if (probeBest >= 80.0f && probe80 < 0) probe80 = ai.frame;
+        return now;
+    }
+    void ProbeReport(const string &in ev, int tech) {
+        if (probeSince < 0) {
+            GenericHelpers::LogUtil("[AIR][NukeScout] TECH="+tech+" "+ev+" at "+NukeScoutProbe::Clock(ai.frame)
+                +": no nuke scout request yet (T2 plant "+NukeScoutProbe::Clock(firstPlantFrame)+")",1);
+            return;
+        }
+        int count = 0;
+        const float now = ProbeNow(count);
+        GenericHelpers::LogUtil("[AIR][NukeScout] TECH="+tech+" "+ev+" at "+NukeScoutProbe::Clock(ai.frame)
+            +": request "+NukeScoutProbe::Clock(probeSince)+" furthest="+(probeBest > -1000.0f ? int(probeBest)+"% unit="+probeBestId : "none")
+            +" now="+(count > 0 ? int(now)+"%" : "none")+" aircraft="+count+" forming="+forming+" T1="+Count(0)+"/"+Wanted(0)
+            +" radar="+Count(1)+"/"+Wanted(1)+" past80="+NukeScoutProbe::Clock(probe80)
+            +" latest call "+NukeScoutProbe::Clock(probeCall)+" furthest="+(probeCallBest > -1000.0f ? int(probeCallBest)+"%" : "none")+" pass80="+(probeBest >= 80.0f ? "yes" : "NO"),1);
+    }
     void Tick() {
         if (!Enabled() || !AirEconomy::Active() || ai.frame-checked<SECOND) return;
         checked=ai.frame;
+        if (probeSince >= 0) { int count = 0; ProbeNow(count); }
         // Lifecycle factory list: O(F) only until the first completed T2 plant.
         if (firstPlantFrame<0) for (uint i=0;i<Factory::factoryList.length();++i) PlantFinished(Factory::factoryList[i]);
         if (nextPeriodic>=0 && ai.frame>=nextPeriodic) {
@@ -358,13 +476,22 @@ namespace AirScoutSweep {
         for (uint i=0;i<away.length();++i) {
             CCircuitUnit@ u=ai.GetTeamUnit(parseInt(away[i])); CRouteTask@ task; flying.get(away[i],@task);
             AIFloat3 end; endpoints.get(away[i],end); int deadline=0; expires.get(away[i],deadline);
+            AIFloat3 rim;
+            if (turning.get(away[i],rim)) {
+                // out to the edge first: home is the route's end, not yet its arrival
+                if (u !is null && MapHelpers::SqDist(u.GetPos(ai.frame),rim)<=512.0f*512.0f) {
+                    turning.delete(away[i]);
+                    GenericHelpers::LogUtil("[AIR][ScoutSweep] edge reached unit="+u.id+" x="+int(rim.x)+" z="+int(rim.z),1);
+                }
+                else if (u !is null && u.task is task && task !is null && !task.IsDead() && ai.frame<deadline) continue;
+            }
             if (u !is null && u.task is task && task !is null && !task.IsDead()
                 && ai.frame<deadline && MapHelpers::SqDist(u.GetPos(ai.frame),end)>256.0f*256.0f) continue;
             if (u !is null && u.task is task && task !is null && !task.IsDead()
                 && MapHelpers::SqDist(u.GetPos(ai.frame),end)<=256.0f*256.0f)
                 GenericHelpers::LogUtil("[AIR][ScoutSweep] arrived unit="+u.id,1);
             if (u !is null && u.task is task) { u.SetIdleMode(1); u.SetFireState(u.circuitDef.GetFireState()); }
-            flying.delete(away[i]); endpoints.delete(away[i]); expires.delete(away[i]);
+            flying.delete(away[i]); endpoints.delete(away[i]); expires.delete(away[i]); turning.delete(away[i]);
             if (task !is null && !task.IsDead()) task.Abort();
         }
         if (!forming && requested && ((firstPlantFrame>=0 && Gate()) || pendUrgent)) Begin();
@@ -403,8 +530,16 @@ namespace AirScoutSweep {
         // with what it has; an empty one is dropped, unless it is the owed nuke scout
         // (owner 2026-10-31). The clock stops while the base defends.
         bool late=false;
+        if (!dispatching && heldUntil>=0 && !Held()) {
+            heldUntil=-1; released=true;
+            GenericHelpers::LogUtil("[AIR][ScoutSweep] hold expired without a half-stockpile call: flying with T1="+Count(0)+"/"+Wanted(0),1);
+        }
         if (!dispatching) {
-            if (AirBaseResponse::Emergency()) formedAt=ai.frame;
+            // held: the form clock waits; released: the nuke is about a minute out, so
+            // the members fly now even while the base defends (Rosetta 2026-11-06)
+            if (Held() || untilFull) formedAt=ai.frame;  // a wave waits for its full count or the release
+            else if (released && !members.isEmpty()) late=true;
+            else if (AirBaseResponse::Emergency()) formedAt=ai.frame;
             else if (ai.frame-formedAt>=Global::RoleSettings::Air::ScoutSweepFormSeconds*SECOND) {
                 if (!members.isEmpty()) late=true;
                 else if (!wantUrgent) {
@@ -413,7 +548,7 @@ namespace AirScoutSweep {
                 }
             }
         }
-        if (!dispatching && !late && ((!wantUrgent && !Gate()) || Count(0)!=Wanted(0) || Count(1)!=Wanted(1) || arrived.getSize()!=members.getSize())) return;
+        if (!dispatching && !late && (Held() || (!wantUrgent && !Gate()) || Count(0)!=Wanted(0) || Count(1)!=Wanted(1) || arrived.getSize()!=members.getSize())) return;
         if (late) GenericHelpers::LogUtil("[AIR][ScoutSweep] forming timeout: flying with T1="+Count(0)+"/"+Wanted(0)+" radar="+Count(1)+"/"+Wanted(1),1);
         if (!dispatching && owedNuke && wantUrgent && Targeted() && nukedAt.x>=0.0f) { wantAt=nukedAt; wantSpread=nukedSpread; }
         if (!dispatching && wantUrgent) owedNuke=false;
@@ -427,6 +562,11 @@ namespace AirScoutSweep {
             if (task is null) continue;
             array<AIFloat3>@ route = null;
             if (Targeted()) @route = LolCannonRecon::Route(starts[slot],wantAt,slot,int(starts.length()),wantSpread);
+            else if (wantUrgent && slot < int(edges.length())) {
+                // a nuke wave: one waypoint at the lane's far edge, then back to staging
+                @route = array<AIFloat3>(); route.insertLast(edges[slot]); route.insertLast(starts[slot]);
+                turning.set(ids[i], edges[slot]);
+            }
             else { @route = array<AIFloat3>(); route.insertLast(goals[slot]); }
             const AIFloat3 end=route[route.length()-1];
             task.SetAirControl(true); task.SetTraversal(true,256,false); task.SetRoute(route);
@@ -445,7 +585,7 @@ namespace AirScoutSweep {
                 members.delete(left[i]); arrived.delete(left[i]);
             }
         }
-        if (members.isEmpty()) { assembly.Abort(); @assembly=null; forming=false; excluded.deleteAll(); wantT1=-1; wantRadar=-1; wantAt=AIFloat3(-1,0,-1); wantUrgent=false; }
+        if (members.isEmpty()) { assembly.Abort(); @assembly=null; forming=false; excluded.deleteAll(); wantT1=-1; wantRadar=-1; wantAt=AIFloat3(-1,0,-1); wantUrgent=false; released=false; untilFull=false; }
     }
     void Reset() {
         array<string>@ controlled=members.getKeys();
@@ -462,9 +602,9 @@ namespace AirScoutSweep {
         @ids=caps.getKeys();
         for(uint i=0;i<ids.length();++i) { CCircuitDef@ def=ai.GetCircuitDef(ids[i]); int cap=0; if(def !is null && caps.get(ids[i],cap)) def.maxThisUnit=cap; }
         pendT1=-1; pendRadar=-1; wantT1=-1; wantRadar=-1; pendAt=AIFloat3(-1,0,-1); wantAt=AIFloat3(-1,0,-1); pendUrgent=false; wantUrgent=false;
-        draftT1=-1; draftRadar=0; formedAt=-1; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false;
+        draftT1=-1; draftRadar=0; formedAt=-1; probeSince=-1; probe80=-1; probeBestId=-1; probeBest=-1000.0f; probeCall=-1; probeCallBest=-1000.0f; nukedAt=AIFloat3(-1,0,-1); nukedSpread=0.0f; owedNuke=false; heldUntil=-1; released=false; pendFull=false; untilFull=false;
         emergencyDraftFrame=-1; owedEmergency=false;
         @assembly=null; forming=false; dispatching=false; requested=false; firstPlantFrame=-1; nextPeriodic=-1; checked=-SECOND; planAfter=0;
-        excluded.deleteAll(); members.deleteAll(); arrived.deleteAll(); flying.deleteAll(); endpoints.deleteAll(); expires.deleteAll(); caps.deleteAll(); starts.resize(0); goals.resize(0);
+        excluded.deleteAll(); members.deleteAll(); arrived.deleteAll(); flying.deleteAll(); endpoints.deleteAll(); expires.deleteAll(); caps.deleteAll(); starts.resize(0); goals.resize(0); edges.resize(0); turning.deleteAll();
     }
 }
