@@ -9,4 +9,8 @@ namespace Global { namespace StartPick {
 	float BoxMargin = 32.0f;
 	// Furthest a side's out-of-box spot is pulled into the box; beyond it the spot is skipped.
 	float MaxPull = 1500.0f;
+	// Clamp target depth inside the polygon box (start_boxes.as): BoxMargin plus room.
+	float BoxInset = 48.0f;
+	// A clamped point keeps this far from the side's other spots (game rejects < 350).
+	float StartSpacing = 360.0f;
 }}
