@@ -224,7 +224,14 @@ namespace AirEmergencyDefense {
     void Answer(Emergency@ e, const string &in takeover)
     {
         const int cooling = CoolingFor(e.site);
-        if (cooling > 0) { Decline(e, "cooling down here (" + cooling + " s left)"); return; }
+        // cooling down: sit this one out, no hand-off (handing it on made the answer hop across
+        // every FRONT on repeat scout pokes: 84 hand-offs in one Flats and Forests game)
+        if (cooling > 0) {
+            e.mine = false; e.handedOver = true;
+            GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + ": this FRONT is cooling down here ("
+                + cooling + " s left), not answering", 1);
+            return;
+        }
         string why;
         if (!CanHelp(e, why)) { Decline(e, why); return; }
         GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + ": this FRONT's labs switch to fast defense"
