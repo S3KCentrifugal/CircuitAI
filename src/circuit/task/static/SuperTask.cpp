@@ -11,6 +11,7 @@
 #include "map/MapManager.h"
 #include "module/MilitaryManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "unit/enemy/EnemyManager.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/ally/AllyTeam.h"
@@ -26,12 +27,16 @@
 #define SMILEY_DEDUPE	(FRAMES_PER_SEC * 5)  // D-124: the stockpile watch draws only if the event did not within this
 #define SMILEY_DEDUPE_EVENT	(FRAMES_PER_SEC * 1)  // D-124: two launch signals this close are one launch
 #include "CircuitAI.h"
+#include "util/GameAttribute.h"
 #include "util/Utils.h"
 #include "spring/SpringCallback.h"
 #include "WeaponMount.h"
 #include "WeaponDef.h"
+#include "Damage.h"
+#include "UnitDef.h"
 
 #include "spring/SpringMap.h"
+#include "spring/SpringUnit.h"
 
 #include "AISCommands.h"
 #include "Lua.h"
@@ -39,6 +44,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <limits>
 #include <vector>
@@ -104,6 +110,10 @@ void CSuperTask::Update()
 			OnLaunch(unit, "stockpile drop");
 		}
 		lastStock = stock;
+	}
+	if (IsNukeSilo(unit->GetCircuitDef()) && (frame - strikeChecked >= FRAMES_PER_SEC)) {
+		strikeChecked = frame;
+		ResolveStrikes(unit, frame);  // once a second: one walk over the ally team's few pending launches
 	}
 
 	if (unit->Blocker() != nullptr) {
@@ -395,7 +405,8 @@ void CSuperTask::Update()
  */
 bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 		float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify, float minValue, bool avoidFriendly,
-		bool allEnemies, bool pulseClaims, bool nuclearHistory)
+		bool allEnemies, bool pulseClaims, bool nuclearHistory, const TAimScale& aimScale, const TExtraAims& extraAims,
+		const CWeaponDef* blastWeapon)
 {
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
@@ -405,6 +416,9 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 		springai::AIFloat3 pos;
 		int rank;
 		float value;
+		float health;
+		const CCircuitDef* cdef;
+		ICoreUnit::Id id;
 	};
 	std::vector<SAreaCand> cands;
 	int rejRange = 0, rejStale = 0, rejClass = 0, rejFriendly = 0;
@@ -451,28 +465,78 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				continue;
 			}
 		}
-		cands.push_back({e.pos, rank, value});
+		cands.push_back({e.pos, rank, value, ((e.health > 0.f) ? e.health : edef->GetHealth()), edef, e.id});
 	}
 	}
+
+	// Aim points: every candidate, plus the caller's extra points (nukes: just
+	// outside an antinuke's coverage), which pass the same range, claim and
+	// friendly checks as a candidate.
+	std::vector<springai::AIFloat3> aims;
+	aims.reserve(cands.size());
+	for (const SAreaCand& c : cands) aims.push_back(c.pos);
+	if (extraAims && !cands.empty()) {
+		for (springai::AIFloat3 p : extraAims(aims)) {
+			if ((p.x < 0.f) || (p.z < 0.f) || (p.x >= CTerrainManager::GetTerrainWidth()) || (p.z >= CTerrainManager::GetTerrainHeight())) continue;
+			if (position.SqDistance2D(p) >= maxSqRange) continue;
+			if ((pulseClaims || nuclearHistory) && !CanAimStrategic(unit, p)) continue;
+			if (avoidFriendly) {
+				auto& friendlies = circuit->GetCallback()->GetFriendlyUnitsIn(p, std::sqrt(sqAoe));
+				const bool hit = !friendlies.empty();
+				utils::free(friendlies);
+				if (hit) continue;
+			}
+			p.y = circuit->GetMap()->GetElevationAt(p.x, p.z);
+			aims.push_back(p);
+		}
+	}
+
+	// Chain reactions (owner 2026-11-02): with a blast weapon, an aim point is
+	// worth the metal of everything that dies - the blast's own kills, then
+	// every death explosion's kills, repeated - see ChainKill. O(A x C) to
+	// gather the units near each aim point, plus ChainKill's O(K^2) per aim on
+	// the K units within blast + chain reach; A and C are the known enemy
+	// structures in range (nukes only, every TARGET_DELAY per silo).
+	float chainReach = 0.f;
+	if (blastWeapon != nullptr) {
+		for (const SAreaCand& c : cands) chainReach = std::max(chainReach, DeathBlastOf(c.cdef).radius);
+	}
+	const float sqReach = SQUARE(std::sqrt(sqAoe) + chainReach);
+	std::vector<SChainUnit> nearUnits;
 
 	int bestRank = std::numeric_limits<int>::max();
 	float bestValue = 0.f;
 	int bestCount = 0;
 	int bestIdx = -1;
-	for (unsigned i = 0; i < cands.size(); ++i) {
+	for (unsigned i = 0; i < aims.size(); ++i) {
 		int rank = std::numeric_limits<int>::max();
 		float value = 0.f;
 		int count = 0;
-		for (unsigned j = 0; j < cands.size(); ++j) {
-			if (cands[i].pos.SqDistance2D(cands[j].pos) >= sqAoe) {
+		if (blastWeapon != nullptr) {
+			nearUnits.clear();
+			for (const SAreaCand& c : cands) {
+				const float sqDist = aims[i].SqDistance2D(c.pos);
+				if (sqDist >= sqReach) continue;
+				if (sqDist < sqAoe) { rank = std::min(rank, c.rank); ++count; }
+				nearUnits.push_back({c.pos, c.value, c.health, c.cdef, FacingOf(c.id, DeathBlastOf(c.cdef))});
+			}
+			if (count < minTargets) continue;
+			value = ChainKill(blastWeapon, std::sqrt(sqAoe), aims[i], nearUnits);
+		} else {
+			for (unsigned j = 0; j < cands.size(); ++j) {
+				if (aims[i].SqDistance2D(cands[j].pos) >= sqAoe) {
+					continue;
+				}
+				rank = std::min(rank, cands[j].rank);
+				value += cands[j].value;
+				++count;
+			}
+			if (count < minTargets) {
 				continue;
 			}
-			rank = std::min(rank, cands[j].rank);
-			value += cands[j].value;
-			++count;
 		}
-		if (count < minTargets) {
-			continue;
+		if (aimScale) {
+			value *= aimScale(aims[i]);
 		}
 		if ((rank < bestRank) || ((rank == bestRank) && (value > bestValue))) {
 			bestRank = rank;
@@ -487,16 +551,17 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 	}
 	if (bestIdx < 0) {
 		if ((frame / TARGET_DELAY) % 6 == 0) {
-			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i minTargets=%i bestValue=%.0f minValue=%.0f",
+			circuit->LOG("%s %s(%i): no target | range=%.0f candidates=%zu rejClass=%i rejRange=%i rejStale=%i rejFriendly=%i minTargets=%i bestValue=%.0f minValue=%.0f",
 					tag, cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange(),
-					cands.size(), rejClass, rejRange, rejStale, minTargets, bestValue, minValue);
+					cands.size(), rejClass, rejRange, rejStale, rejFriendly, minTargets, bestValue, minValue);
 		}
 		return false;
 	}
 
+	areaReach = std::sqrt(sqReach);  // blast plus chain reach: a landed nuke marks this much (StrikeLedger)
 	SetTarget(nullptr);  // area effect at a position, possibly of a unit we can no longer see
-	const bool isMoved = (targetPos.SqDistance2D(cands[bestIdx].pos) > SQUARE(1.f));
-	targetPos = cands[bestIdx].pos;
+	const bool isMoved = (targetPos.SqDistance2D(aims[bestIdx]) > SQUARE(1.f));
+	targetPos = aims[bestIdx];
 	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
 	if (isMoved) {  // Update runs every TARGET_DELAY: only log a new aim point
 		circuit->LOG("%s %s(%i): rank=%i targets=%i value=%.0f at (%i,%i)",
@@ -504,6 +569,135 @@ bool CSuperTask::SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const c
 				int(targetPos.x), int(targetPos.z));
 	}
 	return true;
+}
+
+/*
+ * Blast and chain kills (owner 2026-11-02). Engine area damage is
+ * damage x (R - d) / (R - d x edge effectiveness), d measured to the unit's
+ * collision volume (CollisionVolumes.h, SurfaceDistance). A nuke
+ * (15000, R 960, edge 0) kills a full 9400-health Cortex AFUS only within about
+ * 360 of the impact, but each AFUS or advanced geo that dies explodes for 10600
+ * over 640 (customfusionexplo), fusions and nuke silos for 2650 over 240, so a
+ * tight economy block usually dies whole once one of them goes. ChainKill
+ * applies the blast to every known unit near the aim point (health as last
+ * seen), then each death's explosion to the survivors, until nothing more
+ * dies, and returns the metal of the dead. O(K^2) on the K units passed in.
+ */
+float CSuperTask::AreaDamage(float damage, float radius, float edge, float dist)
+{
+	if ((damage <= 0.f) || (dist >= radius)) return 0.f;
+	const float denom = radius - dist * edge;
+	return (denom > 0.f) ? damage * (radius - dist) / denom : damage;
+}
+
+CSuperTask::SDeathBlast CSuperTask::DeathBlastOf(const CCircuitDef* cdef)
+{
+	auto it = deathBlasts.find(cdef);
+	if (it != deathBlasts.end()) return it->second;
+	SDeathBlast b;
+	CCircuitDef* d = const_cast<CCircuitDef*>(cdef);
+	b.volume = d->GetRadius();
+	// the generated table (CollisionVolumes.h), indexed by name once per process
+	static const std::unordered_map<std::string, const CV::SVolume*> table = []() {
+		std::unordered_map<std::string, const CV::SVolume*> t;
+		for (const CV::SVolume& v : CV::volumes) t.emplace(v.name, &v);
+		return t;
+	}();
+	auto cv = table.find(d->GetDef()->GetName());
+	b.cv = (cv != table.end()) ? cv->second : nullptr;
+	const std::unique_ptr<WeaponDef> wd(d->GetDef()->GetDeathExplosion());
+	if (wd != nullptr) {
+		b.radius = wd->GetAreaOfEffect();
+		b.edge = wd->GetEdgeEffectiveness();
+		const std::unique_ptr<Damage> damage(wd->GetDamage());
+		const std::vector<float>& types = damage->GetTypes();
+		// default armour; a paralyzer death blast (armamex, armshockwave: empblast) stuns, it kills nothing
+		b.damage = (types.empty() || wd->IsParalyzer()) ? 0.f : types[0];
+	}
+	deathBlasts.emplace(cdef, b);
+	return b;
+}
+
+/*
+ * The engine's area damage distance is to the collision volume's surface
+ * (headless calibration 2026-11-02: exact to under 1 elmo). Cylinders (Y axis)
+ * and spheres: planar distance minus the radius; boxes and lying cylinders: the
+ * planar distance to the footprint rectangle, half-sizes and offsets turned by
+ * the building facing (0 south, 1 east, 2 north, 3 west). A def without a table
+ * entry: centre distance minus its radius x nuclear.blast_volume_factor.
+ */
+float CSuperTask::SurfaceDistance(const SDeathBlast& b, float volumeFactor, const AIFloat3& unitPos, int facing, const AIFloat3& p)
+{
+	const CV::SVolume* v = b.cv;
+	if (v == nullptr) {
+		return std::max(0.f, std::sqrt(unitPos.SqDistance2D(p)) - b.volume * volumeFactor);
+	}
+	const bool turned = (facing == 1) || (facing == 3);
+	float ox = v->ox, oz = v->oz;
+	switch (facing) {
+		case 1: ox = v->oz; oz = -v->ox; break;
+		case 2: ox = -v->ox; oz = -v->oz; break;
+		case 3: ox = -v->oz; oz = v->ox; break;
+		default: break;
+	}
+	const float dx = p.x - (unitPos.x + ox), dz = p.z - (unitPos.z + oz);
+	switch (v->type) {
+		case CV::CYL_Y:
+		case CV::SPHERE:
+			return std::max(0.f, std::sqrt(dx * dx + dz * dz) - (v->sx + v->sz) * 0.25f);
+		default: {  // BOX, CYL_X, CYL_Z: the planar rectangle
+			const float hx = (turned ? v->sz : v->sx) * 0.5f, hz = (turned ? v->sx : v->sz) * 0.5f;
+			const float ex = std::max(0.f, std::abs(dx) - hx), ez = std::max(0.f, std::abs(dz) - hz);
+			return std::sqrt(ex * ex + ez * ez);
+		}
+	}
+}
+
+int CSuperTask::FacingOf(ICoreUnit::Id id, const SDeathBlast& b)
+{
+	if ((b.cv == nullptr) || (b.cv->type == CV::CYL_Y) || (b.cv->type == CV::SPHERE)) return 0;  // round: facing does not matter
+	auto it = facings.find(id);
+	if (it != facings.end()) return it->second;
+	CEnemyInfo* info = manager->GetCircuit()->GetEnemyInfo(id);
+	if ((info == nullptr) || !info->GetData()->IsInLOS()) return 0;  // facing 0 until seen
+	const int facing = info->GetUnit()->GetBuildingFacing();
+	if ((facing < 0) || (facing > 3)) return 0;
+	facings.emplace(id, facing);
+	return facing;
+}
+
+float CSuperTask::ChainKill(const CWeaponDef* wd, float radius, const AIFloat3& aim, const std::vector<SChainUnit>& units)
+{
+	const float volumeFactor = manager->GetCircuit()->GetMilitaryManager()->GetNuclearInfo().volumeFactor;
+	const unsigned n = units.size();
+	std::vector<float> hp(n);
+	std::vector<SDeathBlast> blasts(n);
+	std::vector<unsigned> frontier;
+	for (unsigned k = 0; k < n; ++k) {
+		blasts[k] = DeathBlastOf(units[k].cdef);
+		hp[k] = units[k].health - AreaDamage(wd->GetDamage(), radius, wd->GetEdgeEffectiveness(),
+				SurfaceDistance(blasts[k], volumeFactor, units[k].pos, units[k].facing, aim));
+		if (hp[k] <= 0.f) frontier.push_back(k);
+	}
+	std::vector<bool> dead(n, false);
+	float value = 0.f;
+	while (!frontier.empty()) {
+		std::vector<unsigned> next;
+		for (unsigned k : frontier) {
+			if (dead[k]) continue;
+			dead[k] = true;
+			value += units[k].value;
+			const SDeathBlast& b = blasts[k];
+			if (b.damage <= 0.f) continue;
+			for (unsigned j = 0; j < n; ++j) {
+				if (dead[j] || (hp[j] <= 0.f)) continue;
+				hp[j] -= AreaDamage(b.damage, b.radius, b.edge, SurfaceDistance(blasts[j], volumeFactor, units[j].pos, units[j].facing, units[k].pos));
+				if (hp[j] <= 0.f) next.push_back(j);
+			}
+		}
+		frontier.swap(next);
+	}
+	return value;
 }
 
 /*
@@ -592,19 +786,359 @@ bool CSuperTask::CanAimStrategic(CCircuitUnit* unit, const AIFloat3& pos) const
 	if (!strategic::Valid({pos.x, pos.z}) || pos.x >= CTerrainManager::GetTerrainWidth() || pos.z >= CTerrainManager::GetTerrainHeight()) return false;
 	const int frame = circuit->GetLastFrame();
 	if (IsPulse(unit->GetCircuitDef())) return !circuit->GetAllyTeam()->GetPulseClaims().Blocked({pos.x, pos.z}, unit->GetId(), frame, false);
-	if (IsNukeSilo(unit->GetCircuitDef())) return !circuit->GetAllyTeam()->GetNuclearHistory().Blocked({pos.x, pos.z}, unit->GetId(), frame, true);
+	if (IsNukeSilo(unit->GetCircuitDef())) {
+		const strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
+		if (over.Covers({pos.x, pos.z})) return true;  // the overnuke target: every silo, every shot
+		return !over.Done({pos.x, pos.z}, frame)
+			&& !circuit->GetAllyTeam()->GetNuclearHistory().Blocked({pos.x, pos.z}, unit->GetId(), frame, true);
+	}
 	return true;
 }
 
+/*
+ * One overnuke per ally team (owner 2026-11-01): the silos of every allied BARb
+ * count towards the breakpoints, stock the salvo and stop together.
+ * fn(owner AI, its super task, the silo). A walk over the allied AIs' SUPER
+ * tasks - a handful each.
+ */
+template<typename F> static void ForEachAllyNukeSilo(CCircuitAI* circuit, F&& fn)
+{
+	for (CCircuitAI* ai : circuit->GetGameAttribute()->GetCircuits()) {
+		if (!ai->IsInitialized() || (ai->GetAllyTeamId() != circuit->GetAllyTeamId())) continue;
+		for (IFighterTask* task : ai->GetMilitaryManager()->GetTasks(IFighterTask::FightType::SUPER)) {
+			const auto& assignees = task->GetAssignees();
+			if (assignees.empty() || !CSuperTask::IsNukeSilo((*assignees.begin())->GetCircuitDef())) continue;
+			fn(ai, static_cast<CSuperTask*>(task), *assignees.begin());
+		}
+	}
+}
+
+int CSuperTask::CountNukeSilos() const
+{
+	int count = 0;
+	ForEachAllyNukeSilo(manager->GetCircuit(), [&count](CCircuitAI*, CSuperTask*, CCircuitUnit*) { ++count; });
+	return count;
+}
+
+/*
+ * Overnuke (owner 2026-10-28). With nuclear.overnuke_silos finished silos or
+ * more, the best aim point the scan finds becomes the target of every silo for
+ * a roll of overnuke_min..overnuke_max launches (CSuperTask::OnLaunch counts
+ * them), then the next best; a target with no known structure left in the blast
+ * ends early. A silo that cannot reach the target picks its own as before.
+ */
 bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 {
-	const auto& policy = manager->GetCircuit()->GetMilitaryManager()->GetNuclearInfo();
-	const float floor = StockedShotFloor(unit, cdef, manager->GetCircuit()->GetLastFrame(), cdef->GetWeaponDef()->GetCostMShot());
-	return SelectAreaTarget(unit, cdef, "NUCLEAR", SQUARE(cdef->GetAoe()), 1, 0,
-		[&policy](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
-			if (!strategic::NuclearTarget(d->IsMobile(), true, policy.structuresOnly)) return false;
-			rank = 0; value = e.cost; return true;
-		}, floor, true, true, false, true);
+	CCircuitAI* circuit = manager->GetCircuit();
+	const int frame = circuit->GetLastFrame();
+	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
+	const float floor = StockedShotFloor(unit, cdef, frame, cdef->GetWeaponDef()->GetCostMShot());
+	float coverFactor = policy.antinukeFactorOrdinary;  // overnuke: antinukeFactorOvernuke, set below
+	auto scan = [&]() {
+		const auto interceptors = KnownInterceptors();
+		// Nuke outcome (owner 2026-11-06): a ghost in an area a missile of ours landed
+		// on, not seen since, weighs strike_factor; an aim point near an intercept
+		// with no known interceptor counts one presumed interceptor.
+		const strategic::StrikeLedger& strikes = circuit->GetAllyTeam()->GetNuclearStrikes();
+		const bool marked = !strikes.Empty() && (policy.strikeFactor < 1.f);
+		const bool full = strikes.Empty() || (policy.interceptPresumeRadius <= 0.f);
+		const bool found = SelectAreaTarget(unit, cdef, "NUCLEAR", SQUARE(cdef->GetAoe()), 1, 0,
+			[&policy, circuit, &strikes, marked](const SEnemyData& e, CCircuitDef* d, int& rank, float& value) {
+				if (!strategic::NuclearTarget(d->IsMobile(), true, policy.structuresOnly)) return false;
+				rank = 0; value = e.cost;
+				if (marked && !e.IsInLOS()) {
+					const CEnemyInfo* info = circuit->GetEnemyInfo(e.id);
+					const int lastSeen = (info == nullptr) ? -1 : info->GetData()->GetLastSeen();
+					value *= strikes.GhostFactor({e.pos.x, e.pos.z}, lastSeen, policy.strikeFactor);
+				}
+				return true;
+			}, floor, true, true, false, true,
+			[&policy, &interceptors, &coverFactor, &strikes, full, frame](const AIFloat3& pos) {
+				int n = CountInterceptorCover(interceptors, pos);
+				if ((n <= 0) && !full && strikes.PresumedCover({pos.x, pos.z}, policy.interceptPresumeRadius, frame)) n = 1;
+				return (n <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(n)));
+			},
+			[&interceptors](const std::vector<AIFloat3>& targets) {
+				return CoverEdgeAims(interceptors, targets);
+			}, policy.blastKill ? cdef->GetWeaponDef() : nullptr);
+		if (found) {
+			const int cover = CountInterceptorCover(interceptors, targetPos);
+			if (coverLogPos.SqDistance2D(targetPos) > SQUARE(1.f)) {  // once per new aim point
+				coverLogPos = targetPos;
+				circuit->LOG("NUCLEAR %s(%i): aim (%i,%i) antinukes covering=%i of %zu known, value x%.2f",
+						cdef->GetDef()->GetName(), unit->GetId(), int(targetPos.x), int(targetPos.z), cover,
+						interceptors.size(), (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(cover))));
+			}
+		}
+		return found;
+	};
+	strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
+	const int silos = CountNukeSilos();
+	if ((policy.overnukeSilos > 0) && (silos >= policy.overnukeSilos)) {
+		coverFactor = policy.antinukeFactorOvernuke;
+	}
+	if ((policy.overnukeSilos <= 0) || (silos < policy.overnukeSilos)) {
+		if (over.Active()) {
+			circuit->LOG("NUKE: overnuke ends at %i of %i launches: %i silos left", over.Fired(), over.Goal(), silos);
+			over.End(frame, policy.repeatFrames);
+		}
+		return scan();
+	}
+	if (over.Active()) {
+		const AIFloat3 at(over.Pos().x, 0.f, over.Pos().z);
+		bool structure = false;
+		const auto* enemies = circuit->GetEnemyManager();
+		for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) for (const auto& e : *pool) {
+			if (!e.IsFake() && !e.IsDead() && !e.IsDying() && !e.IsIgnore() && (e.cdef != nullptr)
+				&& strategic::NuclearTarget(e.cdef->IsMobile(), true, policy.structuresOnly)
+				&& (at.SqDistance2D(e.pos) < SQUARE(over.Radius()))) { structure = true; break; }
+		}
+		// Fire until empty (owner 2026-11-04): the salvo ends once every allied silo in
+		// reach holds no missile, however many it fired past the roll.
+		int stock = 0;
+		if (structure && over.UntilEmpty()) {
+			ForEachAllyNukeSilo(circuit, [&](CCircuitAI*, CSuperTask*, CCircuitUnit* silo) {
+				if (silo->GetPos(frame).SqDistance2D(at) < SQUARE(silo->GetCircuitDef()->GetMaxRange()))
+					stock += std::max(0, silo->GetUnit()->GetStockpile());
+			});
+		}
+		if (!structure) {
+			circuit->LOG("NUKE: overnuke at (%.0f, %.0f) ends at %i of %i launches: no target left there",
+					at.x, at.z, over.Fired(), over.Goal());
+			over.End(frame, policy.repeatFrames);
+		} else if (over.UntilEmpty() && (stock <= 0)) {
+			circuit->LOG("NUKE: overnuke salvo at (%.0f, %.0f) is empty after %i launches; the next target stocks",
+					at.x, at.z, over.Fired());
+			over.End(frame, policy.repeatFrames);
+			StopNukeSilos();
+		} else if (position.SqDistance2D(at) < SQUARE(cdef->GetMaxRange())) {
+			if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
+				return false;  // hold fire: the salvo is still stocking
+			}
+			const AIFloat3 aim(over.Pos().x, 0.f, over.Pos().z);  // ReleaseSalvo may have moved it
+			SetTarget(nullptr);
+			targetPos = aim;
+			targetPos.y = circuit->GetMap()->GetElevationAt(aim.x, aim.z);
+			return true;
+		} else {
+			return scan();  // out of this silo's reach: its own target
+		}
+	}
+	if (!scan()) return false;
+	// Second breakpoint (owner 2026-10-30): with overnuke_team_silos finished silos across
+	// every allied BARb, the roll is overnuke_team_min..max. CountNukeSilos already counts them.
+	const bool teamRoll = (policy.overnukeTeamSilos > 0) && (silos >= policy.overnukeTeamSilos);
+	// Third breakpoint (owner 2026-11-04): overnuke_tier3_silos and up roll overnuke_tier3_min..max
+	const bool tier3 = (policy.overnukeTier3Silos > 0) && (silos >= policy.overnukeTier3Silos);
+	const int lo = tier3 ? policy.overnukeTier3Min : teamRoll ? policy.overnukeTeamMin : policy.overnukeMin;
+	const int hi = tier3 ? policy.overnukeTier3Max : teamRoll ? policy.overnukeTeamMax : policy.overnukeMax;
+	const int roll = lo + rand() % (hi - lo + 1);
+	circuit->LOG("NUKE: overnuke roll %i..%i (%i silos across the allied AIs%s)", lo, hi, silos,
+			tier3 ? ", the third breakpoint" : teamRoll ? ", the team breakpoint" : "");
+	over.Begin({targetPos.x, targetPos.z}, (policy.repeatRadius > 0.f) ? policy.repeatRadius : cdef->GetAoe(), roll,
+			frame, policy.overnukeStock);
+	circuit->LOG("NUKE: overnuke with %i silos at (%.0f, %.0f): %i launches%s", silos, targetPos.x, targetPos.z, roll,
+			over.Stocking() ? ", stocking the salvo first" : "");
+	StopStraySilos("began");  // owner 2026-11-08: no allied silo keeps an older order of its own
+	if (over.Stocking() && !ReleaseSalvo(frame, scan)) {
+		return false;
+	}
+	targetPos = AIFloat3(over.Pos().x, 0.f, over.Pos().z);
+	targetPos.y = circuit->GetMap()->GetElevationAt(targetPos.x, targetPos.z);
+	return true;
+}
+
+/*
+ * Antinuke cover (owner 2026-11-02). BAR interceptors engage a missile whose
+ * target lies inside their weapon coverage, so an aim point is judged by the
+ * known enemy units with an interceptor weapon (read from the def, not from a
+ * role list, so Legion's Rampart - a geothermal with an antinuke - counts)
+ * whose coverage holds it. Enemy stockpiles are unknown: every known
+ * interceptor counts as armed. Mobile ones count only while in radar or LOS.
+ * Each one multiplies the aim point's metal value by nuclear.antinuke_factor
+ * (SNuclearInfo). O(E) over the known enemies, one cached coverage per def.
+ */
+std::vector<std::pair<AIFloat3, float>> CSuperTask::KnownInterceptors()
+{
+	std::vector<std::pair<AIFloat3, float>> out;
+	CCircuitAI* circuit = manager->GetCircuit();
+	CBattleAnalysis* battle = circuit->GetBattle();
+	if (battle == nullptr) return out;
+	const float margin = circuit->GetMilitaryManager()->GetNuclearInfo().coveredMargin;
+	const auto* enemies = circuit->GetEnemyManager();
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) for (const SEnemyData& e : *pool) {
+		if (e.IsFake() || e.IsDead() || e.IsDying() || (e.cdef == nullptr)) continue;
+		if (e.cdef->IsMobile() && !e.IsInRadarOrLOS()) continue;  // a mobile antinuke's old position says little
+		auto it = interceptorCoverage.find(e.cdef);
+		if (it == interceptorCoverage.end()) {
+			it = interceptorCoverage.emplace(e.cdef, battle->InterceptorCoverage(e.cdef)).first;
+		}
+		if (it->second > 0.f) out.emplace_back(e.pos, SQUARE(it->second + margin));
+	}
+	return out;
+}
+
+/*
+ * Edge aims (owner 2026-11-02): an interceptor engages a missile by where it
+ * will land, so a point just outside the coverage still blasts whatever lies
+ * within the blast radius inside it. For each target inside a coverage the
+ * point on the line from that interceptor through the target, just past its
+ * coverage, is an extra aim point; the scan then scores it like any other (its
+ * own cover by the other interceptors included), so a two-antinuke area can
+ * be hit from the edge where only one covers. The silo attacks that ground.
+ */
+std::vector<AIFloat3> CSuperTask::CoverEdgeAims(const std::vector<std::pair<AIFloat3, float>>& interceptors,
+		const std::vector<AIFloat3>& targets)
+{
+	std::vector<AIFloat3> out;
+	for (const auto& ic : interceptors) {
+		const float r = std::sqrt(ic.second) + 8.f;  // ic.second: squared coverage incl. margin
+		std::vector<AIFloat3> mine;
+		for (const AIFloat3& t : targets) {
+			const float sq = t.SqDistance2D(ic.first);
+			if (sq >= ic.second) continue;
+			AIFloat3 dir(t.x - ic.first.x, 0.f, t.z - ic.first.z);
+			const float len = std::sqrt(sq);
+			if (len < 1.f) continue;  // the interceptor itself: no direction
+			const AIFloat3 p(ic.first.x + dir.x / len * r, 0.f, ic.first.z + dir.z / len * r);
+			bool dup = false;  // targets in one direction share an edge point
+			for (const AIFloat3& q : mine) if (q.SqDistance2D(p) < SQUARE(128.f)) { dup = true; break; }
+			if (!dup) mine.push_back(p);
+		}
+		out.insert(out.end(), mine.begin(), mine.end());
+	}
+	return out;
+}
+
+int CSuperTask::CountInterceptorCover(const std::vector<std::pair<AIFloat3, float>>& interceptors, const AIFloat3& pos)
+{
+	int count = 0;
+	for (const auto& ic : interceptors) if (pos.SqDistance2D(ic.first) < ic.second) ++count;
+	return count;
+}
+
+/*
+ * Nuke outcome (owner 2026-11-06, strategic::StrikeLedger). Once a second per
+ * silo: the silo's experience against its pending launches (a handful). A rise
+ * means the missile dealt damage: the area is marked struck and its ghosts
+ * weigh nuclear.strike_factor until scouted. No rise by the window's end means
+ * it was intercepted: an interceptor is presumed there (aim value x
+ * antinuke_factor) unless a known one already covers the aim.
+ */
+void CSuperTask::ResolveStrikes(CCircuitUnit* unit, int frame)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	strategic::StrikeLedger& strikes = circuit->GetAllyTeam()->GetNuclearStrikes();
+	if (!strikes.HasPending(unit->GetId())) return;
+	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
+	const float exp = unit->GetUnit()->GetExperience();
+	strikes.Resolve(unit->GetId(), exp, frame, policy.interceptPresumeFrames,
+		[&](const strategic::StrikeLedger::Pending& p, strategic::StrikeLedger::Outcome out) {
+			const float seconds = float(frame - p.launch) / FRAMES_PER_SEC;
+			if (out == strategic::StrikeLedger::Outcome::HIT) {
+				circuit->LOG("NUKE: landed from %s(%i) at (%.0f, %.0f) after %.0f s: experience %.5f -> %.5f; ghosts within %.0f x%.2f until scouted",
+						unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), p.aim.x, p.aim.z, seconds, p.exp, exp,
+						p.radius, policy.strikeFactor);
+				return;
+			}
+			const AIFloat3 at(p.aim.x, 0.f, p.aim.z);
+			const int known = CountInterceptorCover(KnownInterceptors(), at);
+			if (known > 0) strikes.ClearPresumed(p.aim, 1.f);  // a known interceptor explains it
+			circuit->LOG("NUKE: intercepted from %s(%i) at (%.0f, %.0f): no experience in %.0f s (%.5f); known antinukes covering=%i%s",
+					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), p.aim.x, p.aim.z, seconds, exp, known,
+					(known > 0 || policy.interceptPresumeRadius <= 0.f) ? "" : ", one presumed there");
+		});
+}
+
+/*
+ * Salvo (owner 2026-10-30). While the overnuke stocks, every silo that reaches
+ * the target holds fire. Each of their updates (one per silo every
+ * TARGET_DELAY) sums the stock of the reaching silos - a walk over the allied AIs'
+ * SUPER tasks, a handful - and opens fire once it reaches the roll (capped by
+ * what they can hold), the timeout runs out, or a reaching silo is hit. At the
+ * release the scan runs once more: when scouting has found a better aim point
+ * since the target was chosen, the whole salvo goes there.
+ */
+bool CSuperTask::ReleaseSalvo(int frame, const std::function<bool ()>& scan)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
+	strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
+	const AIFloat3 at(over.Pos().x, 0.f, over.Pos().z);
+	int stocked = 0, reaching = 0;
+	bool hit = false;
+	ForEachAllyNukeSilo(circuit, [&](CCircuitAI*, CSuperTask*, CCircuitUnit* silo) {
+		CCircuitDef* sdef = silo->GetCircuitDef();
+		if (silo->GetPos(frame).SqDistance2D(at) >= SQUARE(sdef->GetMaxRange())) return;
+		++reaching;
+		stocked += std::max(0, silo->GetUnit()->GetStockpile());
+		if (policy.overnukeFireBelowHealth > 0.f) {
+			hit = hit || (silo->GetUnit()->GetHealth() < policy.overnukeFireBelowHealth * silo->GetUnit()->GetMaxHealth());
+		}
+	});
+	const int need = std::min(over.Goal(), policy.overnukeStockCap * std::max(1, reaching));
+	const strategic::SalvoGate gate = strategic::SalvoRelease(stocked, need, frame, over.Since(),
+			policy.overnukeStockFrames, hit);
+	if (gate == strategic::SalvoGate::HOLD) {
+		return false;
+	}
+	const AIFloat3 keep = targetPos;
+	if (scan() && (targetPos.SqDistance2D(at) > SQUARE(over.Radius()))) {
+		circuit->LOG("NUKE: overnuke salvo moves from (%.0f, %.0f) to (%.0f, %.0f): a better target found since",
+				at.x, at.z, targetPos.x, targetPos.z);
+		over.Retarget({targetPos.x, targetPos.z});
+		StopStraySilos("moved");
+	}
+	targetPos = keep;
+	over.Release(stocked, policy.overnukeFireAll);
+	static const char* why[] = {"", "stocked", "timeout", "a silo hit"};
+	circuit->LOG("NUKE: overnuke salvo released (%s) after %is: %i stocked in %i silos, %i launches",
+			why[int(gate)], (frame - over.Since()) / FRAMES_PER_SEC, stocked, reaching, over.Goal());
+	return true;
+}
+
+/*
+ * The salvo's last launch: stop every silo still holding the attack order, so
+ * none fires again at the finished target before its next update.
+ */
+void CSuperTask::StopNukeSilos()
+{
+	ForEachAllyNukeSilo(manager->GetCircuit(), [](CCircuitAI* owner, CSuperTask* st, CCircuitUnit* silo) {
+		TRY_UNIT(owner, silo, silo->CmdStop();)
+		st->SetTarget(nullptr);
+		st->isTargetOverride = false;
+		st->state = State::ROAM;
+	});
+}
+
+/*
+ * One target for every silo (owner 2026-11-08). A silo of another allied AI
+ * can still hold the attack-ground order its own last update gave - picked
+ * while the ally team counted fewer silos (a silo just finished is counted only
+ * once its SUPER task exists) - and its update runs only every TARGET_DELAY, so
+ * a missile stocked in between flew at that old target (headless: an armsilo
+ * fired 5148 elmos off the overnuke 8 s after a corsilo began it). When an
+ * overnuke begins or moves, every other allied silo aiming outside it stops and
+ * re-selects on its next update, which joins the overnuke.
+ */
+void CSuperTask::StopStraySilos(const char* why)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	const strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
+	if (!over.Active()) return;
+	ForEachAllyNukeSilo(circuit, [&](CCircuitAI* owner, CSuperTask* st, CCircuitUnit* silo) {
+		if ((st == this) || (st->state != State::ENGAGE)) return;
+		const AIFloat3 aim = st->GetAimPos();
+		if (over.Covers({aim.x, aim.z})) return;
+		TRY_UNIT(owner, silo, silo->CmdStop();)
+		st->SetTarget(nullptr);
+		st->isTargetOverride = false;
+		st->state = State::ROAM;
+		st->targetFrame = 0;  // re-select on its next update, not TARGET_DELAY later
+		circuit->LOG("NUKE: overnuke %s at (%.0f, %.0f): %s(%i) of team %i stops its own aim (%.0f, %.0f)",
+				why, over.Pos().x, over.Pos().z, silo->GetCircuitDef()->GetDef()->GetName(), silo->GetId(),
+				owner->GetTeamId(), aim.x, aim.z);
+	});
 }
 
 bool CSuperTask::SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef)
@@ -855,6 +1389,41 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 		const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
 		circuit->GetAllyTeam()->GetNuclearHistory().Add(unit->GetId(), {aim.x, aim.z},
 			policy.repeatRadius > 0.f ? policy.repeatRadius : d->GetAoe(), frame, policy.repeatFrames, false);
+		if (geom::is_valid(aim)) {
+			// Nuke outcome (owner 2026-11-06): pending until the silo's experience rises or the window closes
+			const float exp = unit->GetUnit()->GetExperience();
+			const float reach = std::max(d->GetAoe(), (aim.SqDistance2D(targetPos) < SQUARE(1.f)) ? areaReach : 0.f);
+			circuit->GetAllyTeam()->GetNuclearStrikes().Launch(unit->GetId(), {aim.x, aim.z}, reach, frame,
+					policy.strikeWindowFrames, exp);
+			circuit->LOG("NUKE: outcome pending %s(%i) at (%.0f, %.0f) reach=%.0f experience=%.5f",
+					d->GetDef()->GetName(), unit->GetId(), aim.x, aim.z, reach, exp);
+		}
+		strategic::Overnuke& over = circuit->GetAllyTeam()->GetOvernuke();
+		const bool salvo = over.Salvo();
+		if (over.Count({aim.x, aim.z}, frame, policy.repeatFrames, policy.overnukeScoutEvery)) {
+			circuit->LOG("NUKE: overnuke launch %i of %i from %s(%i)", over.Fired(), over.Goal(),
+					d->GetDef()->GetName(), unit->GetId());
+			if (salvo && over.Active()) {
+				// Mid-salvo: the attack-ground order ends with the shot, so the
+				// next update re-aims the moment the reload (30 s, less with
+				// veterancy: the engine's reload frame already has it) is over,
+				// not at the next 10 s tick (played: 39 s between volleys).
+				int ready = -1;
+				for (int w = 0; w < 4; ++w) {  // silos mount 1-2 weapons; a missing index reads -1
+					ready = std::max(ready, circuit->GetUnitAPI()->GetVisibleWeaponReload(unit->GetId(), w));
+				}
+				if (ready <= frame) ready = frame + d->GetReloadTime();
+				targetFrame = ready - TARGET_DELAY + 1;
+				if (frame - lastSmileyFrame > SMILEY_DEDUPE_EVENT) {
+					lastSmileyFrame = frame;
+					circuit->DrawSmiley(aim, SMILEY_RADIUS);
+				}
+				return;
+			}
+			if (salvo) {
+				StopNukeSilos();  // the last one: no silo fires again at the finished target
+			}
+		}
 	} else {
 		const auto& policy = circuit->GetMilitaryManager()->GetPulseInfo();
 		circuit->GetAllyTeam()->GetPulseClaims().Add(unit->GetId(), {aim.x, aim.z}, d->GetAoe(), frame, policy.coverageFrames, false);
