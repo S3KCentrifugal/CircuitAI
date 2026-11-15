@@ -663,9 +663,9 @@ namespace Front {
             int PorcClusterMax = 6;                       // jobs of this counter standing at most
             int PorcClusterScanSeconds = 5;
             // vehicle constructors: native drops their builds inside a scouted enemy gun's reach, so they only
-            // take a site outside every cluster turret's reach (+ margin)
+            // take a site outside every known enemy static ground gun's reach (+ margin)
             array<string> PorcClusterVehicleUnits = { "armcv", "corcv", "legcv", "armacv", "coracv", "legacv" };
-            float PorcClusterVehicleMargin = 48.0f;
+            float PorcClusterVehicleMargin = 112.0f;     // native mex_safety porc_margin 96 + 16
             // Tactical launchers against enemy heavy turret clusters (owner, 2026-11-02; systems/construction/front_tactical.as).
             // While two known Pulsars / Bulwarks / Bastions (seen now or ghost images) stand within TacticalClusterRadius
             // of each other, every such turret with one of our mexes / static land guns within TacticalFrontRadius gets

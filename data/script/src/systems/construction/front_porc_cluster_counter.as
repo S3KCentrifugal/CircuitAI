@@ -128,8 +128,11 @@ namespace FrontPorcClusterCounter {
 
     void AddGun(const AIFloat3 &in p, int defId) {
         CCircuitDef@ d = ai.GetCircuitDef(defId);
-        if (d is null || d.IsMobile() || !d.HasSurfToLand()) return;
-        gunPos.insertLast(p); gunReach.insertLast(d.GetMaxRange());
+        if (d is null || d.IsMobile() || d.IsAbleToFly() || !d.HasSurfToLand()) return;
+        // native's list (CEconomyManager::RefreshMexPorc): land range, guns over porc_max_range 1800 left out
+        const float r = d.GetMaxRange();
+        if (r <= 0.0f || r > 1800.0f) return;
+        gunPos.insertLast(p); gunReach.insertLast(r);
     }
     // elmos outside the nearest known enemy static gun's reach (< 0 inside); only guns within `near` of `at`
     float GunClear(const AIFloat3 &in p, const array<int>@ near) {
