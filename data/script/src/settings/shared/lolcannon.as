@@ -58,7 +58,27 @@ namespace LolCannon {
     // and moved (another ring or another enemy start) once such porc covers it. 0 = off.
     float SitePorcMargin = 120.0f;
     float SitePorcMaxRange = 2000.0f;
-    int SitePorcCheckSeconds = 5;
+    // owner 2026-11-15 (TECH Calamity sited under scouted Bastions): the whole layout - the
+    // cannon footprint's corners, every turret slot and every storage slot - is checked, every
+    // second, and a hit moves the site in the same tick. A cannon frame already down is
+    // abandoned for porc only while under CannonKeepProgress built (above it, it is finished).
+    int SitePorcCheckSeconds = 1;
+    float CannonKeepProgress = 0.5f;
+    // casualties (owner 2026-11-15): while the cannon goes up (BUILD), deaths of crew members
+    // and of our turrets, storages and the cannon frame (finished or not) within CasualtyRadius
+    // of the site are counted over the last CasualtyWindowSeconds. CasualtyLimit of them, or
+    // turret losses that are at least CasualtyTurretShare of the most turrets that stood (and
+    // at least CasualtyMinTurretLosses), abandon the site: every order there is aborted, the
+    // unfinished frame included, the crews stay and a new site is planned at once. For
+    // SiteBarSeconds no site (cannon, turret block or storage strip centre) is picked within
+    // SiteBarRadius of an abandoned one.
+    float CasualtyRadius = 1200.0f;
+    int CasualtyWindowSeconds = 60;
+    int CasualtyLimit = 8;
+    float CasualtyTurretShare = 0.5f;
+    int CasualtyMinTurretLosses = 2;
+    int SiteBarSeconds = 90;
+    float SiteBarRadius = 1500.0f;
     // further back (owner 2026-10-27): every BackOffAfter failures for one cannon (a site
     // search that found nothing, or a cannon order that came to nothing) move the rings
     // SiteBackStep further out from the enemy start, past the cannon's reach if need be,

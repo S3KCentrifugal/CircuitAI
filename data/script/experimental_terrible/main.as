@@ -92,6 +92,7 @@ namespace Main {
     void AiUnitDestroyed(CCircuitUnit@ unit)
     {
         ArtilleryPolicy::Removed(unit);
+        LolCannon::Destroyed(unit);   // owner 2026-11-15: losses round a lolcannon site abandon it
     }
 
 	void AiUpdate()  // SlowUpdate, every 30 frames with initial offset of skirmishAIId

@@ -65,6 +65,25 @@ this program (owner, 2026-10-26):
           FRONT orders no storage before the cannon's frame is down (unpinned,
           one can land in the cannon's yard), and a starter within 400 of a
           45 s old order with no frame is given the order afresh once a minute.
+  porc    (owner 2026-11-15) no candidate whose cannon spot, cannon footprint
+          corners, turret slots or storage slots lie within the height-aware
+          reach (aiBattle.EnemyStaticCovering) + SitePorcMargin (120) of a seen
+          or ghost enemy armed structure of flat range up to SitePorcMaxRange
+          (2000): Bastion, Pulsar, Bulwark and the like. Such candidates do not
+          count toward SiteProbes. While the cannon goes up the whole layout is
+          checked every SitePorcCheckSeconds (1); porc scouted onto it moves the
+          site in the same tick, abandoning a frame already down while it is
+          under CannonKeepProgress (50%) built.
+  losses  (owner 2026-11-15) while the cannon goes up, deaths of crew members
+          and of our turrets, storages and cannon frame within CasualtyRadius
+          (1200) of the site are counted over CasualtyWindowSeconds (60) (main
+          AiUnitDestroyed -> Destroyed). CasualtyLimit (8) of them, or turret
+          losses of half the most turrets that stood (at least 2), abandon the
+          site ("site (x, z) abandoned" + a REPORT line): the area is barred for
+          SiteBarSeconds (90) within SiteBarRadius (1500), every order and
+          repair there is aborted, the unfinished frame included, and a new
+          site is planned at once with the same crews (released only when no
+          site is found; the search is retried every 30 s as before).
   crews   taken off every other task (Builder AiMakeTask asks here first):
             starter  one T2 air constructor: orders the cannon once
                      TurretsBeforeCannon (16) turrets stand (owner
@@ -230,6 +249,14 @@ namespace LolCannon {
     int unsafeFrom = -1;             // the frame the site was first found unsafe for an order, -1 safe
     int nextUnsafeLog = 0;
     int nextPorcCheck = 0;           // owner 2026-11-15: next height-aware enemy porc check of an unframed site
+    bool forceMove = false;          // owner 2026-11-15: MoveBack may abandon an unfinished frame (porc under CannonKeepProgress, casualties)
+    // owner 2026-11-15: losses round the site while the cannon goes up (Destroyed), and barred areas
+    array<int> lossFrame, lossKind;  // kind: 0 crew, 1 turret, 2 storage, 3 cannon frame
+    array<AIFloat3> lossPos;
+    int peakTurrets = 0;             // the most turrets that stood round the block on this site
+    int lastRemovedCrew = -1;        // UnitRemoved runs before AiUnitDestroyed and forgets the crew member
+    array<AIFloat3> barPos;          // abandoned sites: no new site within SiteBarRadius until barUntil
+    array<int> barUntil;
     array<AIFloat3> badStoreSpots;   // storage spots whose orders kept failing: not chosen again
     array<AIFloat3> failedSites;     // sites this cannon moved back from: later searches keep SiteAvoidRadius off them
 
@@ -526,6 +553,7 @@ namespace LolCannon {
         if (unit is null) return;
         const int kind = CrewKind(unit.id);
         if (kind < 0) return;
+        lastRemovedCrew = unit.id;   // AiUnitDestroyed (Destroyed) follows in the same call when it died
         crewOf.delete(Key(unit.id));
         if (kind <= GROUND && crewCount[kind] > 0) --crewCount[kind];
     }
@@ -906,6 +934,42 @@ namespace LolCannon {
         return aiBattle.EnemyStaticCovering(p, Global::LolCannon::SitePorcMargin, Global::LolCannon::SitePorcMaxRange);
     }
 
+    // owner 2026-11-15: the whole layout of the current site (the cannon's footprint corners,
+    // every turret slot, every storage slot) against seen/ghost enemy porc; the first enemy
+    // id that reaches any of it, else -1. Cost: one EnemyStaticCovering (O(enemy infos)) over
+    // the layout's bounding circle; only when that hits, one per point (~4 + 22 + 9).
+    int LayoutPorc()
+    {
+        if (Global::LolCannon::SitePorcCheckSeconds <= 0 || site.x < 0.0f) return -1;
+        CCircuitDef@ gun = Gun();
+        const float hA = (gun is null) ? 64.0f : LolCannonMath::Pitch(Layout::Across(gun, facing)) * 0.5f;
+        const float hL = (gun is null) ? 64.0f : LolCannonMath::Pitch(Layout::Along(gun, facing)) * 0.5f;
+        float bound2 = hA * hA + hL * hL;
+        for (uint i = 0; i < turretPos.length(); ++i) bound2 = AiMax(bound2, MapHelpers::SqDist(turretPos[i], site));
+        for (uint i = 0; i < storePos.length(); ++i) bound2 = AiMax(bound2, MapHelpers::SqDist(storePos[i], site));
+        const float bound = sqrt(bound2) + 48.0f;   // + half a slot: a footprint's far edge
+        if (aiBattle.EnemyStaticCovering(site, Global::LolCannon::SitePorcMargin + bound, Global::LolCannon::SitePorcMaxRange) < 0) return -1;
+        int over = PorcOver(site);
+        const AIFloat3 side = Layout::Side(facing), fwd = Layout::Fwd(facing);
+        for (int c = 0; c < 4 && over < 0; ++c)
+            over = PorcOver(At(site, side, ((c & 1) == 0) ? -hA : hA, fwd, ((c & 2) == 0) ? -hL : hL));
+        for (uint i = 0; i < turretPos.length() && over < 0; ++i) over = PorcOver(turretPos[i]);
+        for (uint i = 0; i < storePos.length() && over < 0; ++i) over = PorcOver(storePos[i]);
+        return over;
+    }
+
+    // owner 2026-11-15: an abandoned site's area, barred for SiteBarSeconds (expired bars dropped)
+    bool Barred(const AIFloat3 &in p)
+    {
+        if (p.x < 0.0f) return false;
+        const float r = Global::LolCannon::SiteBarRadius;
+        for (int i = int(barPos.length()) - 1; i >= 0; --i) {
+            if (ai.frame >= barUntil[i]) { barPos.removeAt(i); barUntil.removeAt(i); continue; }
+            if (MapHelpers::SqDist(barPos[i], p) < r * r) return true;
+        }
+        return false;
+    }
+
     bool Plan()
     {
         CCircuitDef@ gun = Gun();
@@ -962,9 +1026,10 @@ namespace LolCannon {
         refusedGun = 0; shortTurrets = 0; bestTurrets = 0;
         bool found = false;
         skipResource = 0; skipLayout = 0; skipFailed = 0;
-        int skipPorc = 0, firstPorc = -1;
+        int skipPorc = 0, firstPorc = -1, skipBar = 0;
         for (uint i = 0; i < best.length() && !found && tried < Global::LolCannon::SiteProbes; ++i) {
             if (NearFailed(best[i])) { ++skipFailed; continue; }
+            if (Barred(best[i])) { ++skipBar; continue; }
             const int porcAt = PorcOver(best[i]);
             if (porcAt >= 0) { if (skipPorc++ == 0) firstPorc = porcAt; continue; }
             if (aiTerrainMgr.IsZoneAlly(best[i]) || !GunGroundFree(gun, best[i], bestF[i])) continue;
@@ -974,10 +1039,15 @@ namespace LolCannon {
             ++tried;
             found = TrySite(gun, nano, st, best[i], bestF[i], layoutOn);
             if (found) {
-                // the turret block and the storage strip stand beside the cannon: under porc they die first
-                const int blockPorc = AiMax(PorcOver(blockCentre), PorcOver(stripCentre));
-                if (blockPorc >= 0) {
-                    if (skipPorc++ == 0) firstPorc = blockPorc;
+                // the turret block and the storage strip stand beside the cannon: under porc they die first.
+                // owner 2026-11-15: every footprint of the layout is checked, and a site in a barred
+                // (abandoned) area is refused too; neither counts toward SiteProbes "tried"
+                const bool barred = Barred(site) || Barred(blockCentre) || Barred(stripCentre);
+                const int blockPorc = barred ? -1 : LayoutPorc();
+                if (barred || blockPorc >= 0) {
+                    if (barred) ++skipBar;
+                    else if (skipPorc++ == 0) firstPorc = blockPorc;
+                    --tried;
                     aiTerrainMgr.ReleaseReservation(gunRes); gunRes = -1;
                     ReleaseAll(turretRes); ReleaseAll(storeRes);
                     turretRes.resize(0); storeRes.resize(0);
@@ -992,7 +1062,8 @@ namespace LolCannon {
                     + storesReserved + " storage slots reserved)"
                     + (layoutOn ? " (reserved)" : " (FRONT: cannon, turret block and storage strip held, orders unpinned)") + "; against the enemy spawn at (" + int(siteTarget.x) + ", "
                     + int(siteTarget.z) + "), " + int(sqrt(MapHelpers::SqDist(site, siteTarget))) + " away: " + targetWhy + backWhy
-                    + (skipPorc > 0 ? "; " + skipPorc + " nearer candidate(s) under enemy porc (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : ""), 1);
+                    + (skipPorc > 0 ? "; " + skipPorc + " nearer candidate(s) under enemy porc (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "")
+                    + (skipBar > 0 ? "; " + skipBar + " nearer candidate(s) in an abandoned site's barred area" : ""), 1);
         }
         if (!found && refusedGun > 0) {
             // one non-quiet try: native logs "RESERVE: refused <def> ...: <why>" (terrain, a blocked cell, the engine's ground test)
@@ -1007,7 +1078,8 @@ namespace LolCannon {
                 + starts.length() + " enemy start(s): " + best.length() + " candidates, " + scored + " scored, " + tried
                 + " tried (cannon refused " + refusedGun + ", turrets short " + shortTurrets + ", best " + bestTurrets + "/"
                 + Global::LolCannon::MinTurrets + "); skipped: " + skipResource + " on metal/geo spots, " + skipLayout
-                + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site, " + skipPorc + " under enemy porc"
+                + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site, " + skipPorc + " under enemy porc, "
+                + skipBar + " in a barred area"
                 + (firstPorc >= 0 ? " (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "") + backWhy + "; retry in 30 s", 1);
         return found;
     }
@@ -1021,6 +1093,8 @@ namespace LolCannon {
         storeTask.resize(0); storeMiss.resize(0); storeDead.resize(0); badStoreSpots.resize(0);
         orphanHand.deleteAll(); orphanSince.deleteAll();
         gunTryFrom = -1; quickEnds = 0;
+        peakTurrets = 0; lossFrame.resize(0); lossKind.resize(0); lossPos.resize(0);   // a new site counts its own losses
+        nextPorcCheck = 0;
         turretsOpen = true; nextHold = 0; nextTurretWaitLog = 0; blockFails = 0;
         nextTurretRetry = ai.frame + Global::LolCannon::TurretRetrySeconds * SECOND;
         for (uint i = 0; i < storePos.length(); ++i) { storeTask.insertLast(null); storeMiss.insertLast(0); storeDead.insertLast(false); }
@@ -1056,6 +1130,18 @@ namespace LolCannon {
     }
 
     // ---------------------------------------------------------------- orders
+
+    // owner 2026-11-15: the crews' repair orders on this site's frames (cannon, turrets,
+    // storages), aborted when the site is abandoned; dead ones dropped as new ones come
+    array<IUnitTask@> siteRepairs;
+    IUnitTask@ SiteRepair(IUnitTask@ t)
+    {
+        if (t is null) return null;
+        for (int i = int(siteRepairs.length()) - 1; i >= 0; --i)
+            if (siteRepairs[i] is null || siteRepairs[i].IsDead()) siteRepairs.removeAt(i);
+        siteRepairs.insertLast(t);
+        return t;
+    }
 
     IUnitTask@ Ordered(IUnitTask@ t)
     {
@@ -1128,7 +1214,7 @@ namespace LolCannon {
     {
         if (d is null || !u.circuitDef.CanBuild(d)) return null;
         CCircuitUnit@ unf = aiBuilderMgr.FindUnfinishedNear(centre, near, d);
-        if (unf !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, unf, 30 * SECOND));
+        if (unf !is null) return SiteRepair(aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, unf, 30 * SECOND)));
         if (full) {
             // once the cannon stands, an order nobody works (its crew member was taken off
             // it, to the cannon or by a native re-ask) is still counted in flight, so with
@@ -1426,7 +1512,7 @@ namespace LolCannon {
         CCircuitUnit@ gf = ProjectGun();
         if (gf !is null) {
             gunTryFrom = -1; quickEnds = 0;
-            return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, gf, 60 * SECOND));
+            return SiteRepair(aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, gf, 60 * SECOND)));
         }
         if (!u.circuitDef.CanBuild(gun) || moveBack) return null;
         if (gunTask !is null && !gunTask.IsDead()) {
@@ -1680,9 +1766,16 @@ namespace LolCannon {
     void MoveBack()
     {
         moveBack = false;
-        if (ProjectGun() !is null) return;   // never abandon a frame already associated with this project
+        const bool force = forceMove;
+        forceMove = false;
+        // never abandon a frame already associated with this project, except (owner 2026-11-15)
+        // one under enemy porc below CannonKeepProgress, or a site losing its crews (forceMove)
+        if (!force && ProjectGun() !is null) return;
         if (gunTask !is null && !gunTask.IsDead()) aiBuilderMgr.AbortTask(gunTask);
         @gunTask = null;
+        gunUnitId = -1;
+        for (uint k = 0; k < siteRepairs.length(); ++k) if (siteRepairs[k] !is null && !siteRepairs[k].IsDead()) aiBuilderMgr.AbortTask(siteRepairs[k]);
+        siteRepairs.resize(0);
         for (uint k = 0; k < turretTask.length(); ++k) if (turretTask[k] !is null && !turretTask[k].IsDead()) aiBuilderMgr.AbortTask(turretTask[k]);
         for (uint k = 0; k < storeTask.length(); ++k) if (storeTask[k] !is null && !storeTask[k].IsDead()) aiBuilderMgr.AbortTask(storeTask[k]);
         if (gunRes >= 0) aiTerrainMgr.ReleaseReservation(gunRes);
@@ -2531,6 +2624,72 @@ namespace LolCannon {
         return false;
     }
 
+    // ---------------------------------------------------------------- casualties (owner 2026-11-15)
+
+    // Main AiUnitDestroyed: one of ours died. While the cannon goes up, a crew member, a
+    // turret, a storage or the cannon frame (finished or not) within CasualtyRadius of the
+    // site is recorded. Cost: O(1) per death outside BUILD; inside, a distance test and a
+    // dictionary lookup, and the window is pruned as it grows (at most a few dozen entries).
+    void Destroyed(CCircuitUnit@ unit)
+    {
+        const int removed = lastRemovedCrew;
+        lastRemovedCrew = -1;
+        if (!Enabled() || phase != BUILD || unit is null || unit.circuitDef is null || site.x < 0.0f) return;
+        const AIFloat3 p = unit.GetPos(ai.frame);
+        const float r = Global::LolCannon::CasualtyRadius;
+        if (MapHelpers::SqDist(p, site) > r * r) return;
+        int kind = -1;
+        if (removed == unit.id || CrewKind(unit.id) >= 0) kind = 0;
+        else if (unit.circuitDef is Nano()) kind = 1;
+        else if (unit.circuitDef is Store()) kind = 2;
+        else if (unit.circuitDef is Gun()) kind = 3;
+        if (kind < 0) return;
+        PruneLosses();
+        lossFrame.insertLast(ai.frame); lossKind.insertLast(kind); lossPos.insertLast(p);
+    }
+
+    void PruneLosses()
+    {
+        const int from = ai.frame - Global::LolCannon::CasualtyWindowSeconds * SECOND;
+        int n = 0;
+        while (uint(n) < lossFrame.length() && lossFrame[n] < from) ++n;
+        if (n == 0) return;
+        lossFrame.removeRange(0, n); lossKind.removeRange(0, n); lossPos.removeRange(0, n);
+    }
+
+    // Once a second in BUILD: too many losses round the site in the window abandon it -
+    // the area is barred for SiteBarSeconds, every order there (the unfinished frame too)
+    // is aborted, and MoveBack (called by Advance at once) plans a new site with the crews.
+    bool CasualtyAbandon()
+    {
+        if (Global::LolCannon::CasualtyLimit <= 0 || lossFrame.length() == 0) return false;
+        PruneLosses();
+        array<int> by(4, 0);
+        for (uint i = 0; i < lossKind.length(); ++i) ++by[lossKind[i]];
+        const int n = int(lossKind.length());
+        const int turretLimit = AiMax(Global::LolCannon::CasualtyMinTurretLosses,
+            int(ceil(float(peakTurrets) * Global::LolCannon::CasualtyTurretShare)));
+        const bool many = n >= Global::LolCannon::CasualtyLimit;
+        const bool turrets = peakTurrets > 0 && by[1] >= turretLimit;
+        if (!many && !turrets) return false;
+        CCircuitUnit@ gf = ProjectGun();
+        const string frame = (gf is null) ? "n" : "y " + int(gf.GetBuildProgress() * 100.0f) + "%";
+        GenericHelpers::LogUtil("[LolCannon] site (" + int(site.x) + ", " + int(site.z) + ") abandoned: " + n + " losses in "
+            + Global::LolCannon::CasualtyWindowSeconds + " s (" + by[0] + " crew, " + by[1] + " turrets of " + peakTurrets + " that stood, "
+            + by[2] + " storages, frame " + frame + (by[3] > 0 ? ", frame lost" : "") + "); no site within "
+            + int(Global::LolCannon::SiteBarRadius) + " of it for " + Global::LolCannon::SiteBarSeconds + " s", 1);
+        GenericHelpers::LogUtil("[LolCannon] REPORT abandoned at=" + (ai.frame / SECOND) + "s site=" + int(site.x) + "," + int(site.z)
+            + " losses=" + n + " crew=" + by[0] + " turrets=" + by[1] + "/" + peakTurrets + " storages=" + by[2] + " frame=" + frame
+            + " crews=" + crewCount[STARTER] + "+" + crewCount[AIR] + "+" + crewCount[STORE] + "+" + crewCount[GROUND]
+            + " program=" + (started / SECOND) + "s", 1);
+        barPos.insertLast(site);
+        barUntil.insertLast(ai.frame + Global::LolCannon::SiteBarSeconds * SECOND);
+        lossFrame.resize(0); lossKind.resize(0); lossPos.resize(0);
+        moveBack = true;
+        forceMove = true;
+        return true;
+    }
+
     void Advance()
     {
         // owner 2026-11-11: a cannon killed while its strip or cover still went up is rebuilt at once
@@ -2585,15 +2744,26 @@ namespace LolCannon {
             Begin(false);
             return;
         }
+        if (phase == BUILD && !moveBack) {
+            peakTurrets = AiMax(peakTurrets, nanosNear);
+            if (CasualtyAbandon()) {
+                MoveBack();
+                if (phase != BUILD) return;
+            }
+        }
         if (phase == BUILD && !moveBack && Global::LolCannon::SitePorcCheckSeconds > 0 && ai.frame >= nextPorcCheck) {
             nextPorcCheck = ai.frame + Global::LolCannon::SitePorcCheckSeconds * SECOND;
-            if (ProjectGun() is null) {
-                int over = PorcOver(site);
-                if (over < 0) over = PorcOver(blockCentre);
+            // owner 2026-11-15: the whole layout, every second; a frame under CannonKeepProgress is given up too
+            CCircuitUnit@ gf = ProjectGun();
+            const float progress = (gf is null) ? 0.0f : gf.GetBuildProgress();
+            if (gf is null || progress < Global::LolCannon::CannonKeepProgress) {
+                const int over = LayoutPorc();
                 if (over >= 0) {
                     GenericHelpers::LogUtil("[LolCannon] site (" + int(site.x) + ", " + int(site.z) + ") is under enemy porc: "
-                        + aiBattle.DescribeEnemy(over) + " reaches it (height-aware range); moving the site", 1);
+                        + aiBattle.DescribeEnemy(over) + " reaches its layout (height-aware range); "
+                        + (gf is null ? "" : "the cannon frame at " + int(progress * 100.0f) + "% is abandoned; ") + "moving the site now", 1);
                     moveBack = true;
+                    forceMove = gf !is null;
                 }
             }
         }
