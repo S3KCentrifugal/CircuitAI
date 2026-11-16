@@ -151,18 +151,29 @@ namespace AirScoutSweep {
                 if (pass < 3) ++t1; else ++r;
             }
         }
-        const array<AIFloat3> enemies = Lanes::ScriptStarts(true);
+        // the script's enemy starts, else the start-box spots (owner 2026-11-16: with starts chosen
+        // in game the script lists none, and an aimless draft flew nobody while it still took the
+        // members out of the package, stranding ~23 Finches on Esker Creek); with neither, each
+        // plane sweeps across the map to the point opposite its own through the centre
+        const array<AIFloat3> enemies = Lanes::EnemyStarts();
         for (uint i = 0; i < units.length(); ++i) {
             const AIFloat3 from = units[i].GetPos(ai.frame);
             const string key = ""+units[i].id;
             members.delete(key); arrived.delete(key);   // a forming member leaves the package for its own flight
             if (at.x >= 0.0f) Fly(units[i], LolCannonRecon::Route(from,at,int(i),int(units.length()),spread));
             else if (!enemies.isEmpty()) Fly(units[i], LolCannonRecon::Route(from,enemies[i%enemies.length()],0,1,0.0f));
+            else Fly(units[i], LolCannonRecon::Route(from,CrossMap(from),0,1,0.0f));
         }
-        draftT1 = (at.x >= 0.0f || !enemies.isEmpty()) ? t1 : 0;
-        draftRadar = (at.x >= 0.0f || !enemies.isEmpty()) ? r : 0;
+        draftT1 = t1;
+        draftRadar = r;
         GenericHelpers::LogUtil("[AIR][ScoutSweep] "+why+" draft T1="+draftT1+"/"+wantT1+" radar="+draftRadar+"/"+wantR
             +" baseContact="+AirBaseResponse::Emergency(),1);
+    }
+    // the point opposite p through the map centre, 200 elmos inside the edge (owner 2026-11-16:
+    // with nowhere known to fly, a cross-map sweep to the other side)
+    AIFloat3 CrossMap(const AIFloat3 &in p) {
+        const float w = float(aiTerrainMgr.GetTerrainWidth()), h = float(aiTerrainMgr.GetTerrainHeight());
+        return AIFloat3(AiMax(200.0f, AiMin(w - 200.0f, w - p.x)), 0.0f, AiMax(200.0f, AiMin(h - 200.0f, h - p.z)));
     }
     // Base emergency (owner 2026-11-03), modelled on the nuke rush scout: when the
     // base response's contact goes on while a package is forming or due, the
@@ -177,7 +188,6 @@ namespace AirScoutSweep {
         if (!Enabled() || !AirEconomy::Active() || !Global::RoleSettings::Air::ScoutSweepEmergencyDraft) return;
         if (dispatching || (!forming && !requested)) return;   // nothing due, or the package is already flying out
         if (emergencyDraftFrame >= 0 && ai.frame - emergencyDraftFrame < Global::RoleSettings::Air::ScoutSweepEmergencyRearmSeconds * SECOND) return;
-        emergencyDraftFrame = ai.frame;
         // the due package's counts and target: the forming one's, else the pending request's
         const int dueT1 = forming ? Wanted(0) : (pendT1 >= 0 ? pendT1 : Global::RoleSettings::Air::ScoutSweepT1Count);
         const int dueRadar = forming ? Wanted(1) : (pendRadar >= 0 ? pendRadar : Global::RoleSettings::Air::ScoutSweepRadarCount);
@@ -186,6 +196,7 @@ namespace AirScoutSweep {
         const AIFloat3 at = pendAim ? pendAt : (forming ? wantAt : pendAt);
         const float spread = pendAim ? pendSpread : (forming ? wantSpread : pendSpread);
         const bool urgent = forming ? wantUrgent : pendUrgent;
+        emergencyDraftFrame = ai.frame;
         Draft(at, spread, dueT1, dueRadar, false, true, "emergency");
         int restT1 = AiMax(0, dueT1 - draftT1), restRadar = AiMax(0, dueRadar - draftRadar);
         AIFloat3 owedAt = at;
