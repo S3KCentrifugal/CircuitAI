@@ -256,11 +256,19 @@ namespace HeavyWave {
 
     void TaskRemoved(IUnitTask@ task, bool done) {
         if (!active || task is null || gather !is task) return;
+        @gather = null;
+        // A gather also ends when its last unit is taken off it (retreat, a damaged unit's
+        // repair) with no native launch: keep the hold; the next member asking for a task
+        // opens a new gather (g1 2026-11-16 logged that as a 1/3 launch).
+        if (admitted < size && ai.frame < deadline) {
+            GenericHelpers::LogUtil(Tag() + "wave " + waves + " hold emptied before launch (units pulled away), still holding "
+                + admitted + "/" + size + " alive " + Alive(), 1);
+            return;
+        }
         GenericHelpers::LogUtil(Tag() + "wave " + waves + (Alive() > 0 ? " LAUNCH: " : " gone before launch: ")
             + Alive() + " x " + unitName + " (built "
             + admitted + "/" + size + ") after " + ((ai.frame - started) / SECOND) + " s"
             + (ai.frame >= deadline ? " at the deadline" : ""), 1);
-        @gather = null;   // native moved the units to the attack squad
         Close("launched");
     }
 
