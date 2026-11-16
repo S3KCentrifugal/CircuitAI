@@ -28,15 +28,37 @@ namespace StealthScout {
         float ClaimRadius = 1100.0f;        // another of our scouts' goal this close: score x ClaimFactor
         float ClaimFactor = 0.25f;
         int Candidates = 8;                 // best sectors checked for reach and threat per plan
-        // Threat avoidance: observed armed ground coverage and unidentified radar
-        // dots (aiBattle.GroundHazard), dilated by this margin, are hard-avoided
-        // by the route when possible, else costed. Radar itself cannot see these
-        // units (stealth); proximity (cloak radius 65-75) and sight do.
-        float HazardMargin = 260.0f;
-        float HazardWeight = 200.0f;
+        // Discovery avoidance. These units are radar-stealthy and cloaked: weapon
+        // range does not reveal them, an enemy unit within the cloak radius
+        // (65-75 elmos) does. Headless 11-16 v1 (hard-avoiding weapon coverage)
+        // stalled every scout at the front line and dithered there. So:
+        //  - routes only COST observed armed coverage and radar dots (soft;
+        //    HardAvoid = true restores v1's hard avoidance first);
+        //  - every observed enemy ground contact, armed or not, gets a
+        //    ProxRadius gap: a waypoint ahead inside it is stepped round,
+        //    a contact inside EvadeRadius of the scout makes it step away.
+        bool HardAvoid = false;
+        float HazardMargin = 120.0f;
+        float HazardWeight = 150.0f;
+        // Script ticks once a second; an enemy at 60-100 elmo/s closes ~100
+        // elmos between ticks, so the gaps are cloak radius + one tick + margin.
+        float ProxRadius = 330.0f;
+        float EvadeRadius = 260.0f;
+        // Flank routes (v3): via the map border on either side when the line's
+        // enemy density (contacts per sector, 3x3 weighted) is below FlankRatio
+        // of the straight line's.
+        bool FlankEnabled = true;
+        float FlankRatio = 0.9f;
+        float FlankMinElmos = 1500.0f;      // only for goals this far along the axis
+        float FlankInsetElmos = 450.0f;     // from the lateral border
+        float FlankLengthElmos = 1500.0f;   // path length per unit of risk
+        int HotSeconds = 180;               // sectors round a hit scout
+        int EvadeHotSeconds = 45;           // sectors round a contact a scout had to evade
+        int RetreatSeconds = 8;             // a hit scout pulls back at least this long
+        int HoldMaxSeconds = 8;             // no way round a contact ahead: wait this long, then a new target
         float ContactKeepOut = 320.0f;      // a goal this close to ANY observed enemy ground contact is moved/skipped
         float DecloakRisk = 110.0f;         // a contact this close to the scout is logged as a decloak risk
-        float LookaheadElmos = 900.0f;      // covered waypoints this far ahead -> hold and replan
+        float LookaheadElmos = 700.0f;      // contacts near waypoints this far ahead are stepped round
         float ArriveElmos = 220.0f;
         float WaypointSpacing = 192.0f;
         int MaxIssuedWaypoints = 6;

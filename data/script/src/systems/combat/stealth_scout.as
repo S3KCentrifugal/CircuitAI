@@ -51,6 +51,9 @@ namespace StealthScout {
         int fireSent = -100000;
         IUnitTask@ fireTask;
         int routeFailures = 0;
+        int holdSince = -1;         // waiting for a contact ahead to move on
+        int retreatUntil = 0;       // after a hit: pull back at least until this frame
+        int lastDetourLog = -100000;
     }
 
     array<Scout@> scouts;
@@ -171,8 +174,42 @@ namespace StealthScout {
 
     bool Safe(const AIFloat3& in p)
     {
-        return aiBattle.GroundHazard(p, Global::StealthScout::HazardMargin) <= 0.0f
-            && !NearContact(p, Global::StealthScout::ContactKeepOut);
+        return !NearContact(p, Global::StealthScout::ContactKeepOut);
+    }
+
+    // Observed enemy ground contacts within r of p (O(G)); reused buffer.
+    array<AIFloat3> nearBuf;
+    void Collect(const AIFloat3& in p, float r)
+    {
+        nearBuf.resize(0);
+        const int n = aiBattle.GetGroundContactCount();
+        for (int i = 0; i < n; ++i) {
+            const AIFloat3 c = aiBattle.GetGroundContactPos(i);
+            if (MapHelpers::SqDist(p, c) <= r * r) nearBuf.insertLast(c);
+        }
+    }
+
+    float NearestIn(const AIFloat3& in p, int& out index)
+    {
+        float best = 1e30f;
+        index = -1;
+        for (uint i = 0; i < nearBuf.length(); ++i) {
+            const float d = MapHelpers::SqDist(p, nearBuf[i]);
+            if (d < best) { best = d; index = int(i); }
+        }
+        return index >= 0 ? sqrt(best) : 1e30f;
+    }
+
+    // Straight leg a->b keeps r from every collected contact (samples every 64 elmos).
+    bool LegClear(const AIFloat3& in a, const AIFloat3& in b, float r)
+    {
+        const int steps = AiMax(1, int(a.distance2D(b) / 64.0f));
+        int k;
+        for (int i = 1; i <= steps; ++i) {
+            const AIFloat3 p = a + (b - a) * (float(i) / float(steps));
+            if (NearestIn(p, k) < r) return false;
+        }
+        return true;
     }
 
     bool InMap(const AIFloat3& in p)
@@ -222,6 +259,7 @@ namespace StealthScout {
         for (int i = 0; i < n; ++i) {
             if (i == s.sector && s.routeFailures > 0) continue;
             if (ai.frame < unreachableUntil[i]) continue;
+            if (int(hotUntil.length()) == n && ai.frame < hotUntil[i]) continue;
             const float st = StaleSeconds(i);
             if (st < float(Global::StealthScout::MinStaleSeconds)) continue;
             const AIFloat3 c = Centre(i);
@@ -274,11 +312,38 @@ namespace StealthScout {
                 const int j = (k % 2 == 0) ? k / 2 : -(k + 1) / 2;   // 0, -1, 1, -2, 2 ... around the away bearing
                 const float a = base + float(j) * 0.392699f;
                 AIFloat3 q = pos + AIFloat3(cos(a), 0.0f, sin(a)) * float(ring * 128);
-                if (!InMap(q) || !aiTerrainMgr.CanMoveTo(u, q) || !Safe(q)) continue;
+                if (!InMap(q) || !aiTerrainMgr.CanMoveTo(u, q) || NearContact(q, Global::StealthScout::ProxRadius * 1.5f)) continue;
                 q.y = aiBattle.Height(q);
                 p = q;
                 return true;
             }
+        }
+        return false;
+    }
+
+    // Step round the contact c nearest waypoint k: corners either side of it at
+    // 1.4-3x ProxRadius (also pushed along the route), the first whose legs from
+    // the scout and on to waypoint k+1 keep the gap. O(24 * leg/64 * nearby contacts).
+    bool Detour(Scout@ s, CCircuitUnit@ u, const AIFloat3& in pos, uint k, int c)
+    {
+        const float r = Global::StealthScout::ProxRadius;
+        const AIFloat3 blocker = nearBuf[uint(c)];
+        const AIFloat3 next = (k + 1 < s.route.length()) ? s.route[k + 1] : s.route[k];
+        AIFloat3 dir = next - pos; dir.y = 0.0f;
+        const float len = dir.Length2D();
+        if (len < 1.0f) return false;
+        dir = dir * (1.0f / len);
+        const AIFloat3 side(-dir.z, 0.0f, dir.x);
+        for (int m = 0; m < 4; ++m) for (int sgn = -1; sgn <= 1; sgn += 2) for (int f = 0; f <= 2; ++f) {
+            AIFloat3 d = blocker + side * (float(sgn) * r * (1.4f + 0.55f * float(m))) + dir * (float(f) * r * 0.6f);
+            if (!InMap(d) || !aiTerrainMgr.CanMoveTo(u, d)) continue;
+            if (!LegClear(pos, d, r) || !LegClear(d, next, r)) continue;
+            d.y = aiBattle.Height(d);
+            array<AIFloat3> route = {d};
+            for (uint i = k + 1; i < s.route.length(); ++i) route.insertLast(s.route[i]);
+            s.route = route; s.cursor = 0;
+            IssueWindow(s);
+            return true;
         }
         return false;
     }
@@ -324,13 +389,143 @@ namespace StealthScout {
         replanQueue.insertLast(s.id);
     }
 
+    // ---------------- flank routes ----------------
+    // Headless 11-16 v2: scouts crossing the middle of an 8v8 front were walked
+    // into (decloaked) and killed within 1-2 min. A route via the map's lateral
+    // border (both sides tried) is taken when its enemy density is lower.
+    // density[]: observed enemy ground contacts per sector, rebuilt once per
+    // second while this AI has scouts (O(G)); hotUntil[]: sectors where one of
+    // our scouts was hit, avoided by routes and targets for HotSeconds.
+    array<int> density;
+    array<int> hotUntil;
+
+    void RebuildDensity()
+    {
+        const int n = cols * rows;
+        if (int(density.length()) != n) { density.resize(n); hotUntil.resize(n); for (int i = 0; i < n; ++i) hotUntil[i] = 0; }
+        for (int i = 0; i < n; ++i) density[i] = 0;
+        const int g = aiBattle.GetGroundContactCount();
+        for (int i = 0; i < g; ++i) {
+            const int s = SectorAt(aiBattle.GetGroundContactPos(i));
+            if (s >= 0) ++density[s];
+        }
+    }
+
+    float CellRisk(const AIFloat3& in p)
+    {
+        const int s = SectorAt(p);
+        if (s < 0) return 0.0f;
+        const int x = s % cols, z = s / cols;
+        float r = 0.0f;
+        for (int dz = -1; dz <= 1; ++dz) for (int dx = -1; dx <= 1; ++dx) {
+            const int xx = x + dx, zz = z + dz;
+            if (xx < 0 || zz < 0 || xx >= cols || zz >= rows) continue;
+            const int k = zz * cols + xx;
+            r += float(density[k]) * ((dx == 0 && dz == 0) ? 1.0f : 0.35f);
+            if (ai.frame < hotUntil[k]) r += (dx == 0 && dz == 0) ? 20.0f : 6.0f;
+        }
+        if (aiBattle.GroundHazard(p, 0.0f) > 0.0f) r += 2.0f;
+        return r;
+    }
+
+    float LineRisk(const array<AIFloat3>& in pts)
+    {
+        float r = 0.0f, len = 0.0f;
+        for (uint i = 1; i < pts.length(); ++i) {
+            const float d = pts[i - 1].distance2D(pts[i]);
+            len += d;
+            const int steps = AiMax(1, int(d / 256.0f));
+            for (int k = 1; k <= steps; ++k) r += CellRisk(pts[i - 1] + (pts[i] - pts[i - 1]) * (float(k) / float(steps)));
+        }
+        return r + len / Global::StealthScout::FlankLengthElmos;
+    }
+
+    bool SnapNear(CCircuitUnit@ u, const AIFloat3& in at, AIFloat3& out p)
+    {
+        p = at;
+        for (int ring = 0; ring <= 6; ++ring) for (int k = 0; k < (ring == 0 ? 1 : 12); ++k) {
+            const float a = float(k) * 0.523599f;
+            AIFloat3 q = at + AIFloat3(cos(a), 0.0f, sin(a)) * float(ring * 128);
+            if (!InMap(q) || !aiTerrainMgr.CanMoveTo(u, q)) continue;
+            q.y = aiBattle.Height(q);
+            p = q;
+            return true;
+        }
+        return false;
+    }
+
+    // Our starts' centre -> theirs, unit length; false when the starts are unknown.
+    bool Axis(AIFloat3& out ours, AIFloat3& out axis, float& out len)
+    {
+        const array<AIFloat3> enemy = Lanes::EnemyStarts();
+        const AIFloat3 e = Mean(enemy);
+        ours = Mean(Lanes::AllyStarts());
+        if (ours.x < 0.0f) ours = Global::Map::StartPos;
+        axis = e - ours; axis.y = 0.0f;
+        len = axis.Length2D();
+        if (e.x < 0.0f || len < 1.0f) return false;
+        axis = axis * (1.0f / len);
+        return true;
+    }
+
+    // A flank path pos -> border -> border -> goal when it is clearly safer than
+    // the straight line; null keeps the direct route. Up to 3 route solves.
+    array<AIFloat3>@ FlankRoute(CCircuitUnit@ u, const AIFloat3& in pos, const AIFloat3& in goal, string& out via)
+    {
+        via = "direct";
+        if (!Global::StealthScout::FlankEnabled || int(density.length()) != cols * rows) return null;
+        AIFloat3 ours, axis; float len;
+        if (!Axis(ours, axis, len)) return null;
+        const AIFloat3 c(float(AiTerrainWidth()) * 0.5f, 0.0f, float(AiTerrainHeight()) * 0.5f);
+        const AIFloat3 perp(-axis.z, 0.0f, axis.x);
+        const float lp = (pos.x - c.x) * axis.x + (pos.z - c.z) * axis.z;
+        const float lg = (goal.x - c.x) * axis.x + (goal.z - c.z) * axis.z;
+        if (abs(lg - lp) < Global::StealthScout::FlankMinElmos) return null;
+        array<AIFloat3> direct = {pos, goal};
+        const float directRisk = LineRisk(direct);
+        float best = directRisk * Global::StealthScout::FlankRatio;
+        array<AIFloat3> chosen;
+        for (int sgn = -1; sgn <= 1; sgn += 2) {
+            float t = 0.0f;
+            while (t < 30000.0f && InMap(c + perp * (float(sgn) * (t + 256.0f)))) t += 256.0f;
+            const float lat = AiMax(0.0f, t - Global::StealthScout::FlankInsetElmos) * float(sgn);
+            AIFloat3 v1, v2;
+            if (!SnapNear(u, c + axis * lp + perp * lat, v1) || !SnapNear(u, c + axis * lg + perp * lat, v2)) continue;
+            array<AIFloat3> line = {pos, v1, v2, goal};
+            const float risk = LineRisk(line);
+            if (risk < best) { best = risk; chosen = line; via = sgn < 0 ? "flank-a" : "flank-b"; }
+        }
+        if (chosen.length() == 0) { via = "direct"; return null; }
+        array<AIFloat3> path;
+        for (uint i = 1; i < chosen.length(); ++i) {
+            array<AIFloat3>@ leg = aiBattle.GetUnitRaidRoute(u.circuitDef, chosen[i - 1], chosen[i],
+                Global::StealthScout::HazardMargin, Global::StealthScout::HazardWeight, false);
+            if (leg is null || leg.length() < 2) { via = "direct"; return null; }
+            for (uint k = (i == 1 ? 0 : 1); k < leg.length(); ++k) path.insertLast(leg[k]);
+        }
+        via += " risk=" + int(best) + "/" + int(directRisk);
+        return path;
+    }
+
+    void MarkHot(const AIFloat3& in p, int seconds)
+    {
+        const int s = SectorAt(p);
+        if (s < 0 || int(hotUntil.length()) != cols * rows) return;
+        const int x = s % cols, z = s / cols;
+        for (int dz = -1; dz <= 1; ++dz) for (int dx = -1; dx <= 1; ++dx) {
+            const int xx = x + dx, zz = z + dz;
+            if (xx < 0 || zz < 0 || xx >= cols || zz >= rows) continue;
+            hotUntil[zz * cols + xx] = AiMax(hotUntil[zz * cols + xx], ai.frame + seconds * SECOND);
+        }
+    }
+
     void Plan(Scout@ s, CCircuitUnit@ u)
     {
         s.queued = false;
         const AIFloat3 pos = u.GetPos(ai.frame);
         s.lastPos = pos; s.lastMove = ai.frame;
         const float margin = Global::StealthScout::HazardMargin;
-        s.escaping = aiBattle.GroundHazard(pos, margin) > 0.0f;
+        s.escaping = false; s.holdSince = -1;   // an evade or a wait ends with a plan
         AIFloat3 goal;
         string why;
         if (s.escaping) {
@@ -357,14 +552,18 @@ namespace StealthScout {
                 why = "target sector=" + sector + " stale=" + int(stale) + "s score=" + int(score);
             }
         }
-        array<AIFloat3>@ path = aiBattle.GetUnitRaidRoute(u.circuitDef, pos, goal, margin, Global::StealthScout::HazardWeight, !s.escaping);
-        bool soft = false;
-        if (!s.escaping && (path is null || path.length() < 2)) {
+        const bool hard = Global::StealthScout::HardAvoid;
+        string via = "direct";
+        array<AIFloat3>@ path = FlankRoute(u, pos, goal, via);
+        if (path is null) @path = aiBattle.GetUnitRaidRoute(u.circuitDef, pos, goal, margin, Global::StealthScout::HazardWeight, hard);
+        bool soft = !hard;
+        if (hard && (path is null || path.length() < 2)) {
             // Hard avoidance found no way round: cost coverage instead of
             // forbidding it. Still nothing: the sector is put aside.
             @path = aiBattle.GetUnitRaidRoute(u.circuitDef, pos, goal, margin, Global::StealthScout::HazardWeight, false);
             soft = true;
         }
+        why += " via=" + via;
         if (path is null || path.length() < 2) {
             ++s.routeFailures;
             if (s.sector >= 0) unreachableUntil[s.sector] = ai.frame + Global::StealthScout::UnreachableForgetSeconds * SECOND;
@@ -383,7 +582,7 @@ namespace StealthScout {
         ++planned;
         GenericHelpers::LogUtil("[StealthScout] route unit=" + s.id + " def=" + u.circuitDef.GetName() + " " + why
             + " from=(" + int(pos.x) + "," + int(pos.z) + ") goal=(" + int(goal.x) + "," + int(goal.z) + ") points=" + s.route.length()
-            + " dist=" + int(pos.distance2D(goal)) + (soft ? " soft" : ""), 1);
+            + " dist=" + int(pos.distance2D(goal)) + (soft ? "" : " hard"), 1);
     }
 
     // ---------------- admission ----------------
@@ -473,7 +672,7 @@ namespace StealthScout {
         if (!Active()) { if (scouts.length() > 0) Reset(); return; }
         InitGrid();
         Scan();
-        const float margin = Global::StealthScout::HazardMargin;
+        if (scouts.length() > 0) RebuildDensity();
         for (int i = int(scouts.length()) - 1; i >= 0; --i) {
             Scout@ s = scouts[i];
             CCircuitUnit@ u = ai.GetTeamUnit(s.id);
@@ -486,6 +685,18 @@ namespace StealthScout {
                 ++hits;
                 GenericHelpers::LogUtil("[StealthScout] hit unit=" + s.id + " hp=" + int(hp * 100.0f) + "% at (" + int(pos.x) + "," + int(pos.z)
                     + ") inCoverage=" + (aiBattle.GroundHazard(pos, 0.0f) > 0.0f), 1);
+                // Discovered here: every scout of ours avoids this area for HotSeconds;
+                // this one drops its goal and replans (the hot sectors push the route away).
+                MarkHot(pos, Global::StealthScout::HotSeconds);
+                // Pull back away from the shooter before anything else (v4: v3 replanned
+                // straight on toward the goal and died in the same spot).
+                AIFloat3 back;
+                if (EscapePoint(u, pos, back)) {
+                    array<AIFloat3> leg = {back};
+                    s.task.SetRoute(leg);
+                    s.escaping = true; s.holdSince = -1; s.sector = -1;
+                    s.retreatUntil = ai.frame + Global::StealthScout::RetreatSeconds * SECOND;
+                }
             }
             s.lastHealth = hp;
             if (ai.frame - s.lastRisk >= 20 * SECOND && NearContact(pos, Global::StealthScout::DecloakRisk)) {
@@ -501,35 +712,76 @@ namespace StealthScout {
             while (s.cursor < s.route.length() && MapHelpers::SqDist(pos, s.route[s.cursor]) < 128.0f * 128.0f) ++s.cursor;
             if (MapHelpers::SqDist(pos, s.lastPos) > 64.0f * 64.0f) { s.lastPos = pos; s.lastMove = ai.frame; }
             const bool windowEnd = s.issuedEnd < s.route.length() && (s.cursor + 2 >= s.issuedEnd || s.task.IsAtEnd(u));
-            if (windowEnd && ai.frame - s.lastWindow >= Global::StealthScout::WindowSeconds * SECOND) IssueWindow(s);
+            if (windowEnd && !s.escaping && s.holdSince < 0 && ai.frame - s.lastWindow >= Global::StealthScout::WindowSeconds * SECOND) IssueWindow(s);
             if (s.queued) continue;
-            // Escape first.
-            const bool covered = aiBattle.GroundHazard(pos, margin) > 0.0f;
+            // Discovery avoidance (see settings): contacts near the scout and near
+            // the waypoints ahead, collected once per scout per second, O(G).
+            const float prox = Global::StealthScout::ProxRadius;
+            Collect(pos, Global::StealthScout::LookaheadElmos + prox);
+            int ci;
+            const float nearest = NearestIn(pos, ci);
+            const bool covered = aiBattle.GroundHazard(pos, 0.0f) > 0.0f;
             if (covered != s.inside) {
-                s.inside = covered;
+                s.inside = covered;   // logged only: weapon coverage does not see a cloaked scout
                 GenericHelpers::LogUtil("[StealthScout] " + (covered ? "inside coverage" : "clear of coverage") + " unit=" + s.id
                     + " at (" + int(pos.x) + "," + int(pos.z) + ")", 1);
-                Queue(s);
+            }
+            if (nearest < Global::StealthScout::EvadeRadius) {
+                // Something is about to walk into us: step away (one MOVE), resume after.
+                AIFloat3 away;
+                if (!s.escaping && EscapePoint(u, pos, away)) {
+                    array<AIFloat3> leg = {away};
+                    s.task.SetRoute(leg);
+                    s.escaping = true; s.holdSince = -1;
+                    // the contact's area costs routes for a while, so the resume goes round it
+                    MarkHot(nearBuf[uint(ci)], Global::StealthScout::EvadeHotSeconds);
+                    GenericHelpers::LogUtil("[StealthScout] evade unit=" + s.id + " contact " + int(nearest) + " at (" + int(pos.x) + ","
+                        + int(pos.z) + ") to (" + int(away.x) + "," + int(away.z) + ")", 1);
+                }
+                s.lastMove = ai.frame;
                 continue;
             }
             if (s.escaping) {
-                if (!covered || s.task.IsAtEnd(u)) Queue(s);
+                // Clear again: resume (the plan keeps the goal unless it was seen meanwhile).
+                if (ai.frame >= s.retreatUntil && (nearest >= prox || s.task.IsAtEnd(u))) Queue(s);
                 continue;
             }
-            // Coverage appeared ahead: stop and replan around it.
-            bool ahead = false;
+            // A contact near a waypoint ahead: step round it, else wait for it to pass.
+            int blockK = -1, blockC = -1;
             float run = 0.0f;
             AIFloat3 prev = pos;
-            for (uint k = s.cursor; k < s.route.length() && (run < Global::StealthScout::LookaheadElmos || k < s.cursor + 3); ++k) {
-                if (aiBattle.GroundHazard(s.route[k], margin) > 0.0f) { ahead = true; break; }
+            for (uint k = s.cursor; k < s.route.length() && (run < Global::StealthScout::LookaheadElmos || k < s.cursor + 2); ++k) {
+                int c;
+                if (NearestIn(s.route[k], c) < prox) { blockK = int(k); blockC = c; break; }
                 run += prev.distance2D(s.route[k]); prev = s.route[k];
             }
-            if (ahead) {
-                Hold(s, pos);
-                GenericHelpers::LogUtil("[StealthScout] coverage ahead unit=" + s.id + " hold at (" + int(pos.x) + "," + int(pos.z) + ")", 1);
-                Queue(s);
+            if (blockK >= 0) {
+                const AIFloat3 b = nearBuf[uint(blockC)];
+                if (Detour(s, u, pos, uint(blockK), blockC)) {
+                    s.holdSince = -1;
+                    if (ai.frame - s.lastDetourLog >= 10 * SECOND) {
+                        s.lastDetourLog = ai.frame;
+                        GenericHelpers::LogUtil("[StealthScout] detour unit=" + s.id + " round (" + int(b.x) + "," + int(b.z)
+                            + ") at (" + int(pos.x) + "," + int(pos.z) + ")", 1);
+                    }
+                } else if (s.holdSince < 0) {
+                    s.holdSince = ai.frame;
+                    array<AIFloat3> hold = {pos};
+                    s.task.SetRoute(hold);   // s.route kept: resume when the contact moves on
+                    s.issuedEnd = s.cursor;
+                    GenericHelpers::LogUtil("[StealthScout] wait unit=" + s.id + " contact ahead (" + int(b.x) + "," + int(b.z)
+                        + ") at (" + int(pos.x) + "," + int(pos.z) + ")", 1);
+                } else if (ai.frame - s.holdSince > Global::StealthScout::HoldMaxSeconds * SECOND) {
+                    s.holdSince = -1;
+                    if (s.sector >= 0) unreachableUntil[s.sector] = ai.frame + 60 * SECOND;
+                    GenericHelpers::LogUtil("[StealthScout] give way unit=" + s.id + " sector=" + s.sector + "; new target", 1);
+                    s.sector = -1;
+                    Queue(s);
+                }
+                s.lastMove = ai.frame;   // waiting is not stuck
                 continue;
             }
+            if (s.holdSince >= 0) { s.holdSince = -1; IssueWindow(s); }
             // Arrival / goal already seen by someone else / timeout / stuck.
             if (s.sector >= 0) {
                 const bool seenMeanwhile = lastSeen[s.sector] > s.goalFrame;
