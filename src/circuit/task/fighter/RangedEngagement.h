@@ -33,6 +33,16 @@ private:
     void UpdateCohort(CCircuitUnit* unit);
     bool LegalPath(CCircuitUnit* unit,const std::vector<springai::AIFloat3>& route,bool escape);
     bool SafeMove(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,float margin,bool escape);
+    // Owner 2026-11-16 (Catapults, Daedalus, Myrmidons idle at the gantry): with no
+    // shot, no danger and no usable firing site, walk a threat-aware path towards
+    // the objective (or the nearest known enemy) and stop where the walk would
+    // enter live or ghost static coverage: the front. False when nothing to do.
+    bool March(CCircuitUnit* unit,const springai::AIFloat3& pos,const springai::AIFloat3* objective,float maxRange);
+    bool MarchGoal(const springai::AIFloat3& pos,springai::AIFloat3& goal);
+    // Owner 2026-11-16: RANGEDTIME log lines, once per unit: born (first
+    // assignment), front, engage (first shot or drone launch target).
+    void TimingTick(CCircuitUnit* unit,const springai::AIFloat3& pos,float maxRange,bool drones);
+    void TimingFront(CCircuitUnit* unit,const char* reason);
     CCircuitAI* ai;
     IUnitTask* owner;
     // Tasks may outlive the derived manager destructor during shutdown.
@@ -78,6 +88,8 @@ private:
     unsigned rejections=0, assistCheckRejections=0;
     bool assistInvariantLogged=false;
     std::vector<springai::AIFloat3> path;
+    bool marching=false; int marchRetryFrame=0;
+    springai::AIFloat3 marchGoal;
 };
 }
 #endif

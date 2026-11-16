@@ -23,6 +23,7 @@
 #include <cmath>
 #include <limits>
 #include <cstdlib>
+#include <map>
 
 namespace circuit {
 namespace {
@@ -207,7 +208,7 @@ void CRangedEngagement::Hold(CCircuitUnit* unit,bool unsafe)
         return;
     }
     orientUntil=0;
-    query.reset(); ++generation;
+    query.reset(); ++generation; marching=false;
     if(moving && !issuing) {
         moving=false; path.clear(); issuing=true;
         TRY_UNIT(ai,unit,unit->CmdStop();)
@@ -264,6 +265,154 @@ void CRangedEngagement::Disperse(CCircuitUnit* unit)
         }
     }
 }
+// Owner 2026-11-16: timing per unit, kept across re-assignments (a retreat and
+// back makes a new controller). Keyed by AI instance and unit id; one entry per
+// ranged unit for the game.
+namespace {
+struct SRangedTiming { int born=-1, front=-1, engage=-1; };
+std::map<std::pair<const void*,int>,SRangedTiming> rangedTimings;
+const bool noMarch = std::getenv("CIRCUIT_RANGED_NO_MARCH") != nullptr;   // A/B baseline only
+}
+void CRangedEngagement::TimingFront(CCircuitUnit* unit,const char* reason)
+{
+    auto& t=rangedTimings[{ai,id}];
+    if(t.born<0 || t.front>=0) return;
+    const int frame=ai->GetLastFrame(); t.front=frame;
+    const auto pos=unit->GetPos(frame);
+    ai->LOG("RANGEDTIME: front unit=%d def=%s frame=%d after=%.1f reason=%s pos=%.0f,%.0f",id,
+        unit->GetCircuitDef()->GetDef()->GetName(),frame,float(frame-t.born)/FRAMES_PER_SEC,reason,pos.x,pos.z);
+}
+void CRangedEngagement::TimingTick(CCircuitUnit* unit,const AIFloat3& pos,float maxRange,bool drones)
+{
+    const int frame=ai->GetLastFrame();
+    auto& t=rangedTimings[{ai,id}];
+    if(t.born<0) {
+        t.born=frame;
+        ai->LOG("RANGEDTIME: born unit=%d def=%s frame=%d produced=%d pos=%.0f,%.0f march=%d",id,
+            unit->GetCircuitDef()->GetDef()->GetName(),frame,unit->GetProductionFrame(),pos.x,pos.z,int(!noMarch));
+    }
+    if(t.front<0) {
+        // At the front: a ground contact (live, any identity) inside weapon reach + 500.
+        const float r=maxRange+500.f;
+        for(int i:nearby) {
+            const auto& c=world.Contacts()[i];
+            if((c.def && c.def->IsAbleToFly()) || c.airDot || c.pos.y< -20.f) continue;
+            if(pos.SqDistance2D(c.pos)<=r*r) { TimingFront(unit,"contact"); break; }
+        }
+    }
+    if(t.engage<0) {
+        const int fired=unit->GetFireFrame();
+        const char* how=(fired>=t.born && fired>0) ? "shot" : (drones ? "drones" : nullptr);
+        if(how) {
+            if(t.front<0) TimingFront(unit,how);
+            t.engage=frame;
+            ai->LOG("RANGEDTIME: engage unit=%d def=%s frame=%d after=%.1f sinceFront=%.1f how=%s",id,
+                unit->GetCircuitDef()->GetDef()->GetName(),frame,float(frame-t.born)/FRAMES_PER_SEC,
+                float(frame-t.front)/FRAMES_PER_SEC,how);
+        }
+    }
+}
+bool CRangedEngagement::MarchGoal(const AIFloat3& pos,AIFloat3& goal)
+{
+    float best=std::numeric_limits<float>::max();
+    // 1. ghost porc: the last known defence line
+    for(const auto& g:world.Ghosts()) {
+        const float d=pos.SqDistance2D(g.pos);
+        if(d<best) { best=d; goal=g.pos; }
+    }
+    if(best<std::numeric_limits<float>::max()) return true;
+    // 2. any known enemy ground unit or structure, last known position
+    for(const auto& kv:ai->GetEnemyInfos()) {
+        const CEnemyInfo* e=kv.second;
+        if(e==nullptr || e->IsHidden()) continue;
+        const CCircuitDef* d=e->GetCircuitDef();
+        if(d!=nullptr && d->IsAbleToFly()) continue;
+        const AIFloat3& p=e->GetPos();
+        if(!std::isfinite(p.x) || !std::isfinite(p.z) || p.x<0.f || p.z<0.f) continue;
+        const float dist=pos.SqDistance2D(p);
+        if(dist<best) { best=dist; goal=p; }
+    }
+    if(best<std::numeric_limits<float>::max()) return true;
+    // 3. the nearest enemy start in the start script
+    auto* setup=ai->GetSetupManager();
+    const int starts=setup->GetScriptStartCount();
+    for(int i=0;i<starts;++i) {
+        if(!setup->IsScriptStartEnemy(i)) continue;
+        const AIFloat3 p=setup->GetScriptStart(i);
+        if(p.x<0.f || p.z<0.f) continue;
+        const float dist=pos.SqDistance2D(p);
+        if(dist<best) { best=dist; goal=p; }
+    }
+    if(best<std::numeric_limits<float>::max()) return true;
+    // 4. the enemy manager's centre of enemy groups (terrain centre when blind)
+    goal=ai->GetEnemyManager()->GetEnemyPos();
+    return pos.SqDistance2D(goal)>1000.f*1000.f;
+}
+bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFloat3* objective,float maxRange)
+{
+    if(noMarch) return false;
+    const int frame=ai->GetLastFrame();
+    const auto& policy=unit->GetCircuitDef()->GetRangedPolicy();
+    if(frame<marchRetryFrame) return marching && moving;   // halted at the front, or a failed path: wait
+    AIFloat3 goal;
+    if(objective) goal=*objective; else if(!MarchGoal(pos,goal)) return false;
+    goal.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(goal.x,goal.z);
+    const float stop=std::max(maxRange*policy.rangeFraction,float(ai->GetPathfinder()->GetSquareSize()));
+    if(pos.SqDistance2D(goal)<=stop*stop) { marching=false; return false; }
+    // Keep a live, still-legal march towards the same goal.
+    if(marching && (moving || query) && marchGoal.SqDistance2D(goal)<256.f*256.f
+        && (query || (ai->GetUnitAPI()->GetCMDQueueSize(id)>0 && LegalPath(unit,path,true)))) return true;
+    if(policy.moveFloorSeconds>0.f && frame<lastMoveFrame+int(policy.moveFloorSeconds*FRAMES_PER_SEC)) return marching;
+    marchGoal=goal; marching=true; completedMove=false;
+    query.reset(); const unsigned version=++generation; lastMoveFrame=frame;
+    auto* finder=ai->GetPathfinder();
+    // The threat map routes round known guns; the walk is then cut where it
+    // first enters live or ghost static coverage (the same Safe test as firing
+    // sites) and at weapon reach of the goal (the path radius).
+    query=finder->CreatePathSingleQuery(unit,ai->GetThreatMap(),pos,goal,stop);
+    const std::weak_ptr<int> alive=lifetime;
+    finder->RunQuery(ai->GetScheduler().get(),query,[this,alive,version](const IPathQuery* result) {
+        if(alive.expired()) return;
+        auto* unit=ai->GetTeamUnit(id);
+        if(!unit || unit->GetTask()!=owner || version!=generation || result!=query.get()) return;
+        query.reset();
+        const int now=ai->GetLastFrame();
+        const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+        ExactStaticScope exact(world,p);
+        world.Refresh();
+        const auto points=static_cast<const CQueryPathSingle*>(result)->GetPathInfo()->posPath;
+        const AIFloat3 current=unit->GetPos(now);
+        std::vector<AIFloat3> legal;
+        AIFloat3 from=current;
+        bool cut=false;
+        for(const auto& q:points) {
+            if(from.SqDistance2D(q)<16.f) continue;
+            if(!SafeMove(unit,from,q,StaticMargin(p),true)
+                || world.DangerSign(q,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))>0) { cut=true; break; }
+            legal.push_back(q); from=q;
+        }
+        if(points.empty() || legal.empty() || current.SqDistance2D(legal.back())<128.f*128.f) {
+            // Nothing safe further on: this is the front (or no path). Wait here.
+            marching=false; marchRetryFrame=now+FRAMES_PER_SEC*5;
+            if(points.empty()) ++failures;
+            else TimingFront(unit,"halt");
+            if(trace || !points.empty()) ai->LOG("RANGED: march halt unit=%d points=%u legal=%u cut=%d goal=%.0f,%.0f",
+                id,unsigned(points.size()),unsigned(legal.size()),int(cut),marchGoal.x,marchGoal.z);
+            return;
+        }
+        const int cap=p.maxWaypoints;
+        if(cap>=1 && legal.size()>size_t(cap)) legal.resize(cap);
+        path=legal; pathCursor=0; moving=true; issuing=true; destination=legal.back();
+        world.SetSlot(id,destination,p.spacing,unit->GetCircuitDef()->GetCostM());
+        TRY_UNIT(ai,unit,
+            for(size_t i=0;i<path.size();++i) unit->CmdMoveTo(path[i],i?UNIT_COMMAND_OPTION_SHIFT_KEY:0);
+        )
+        issuing=false;
+        if(trace) ai->LOG("RANGED: march unit=%d legs=%u cut=%d to=%.0f,%.0f goal=%.0f,%.0f",id,unsigned(path.size()),int(cut),
+            destination.x,destination.z,marchGoal.x,marchGoal.z);
+    });
+    return true;
+}
 bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape,bool urgent)
 {
     const auto& policy=unit->GetCircuitDef()->GetRangedPolicy();
@@ -318,7 +467,7 @@ bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape
     if(trace) ai->LOG("RANGED: move-replace unit=%d objective=%d mode=%d urgent=%d moving=%d pending=%d queue=%d from=%.1f,%.1f old=%.1f,%.1f new=%.1f,%.1f",
         id,moveObjective,moveMode,int(urgentMove),int(moving),int(query!=nullptr),
         ai->GetUnitAPI()->GetCMDQueueSize(id),pos.x,pos.z,destination.x,destination.z,dest.x,dest.z);
-    completedMove=false;
+    completedMove=false; marching=false;
     destination=dest; query.reset(); const unsigned version=++generation; lastMoveFrame=ai->GetLastFrame();
     world.SetSlot(id,dest,policy.spacing,unit->GetCircuitDef()->GetCostM());
     auto* finder=ai->GetPathfinder();
@@ -912,6 +1061,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     for(const auto& w:caps.weapons) maxRange=std::max(maxRange,w.range);
     world.Nearby(pos,maxRange+1000.f,nearby);
     const auto& contacts=world.Contacts();
+    TimingTick(unit,pos,maxRange,false);   // owner 2026-11-16: RANGEDTIME
     const bool report=trace && frame>=traceFrame+150;
     if(report) { traceFrame=frame; ai->LOG("RANGED: sample unit=%d contacts=%u near=%u range=%.1f",id,unsigned(contacts.size()),unsigned(nearby.size()),maxRange); }
 
@@ -1109,6 +1259,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         const auto& c=contacts[droneTarget];
         if(report) ai->LOG("RANGED: drone target unit=%d target=%d dist=%.0f spam=%d",id,c.id,std::sqrt(pos.SqDistance2D(c.pos)),int(spamInRange));
         SelectTarget(unit,c.id,-1,0.f,0.f);
+        TimingTick(unit,pos,maxRange,true);
     }
     if(best>=0) {
         const auto& c=contacts[best];
@@ -1225,7 +1376,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if(report && unknownObjectives>0) ai->LOG("RANGED: unknown radar approach withheld unit=%d candidates=%d",id,unknownObjectives);
     if(objective<0) {
         if(report) ai->LOG("RANGED: no objective unit=%d",id);
-        if (policy.holdFireline) Hold(unit,true); else Disperse(unit);
+        // Owner 2026-11-16: nothing identified in radar/LOS. Walk to the front
+        // (ghost porc, last known enemy, enemy start) instead of waiting at home.
+        if (policy.holdFireline) Hold(unit,true);
+        else if (closing || frame<withdrawalUntil || droneTarget>=0 || !March(unit,pos,nullptr,maxRange)) Disperse(unit);
         return;
     }
     const auto& c=contacts[objective];
@@ -1331,6 +1485,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     } else if(found) {
         world.SetSlot(id,chosen,spacing,def->GetCostM());
         if(Move(unit,chosen,true) && assisting) { assistCheckFrame=frame; assistCheckRejections=rejections; }
+    } else if(!found && best<0 && droneTarget<0 && !closing && !policy.holdFireline && March(unit,pos,&c.pos,maxRange)) {
+        // Owner 2026-11-16: no firing site passes from here (the straight walk
+        // from the gantry crosses enemy coverage): walk up to that coverage.
+        if(report) ai->LOG("RANGED: march to objective unit=%d target=%d",id,c.id);
     } else if(!moving) world.SetSlot(id,pos,spacing,def->GetCostM());
     if(report) ai->LOG("RANGED: sites unit=%d target=%d known=%d found=%d terrain=%d slots=%d coverage=%d fire=%d dest=%.0f,%.0f moving=%d query=%d queryid=%d generation=%u",id,c.id,c.def!=nullptr,int(found),terrainRejected,slotRejected,coverageRejected,fireRejected,chosen.x,chosen.z,int(moving),query?int(query->GetState()):-1,query?query->GetId():-1,generation);
     if(pos.SqDistance2D(lastPos)>1024.f) { lastPos=pos; lastProgressFrame=frame; failures=0; }
