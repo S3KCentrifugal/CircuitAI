@@ -55,7 +55,7 @@ lab faces the way native would face it (toward the map centre) and the
 turrets are ordered behind that.
 
 The lane starts (cluster, then production) once FRONT has a finished T2
-factory and has held EdgeMinMetalIncome (65) and EdgeMinEnergyIncome for 10 s;
+factory and has held EdgeMinMetalIncome (60) and EdgeMinEnergyIncome for 10 s;
 below ReleaseFraction of them it pauses. The lab produces
 Spam::SpamUnitFor(lab) on repeat (native repeat recruit, as
 Spam::FactoryMakeTask) while the lane is on. Its units take the lane as their factory route
