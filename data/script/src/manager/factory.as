@@ -9,6 +9,7 @@
 #include "../systems/team/ferry.as"
 #include "../systems/production/gantry_fallback.as"
 #include "../systems/production/rez_replenish.as"
+#include "../systems/production/heavy_wave.as"
 
 namespace Factory {
 
@@ -215,6 +216,7 @@ namespace Factory {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		HeavyWave::RecruitRemoved(task, done);
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
 		if(cfg !is null && cfg.FactoryAiTaskRemovedHandler !is null)
 			cfg.FactoryAiTaskRemovedHandler(task, done);
@@ -430,6 +432,7 @@ namespace Factory {
 		Spam::OnFactoryRemoved(unit);   // drop the factory spam route
 		IdleReclaim::UnitRemoved(unit); // a lost lab marks a wreck site
 		GantryFallback::Forget(unit);
+		HeavyWave::FactoryRemoved(unit);
 		// Clear lab references when a lab dies
 		if (Factory::primaryT1BotLab is unit){ @Factory::primaryT1BotLab = null; }
 		if (Factory::primaryT2BotLab is unit){ @Factory::primaryT2BotLab = null; }

@@ -1126,6 +1126,9 @@ namespace RoleTech
 			if (t3rush !is null) return t3rush;
             IUnitTask@ amphib = AmphibiousOps::Produce(u, botLabGate);
             if (amphib !is null) return amphib;
+            // owner 2026-11-16: a heavy wave roll's units back to back, outside the rotation
+            IUnitTask@ wave = HeavyWave::Produce(u, side);
+            if (wave !is null) return wave;
 			// owner, 2026-10-26: with a HeavyPair<Side> set the pair alternates from the
 			// gantry's first unit (after the t3rush units on that plan), whatever the income;
 			// one unit per ask (owner, 2026-10-27), so it goes Sol, Astraeus, Sol ... not five of each

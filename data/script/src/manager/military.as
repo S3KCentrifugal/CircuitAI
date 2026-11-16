@@ -12,6 +12,7 @@
 #include "../systems/amphibious/amphibious_ops.as"
 #include "../systems/world/coverage_lanes.as"
 #include "../systems/construction/commander_group.as"
+#include "../systems/production/heavy_wave.as"
 
 namespace Military {
 
@@ -126,7 +127,9 @@ namespace Military {
 			return st;
 		}
 
-		IUnitTask@ t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
+		IUnitTask@ t = HeavyWave::MilitaryTask(u);   // owner 2026-11-16: a held heavy wave waits at its gantry
+		if (t !is null) return t;
+		@t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
 		if (t !is null) return t;
 		@t = TechCapitalRush::MilitaryTask(u);   // a capital bomber waits at home for its wave
 		if (t !is null) return t;
@@ -166,6 +169,7 @@ namespace Military {
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
 		Spam::OnTaskRemoved(task);
+		HeavyWave::TaskRemoved(task, done);
 		ScoutRaid::TaskRemoved(task);
 		TechFlank::TaskRemoved(task);
         AmphibiousOps::TaskRemoved(task);
@@ -182,6 +186,7 @@ namespace Military {
 		T3Unstick::UnitAdded(unit);       // watch T3 units for getting penned in (owner 2026-10-20)
 		GremlinEcoFire::UnitAdded(unit);  // Gremlins fire only at enemy economy
 		ThugFireAtWill::UnitAdded(unit);  // Thugs and Maces always fire at will (owner 2026-10-19)
+		HeavyWave::UnitAdded(unit);       // owner 2026-11-16: counts our gantry heavies, admits held wave members
 
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
@@ -194,6 +199,7 @@ namespace Military {
 	{
         CommanderGroup::OnRemoved(unit);
         TechHeavyDelivery::Removed(unit);
+        HeavyWave::UnitRemoved(unit);
         TechCapitalRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site
@@ -214,6 +220,7 @@ namespace Military {
         AmphibiousOps::Reset(); // ephemeral routes are rebuilt through Military::AiMakeTask
         AmphibiousOps::lastTick = -100000; // a loaded frame may precede the last live update
         FrontOpener::Load(); // retire ephemeral opener task ownership after reload
+        HeavyWave::Load(); // held heavies back to ordinary military policy
         FrontWaveEscort::Load(); // T2 wave escorts back to ordinary military policy
         FrontArtySquad::Load(); // T2 artillery squads too
         ScoutRaid::Reset(); // raid routes are rebuilt through Military::AiMakeTask

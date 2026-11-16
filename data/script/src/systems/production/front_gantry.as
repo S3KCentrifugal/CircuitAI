@@ -5,6 +5,7 @@
 #include "../../helpers/common/generic_helpers.as"
 #include "../../helpers/units/unit_helpers.as"
 #include "../world/strategic_sites.as"
+#include "heavy_wave.as"
 
 /******************************************************************************
 
@@ -69,6 +70,9 @@ namespace FrontGantry {
         if (!UnitHelpers::IsGantryLab(g.circuitDef.GetName()) || g.GetBuildProgress() < 1.0f) return null;
         IUnitTask@ pending = aiFactoryMgr.GetPendingFactoryTask(g);
         if (pending !is null) return pending;
+        // owner 2026-11-16: a heavy wave roll's units back to back, outside the rotation
+        IUnitTask@ wave = HeavyWave::Produce(g, side);
+        if (wave !is null) return wave;
         IUnitTask@ task = Factory::EnqueueGantryBatchFrom(g, Order(g, side), 1, Task::Priority::HIGH);
         if (task is null) return null;
         if (orderRotated && Factory::lastGantryBatchIndex >= 0)
