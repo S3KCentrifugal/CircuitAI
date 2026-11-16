@@ -487,7 +487,9 @@ namespace SiloAntiNukes {
             if (ai.frame < nextSearch) { Held("block site search backing off " + ((nextSearch - ai.frame) / SECOND) + " s"); return null; }
             bool reserved = false;
             const array<int>@ shapes = @Global::SiloAntiNukes::Shapes;
-            const int room = Global::SiloAntiNukes::Max - int(slots.length());
+            // Owner 2026-11-16: one silo known reserves only the first pad; the block (3x2 .. 1x1)
+            // is reserved beside it once more silos are scouted (Reserve stands round `centre`).
+            const int room = want <= 1 && slots.length() == 0 ? 1 : Global::SiloAntiNukes::Max - int(slots.length());
             for (uint k = 0; k + 1 < shapes.length() && !reserved; k += 2) {
                 if (shapes[k] * shapes[k + 1] > room) continue;
                 reserved = Reserve(b, d, shapes[k], shapes[k + 1], searchFails >= 2);
