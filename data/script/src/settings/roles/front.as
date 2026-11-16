@@ -677,7 +677,7 @@ namespace Front {
             float TacticalClusterRadius = 700.0f;      // two targets this near each other open the step
             float TacticalFrontRadius = 2250.0f;       // a target counts with one of our mexes / porc this near it
             float TacticalMinMetalIncome = 90.0f;      // 10 s minimum metal income (owner 2026-11-13: was 150)
-            float TacticalMinEnergyIncome = 5000.0f;   // energy income
+            float TacticalMinEnergyIncome = 3800.0f;   // energy income (owner 2026-11-16: was 5000)
             float TacticalRangeMargin = 120.0f;        // the site stands this far inside the launcher's range
             float TacticalShake = 40.0f;               // native looks this far round the site for room
             int TacticalMax = 12;                      // most standing at once

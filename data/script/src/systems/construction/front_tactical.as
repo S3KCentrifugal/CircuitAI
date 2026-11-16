@@ -18,7 +18,7 @@
 //    TacticalFrontRadius (2250). Only such targets get a launcher ("it sees");
 //  - economy: 10 s minimum metal income >= TacticalMinMetalIncome (90, was 150 to 2026-11-13; the artillery rules below:
 //    TacticalArtiMinMetalIncome, 65) and energy income >=
-//    TacticalMinEnergyIncome (5000).
+//    TacticalMinEnergyIncome (3800; 5000 to 2026-11-16).
 //
 // Launcher (TacticalUnits): Paralyzer armemp, Catalyst cortron, Perdition legperdition; a builder takes its
 // own faction's first, then any other it can build (traded constructors).
