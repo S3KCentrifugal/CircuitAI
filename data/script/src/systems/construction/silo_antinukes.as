@@ -261,6 +261,16 @@ namespace SiloAntiNukes {
         return null;
     }
 
+    // A builder on, or recruited for, one of our antinuke orders: other rules leave it alone
+    // (played, v5: 38 of 83 recruits taken by PorcCluster, MexUpT2, FrontRadar ...).
+    bool Owns(CCircuitUnit@ u)
+    {
+        if (u is null) return false;
+        if (pending !is null && !pending.IsDead() && ((u.task !is null && u.task is pending) || u.id == recruitId)) return true;
+        if (padPending !is null && !padPending.IsDead() && ((u.task !is null && u.task is padPending) || u.id == padRecruitId)) return true;
+        return false;
+    }
+
     void Held(const string &in why)
     {
         if (ai.frame - nextHeld < 60 * SECOND) return;
@@ -293,7 +303,7 @@ namespace SiloAntiNukes {
     }
 
     // One cols x rows block, or nothing. True when reserved.
-    bool Reserve(CCircuitUnit@ u, CCircuitDef@ d, int cols, int rows)
+    bool Reserve(CCircuitUnit@ u, CCircuitDef@ d, int cols, int rows, bool relax)
     {
         const AIFloat3 home = Global::Map::StartPos;
         if (home.x < 0.0f || home.z < 0.0f) return false;
@@ -339,12 +349,13 @@ namespace SiloAntiNukes {
                     // played (v1): blocks 1.1-1.5 km out toward the enemy; half-built frames shot down.
                     // Not past ForwardShare x coverage along the enemy axis, never in observed enemy reach.
                     const float along = (c.x - home.x) * axis.x + (c.z - home.z) * axis.z;
-                    if (along > Global::SiloAntiNukes::ForwardShare * R) { ++forwardCut; continue; }
+                    if (along > (relax ? 1.5f : 1.0f) * Global::SiloAntiNukes::ForwardShare * R) { ++forwardCut; continue; }
                     if (aiBattle.GroundHazard(c, Global::SiloAntiNukes::HazardMargin) > 0.0f) { ++hazard; continue; }
                     float laneD = 1e9f;
                     for (uint l = 0; l < laneA.length(); ++l) laneD = AiMin(laneD, sqrt(SqDistSegment(c, laneA[l], laneB[l])));
-                    if (laneD < own) { ++onLane; continue; }   // the block itself would stand on a lane line
+                    if (laneD < own && !relax) { ++onLane; continue; }   // the block itself would stand on a lane line (relaxed: penalised)
                     float score = AiMax(dHome, dFront * Global::SiloAntiNukes::FrontWeight) + dHome * Global::SiloAntiNukes::HomeWeight;
+                    if (laneD < own) score += 2.0f * Global::SiloAntiNukes::LanePenalty;
                     if (laneD < own + Global::SiloAntiNukes::LaneClear) score += Global::SiloAntiNukes::LanePenalty;
                     if (!aiTerrainMgr.CanReachAt(u, c, u.circuitDef.GetBuildDistance() + halfAcross)) { ++unreachable; continue; }
                     if (!aiTerrainMgr.CanReserveArea(c, f, halfAcross, halfAlong)) { ++refused; continue; }
@@ -395,7 +406,7 @@ namespace SiloAntiNukes {
         if (!found)
             GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] no " + cols + "x" + rows + " site: " + candC.length() + " candidates (skipped " + offMap
                 + " off map, " + uncovered + " not covering the base, " + forwardCut + " too far forward, " + hazard + " in enemy reach, " + onLane + " on lanes, " + unreachable + " unreachable, "
-                + refused + " refused by layouts, " + unbuildable + " unbuildable), " + tried + " tried", 2);
+                + refused + " refused by layouts, " + unbuildable + " unbuildable), " + tried + " tried" + (relax ? " (relaxed)" : ""), 1);
         return found;
     }
 
@@ -479,7 +490,7 @@ namespace SiloAntiNukes {
             const int room = Global::SiloAntiNukes::Max - int(slots.length());
             for (uint k = 0; k + 1 < shapes.length() && !reserved; k += 2) {
                 if (shapes[k] * shapes[k + 1] > room) continue;
-                reserved = Reserve(b, d, shapes[k], shapes[k + 1]);
+                reserved = Reserve(b, d, shapes[k], shapes[k + 1], searchFails >= 2);
             }
             if (!reserved) {
                 nextSearch = ai.frame + AiMin(Global::SiloAntiNukes::RetryMaxSeconds,

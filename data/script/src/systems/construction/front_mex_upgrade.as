@@ -101,6 +101,7 @@ namespace FrontMexUp {
     // A helper: work the team loses nothing by moving (another builder stays on a shared build)
     bool Helper(CCircuitUnit@ u) {
         if (u is null || u.circuitDef is null) return false;
+        if (SiloAntiNukes::Owns(u)) return false;   // owner 2026-11-15: an antinuke builder
         IUnitTask@ t = u.task;
         if (t is null || t.IsDead() || t.IsExternalControlled() || t.IsEnemyReclaim()) return false;
         if (t.GetType() != Task::Type::BUILDER) return false;

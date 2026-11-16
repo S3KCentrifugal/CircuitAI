@@ -229,6 +229,7 @@ namespace FrontPorcClusterCounter {
         if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f || Busy(u) || OnFrame(u)) return false;
         if (FrontAgitatorCounter::Holds(u.id) || FrontAgitatorCounter::Owns(u)) return false;
         if (FrontTactical::Owns(u) || FrontAgitator::OnOrder(u) || LolCannon::IsCrew(u.id)) return false;
+        if (SiloAntiNukes::Owns(u)) return false;   // owner 2026-11-15: an antinuke builder
         return true;
     }
 
