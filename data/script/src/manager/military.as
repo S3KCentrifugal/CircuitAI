@@ -5,6 +5,7 @@
 #include "../systems/combat/spam.as"
 #include "../systems/combat/mass_mode.as"
 #include "../systems/combat/scout_raid.as"
+#include "../systems/combat/stealth_scout.as"
 #include "../systems/combat/t3_unstick.as"
 #include "../systems/combat/gremlin_eco_fire.as"
 #include "../systems/combat/thug_fire_at_will.as"
@@ -145,6 +146,8 @@ namespace Military {
 		if (t !is null) return t;
 		@t = Spam::MilitaryMakeTask(u);   // spam units join their factory's route
 		if (t !is null) return t;
+		@t = StealthScout::MilitaryMakeTask(u);   // owner 2026-11-16: spy bots and Gremlins scout stale enemy-side sectors
+		if (t !is null) return t;
 		@t = ScoutRaid::MilitaryMakeTask(u);   // D-296: non-spam land scouts raid the backline
 		if (t !is null) return t;
 		// Preserve specialist owners above; production is unaffected.
@@ -175,6 +178,7 @@ namespace Military {
 		Spam::OnTaskRemoved(task);
 		HeavyWave::TaskRemoved(task, done);
 		ScoutRaid::TaskRemoved(task);
+		StealthScout::TaskRemoved(task);
 		TechFlank::TaskRemoved(task);
         AmphibiousOps::TaskRemoved(task);
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
@@ -213,6 +217,7 @@ namespace Military {
 		TechFlank::UnitRemoved(unit);
         AmphibiousOps::UnitRemoved(unit);
         ScoutRaid::UnitRemoved(unit);
+        StealthScout::UnitRemoved(unit);
         AirEmergencyDefense::UnitRemoved(unit);
 
 		// Delegate to role-specific handler if registered
@@ -233,6 +238,8 @@ namespace Military {
         FrontArtySquad::Load(); // T2 artillery squads too
         ScoutRaid::Reset(); // raid routes are rebuilt through Military::AiMakeTask
         ScoutRaid::lastTick = -100000;
+        StealthScout::Reset();
+        StealthScout::lastTick = -100000;
 	}
 
 	void AiSave(OStream& ostream)

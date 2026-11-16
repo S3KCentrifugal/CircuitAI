@@ -14,6 +14,7 @@
 #include "shared/anti_spam.as"
 #include "shared/scout_raid.as"
 #include "shared/gremlin_eco_fire.as"
+#include "shared/stealth_scout.as"
 #include "shared/construction.as"
 #include "shared/idle_reclaim.as"
 #include "shared/lolcannon.as"

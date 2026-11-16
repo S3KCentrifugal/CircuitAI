@@ -114,6 +114,8 @@ namespace GremlinEcoFire {
             Gremlin@ g = gremlins[i];
             CCircuitUnit@ u = ai.GetTeamUnit(g.id);
             if (u is null) { gremlins.removeAt(uint(i)); continue; }
+            // owner 2026-11-16: a stealth-scouting Gremlin holds fire (StealthScout owns its fire state)
+            if (Global::StealthScout::Enabled && Global::StealthScout::HoldFire && StealthScout::Owns(g.id)) { g.state = HOLD; continue; }
             const AIFloat3 pos = u.GetPos(ai.frame);
             int target;
             const int want = Wanted(pos, u.circuitDef.GetMaxRange(), target);

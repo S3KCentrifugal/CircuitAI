@@ -81,6 +81,7 @@ namespace Main {
         Global::RoleSettings::Air::BankFunding = true; // AIR: bank funds energy/cons/T2 turrets; far mexes past a small home (owner 2026-10-17)
         Global::RoleSettings::Air::FirstLabBankAssist = false; // off 2026-11-01 (@Barscrewl): Cent's floating support runs alone for the A/B; true brings ours back
         Global::GremlinEcoFire::Enabled = true; // Gremlins scout, firing only at enemy economy (owner 2026-10-19)
+        Global::StealthScout::Enabled = true;   // owner 2026-11-16: spy bots + Gremlins scout stale enemy-side sectors, hold fire
         Global::RoleSettings::Tech::LayoutNoRoomRetrySeconds = 1.0f; // owner 2026-10-19: no-room sweep backoff 1-3 s
         Global::RoleSettings::Air::EcoSlotRetrySeconds = 2.0f;      // owner 2026-10-19: one AIR reactor order per slot per 2 s
         Global::RoleSettings::Air::T2HeavyAirIncomeThreshold = 175.0f;
@@ -246,6 +247,7 @@ namespace Main {
         Lanes::Poll(); // complete async surveys for every role before consumers run
         AmphibiousOps::Tick();
         ScoutRaid::Tick(); // D-296: no-op unless the profile JSON enables scout raids
+        StealthScout::Tick(); // owner 2026-11-16: stealth land scouts + the ally last-seen map
         GremlinEcoFire::Tick(); // Gremlins scout, firing only at enemy economy in reach
         ThugFireAtWill::Tick(); // preserve the working-copy fire-state fallback after task changes
 		Commands::DrawTick();   // the widget's map drawing, paced under the server's flood guard
