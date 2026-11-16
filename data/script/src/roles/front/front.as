@@ -702,10 +702,6 @@ namespace RoleFront {
         if (g_frontLadderGantryTask !is null && !g_frontLadderGantryTask.IsDead() && builder.task is g_frontLadderGantryTask)
             return g_frontLadderGantryTask;
 
-        // Owner 2026-11-15: the builder on our antinuke order keeps it (silo_antinukes.as)
-        IUnitTask@ keepAntiNuke=SiloAntiNukes::Keep(builder);
-        if (keepAntiNuke !is null) return keepAntiNuke;
-
         if(UnitHelpers::IsCommander(builder.circuitDef)) {
             IUnitTask@ startFactory=Front_StartFactoryTakeover(builder);
             if(startFactory !is null) return startFactory;
@@ -720,9 +716,6 @@ namespace RoleFront {
         // Owner (2026-10-19): after losing the base, retake the mexes first (Front::Recovery)
         IUnitTask@ recovery=FrontRecovery::Work(builder);
         if (recovery !is null) return recovery;
-        // Owner (2026-11-15): one antinuke per scouted enemy silo, the first covering the main base and the front, the rest in a tight block beside it (silo_antinukes.as)
-        IUnitTask@ antiNuke=SiloAntiNukes::FrontWork(builder);
-        if (antiNuke !is null) return antiNuke;
         // Owner (2026-10-25): a T2 lab's turrets from the moment it is framed (front_factory_nanos.as)
         IUnitTask@ labNano=FrontFactoryNanos::Work(builder);
         if (labNano !is null) return labNano;

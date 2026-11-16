@@ -18,6 +18,7 @@
 #include "../systems/construction/layout.as"
 #include "../systems/construction/front_energy.as"
 #include "../systems/construction/forward_geothermal.as"
+#include "../systems/construction/silo_antinukes.as"
 #include "../systems/team/sea_assist.as"
 #include "../systems/construction/idle_reclaim.as"
 #include "../systems/construction/lolcannon.as"
@@ -2003,6 +2004,11 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+		// owner, 2026-11-15: antinukes against scouted enemy silos come first (silo_antinukes.as). Played (v5):
+		// asked from Front_BuilderAiMakeTask they came after the seat work, mex upgraders and radars, so
+		// FRONT's T2 constructors never reached them and recruits were taken back.
+		{ IUnitTask@ an = SiloAntiNukes::Keep(u); if (an !is null) return an; }
+		if (Global::AISettings::Role == AiRole::FRONT) { IUnitTask@ an = SiloAntiNukes::FrontWork(u); if (an !is null) return an; }
 		// owner, 2026-11-13: the dedicated T2 mex upgraders work only on our T1 mexes (early_mex_upgraders.as)
 		EarlyMexUpgraders::Tick();
 		{
