@@ -524,7 +524,7 @@ namespace SiloAntiNukes {
     **************************************************************************/
     array<int> padSlots;
     IUnitTask@ padPending = null;
-    int padNextSearch = 0, padHeldAt = -1000000, padNextRecruit = -1000000, padRecruitId = -1;
+    int padNextSearch = 0, padHeldAt = -1000000, padNextRecruit = -1000000, padRecruitId = -1, padOrderedAt = 0, padNextOrder = 0;
     void PadHeld(const string &in why)
     {
         if (ai.frame - padHeldAt < 60 * SECOND) return;
@@ -547,7 +547,8 @@ namespace SiloAntiNukes {
         const float half = float(AiMax(d.GetFootprintX(), d.GetFootprintZ())) * SQUARE_SIZE;
         const float edge = half + Global::SiloAntiNukes::MapEdgeMargin;
         AIFloat3 best(-1.0f, 0.0f, -1.0f);
-        float bestScore = -1e30f;
+        float bestScore = -1e30f, bestForward = 0.0f;
+        int bestPass = 0;
         int offMap = 0, ally = 0, refused = 0;
         const int spokes = AiMax(8, Global::SiloAntiNukes::PeripherySpokes);
         // played (v3): an AIR pad 1,081 straight toward the enemy lost its frames for 10 min.
@@ -571,7 +572,7 @@ namespace SiloAntiNukes {
                 if (!aiTerrainMgr.CanReserveArea(c, 0, half + 32.0f, half + 32.0f)
                     || !aiTerrainMgr.CanReserveBuilding(d, c, 0)
                     || !aiTerrainMgr.CanReachAt(u, c, u.circuitDef.GetBuildDistance())) { ++refused; continue; }
-                bestScore = score; best = c;
+                bestScore = score; best = c; bestPass = pass; bestForward = forward;
             }
         }
         if (best.x < 0.0f) {
@@ -588,7 +589,8 @@ namespace SiloAntiNukes {
             return -1;
         }
         padSlots.insertLast(slot);
-        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] periphery pad " + slot + " at (" + int(p.x) + ", " + int(p.z) + "), "
+        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] periphery pad " + slot + " at (" + int(p.x) + ", " + int(p.z) + "), forward "
+            + int(bestForward * 100.0f) + "%" + (bestPass > 0 ? " (fallback: no pad off the enemy side)" : "") + ", "
             + int(Dist(p, home)) + " from start, " + others.length() + " own antinukes, coverage " + int(R), 1);
         return slot;
     }
@@ -604,7 +606,13 @@ namespace SiloAntiNukes {
         if (have >= want) return null;
         if (have < 1) { PadHeld("waiting for the role's own first antinuke (" + want + " owed)"); return null; }
         if (padPending !is null && !padPending.IsDead()) return null;
+        // played (v4): an AIR periphery order died at once and was placed again every 1-2 s for 77 s
+        if (padPending !is null && ai.frame - padOrderedAt < 10 * SECOND) {
+            padNextOrder = ai.frame + 30 * SECOND;
+            PadHeld("the last order died within 10 s; next in 30 s");
+        }
         @padPending = null;
+        if (ai.frame < padNextOrder) return null;
         CCircuitDef@ d = AntiNukeFor(u);
         if (d is null) @d = ai.GetCircuitDef(UnitHelpers::GetAntiNukeNameForSide(Global::AISettings::Side));
         if (d is null || !d.IsAvailable(ai.frame)) { PadHeld("no available antinuke"); return null; }
@@ -635,6 +643,7 @@ namespace SiloAntiNukes {
         IUnitTask@ t = Order(b, d, slot);
         if (t is null) return null;
         @padPending = t;
+        padOrderedAt = ai.frame;
         padRecruitId = b is u ? -1 : b.id;
         const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
         GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
