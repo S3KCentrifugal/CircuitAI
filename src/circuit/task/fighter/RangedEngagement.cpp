@@ -385,11 +385,30 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         std::vector<AIFloat3> legal;
         AIFloat3 from=current;
         bool cut=false;
+        // Headless 11-17 (live mode): the threat-map path came back as a single
+        // point inside coverage, and a whole-leg test then halted the march at
+        // the gantry. Walk each leg in 64-elmo samples and keep the last safe
+        // one, so the march always reaches the coverage edge.
+        const auto safeAt=[&](const AIFloat3& a,const AIFloat3& b) {
+            return SafeMove(unit,a,b,StaticMargin(p),true)
+                && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0;
+        };
         for(const auto& q:points) {
             if(from.SqDistance2D(q)<16.f) continue;
-            if(!SafeMove(unit,from,q,StaticMargin(p),true)
-                || world.DangerSign(q,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))>0) { cut=true; break; }
-            legal.push_back(q); from=q;
+            if(safeAt(from,q)) { legal.push_back(q); from=q; continue; }
+            cut=true;
+            const float length=std::sqrt(from.SqDistance2D(q));
+            const int steps=std::max(1,int(length/64.f));
+            AIFloat3 last=from; bool any=false;
+            for(int i=1;i<steps;++i) {
+                AIFloat3 sample=from+(q-from)*(float(i)/steps);
+                CTerrainManager::CorrectPosition(sample);
+                sample.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(sample.x,sample.z);
+                if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),sample) || !safeAt(last,sample)) break;
+                last=sample; any=true;
+            }
+            if(any) legal.push_back(last);
+            break;
         }
         if(points.empty() || legal.empty() || current.SqDistance2D(legal.back())<128.f*128.f) {
             // Nothing safe further on: this is the front (or no path). Wait here.
