@@ -380,6 +380,15 @@ namespace Tech {
             float GantryScaleEnergyFloor = 0.0f;        // optional absolute E/s floor (0 = metal only, the owner's rule)
             int GantryScaleMax = 6;
             int GantryScaleGraceSeconds = 300;          // INV-199: due this long without progress (cooldown 120 s + turrets + order)
+            // Gantry crew (owner, 2026-11-17): played Plains and Passes 11-17, team 8's gantry was due 7+ min
+            // with two sites held and never ordered: every T2 constructor was held by a row above gantry.scale
+            // (converter seat, mex upgrades, engineering.front, the lolcannon crew, D-107). While a gantry is
+            // due, one T2 land constructor is the gantry's: a free one is claimed after GantryCrewClaimSeconds
+            // of due, and if none came the T2 lab builds one after GantryCrewRecruitSeconds.
+            bool GantryCrewEnabled = true;
+            int GantryCrewClaimSeconds = 60;
+            int GantryCrewRecruitSeconds = 90;
+            int GantryCrewRecruitRetrySeconds = 120;   // a recruit that never reached the crew: another after this
             int FrontT3TurretsFirst = 10;                  // D-119: the gantry is ordered once this many of its turrets stand; the rest keep filling
             // T3RushTurretsMin / T3RushTurretsMax (owner, 2026-10-11, back on 2026-10-18): the t3rush gantry's cluster
             // gets a random number of turrets in [Min, Max], rolled once a game, while its gantry goes up

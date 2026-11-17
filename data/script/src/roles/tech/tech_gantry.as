@@ -1,4 +1,4 @@
-#include "../../helpers/math/gantry_math.as"
+﻿#include "../../helpers/math/gantry_math.as"
 #include "../../helpers/math/heavy_rush_math.as"
 
 // TECH-only policy over the existing factory reservations and native recovery.
@@ -985,8 +985,184 @@ namespace TechGantryScale {
     void Check() {
         if (!Due()) return;
         const int since = AiMax(dueSince, progressFrame);
+        // "none": Work never ran, so no T2 constructor reached gantry.scale (played 11-17, every one was
+        // held by a row above it); the gantry crew's state says why
+        const string last = lastReason == "none" ? "no T2 constructor reached gantry.scale (" + TechGantryCrew::Status() + ")" : lastReason;
         if (ai.frame - since > Global::RoleSettings::Tech::GantryScaleGraceSeconds * SECOND)
             Invariants::Violation("INV-199", "due", "gantry due " + ((ai.frame - since) / SECOND) + " s without progress: have="
-                + have + " target=" + highWater + " cap=" + landDef.maxThisUnit + " " + UnitBudget() + " last=" + lastReason);
+                + have + " target=" + highWater + " cap=" + landDef.maxThisUnit + " " + UnitBudget() + " last=" + last);
+    }
+}
+
+// Gantry crew (owner, 2026-11-17). Played Plains and Passes 11-17 (team 8, Armada TECH): the gantry was
+// due from +421 metal for 7+ minutes with two T3 clusters held since minute 1, and no order ever went out:
+// rule gantry.scale is CON_T2 and every T2 constructor was held by something asked first (the converter
+// seat, mex upgraders, engineering.front, the lolcannon crew, the D-107 air constructors); the rest had
+// been donated to FRONTs. While a gantry is due, one T2 constructor that can build it is the
+// gantry's: a free one is claimed at its next ask once the gantry has been due GantryCrewClaimSeconds,
+// and if none came by GantryCrewRecruitSeconds a T2 bot/vehicle lab builds one (kept from donation).
+// The crew runs TechGantryScale::Work first at every ask, helps our gantry frame until it stands, and is
+// released when no gantry is due and none is going up. One unit id, O(1) per builder ask; the cluster
+// lookups are TechGantryScale's own (O(clusters), a handful).
+namespace TechGantryCrew {
+    int crewId = -1;
+    IUnitTask@ recruit = null;
+    int recruitFrame = -1;       // frame our lab order went out (-1: none)
+    string recruitName = "";     // what it builds: only that kind joins as "built for it"
+    int lastLog = -100000;
+
+    bool On() {
+        return Global::AISettings::Role == AiRole::TECH && Global::RoleSettings::Tech::GantryCrewEnabled
+            && TechGantryScale::Enabled();
+    }
+    // The gantry has been due at least `seconds`
+    bool DueFor(int seconds) {
+        return TechGantryScale::Due() && TechGantryScale::dueSince >= 0
+            && ai.frame - TechGantryScale::dueSince >= seconds * SECOND;
+    }
+    // A T2 constructor (land or air) that can build our land gantry. Air ones count too (played s2 11-17: a
+    // TECH with 60 armaca and no free armack); the two D-107 dedicated air constructors never.
+    bool IsT2Builder(CCircuitUnit@ u) {
+        if (u is null || u.circuitDef is null || !u.circuitDef.IsMobile() || UnitHelpers::IsCommander(u.circuitDef)) return false;
+        if (UnitHelpers::GetConstructorTier(u.circuitDef) != 2 || TechBuild::IsDedicatedAirCon(u)) return false;
+        if ((Builder::primaryT2AirConstructor !is null && Builder::primaryT2AirConstructor.id == u.id)
+            || (Builder::secondaryT2AirConstructor !is null && Builder::secondaryT2AirConstructor.id == u.id)) return false;
+        CCircuitDef@ gantry = TechGantryScale::landDef;
+        return gantry !is null && u.circuitDef.CanBuild(gantry)
+            && u.circuitDef.GetBuildSpeed() >= Global::RoleSettings::Tech::GantryMinimumBuilderPower;
+    }
+    // Held by a program that owns it outright (another crew, a gift, a dedicated job)
+    bool OwnedElsewhere(CCircuitUnit@ u) {
+        const int id = u.id;
+        return EarlyMexUpgraders::IsClaimed(id) || LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id)
+            || TechAirFoundry::Owns(id) || TechFlank::Owns(u) || CommanderGroup::Owns(id)
+            || Team::Ferry::IsGift(id) || Team::Recovery::IsGift(id);
+    }
+    bool Steered(IUnitTask@ t) {
+        return t !is null && !t.IsDead() && (t.IsExternalControlled() || t.GetType() == int(Task::Type::PLAYER)
+            || t.GetType() == int(Task::Type::RETREAT));
+    }
+    // On a frame going up (any structure): never pulled off it, the next ask after it decides
+    bool OnFrame(CCircuitUnit@ u) {
+        IBuilderTask@ b = (u.task is null) ? null : cast<IBuilderTask>(u.task);
+        return b !is null && !b.IsDead() && b.target !is null && b.target.GetBuildProgress() < 1.0f;
+    }
+    string Status() {
+        if (!On()) return "crew off";
+        if (crewId >= 0) return "crew " + crewId;
+        if (recruit !is null && !recruit.IsDead()) return "crew: lab building one";
+        return "crew: none claimed yet";
+    }
+    void Release(const string &in why) {
+        if (crewId < 0) return;
+        GenericHelpers::LogUtil("[TECH][GantryCrew] constructor " + crewId + " back to normal duty: " + why, 1);
+        crewId = -1;
+    }
+    void Claim(CCircuitUnit@ u, const string &in how) {
+        crewId = u.id;
+        @recruit = null; recruitFrame = -1;
+        GenericHelpers::LogUtil("[TECH][GantryCrew] " + u.circuitDef.GetName() + " " + u.id + " is the gantry's constructor ("
+            + how + ", due " + ((ai.frame - TechGantryScale::dueSince) / SECOND) + " s, have=" + TechGantryScale::have
+            + " target=" + TechGantryScale::highWater + ")", 1);
+    }
+    // Our gantry frame going up, if any
+    CCircuitUnit@ Frame() {
+        CCircuitDef@ gantry = TechGantryScale::landDef;
+        if (gantry is null) return null;
+        TechFactories::Cluster@ c = TechFactories::ExistingGantry(gantry.GetName());
+        if (c is null) return null;
+        CCircuitUnit@ lab = TechFactories::LabAt(c);
+        return (lab !is null && lab.GetBuildProgress() < 1.0f) ? lab : null;
+    }
+    // Our gantry order out with no frame yet (Have() counts it, so the gantry is no longer due).
+    // Played s2 11-17: the crew ordered the gantry and was released the same second, before the frame.
+    IUnitTask@ Order() {
+        CCircuitDef@ gantry = TechGantryScale::landDef;
+        if (gantry is null) return null;
+        TechFactories::Cluster@ c = TechFactories::ExistingGantry(gantry.GetName());
+        if (c is null || c.labTask is null || c.labTask.IsDead()) return null;
+        return c.labTask;
+    }
+
+    // manager/builder.as AiMakeTask (TECH), after the mex upgraders: the crew's gantry work, or a claim
+    IUnitTask@ Work(CCircuitUnit@ u) {
+        if (!On() || u is null || u.circuitDef is null) return null;
+        if (crewId >= 0 && ai.GetTeamUnit(crewId) is null) Release("lost");
+        if (crewId < 0) {
+            // our recruit (the kind the lab builds for us, while the order is pending) joins at its first ask;
+            // a T2 air constructor never passes donation.as OnConstructorBuilt, where ClaimOnBuilt sits
+            const bool ours = recruitFrame >= 0 && TechGantryScale::Due() && u.circuitDef.GetName() == recruitName;
+            if (!(ours || DueFor(Global::RoleSettings::Tech::GantryCrewClaimSeconds)) || !IsT2Builder(u) || OwnedElsewhere(u)
+                || Steered(u.task) || OnFrame(u)) return null;
+            Claim(u, ours ? "built for it" : "a free T2 constructor at its ask");
+        }
+        if (u.id != crewId) return null;
+        if (OwnedElsewhere(u)) { Release("taken by another program"); return null; }
+        if (Steered(u.task)) return null;
+        CCircuitUnit@ frame = Frame();
+        // already helping our gantry frame: stay on it
+        IBuilderTask@ cur = (u.task is null) ? null : cast<IBuilderTask>(u.task);
+        if (frame !is null && cur !is null && !cur.IsDead() && cur.target !is null && cur.target.id == frame.id) return u.task;
+        if (TechGantryScale::Due()) {
+            const int id = u.id;
+            IUnitTask@ t = TechGantryScale::Work(u);
+            if (t !is null) return t;
+            @u = ai.GetTeamUnit(id);   // Route may dispatch callbacks: read the unit again by id
+            if (u is null) { Release("lost"); return null; }
+        }
+        if (frame !is null) {
+            if (TechGantry::SafeWorker(u, frame.GetPos(ai.frame)))
+                return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, Global::RoleSettings::Tech::GantryAssistSeconds * SECOND));
+            return null;
+        }
+        IUnitTask@ order = Order();
+        if (order !is null) {
+            if (order is u.task) return u.task;
+            if (order.GetUnits().length() < uint(AiMax(1, Global::RoleSettings::Tech::GantryMaximumTaskBuilders))) return order;
+            return null;   // the order has its builders: normal duty meanwhile, still the crew until the frame stands
+        }
+        if (!TechGantryScale::Due()) Release("no gantry due or going up");
+        return null;   // due but not orderable yet (funding, cooldown): normal duty meanwhile, still the crew
+    }
+
+    // donation.as OnConstructorBuilt: our recruit joins the crew instead of being donated
+    bool ClaimOnBuilt(CCircuitUnit@ u) {
+        if (!On() || crewId >= 0 || recruitFrame < 0 || !TechGantryScale::Due() || !IsT2Builder(u)) return false;
+        if (u.circuitDef.GetName() != recruitName) return false;   // a teammate's ordered donation is never taken
+        Claim(u, "built for it");
+        return true;
+    }
+
+    // manager/factory.as AiMakeTask (TECH): a T2 bot/vehicle lab builds the crew when no free one came
+    IUnitTask@ FactoryMakeTask(CCircuitUnit@ factory) {
+        if (!On() || crewId >= 0 || factory is null || factory.circuitDef is null) return null;
+        if (!DueFor(Global::RoleSettings::Tech::GantryCrewRecruitSeconds)) return null;
+        const string facName = factory.circuitDef.GetName();
+        const bool air = UnitHelpers::IsT2AircraftPlant(facName);
+        if (!air && !UnitHelpers::IsT2BotLab(facName) && !UnitHelpers::IsT2VehicleLab(facName)) return null;
+        if (recruit !is null && !recruit.IsDead()) return null;
+        if (recruitFrame >= 0 && ai.frame - recruitFrame < Global::RoleSettings::Tech::GantryCrewRecruitRetrySeconds * SECOND) return null;
+        // land labs: EarlyMexUpgraders' pick (bots, vehicles); the T2 air plant: its air constructor
+        CCircuitDef@ d = air ? ai.GetCircuitDef(UnitHelpers::GetT2AirConstructorNameForSide(UnitHelpers::GetSideForUnitName(facName)))
+            : EarlyMexUpgraders::ConstructorFor(factory);
+        if (d !is null && (!factory.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame) || (d.maxThisUnit >= 0 && d.count >= d.maxThisUnit))) @d = null;
+        CCircuitDef@ gantry = TechGantryScale::landDef;
+        if (d is null || gantry is null || !d.CanBuild(gantry)) {
+            if (ai.frame - lastLog >= 60 * SECOND) {
+                lastLog = ai.frame;
+                GenericHelpers::LogUtil("[TECH][GantryCrew] " + facName + " cannot build a gantry constructor ("
+                    + (d is null ? "none available or capped" : d.GetName() + " cannot build " + gantry.GetName()) + ")", 1);
+            }
+            return null;
+        }
+        @recruit = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::BUILDPOWER, Task::Priority::HIGH, d,
+            factory.GetPos(ai.frame), 64.f));
+        if (recruit !is null && recruit.IsDead()) @recruit = null;
+        if (recruit is null) return null;
+        recruitFrame = ai.frame;
+        recruitName = d.GetName();
+        GenericHelpers::LogUtil("[TECH][GantryCrew] " + facName + " builds " + d.GetName() + " for the gantry (due "
+            + ((ai.frame - TechGantryScale::dueSince) / SECOND) + " s, no free T2 constructor came)", 1);
+        return recruit;
     }
 }

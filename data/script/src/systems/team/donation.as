@@ -284,6 +284,7 @@ namespace Donation {
         if (UnitHelpers::GetAllT2BotConstructors().find(unit.circuitDef.GetName())<0) return;
         if (ordered > 0) --ordered;
         if(EngineeringReplacements::Claim(unit)) return;
+        if (TechGantryCrew::ClaimOnBuilt(unit)) return;   // owner, 2026-11-17: built for the due gantry, never donated
         if (_OwnT2Constructors() <= Global::RoleSettings::Tech::DonationKeepT2Constructors) {
             GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
                 + unit.id + ") is ours: TECH keeps its first " + Global::RoleSettings::Tech::DonationKeepT2Constructors, 1);

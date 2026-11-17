@@ -2017,6 +2017,12 @@ namespace Builder {
 			if (keepUp) return null;
 			if (up !is null) return up;
 		}
+        // owner, 2026-11-17: a due gantry keeps one T2 land constructor of its own (tech_gantry.as TechGantryCrew);
+        // played Plains and Passes 11-17, every T2 constructor was held by a row above gantry.scale for 7+ min
+        if (Global::AISettings::Role == AiRole::TECH) {
+            IUnitTask@ crew = TechGantryCrew::Work(u);
+            if (crew !is null) return crew;
+        }
         IUnitTask@ foundry = TechAirFoundry::Work(u);
         if (foundry !is null) return foundry;
         ForwardGeo::Update(); // D-488: judges the vents once; withdraws them on a role change

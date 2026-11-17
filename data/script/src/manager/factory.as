@@ -163,6 +163,11 @@ namespace Factory {
 			IUnitTask@ mexUp = EarlyMexUpgraders::FactoryMakeTask(u);
 			if (mexUp !is null) return mexUp;
 		}
+		// owner, 2026-11-17: a due gantry with no free T2 constructor gets one built (tech_gantry.as TechGantryCrew)
+		if (Global::AISettings::Role == AiRole::TECH) {
+			IUnitTask@ crew = TechGantryCrew::FactoryMakeTask(u);
+			if (crew !is null) return crew;
+		}
 		// owner, 2026-10-27: spam-lane turrets repair the lane
 		IUnitTask@ anti = AntiSpam::FactoryMakeTask(u);
 		if (anti !is null) return anti;
