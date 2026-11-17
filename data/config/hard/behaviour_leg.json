@@ -825,13 +825,13 @@
 			"legmed": {
 				"role":	["assault"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "bombardment", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "bombardment", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 				"retreat": 0.5
 			},
 			"legvcarry": {
 				"role":	["riot"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "carrier", "range_fraction": 0.94, "spacing": 160, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "carrier", "range_fraction": 0.94, "spacing": 160, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 				"limit": 3
 			},
 			"leginf": {

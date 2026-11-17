@@ -446,7 +446,7 @@
 	"armfboy": {
 		"role": ["assault", "heavy"],
 		"attribute": ["ranged"],
-		"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "stage_when_blocked": true},
+		"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "stage_when_blocked": true},
 	},
 	"armmav": {
 		"role": ["riot"],
@@ -455,7 +455,7 @@
 	"armfido": {
 		"role": ["skirmish"],
 		"attribute": ["ranged"],
-		"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+		"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 		"slow_target": true
 	},
 	"armvader": {
@@ -481,7 +481,7 @@
 	"armsnipe": {
 		"role": ["anti_heavy"],
 		"attribute": ["ranged", "ret_hold"],
-		"ranged": {"target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true, "max_waypoints": 2, "move_floor_seconds": 0.5},
+		"ranged": {"ghost_porc_range": 3000, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true, "max_waypoints": 2, "move_floor_seconds": 0.5},
 	},
 	"armamph": {
 		"role": ["raider", "anti_air"]
@@ -571,7 +571,7 @@
 		"role": ["anti_heavy"],
 		"retreat": 0.65,
 		"attribute": ["artillery", "ranged"],
-		"ranged": {"always_fire_at_will": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "move_floor_seconds": 1},
+		"ranged": {"ghost_porc_range": 3000, "always_fire_at_will": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "move_floor_seconds": 1},
 	},
 	"armmart": {
 		"role": ["artillery"],
@@ -908,7 +908,7 @@
 	"corban": {
 		"role": ["skirmish"],
 		"attribute": ["ranged"],
-		"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+		"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 	},
 	"cortrem": {
 		"role": ["artillery", "heavy"],

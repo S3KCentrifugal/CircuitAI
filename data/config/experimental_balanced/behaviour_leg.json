@@ -888,7 +888,7 @@
 				"fire_state": 2,   // owner 2026-11-15: fire at will always (always_fire_at_will); engine autofire may take spam, picks stay on good targets for plasma and drones
 				"role": ["skirmish", "heavy", "assault", "anti_heavy"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"always_fire_at_will": true, "target_mode": "bombardment", "range_fraction": 0.97, "spacing": 160, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"ghost_porc_range": 3000, "always_fire_at_will": true, "target_mode": "bombardment", "range_fraction": 0.97, "spacing": 160, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -924,7 +924,7 @@
 				"fire_state": 2,
 				"role": ["assault"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -990,7 +990,7 @@
 				"role": ["skirmish"],
 				"attribute": ["ranged"],
 				// Owner 2026-11-13: Lance joins the Barrage ranged controller: approaches and fires from 99% of its 650 ground railgun (643; the 750 AA railgun only targets VTOL), backs off when fired upon, 1 blind volley per ghost image in range only when no LOS unit, identified radar contact or radar dot is in range; porc reach + 12 exact, always fire at will.
-				"ranged": {"ghost_volleys": 1, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 12, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				"ranged": {"ghost_porc_range": 3000, "ghost_volleys": 1, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 12, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1034,14 +1034,14 @@
 			"legmed": {
 				"role":	["assault"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "bombardment", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "hold_fireline": true, "fire_at_will": true, "spam_max_cost": 75, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "bombardment", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "hold_fireline": true, "fire_at_will": true, "spam_max_cost": 75, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
 			"legvcarry": {
 				"role":	["riot"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "carrier", "range_fraction": 0.94, "spacing": 160, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "carrier", "range_fraction": 0.94, "spacing": 160, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

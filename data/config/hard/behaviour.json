@@ -1014,7 +1014,7 @@
 		"armfboy": {
 			"role": ["heavy"],
 			"attribute": ["ranged"],
-			"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "stage_when_blocked": true},
+			"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "stage_when_blocked": true},
 			"threat":{"air": 0.0, "water": 0.0, "surf": 1.5,
 				"vs":{"artillery": 2.0, "anti_air": 2.0, "vy": 0.7}
 			}
@@ -1030,7 +1030,7 @@
 		"armfido": {
 			"role": ["assault"],
 			"attribute": ["siege", "ranged"],
-			"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+			"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 			"slow_target": true,
 			"retreat": 0.5,
 			"threat":{"air": 0.0, "water": 0.0, "surf": 1.0},
@@ -1072,7 +1072,7 @@
 		"armsnipe": {
 			"role": ["anti_heavy_ass"],
 			"attribute": ["siege", "ranged", "ret_hold"],
-			"ranged": {"target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true, "max_waypoints": 2, "move_floor_seconds": 0.5},
+			"ranged": {"ghost_porc_range": 3000, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "cloak_on_reload": true, "max_waypoints": 2, "move_floor_seconds": 0.5},
 			"threat": {"air": 0.0, "water": 0.0,"vs": {"scout":0.5, "raider":0.5}},
             "retreat": 0.6
 		},
@@ -1208,7 +1208,7 @@
 			"role": ["anti_heavy_ass"],
 			"retreat": 0.65,
 			"attribute": ["siege", "ranged"],
-			"ranged": {"always_fire_at_will": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "move_floor_seconds": 1},
+			"ranged": {"ghost_porc_range": 3000, "always_fire_at_will": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": true, "move_floor_seconds": 1},
 			"threat":{"air":0.0, "water":0.0,
 				"vs":{"anti_air": 2.0, "raider": 0.5, "heavy":2.0}	
 			}
@@ -1473,7 +1473,7 @@
 		"cormort": {
 			"role": ["assault"],
 			"attribute":["support", "ranged"],
-			"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "move_floor_seconds": 1},  //was siege too - but evtl not working correct
+			"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false, "move_floor_seconds": 1},  //was siege too - but evtl not working correct
 			"retreat": 0.85
 		},
 		"corhrk": {
@@ -1636,7 +1636,7 @@
 		"corban": {
 			"role":	["assault"], 
 			"attribute": ["siege", "ranged"],
-			"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
+			"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "prefer_heavy": false},
 			"retreat": 0.5
 		},
 		"cortrem": {

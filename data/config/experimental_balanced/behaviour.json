@@ -1735,7 +1735,7 @@
 			"armfboy": {
 				"role": ["assault", "heavy"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "stage_when_blocked": true, "avoid_categories": "GROUNDSCOUT", "evasion_limit": 1.5, "press_static": 1, "commander_priority": 8},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 144, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "stage_when_blocked": true, "avoid_categories": "GROUNDSCOUT", "evasion_limit": 1.5, "press_static": 1, "commander_priority": 8},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1748,7 +1748,7 @@
 			"armfido": {
 				"role": ["skirmish"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -1790,7 +1790,7 @@
 			"armsnipe": {
 				"role": ["anti_heavy"],
 				"attribute": ["ranged", "ret_hold"],
-				"ranged": {"commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": true, "cloak_on_reload": true, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				"ranged": {"ghost_porc_range": 3000, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.94, "spacing": 112, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": true, "cloak_on_reload": true, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"retreat": 0.95,
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1929,7 +1929,7 @@
 			"armmanni": {
 				"role": ["anti_heavy", "assault"],
 				"attribute": ["artillery", "siege", "ranged"],
-				"ranged": {"always_fire_at_will": true, "commander_priority": 100, "hold_fireline": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": true, "assist_radius": 3500, "assist_margin": 150, "assist_screen": true, "move_floor_seconds": 1},
+				"ranged": {"ghost_porc_range": 3000, "always_fire_at_will": true, "commander_priority": 100, "hold_fireline": true, "target_mode": "precision", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 256, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": true, "assist_radius": 3500, "assist_margin": 150, "assist_screen": true, "move_floor_seconds": 1},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}
 				},
@@ -2528,7 +2528,7 @@
 				// breaks the 1 s target hold). Ranged hulls take this, not the commander_snipe lock.
 				"role":	["skirmish"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "commander_priority": 100},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 128, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "commander_priority": 100},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0,
 					"vs": { "spam": 0}
 				},
