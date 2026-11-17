@@ -1065,23 +1065,28 @@ namespace TechGantryCrew {
             + how + ", due " + ((ai.frame - TechGantryScale::dueSince) / SECOND) + " s, have=" + TechGantryScale::have
             + " target=" + TechGantryScale::highWater + ")", 1);
     }
-    // Our gantry frame going up, if any
+    // Our gantry frame going up, if any. Every T3 cluster, not ExistingGantry's first one (played t2 11-17:
+    // with the first gantry standing, the second's crew was released while its order was out).
+    // O(clusters), a handful, as TechGantryScale::Have.
     CCircuitUnit@ Frame() {
-        CCircuitDef@ gantry = TechGantryScale::landDef;
-        if (gantry is null) return null;
-        TechFactories::Cluster@ c = TechFactories::ExistingGantry(gantry.GetName());
-        if (c is null) return null;
-        CCircuitUnit@ lab = TechFactories::LabAt(c);
-        return (lab !is null && lab.GetBuildProgress() < 1.0f) ? lab : null;
+        for (uint i = 0; i < TechFactories::clusters.length(); ++i) {
+            TechFactories::Cluster@ c = TechFactories::clusters[i];
+            if (c.ahead || c.tier < 3 || c.labRes < 0) continue;
+            CCircuitUnit@ lab = TechFactories::LabAt(c);
+            if (lab !is null && lab.GetBuildProgress() < 1.0f) return lab;
+        }
+        return null;
     }
     // Our gantry order out with no frame yet (Have() counts it, so the gantry is no longer due).
     // Played s2 11-17: the crew ordered the gantry and was released the same second, before the frame.
     IUnitTask@ Order() {
-        CCircuitDef@ gantry = TechGantryScale::landDef;
-        if (gantry is null) return null;
-        TechFactories::Cluster@ c = TechFactories::ExistingGantry(gantry.GetName());
-        if (c is null || c.labTask is null || c.labTask.IsDead()) return null;
-        return c.labTask;
+        for (uint i = 0; i < TechFactories::clusters.length(); ++i) {
+            TechFactories::Cluster@ c = TechFactories::clusters[i];
+            if (c.ahead || c.tier < 3 || c.labRes < 0 || c.labTask is null || c.labTask.IsDead()) continue;
+            IBuilderTask@ order = cast<IBuilderTask>(c.labTask);
+            if (order !is null && order.target is null) return c.labTask;
+        }
+        return null;
     }
 
     // manager/builder.as AiMakeTask (TECH), after the mex upgraders: the crew's gantry work, or a claim
