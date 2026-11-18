@@ -24,12 +24,50 @@ signature unit. Each candidate still passes the gantry's CanBuild and the
 unit cap in Factory::EnqueueGantryBatchFrom. With no candidate buildable the
 native picker runs as before.
 
+T3 rush opening (owner, 2026-11-18): before that, the first
+Front::GantryRushUnits units (10) of all FRONT gantries together come from
+TECH's T3Rush<Side> list (Armada Razorback/Vanguard, Cortex Shiva/Catapult,
+Legion Daedalus/Myrmidon), taking turns. A gantry that can build neither of
+them right now (a water gantry, a map cap) falls through to the heavies
+without using up the opening. Log tag [FRONT][Gantry] ... rush k/n.
+
 ******************************************************************************/
 namespace FrontGantry {
     dictionary lastPos;      // gantry id -> list position its last order built (a unit may repeat, owner 2026-11-07)
     array<string> order;     // reused candidate order
     int orderStart = 0;      // list position of Order()'s first entry
     bool orderRotated = false;
+    int rushOrdered = 0;     // T3 rush units ordered so far, every gantry together
+    int rushNext = 0;        // the rush list's unit in turn
+    array<string> rushOrder; // reused rush candidate order
+
+    array<string>@ RushList(const string &in side)
+    {
+        if (side == "cortex") return Global::RoleSettings::Tech::T3RushCortex;
+        if (side == "legion") return Global::RoleSettings::Tech::T3RushLegion;
+        return Global::RoleSettings::Tech::T3RushArmada;
+    }
+
+    // The opening's next unit (the one in turn first, the others as fallback); null once done or none buildable
+    IUnitTask@ Rush(CCircuitUnit@ g, const string &in side)
+    {
+        const int total = Global::RoleSettings::Front::GantryRushUnits;
+        if (total <= 0 || rushOrdered >= total) return null;
+        array<string>@ list = RushList(side);
+        if (list.length() == 0) return null;
+        rushOrder.resize(0);
+        const uint start = uint(rushNext) % list.length();
+        for (uint i = 0; i < list.length(); ++i)
+            rushOrder.insertLast(list[(start + i) % list.length()]);
+        IUnitTask@ task = Factory::EnqueueGantryBatchFrom(g, rushOrder, 1, Task::Priority::HIGH);
+        if (task is null || Factory::lastGantryBatchIndex < 0) return null;
+        rushNext = int((start + uint(Factory::lastGantryBatchIndex) + 1) % list.length());
+        ++rushOrdered;
+        GenericHelpers::LogUtil("[FRONT][Gantry] gantry=" + g.circuitDef.GetName() + " " + g.id
+            + " unit=" + Factory::lastGantryBatchUnit + " rush " + rushOrdered + "/" + total
+            + (rushOrdered >= total ? " (opening done: heavies next)" : ""), 1);
+        return task;
+    }
 
     array<string>@ List(const string &in side, bool moated)
     {
@@ -70,6 +108,9 @@ namespace FrontGantry {
         if (!UnitHelpers::IsGantryLab(g.circuitDef.GetName()) || g.GetBuildProgress() < 1.0f) return null;
         IUnitTask@ pending = aiFactoryMgr.GetPendingFactoryTask(g);
         if (pending !is null) return pending;
+        // owner 2026-11-18: the first GantryRushUnits units are TECH's T3 rush list
+        IUnitTask@ rush = Rush(g, side);
+        if (rush !is null) return rush;
         // owner 2026-11-16: a heavy wave roll's units back to back, outside the rotation
         IUnitTask@ wave = HeavyWave::Produce(g, side);
         if (wave !is null) return wave;

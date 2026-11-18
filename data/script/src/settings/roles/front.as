@@ -165,6 +165,10 @@ namespace Front {
             // T3 gantries (owner, 2026-11-01; systems/production/front_gantry.as): build TECH's late heavies
             // (HeavyPair<Side>, HeavyMoated<Side> on a moated start), one unit per ask. false = native picker.
             bool GantryHeavies = true;
+            // T3 rush opening (owner, 2026-11-18): the FRONT gantries' first GantryRushUnits units come from
+            // TECH's T3Rush<Side> list (Razorback/Vanguard, Shiva/Catapult, Daedalus/Myrmidon), in turn, every
+            // FRONT gantry together; then the heavies above. 0 = off.
+            int GantryRushUnits = 10;
 
             // Nuclear silos (owner, 2026-10-30; systems/construction/front_silo_grid.as). From NukeMinSeconds,
             // once the 10 s minimum metal / energy income have stayed at or above NukeMetalIncome / NukeEnergyIncome
