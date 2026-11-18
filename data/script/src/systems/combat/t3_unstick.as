@@ -132,8 +132,8 @@ namespace T3Unstick {
             const string key = "" + h.blockers[i];
             CCircuitUnit@ original = null, current = null;
             if (!h.blockerUnits.get(key, @original) || !blockerUnit.get(key, @current) || current !is original) continue;
-            int users = 0;
-            blockerUsers.get(key, users);
+            int64 users = 0;   // int64: an int out-parameter is not reliable on a dictionary miss (11-18)
+            if (!blockerUsers.get(key, users)) users = 0;
             if (users > 1) { blockerUsers.set(key, users - 1); continue; }
             const int index = activeBlockers.find(h.blockers[i]);
             if (index >= 0) activeBlockers.removeAt(uint(index));
@@ -274,10 +274,10 @@ namespace T3Unstick {
             if (tech && !gated) TechReclaim::Track(b, t, "t3unstick");
             reclaimTask.set("" + b.id, @t);
             const string key = "" + b.id;
-            if (only > 0) squadOnly.set(key, only);
+            if (only > 0) squadOnly.set(key, int64(only));
             CCircuitUnit@ previousBlocker = null;
-            int users = 0;
-            if (blockerUnit.get(key, @previousBlocker) && previousBlocker is b) blockerUsers.get(key, users);
+            int64 users = 0;
+            if (blockerUnit.get(key, @previousBlocker) && previousBlocker is b && !blockerUsers.get(key, users)) users = 0;
             blockerUnit.set(key, @b);
             blockerUsers.set(key, users + 1);
             h.blockerUnits.set(key, @b);
@@ -312,8 +312,8 @@ namespace T3Unstick {
             CCircuitUnit@ b = null;
             if (!h.blockerUnits.get("" + h.blockers[i], @b) || !ai.IsOwnedUnit(b)) continue;
             any = true;
-            int only = 0;
-            squadOnly.get("" + h.blockers[i], only);
+            int64 only = 0;
+            if (!squadOnly.get("" + h.blockers[i], only)) only = 0;
             if (only != 2 && ai.frame - h.lastPull >= 10 * SECOND)
                 aiBuilderMgr.TurretsOnReclaim(h.blockers[i], Global::T3Unstick::TurretMargin, true, false);
         }

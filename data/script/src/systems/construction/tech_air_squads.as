@@ -128,21 +128,27 @@ namespace TechAirSquads {
         }
     }
     int GuardTarget() { return int(gantries.length()) * AiMax(0, Global::RoleSettings::Tech::GantryGuardPerGantry); }
-    int CountOn(int gid) { int n = 0; guardCount.get("" + gid, n); return n; }
+    // Dictionary integers are read through int64 and only on a hit (played 11-18: an int out-parameter
+    // came back holding the frame number on a miss, so every member guarded a random unit id).
+    int DictInt(dictionary@ d, const string &in key, int fallback)
+    {
+        int64 v = 0;
+        return d.get(key, v) ? int(v) : fallback;
+    }
+    int CountOn(int gid) { return DictInt(guardCount, "" + gid, 0); }
     void Unassign(int id)
     {
-        int gid = -1;
-        if (!guardOf.get("" + id, gid)) return;
+        const int gid = DictInt(guardOf, "" + id, -1);
+        if (gid < 0) return;
         guardOf.delete("" + id);
         const int n = CountOn(gid) - 1;
-        if (n > 0) guardCount.set("" + gid, n); else guardCount.delete("" + gid);
+        if (n > 0) guardCount.set("" + gid, int64(n)); else guardCount.delete("" + gid);
     }
 
     IUnitTask@ GuardWork(CCircuitUnit@ u)
     {
         RefreshGantries();
-        int gid = -1;
-        guardOf.get("" + u.id, gid);
+        int gid = DictInt(guardOf, "" + u.id, -1);
         CCircuitUnit@ g = (gid >= 0) ? ai.GetTeamUnit(gid) : null;
         if (gid >= 0 && (!ai.IsOwnedUnit(g) || gantries.find(gid) < 0)) { Unassign(u.id); gid = -1; @g = null; }
         if (gid < 0) {
@@ -156,8 +162,8 @@ namespace TechAirSquads {
             @g = ai.GetTeamUnit(best);
             if (!ai.IsOwnedUnit(g)) return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
             gid = best;
-            guardOf.set("" + u.id, gid);
-            guardCount.set("" + gid, CountOn(gid) + 1);
+            guardOf.set("" + u.id, int64(gid));
+            guardCount.set("" + gid, int64(CountOn(gid) + 1));
             Log(u.circuitDef.GetName() + " " + u.id + " guards gantry " + g.circuitDef.GetName() + " " + gid + " (" + CountOn(gid) + " on it)");
         }
         IUnitTask@ t = GuardHelpers::AssignWorkerGuard(u, g, Task::Priority::HIGH, true,
