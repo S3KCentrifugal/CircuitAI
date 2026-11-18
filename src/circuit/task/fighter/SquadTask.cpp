@@ -314,16 +314,24 @@ bool ISquadTask::IsMustRegroup()
 			++spread;
 		}
 	}
-	// Owner 2026-11-18 (Thors idled at the gantry until nuked): a T3 ground squad
-	// never regroups. REGROUP sent every member to the centre of the squad
-	// (Gather) and held it there while one member was stuck, so none went to the
-	// front. Each member keeps the squad's normal path to the front at the normal
-	// order cadence instead, and the engine's pathfinding gets them round.
-	if ((State::REGROUP == state) && (leader->GetCircuitDef()->GetTechLevel() >= 3.f) && !leader->GetCircuitDef()->IsPlane()) {
+	// Owner 2026-11-18 (Thors idled until nuked; "change it when we get past 3
+	// Thors"): a squad with more than 3 T3 ground members never regroups.
+	// REGROUP sent every member to the centre of the squad (Gather) and held it
+	// there while one member was stuck, so none went to the front. Each member
+	// keeps the squad's normal path to the front at the normal order cadence
+	// instead, and the engine's pathfinding gets them round. Squads with 3 or
+	// fewer T3 members regroup as before.
+	int heavies = 0;
+	for (CCircuitUnit* unit : validUnits) {
+		if (unit->GetCircuitDef()->GetTechLevel() >= 3.f) {
+			++heavies;
+		}
+	}
+	if ((State::REGROUP == state) && (heavies > 3)) {
 		if (frame >= noRegroupLogFrame + FRAMES_PER_SEC * 30) {
 			noRegroupLogFrame = frame;
-			circuit->LOG("SQUAD: T3 squad %p leader=%s(%i) skips regroup: %i/%u members beyond %.0f of (%.0f, %.0f), leader at (%.0f, %.0f)",
-					(void*)this, leader->GetCircuitDef()->GetDef()->GetName(), leader->GetId(), spread, unsigned(validUnits.size()),
+			circuit->LOG("SQUAD: T3 squad %p leader=%s(%i) heavies=%i skips regroup: %i/%u members beyond %.0f of (%.0f, %.0f), leader at (%.0f, %.0f)",
+					(void*)this, leader->GetCircuitDef()->GetDef()->GetName(), leader->GetId(), heavies, spread, unsigned(validUnits.size()),
 					std::sqrt(sqMaxDist), groupPos.x, groupPos.z, leadPos.x, leadPos.z);
 		}
 		state = State::ROAM;
