@@ -137,8 +137,8 @@ namespace SiloAntiNukes {
         int most = 0;
         array<string>@ keys = eventShots[k].getKeys();
         for (uint i = 0; i < keys.length(); ++i) {
-            int n = 0;
-            if (eventShots[k].get(keys[i], n) && n > most) most = n;
+            int64 n = 0;   // int64: an int out-arg to dictionary::get came back with garbage (played 11-18: +unit id per merge)
+            if (eventShots[k].get(keys[i], n) && n > most) most = int(n);
         }
         return most;
     }
@@ -152,9 +152,9 @@ namespace SiloAntiNukes {
         const string key = "" + team + ":" + unit;
         if (k > 0 && ai.frame - eventLast[k - 1] <= merge) {
             const int before = EventCount(k - 1);
-            int n = 0;
-            eventShots[k - 1].get(key, n);
-            eventShots[k - 1].set(key, n + shots);
+            int64 n = 0;
+            if (!eventShots[k - 1].get(key, n)) n = 0;
+            eventShots[k - 1].set(key, n + int64(shots));
             eventLast[k - 1] = ai.frame;
             launchesSeen += EventCount(k - 1) - before;
         } else {
@@ -182,12 +182,13 @@ namespace SiloAntiNukes {
             if (u is null || u.circuitDef is null || !IsAntiNuke(u.circuitDef.id) || u.GetBuildProgress() < 1.0f) continue;
             const int stock = u.GetStockpile();
             const string key = "" + u.id;
-            int prev = 0;
-            if (stockOf.get(key, prev) && stock < prev) {
+            int64 prev64 = 0;
+            const int prev = stockOf.get(key, prev64) ? int(prev64) : -1;
+            if (prev >= 0 && stock < prev) {
                 AddShots(ai.teamId, u.id, prev - stock, "our");
                 AiSendMessage(LaunchMsg + u.id + "|" + (prev - stock));
             }
-            now.set(key, stock);
+            now.set(key, int64(stock));
         }
         stockOf = now;
     }
