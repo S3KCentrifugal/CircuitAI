@@ -355,7 +355,7 @@
 				"power": 1.0
 			},
 			"legacluster": {
-				"controller": "artillery_popup",
+				"controller": "artillery_popup_deep",
 				"role": ["static"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0

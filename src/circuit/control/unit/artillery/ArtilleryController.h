@@ -39,6 +39,17 @@ struct ArtilleryConfig {
 	float closeSeconds = 6.f;     // ... and stay closed this long
 	float hitSeconds = 2.f;       // "under fire": hit within this many seconds
 	float log = 1.f;              // aim, release and close lines
+	// Keep-open pulse (owner 2026-11-18, Esker): a pop-up gun whose close sinks
+	// its muzzle below ground (Eviscerator) can never reopen: the engine finds no
+	// line of fire from the buried muzzle, so it never aims, and only an aim opens
+	// it. After keep_open_seconds without a shot or an aim of ours, a short
+	// attack-ground order (keep_open_order_seconds, turned keep_open_turn degrees
+	// off the facing, alternating sides) starts an aim, which restarts the gun's
+	// 10 s close timer; it usually expires before the turret finishes turning.
+	float keepOpenSeconds = 0.f;       // 0: off
+	float keepOpenOrderSeconds = 1.f;
+	float keepOpenTurn = 70.f;         // degrees off the building facing
+	float keepOpenReach = .6f;         // share of the gun's range for the pulse point
 };
 
 namespace control {
@@ -48,6 +59,11 @@ struct ArtilleryState : ControlledState {
 	int kind = 0;           // artillery::Kind of the aim
 	int issued = 0;         // frame of the last order
 	int closedUntil = 0;    // pop-up: no structure aim before this frame
+	int reload = -1;        // last sampled main-weapon reload frame
+	int shot = -1;          // frame a shot was last seen (rising reload frame)
+	int pulse = -1;         // frame of the last keep-open pulse
+	int side = 1;           // the next pulse's side of the facing
+	int pulses = 0;
 };
 }
 
@@ -75,6 +91,7 @@ private:
 	void Order(CCircuitUnit* unit, control::ArtilleryState& s, int targetId, artillery::Kind kind,
 		const springai::AIFloat3& pos, bool mobile, int frame);
 	void Release(CCircuitUnit* unit, control::ArtilleryState& s, const char* why);
+	void KeepOpen(CCircuitUnit* unit, control::ArtilleryState& s, int frame);
 	artillery::DefFacts Facts(const CCircuitDef* def) const;
 
 	CCircuitAI* ai;
