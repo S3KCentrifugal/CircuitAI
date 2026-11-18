@@ -273,24 +273,24 @@ namespace TechWeapons {
     float Gate(int kind)
     {
         switch (kind) {
-            case KILL: return Global::RoleSettings::Tech::WeaponKillMinIncome;
+            // case KILL: return Global::RoleSettings::Tech::WeaponKillMinIncome; // TEMPORARILY OFF (owner 2026-11-18): kill zone/coast clusters denied land build spots
             case AIR: return Global::RoleSettings::Tech::WeaponAirMinIncome;
             case ARTY: return Global::RoleSettings::Tech::WeaponArtyMinIncome;
             case LRPC: return Global::RoleSettings::Tech::WeaponLrpcMinIncome;
             case SUPER: return Global::RoleSettings::Tech::SuperMinMetalIncome;
-            case COAST: return Global::RoleSettings::Tech::WeaponCoastMinIncome;
+            // case COAST: return Global::RoleSettings::Tech::WeaponCoastMinIncome;
         }
         return 1e9f;
     }
     int MaxOf(int kind)
     {
         switch (kind) {
-            case KILL: return Global::RoleSettings::Tech::WeaponMaxKill;
+            // case KILL: return Global::RoleSettings::Tech::WeaponMaxKill; // TEMPORARILY OFF (owner 2026-11-18): kill zone/coast clusters denied land build spots
             case AIR: return Global::RoleSettings::Tech::WeaponMaxAir;
             case ARTY: return Global::RoleSettings::Tech::WeaponMaxArty;
             case LRPC: return Global::RoleSettings::Tech::WeaponMaxLrpc;
             case SUPER: return LolCannon::Enabled() ? 0 : Global::RoleSettings::Tech::WeaponMaxSuper;   // the lolcannon program owns it
-            case COAST: return Global::RoleSettings::Tech::WeaponMaxCoast;
+            // case COAST: return Global::RoleSettings::Tech::WeaponMaxCoast;
         }
         return 0;
     }
@@ -314,12 +314,12 @@ namespace TechWeapons {
         const float artyShare = Share(arty, mobile);
         switch (kind) {
             // artillery beats statics that cannot answer: fewer kill zones against it
-            case KILL:  return (0.6f + 1.5f * Share(land + amph + hover, mobile) + Share(heavy, mobile)) * (1.0f - 0.5f * artyShare);
+            // case KILL:  return (0.6f + 1.5f * Share(land + amph + hover, mobile) + Share(heavy, mobile)) * (1.0f - 0.5f * artyShare);
             case AIR:   return 0.4f + 2.0f * Share(air, mobile);
             case ARTY:  return (0.4f + Share(stat, mobile + stat) + Share(land, mobile)) * (1.0f - Share(air, mobile));
             case LRPC:  return 0.4f + Share(stat + lrpc, mobile + stat + lrpc) + Share(ship, mobile) + artyShare;
             case SUPER: return 0.5f + Share(stat + lrpc, mobile + stat + lrpc) + ((MetalIncome() >= Global::RoleSettings::Tech::SuperIdealMetalIncome) ? 1.0f : 0.0f);
-            case COAST: return 0.3f + 2.0f * Share(ship + sub + hover + amph, mobile) + ((heavy > 0.0f && amph > 0.0f) ? 1.0f : 0.0f);
+            // case COAST: return 0.3f + 2.0f * Share(ship + sub + hover + amph, mobile) + ((heavy > 0.0f && amph > 0.0f) ? 1.0f : 0.0f);
         }
         return 0.0f;
     }
@@ -581,7 +581,7 @@ namespace TechWeapons {
     {
         const AIFloat3 p = c.pos, d = c.dir, back(-d.x, 0.0f, -d.z);
         const bool t2 = MetalIncome() >= Global::RoleSettings::Tech::WeaponArtyMinIncome;
-        if (Global::AISettings::Role == AiRole::TECH && (c.kind == KILL || c.kind == ARTY)) AddFactionSupport(c);
+        if (Global::AISettings::Role == AiRole::TECH && c.kind == ARTY) AddFactionSupport(c);   // kill zones TEMPORARILY OFF (owner 2026-11-18)
         const bool heavy = aiBattle.EnemyCost(E_HEAVY) > 0.0f;
         const bool t2air = aiBattle.EnemyCost(E_AIR) > 3000.0f;
         // TEMPORARILY OFF (owner 2026-11-18): kill zone clusters were denying proper spots to build important land structures.

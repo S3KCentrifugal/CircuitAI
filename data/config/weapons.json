@@ -22,6 +22,7 @@
 	},
 
 	// the metal income each cluster kind waits for
+	// kill_zone and coast: TEMPORARILY OFF in tech_weapons.as (owner 2026-11-18): they denied land build spots
 	"gates": {
 		"kill_zone": 200,             // WeaponKillMinIncome
 		"air_defence": 200,           // WeaponAirMinIncome
