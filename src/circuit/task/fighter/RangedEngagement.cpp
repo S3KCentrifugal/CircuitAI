@@ -1340,6 +1340,12 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     const auto& choices=nearby.empty() ? world.Objectives() : nearby;
     float nearest=std::numeric_limits<float>::max(); int objective=-1;
     int unknownObjectives=0;
+    // Owner 2026-11-18 (Astraeus): kite_min_tech / kite_ignore_fast_dots. A
+    // kite-ignored contact (T1 mobile, fast unknown dot) is an objective only
+    // when no other is: a firing band at max range around a T1 walking at us
+    // lies behind us, so that objective walked the hull backwards.
+    const bool kiteFilter=world.KiteMinTech()>0.f || world.KiteDotSpeed()>0.f;
+    float nearestIgnored=std::numeric_limits<float>::max(); int ignoredObjective=-1;
     const auto consider=[&](int i) {
         const auto& c=contacts[i];
         if (policy.holdFireline && !c.los) return;
@@ -1354,7 +1360,9 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // is the only way to identify them; the blind SHOT is what is refused.
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) return;
         const float dist=pos.SqDistance2D(c.pos);
-        if(dist<nearest && (!c.def || (c.def->GetCategory()&def->GetTargetCategory()))) { nearest=dist; objective=i; }
+        if(c.def && !(c.def->GetCategory()&def->GetTargetCategory())) return;
+        if(kiteFilter && world.KiteIgnored(c)) { if(dist<nearestIgnored) { nearestIgnored=dist; ignoredObjective=i; } return; }
+        if(dist<nearest) { nearest=dist; objective=i; }
     };
     // D-295: with no legal shot, prefer the nearest visible contact an allied
     // screen is already fighting (precedence: shot > danger/closing > assist >
@@ -1397,8 +1405,11 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if((c.mobile?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
         const float distance=pos.SqDistance2D(c.pos);
+        if(kiteFilter && world.KiteIgnored(c)) { if(distance<nearestIgnored) { nearestIgnored=distance; ignoredObjective=i; } continue; }
         if(distance<nearest) { nearest=distance; objective=i; }
     }
+    const bool ignoredOnly=objective<0 && ignoredObjective>=0;
+    if(ignoredOnly) objective=ignoredObjective;
     if(report && unknownObjectives>0) ai->LOG("RANGED: unknown radar approach withheld unit=%d candidates=%d",id,unknownObjectives);
     if(objective<0) {
         if(report) ai->LOG("RANGED: no objective unit=%d",id);
@@ -1414,6 +1425,19 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         return;
     }
     const float spacing=policy.spacing;
+    // Owner 2026-11-18: only kite-ignored contacts around. Inside our reach of
+    // it already: stay and fire (engine autofire), never step back to the
+    // band. Out of reach: the site loop below takes forward/lateral sites only.
+    if(ignoredOnly) {
+        const bool inReach=std::any_of(caps.weapons.begin(),caps.weapons.end(),[&](const auto& w){
+            const float r=world.Range(w,pos,c.pos)*policy.rangeFraction; return pos.SqDistance2D(c.pos)<=r*r; });
+        if(inReach) {
+            if(report) ai->LOG("RANGED: kite-ignored objective in reach, holding unit=%d target=%d",id,c.id);
+            if(moving) Hold(unit,true);
+            world.SetSlot(id,pos,spacing,def->GetCostM());
+            return;
+        }
+    }
     AIFloat3 back=pos-c.pos; back.Normalize2D();
     const float baseAngle=std::atan2(back.z,back.x);
     float chosenScore=std::numeric_limits<float>::max(); AIFloat3 chosen=pos; bool found=false;
@@ -1456,7 +1480,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // Forward-fire policy chooses safe advancing/lateral firing sites,
             // never a rearward range correction. O(1) within the existing
             // bounded site loop; independent of other ranged units' kiting.
-            if (policy.holdFireline && ((point.x-pos.x)*(c.pos.x-pos.x)+(point.z-pos.z)*(c.pos.z-pos.z))<0.f) continue;
+            if ((policy.holdFireline || ignoredOnly) && ((point.x-pos.x)*(c.pos.x-pos.x)+(point.z-pos.z)*(c.pos.z-pos.z))<0.f) continue;
             const float move=pos.SqDistance2D(point);
             const float stable=destination.SqDistance2D(point)<policy.hysteresis*policy.hysteresis?.8f:1.f;
             const float screen=policy.preferScreen && !world.HasScreen(id,point,c.pos)?1.15f:1.f;
