@@ -45,7 +45,9 @@ and only while fewer than ClearMaxCannons lolcannons stand on our ally team
 ClearMaxRounds rounds were run for this cannon.
 
 Allowed (Kind): Global::Team::AllyClearPorc (T1 and T1.5 porc and AA: LLT,
-Beamer/HLLT, HLT, Claw/Maw/Dragon's Breath, the T1 and T1.5 AA), whoever
+Beamer/HLLT, HLT, Claw/Maw/Dragon's Breath, the T1 and T1.5 AA, Hive) and
+Global::LolCannon::ClearExtraKinds (the T1 plasma batteries Gauntlet,
+Agitator, Amputator), whoever
 placed them (TECH's weapon clusters too: roles/tech/tech_weapons.as kill
 zones and coast), and Global::Team::AllyClearEco (wind, solar, T1 converter)
 except energy storage. Never (Critical, logged by kind): fusions and advanced
@@ -124,7 +126,8 @@ namespace LolCannonClear {
     bool Kind(const string &in n)
     {
         if (Critical(n).length() > 0) return false;
-        return Global::Team::AllyClearPorc.find(n) >= 0 || Global::Team::AllyClearEco.find(n) >= 0;
+        return Global::Team::AllyClearPorc.find(n) >= 0 || Global::Team::AllyClearEco.find(n) >= 0
+            || Global::LolCannon::ClearExtraKinds.find(n) >= 0;
     }
     bool Judge(CCircuitUnit@ u, string &out why)
     {

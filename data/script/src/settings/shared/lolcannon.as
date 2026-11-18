@@ -257,5 +257,8 @@ namespace LolCannon {
     int ClearRoundSeconds = 120;    // a round's reclaims are given up after this
     int ClearMaxRounds = 4;         // rounds per cannon
     int ClearCrewPerBlocker = 3;    // crew members on one blocker's reclaim
+    // cleared on top of Global::Team::AllyClearPorc and AllyClearEco (owner 2026-11-18: "good spots taken up by
+    // LLTs, hives, amputators"): the T1 plasma batteries Gauntlet, Agitator, Amputator
+    array<string> ClearExtraKinds = { "armguard", "corpun", "legcluster" };
 }
 }
