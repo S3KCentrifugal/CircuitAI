@@ -85,7 +85,7 @@ namespace Main {
         Global::RoleSettings::Air::EcoSlotRetrySeconds = 2.0f;      // owner 2026-10-19: one AIR reactor order per slot per 2 s
         Global::RoleSettings::Air::T2HeavyAirIncomeThreshold = 175.0f;
         // owner 2026-11-08: a nuke rush TECH builds 1 silo - no second call (was 18 min, up to 8) and
-        // no silo per AFUS (was 1 + AFUS, up to NukeLimit); the FRONT silo grid (35 min) still feeds the overnuke
+        // no silo per AFUS (was 1 + AFUS, up to NukeLimit); the FRONT silo grid was removed 2026-11-18 (restore from 040a722e7)
         Global::RoleSettings::Tech::NukeRushSecondCallSeconds = -1;
         Global::RoleSettings::Tech::NukeRushSiloPerAfus = false;
         Global::RoleSettings::Tech::NukeLimit = 15;

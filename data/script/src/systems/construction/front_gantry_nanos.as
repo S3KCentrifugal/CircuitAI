@@ -8,7 +8,7 @@
 //   - the moment a land gantry of ours is framed it rolls GantryCaretakersMin..Max turrets and reserves a
 //     turret block behind it (native ReserveNanoBlockAt with the gantry's real facing, the biggest full
 //     block that holds the roll, else the fullest partial one; layout is opened only for the reservation,
-//     as FrontSiloGrid / FrontLabPorc do). Orders are pinned to the block's slots; past the block (or with
+//     as FrontLabPorc does). Orders are pinned to the block's slots; past the block (or with
 //     no block) they fall back to an engine-sited turret beside the gantry;
 //   - FRONT requisitions up to GantryCaretakerCons T1 constructors at high priority (nearest first, within
 //     GantryCaretakerReach; busy ones too, except a constructor on a factory frame, a retreat, a player or

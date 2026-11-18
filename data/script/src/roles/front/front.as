@@ -29,7 +29,7 @@
 #include "../../systems/construction/front_tactical.as"
 #include "../../systems/construction/front_agitator_counter.as"
 #include "../../systems/construction/front_porc_cluster_counter.as"
-#include "../../systems/construction/front_silo_grid.as"
+// FRONT silo grid (mass nukes) removed 2026-11-18, to be refactored into another situation; restore front_silo_grid.as from 040a722e7
 #include "../../systems/construction/silo_antinukes.as"
 #include "../../systems/construction/front_long_aa.as"
 #include "../../systems/construction/front_layout.as"
@@ -746,9 +746,7 @@ namespace RoleFront {
         if (ladderGantry !is null) return ladderGantry;
         IUnitTask@ ladder=FrontEcoLadder::Work(builder);
         if (ladder !is null) return ladder;
-        // Owner (2026-11-01): from 35 min at a 10 s minimum income of 175 metal / 5000 energy, silos in tight packs off the lanes (front_silo_grid.as)
-        IUnitTask@ silo=FrontSiloGrid::Work(builder);
-        if (silo !is null) return silo;
+        // FRONT silo grid (35 min, up to 8 silos) removed (owner 2026-11-18); restore FrontSiloGrid::Work here from 040a722e7
         // Owner (2026-10-22): T2 constructors upgrade our T1 mexes before native assist/help work
         IUnitTask@ mexUp=FrontMexUp::Work(builder);
         if (mexUp !is null) return mexUp;

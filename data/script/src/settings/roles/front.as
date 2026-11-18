@@ -103,7 +103,6 @@ namespace Front {
             int MinAiSwitchTime = 20;
             int MaxAiSwitchTime = 60;
 
-            // NukeLimit: maximum number of nukes allowed for FRONT role
             /******************** FRONT BASE SETTINGS ********************/
             // All settings applied to front role at game start, logic can change throughout game
             float AllyRange = 900.0f;
@@ -170,29 +169,9 @@ namespace Front {
             // FRONT gantry together; then the heavies above. 0 = off.
             int GantryRushUnits = 10;
 
-            // Nuclear silos (owner, 2026-10-30; systems/construction/front_silo_grid.as). From NukeMinSeconds,
-            // once the 10 s minimum metal / energy income have stayed at or above NukeMetalIncome / NukeEnergyIncome
-            // for NukeSustainSeconds without a break, one silo at a time up to NukeLimit, all on one grid reserved
-            // block by block (SiloGridShapes), side by side with no gap, SiloGridMargin clear round it, at least SiloGridLaneClear
-            // off every allied start's line to its nearest enemy start, nearest home first. Log [FRONT][SiloGrid].
-            bool SiloGrid = true;
-            int NukeLimit = 8;
-            int NukeMinSeconds = 35 * 60;       // owner 2026-11-01: 35 min
-            float NukeMetalIncome = 175.0f;      // owner 2026-11-01: 10 s minimum metal income
-            float NukeEnergyIncome = 5000.0f;    // owner 2026-11-01: 10 s minimum energy income
-            int NukeSustainSeconds = 0;         // owner 2026-10-31: the 10 s minimum metal income is the gate
-            // block shapes tried in order, as columns,rows pairs; a block goes up next to the last one
-            array<int> SiloGridShapes = { 4, 2,  2, 2,  2, 1,  1, 1 };
-            float SiloGridMargin = 48.0f;
-            float SiloGridLaneClear = 200.0f;   // played: 500 left no site round a FRONT (8 allied lanes cross its base)
-            float SiloGridSearchStep = 256.0f;
-            int SiloGridSearchRings = 20;       // x SiloGridSearchStep: 5,120 out (played: edge FRONTs found no site within 3,584)
-            int SiloGridSearchSpokes = 32;
-            float SiloGridMaxHomeDistance = 2560.0f;  // played: grids 4-5 km out stood mid-map; none was ever started
-            float SiloGridMaxForward = 300.0f;        // a site may be at most this much nearer the nearest enemy start than home
-            int SiloGridRetrySeconds = 30;
-            int SiloGridRetryMaxSeconds = 300;
-            int SiloGridMaxTries = 12;          // reservations tried per search (each reserves up to NukeLimit slots)
+            // FRONT nuclear silos (SiloGrid, NukeLimit 8, NukeMinSeconds 35 min, 175 M / 5000 E gates, SiloGrid* site search)
+            // removed (owner 2026-11-18), to be refactored into another situation; restore from 040a722e7.
+            // StartCapNukeSilos above keeps FRONT's native builders off silos.
 
             // T2 long-range AA (owner 2026-11-12; systems/construction/front_long_aa.as): Mercury / Screamer /
             // Xyston (armmercury / corscreamer / leglraa, 1600 M, 33k E, range 2400). Once the 10 s minimum metal

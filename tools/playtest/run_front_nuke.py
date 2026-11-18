@@ -5,8 +5,8 @@ with a target cluster. widgets/front_nuke_fixture.lua gives TECH --tech-silos
 silos and FRONT --front-silos silos (together at the overnuke breakpoint, each
 alone below it), FRONT the income for its silo grid gate and two T2
 constructors at --con-minute. Expected: one overnuke over all of them
-("overnuke with N silos", the salvo stocked in every reaching silo), and FRONT's
-grid orders its next silo only from 35:00.
+("overnuke with N silos", the salvo stocked in every reaching silo). The FRONT silo grid
+was removed 2026-11-18 (restore from 040a722e7); FRONT builds no silos of its own.
 """
 import argparse
 import json
@@ -32,7 +32,7 @@ def main():
     p.add_argument('--con-minute', type=int, default=30)
     p.add_argument('--minutes', type=float, default=38)
     p.add_argument('--map', default='Supreme Isthmus v1.7')
-    p.add_argument('--set', action='append', default=[], help='role setting override for playtest.py stage, e.g. Front.NukeMinSeconds=600')
+    p.add_argument('--set', action='append', default=[], help='role setting override for playtest.py stage, e.g. Front.GantryRushUnits=0')
     p.add_argument('--stage-only', action='store_true')
     a = p.parse_args()
     silos = a.tech_silos + a.front_silos
@@ -50,8 +50,7 @@ def main():
     check = d / 'checks.json'
     check.write_text(json.dumps({'stop_minute': a.minutes, 'expect': [
         {'key': 'shared', 'pattern': r'NUKE: overnuke with %d silos' % silos, 'by_minute': 6, 'scope': 'any'},
-        {'key': 'released', 'pattern': r'NUKE: overnuke salvo released .* in %d silos' % silos, 'by_minute': 20, 'scope': 'any'},
-        {'key': 'grid', 'pattern': r'\[FRONT\]\[SiloGrid\] silo \d+ of 8', 'by_minute': a.minutes, 'scope': 'any'}],
+        {'key': 'released', 'pattern': r'NUKE: overnuke salvo released .* in %d silos' % silos, 'by_minute': 20, 'scope': 'any'}],
         'forbid': [{'key': 'script', 'pattern': r': ERR\s+:|SCRIPT CRASH|Lib exception', 'scope': 'any'}]}, indent=2))
     cmd = [sys.executable, str(HERE / 'playtest.py')]
     stage = cmd + ['stage', '--dir', str(d), '--dll', a.dll, '--data', str(a.data), '--map', a.map,
