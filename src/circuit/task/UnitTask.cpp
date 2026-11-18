@@ -13,6 +13,7 @@
 #include "terrain/path/PathQuery.h"
 #include "unit/CircuitUnit.h"
 #include "unit/action/AntiCapAction.h"
+#include "unit/action/TravelAction.h"
 #include "CircuitAI.h"
 #include "module/BuilderManager.h"
 #include "util/Utils.h"
@@ -142,6 +143,13 @@ void IUnitTask::OnUnitMoveFailed(CCircuitUnit* unit)
 		const AIFloat3& upos = unit->GetPos(frame);
 		circuit->LOG("EXP: move failed: %s(%i) at (%.0f, %.0f); a radial move of 256 follows and the command queue is replaced",
 				unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), upos.x, upos.z);
+	}
+	ITravelAction* travel = unit->GetTravelAct();
+	if ((travel != nullptr) && travel->IsEnginePath()) {
+		// owner 2026-11-18: no sideways jiggle for a T3 ground unit; its next
+		// path-end order comes at the normal cadence (at most every 3 s)
+		travel->ForceEnginePath();
+		return;
 	}
 	AIFloat3 pos = geom::get_radial_pos(unit->GetPos(frame), SQUARE_SIZE * 32);
 	CTerrainManager::CorrectPosition(pos);

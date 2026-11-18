@@ -32,6 +32,14 @@ public:
 	// Force move-orders
 	void InvalidateLastSector() { lastSector = -1; }
 
+	// Owner 2026-11-18 (Thors): a T3 ground unit gets one move to the end of the
+	// squad path and the engine's pathfinding finds the way; the order is
+	// re-sent at most every 3 s, and only when the goal moved, the unit has no
+	// orders, or 15 s passed. A move failure no longer jiggles it sideways.
+	void SetEnginePath(bool value) { enginePath = value; }
+	bool IsEnginePath() const { return enginePath; }
+	void ForceEnginePath() { engineFrame = -1; engineIssued = false; }
+
 protected:
 	int CalcSpeedStep(CCircuitAI* circuit, float& stepSpeed);
 
@@ -42,6 +50,10 @@ protected:
 	int minSqDist;
 	int lastSector;  // last issued sector index
 	int lastFrame;
+	bool enginePath = false;
+	bool engineIssued = false;
+	int engineFrame = -1;
+	springai::AIFloat3 engineGoal;
 
 #ifdef DEBUG_VIS
 public:

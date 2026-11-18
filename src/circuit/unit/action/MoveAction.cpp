@@ -42,6 +42,11 @@ void CMoveAction::Update(CCircuitAI* circuit)
 	}
 	lastFrame = circuit->GetLastFrame();
 
+	if (enginePath) {
+		UpdateEnginePath(circuit, unit);
+		return;
+	}
+
 	float stepSpeed;
 	int pathMaxIndex = CalcSpeedStep(circuit, stepSpeed);
 	switch (pathMaxIndex) {
@@ -92,6 +97,37 @@ void CMoveAction::Update(CCircuitAI* circuit)
 			unit->CmdMoveTo(pos, options, lastFrame + FRAMES_PER_SEC * 60 * i);
 		}
 	)
+}
+
+void CMoveAction::UpdateEnginePath(CCircuitAI* circuit, CCircuitUnit* unit)
+{
+	if ((pPath == nullptr) || pPath->posPath.empty()) {
+		return;
+	}
+	const int frame = lastFrame;
+	const AIFloat3& goal = pPath->posPath.back();
+	const AIFloat3& pos = unit->GetPos(frame);
+	if (pos.SqDistance2D(goal) <= SQUARE(SQUARE_SIZE * 16)) {
+		engineIssued = false;
+		StateFinish();  // the task takes over at its target (OnTravelEnd)
+		return;
+	}
+	if ((engineFrame >= 0) && (frame < engineFrame + FRAMES_PER_SEC * 3)) {
+		return;  // normal cadence: at most one order every 3 s
+	}
+	const bool hasOrders = circuit->GetCallback()->Unit_HasCommands(unit->GetId());
+	if (engineIssued && hasOrders && (frame < engineFrame + FRAMES_PER_SEC * 15)
+		&& (goal.SqDistance2D(engineGoal) <= SQUARE(SQUARE_SIZE * 32)))
+	{
+		return;  // same goal, the engine is still walking it
+	}
+	TRY_UNIT(circuit, unit,
+		unit->CmdMoveTo(goal, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 300);
+		unit->CmdWantedSpeed(speed);
+	)
+	engineGoal = goal;
+	engineFrame = frame;
+	engineIssued = true;
 }
 
 } // namespace circuit

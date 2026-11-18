@@ -20,6 +20,9 @@ public:
 	virtual ~CMoveAction();
 
 	virtual void Update(CCircuitAI* circuit) override;
+
+private:
+	void UpdateEnginePath(CCircuitAI* circuit, CCircuitUnit* unit);
 };
 
 } // namespace circuit

@@ -81,6 +81,8 @@ void CAntiHeavyTask::AssignTo(CCircuitUnit* unit)
 		travelAction = new CFightAction(unit, squareSize);
 	} else {
 		travelAction = new CMoveAction(unit, squareSize);
+		// owner 2026-11-18: T3 ground units walk to the path end on the engine's pathfinding
+		travelAction->SetEnginePath((cdef->GetTechLevel() >= 3.f) && !cdef->IsPlane());
 	}
 	unit->PushTravelAct(travelAction);
 	travelAction->StateWait();
