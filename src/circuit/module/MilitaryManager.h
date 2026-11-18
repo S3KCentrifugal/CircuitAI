@@ -255,6 +255,56 @@ public:
 		bool structuresOnly = true;
 		int repeatFrames = 300 * FRAMES_PER_SEC;
 		float repeatRadius = 0.f; // zero uses the loaded blast radius
+		// Overnuke (owner 2026-10-28): from overnukeSilos finished silos up (every
+		// allied BARb's), all of them fire at one target for a roll of
+		// overnukeMin..overnukeMax launches; overnukeScoutEvery counts scout requests.
+		int overnukeSilos = 3;  // 0 = off
+		int overnukeMin = 10;
+		int overnukeMax = 25;
+		int overnukeScoutEvery = 10;
+		// Salvo (owner 2026-10-30): the reaching silos hold fire until together
+		// they stock the roll (each holds overnukeStockCap), then fire as fast as
+		// their reload allows; earlier after overnukeStockFrames, or when a
+		// reaching silo falls below overnukeFireBelowHealth of its health.
+		bool overnukeStock = true;
+		int overnukeStockCap = 10;  // BAR stockpilelimit of every silo
+		int overnukeStockFrames = 900 * FRAMES_PER_SEC;  // 0 = no timeout
+		float overnukeFireBelowHealth = 0.5f;  // 0 = off
+		// Second breakpoint (owner 2026-10-30): from overnukeTeamSilos finished
+		// silos across every allied BARb, the roll is overnukeTeamMin..Max.
+		int overnukeTeamSilos = 8;  // 0 = off
+		int overnukeTeamMin = 15;
+		int overnukeTeamMax = 30;
+		// Third breakpoint (owner 2026-11-04): from overnukeTier3Silos, overnukeTier3Min..Max.
+		int overnukeTier3Silos = 0;  // 0 = off
+		int overnukeTier3Min = 19;
+		int overnukeTier3Max = 25;
+		// owner 2026-11-04: a released salvo fires every missile the reaching silos hold,
+		// not only the roll; what they stock after waits for the next target.
+		bool overnukeFireAll = false;
+		// Antinuke cover (owner 2026-10-31, restored 2026-11-02): each known enemy
+		// interceptor (any def with an interceptor weapon: Protector, Fortitude,
+		// Aegis, Rampart, mobile and ship antinukes) whose coverage holds an aim
+		// point multiplies the aim point's metal value by a factor (owner 2026-11-03):
+		// value x max(antinukeFloor, factor ^ covering), e.g. 0.70, 0.49, 0.343.
+		float antinukeFactorOrdinary = 0.70f;  // an ordinary shot
+		float antinukeFactorOvernuke = 0.85f;  // an overnuke target (the salvo is meant to saturate)
+		float antinukeFloor = 0.05f;
+		float coveredMargin = 64.f;  // added to each coverage radius
+		// value each target by what the blast's falloff and the chain of death blasts kill (CSuperTask::ChainKill)
+		bool blastKill = true;
+		// blast distance is measured to the target's collision volume (CollisionVolumes.h); a def missing
+		// from that table: centre distance - def radius x this (0.86: the best single fit, 2026-11-02)
+		float volumeFactor = 0.86f;
+		// Nuke outcome (owner 2026-11-06, strategic::StrikeLedger): a launch whose silo
+		// gains experience within strikeWindowFrames landed; ghosts in its blast plus
+		// chain reach, last seen before it, are worth strikeFactor of their metal until
+		// seen again. One that gains none was intercepted: an interceptor is presumed
+		// within interceptPresumeRadius of the aim for interceptPresumeFrames.
+		float strikeFactor = 0.33f;  // 1 = off
+		int strikeWindowFrames = 60 * FRAMES_PER_SEC;
+		float interceptPresumeRadius = 2000.f;  // 0 = off
+		int interceptPresumeFrames = 600 * FRAMES_PER_SEC;
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
 
@@ -376,6 +426,10 @@ public:
 		bool spamRetreat = true;           // 2026-11-06: Ambassador/Negotiator/Boreas back off from spam
 		float spamRetreatDistance = 500.f;
 		int spamRetreatQuietFrames = 120;  // 4 s
+		// Owner 2026-11-08: no Approach99 / old path-query FIGHT while a known
+		// target (LOS, identified or unidentified radar, slow) or a ghost
+		// structure still owed its blind volleys is in weapon range.
+		bool holdBeforeMove = true;
 		int visibleMaxVolleys = 0;    // 0: seen porc until dead (owner 01:43Z)
 		int confirmFrames = 3 * 30;
 		int repeatFrames = 60 * 30;
@@ -440,6 +494,10 @@ public:
 		int approachTarget = -1;  // APPROACH99 target and order
 		int approachOrderUntil = -1;
 		springai::AIFloat3 approachSpot;
+		int holdLogKey = -1;      // 2026-11-08 hold before move: last logged reason (target id) ...
+		int holdLogFrame = -1;    // ... and when (one line per change or per 10 s)
+		int skipLogFrame = -1;    // ghost-skip reason lines, at most one per 10 s per unit
+		bool moveHeld = false;    // holding: the move / FIGHT under way was stopped once
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none

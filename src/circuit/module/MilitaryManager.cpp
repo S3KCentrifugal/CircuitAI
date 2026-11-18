@@ -560,6 +560,40 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.structuresOnly = nuclear.get("structures_only", true).asBool();
 	nuclearInfo.repeatFrames = std::max(0, nuclear.get("repeat_seconds", 300).asInt()) * FRAMES_PER_SEC;
 	nuclearInfo.repeatRadius = std::max(0.f, nuclear.get("repeat_radius", 0.f).asFloat());
+	nuclearInfo.overnukeSilos = std::max(0, nuclear.get("overnuke_silos", 3).asInt());
+	nuclearInfo.overnukeMin = std::max(1, nuclear.get("overnuke_min", 10).asInt());
+	nuclearInfo.overnukeMax = std::max(nuclearInfo.overnukeMin, nuclear.get("overnuke_max", 25).asInt());
+	nuclearInfo.overnukeScoutEvery = std::max(0, nuclear.get("overnuke_scout_every", 10).asInt());
+	nuclearInfo.overnukeStock = nuclear.get("overnuke_stock", true).asBool();
+	nuclearInfo.overnukeStockCap = std::max(1, nuclear.get("overnuke_stock_cap", 10).asInt());
+	nuclearInfo.overnukeStockFrames = std::max(0, nuclear.get("overnuke_stock_seconds", 900).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.overnukeFireBelowHealth = std::min(1.f, std::max(0.f, nuclear.get("overnuke_fire_below_health", 0.5f).asFloat()));
+	nuclearInfo.overnukeTeamSilos = std::max(0, nuclear.get("overnuke_team_silos", 8).asInt());
+	nuclearInfo.overnukeTeamMin = std::max(1, nuclear.get("overnuke_team_min", 15).asInt());
+	nuclearInfo.overnukeTeamMax = std::max(nuclearInfo.overnukeTeamMin, nuclear.get("overnuke_team_max", 30).asInt());
+	nuclearInfo.overnukeTier3Silos = std::max(0, nuclear.get("overnuke_tier3_silos", 0).asInt());
+	nuclearInfo.overnukeTier3Min = std::max(1, nuclear.get("overnuke_tier3_min", 19).asInt());
+	nuclearInfo.overnukeTier3Max = std::max(nuclearInfo.overnukeTier3Min, nuclear.get("overnuke_tier3_max", 25).asInt());
+	nuclearInfo.overnukeFireAll = nuclear.get("overnuke_fire_all", false).asBool();
+	nuclearInfo.antinukeFactorOrdinary = std::min(1.f, std::max(0.f, nuclear.get("antinuke_factor", 0.70f).asFloat()));
+	nuclearInfo.antinukeFactorOvernuke = std::min(1.f, std::max(0.f, nuclear.get("antinuke_factor_overnuke", 0.85f).asFloat()));
+	nuclearInfo.antinukeFloor = std::min(1.f, std::max(0.f, nuclear.get("antinuke_floor", 0.05f).asFloat()));
+	nuclearInfo.coveredMargin = std::max(0.f, nuclear.get("antinuke_margin", 64.f).asFloat());
+	nuclearInfo.blastKill = nuclear.get("blast_kill", true).asBool();
+	nuclearInfo.volumeFactor = std::max(0.f, nuclear.get("blast_volume_factor", 0.86f).asFloat());
+	nuclearInfo.strikeFactor = std::min(1.f, std::max(0.f, nuclear.get("strike_factor", 0.33f).asFloat()));
+	nuclearInfo.strikeWindowFrames = std::max(1, nuclear.get("strike_window_seconds", 60).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.interceptPresumeRadius = std::max(0.f, nuclear.get("intercept_presume_radius", 2000.f).asFloat());
+	nuclearInfo.interceptPresumeFrames = std::max(0, nuclear.get("intercept_presume_seconds", 600).asInt()) * FRAMES_PER_SEC;
+	circuit->LOG("CONFIG %s: nuclear antinuke factor=%.2f overnuke factor=%.2f (per covering antinuke) floor=%.2f margin=%.0f blastKill=%i",
+			cfgName.c_str(), nuclearInfo.antinukeFactorOrdinary, nuclearInfo.antinukeFactorOvernuke,
+			nuclearInfo.antinukeFloor, nuclearInfo.coveredMargin, int(nuclearInfo.blastKill));
+	circuit->LOG("CONFIG %s: overnuke silos=%i roll=%i..%i team(silos=%i roll=%i..%i) tier3(silos=%i roll=%i..%i) fireAll=%i stock=%i cap=%i timeout=%is fireBelowHealth=%.2f",
+			cfgName.c_str(), nuclearInfo.overnukeSilos, nuclearInfo.overnukeMin, nuclearInfo.overnukeMax,
+			nuclearInfo.overnukeTeamSilos, nuclearInfo.overnukeTeamMin, nuclearInfo.overnukeTeamMax,
+			nuclearInfo.overnukeTier3Silos, nuclearInfo.overnukeTier3Min, nuclearInfo.overnukeTier3Max, int(nuclearInfo.overnukeFireAll),
+			int(nuclearInfo.overnukeStock), nuclearInfo.overnukeStockCap,
+			nuclearInfo.overnukeStockFrames / FRAMES_PER_SEC, nuclearInfo.overnukeFireBelowHealth);
 	if (!stockCfg.isNull()) {
 		stockInfo.patienceSeconds = std::max(0.f, stockCfg.get("patience_seconds", 240.f).asFloat());
 		stockInfo.minFraction = std::min(1.f, std::max(0.f, stockCfg.get("min_fraction", 0.25f).asFloat()));
@@ -725,6 +759,7 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.spamRetreat = snipeArtyCfg.get("spam_retreat", true).asBool();
 		artySnipeInfo.spamRetreatDistance = std::max(100.f, snipeArtyCfg.get("spam_retreat_distance", 500.f).asFloat());
 		artySnipeInfo.spamRetreatQuietFrames = int(std::max(1.f, snipeArtyCfg.get("spam_retreat_quiet_seconds", 4.f).asFloat()) * FRAMES_PER_SEC);
+		artySnipeInfo.holdBeforeMove = snipeArtyCfg.get("hold_before_move", true).asBool();
 		artySnipeInfo.visibleMaxVolleys = std::max(0, snipeArtyCfg.get("visible_max_volleys", 0).asInt());
 		auto seconds = [&](const char* key, float def) {
 			return int(std::max(0.f, snipeArtyCfg.get(key, def).asFloat()) * FRAMES_PER_SEC);

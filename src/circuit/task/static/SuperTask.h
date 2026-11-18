@@ -10,6 +10,8 @@
 
 #include "task/fighter/FighterTask.h"
 #include "task/static/TierTargeting.h"
+#include "unit/CollisionVolumes.h"
+#include "unit/CoreUnit.h"
 
 #include <algorithm>
 #include <functional>
@@ -19,6 +21,7 @@
 
 namespace circuit {
 
+class CWeaponDef;
 class CCircuitDef;
 struct SEnemyData;
 
@@ -75,12 +78,42 @@ private:
 	// minValue: the best aim point must sum to at least this, else no target.
 	// avoidFriendly: an aim point whose blast holds one of our own units is
 	// rejected (damaging weapons: Perdition, Catalyst). EMP and Juno do no damage.
+	// aimScale: optional, multiplies an aim point's summed value (nukes: antinuke cover).
+	using TAimScale = std::function<float (const springai::AIFloat3&)>;
+	// extraAims: optional, extra aim points from the candidates' positions (nukes: antinuke edges).
+	using TExtraAims = std::function<std::vector<springai::AIFloat3> (const std::vector<springai::AIFloat3>&)>;
+	// blastWeapon: optional, an aim point is worth what dies (ChainKill), not the metal inside the blast.
 	bool SelectAreaTarget(CCircuitUnit* unit, CCircuitDef* cdef, const char* tag,
 			float sqAoe, int minTargets, int mobileMaxAge, const TClassify& classify,
 			float minValue = 0.f, bool avoidFriendly = false, bool allEnemies = false,
-			bool pulseClaims = false, bool nuclearHistory = false);
+			bool pulseClaims = false, bool nuclearHistory = false, const TAimScale& aimScale = nullptr,
+			const TExtraAims& extraAims = nullptr, const CWeaponDef* blastWeapon = nullptr);
+	// Blast + chain kills of a nuke (SuperTask.cpp, ChainKill).
+	// volume: the def's collision volume (CollisionVolumes.h), nullptr = def radius x blast_volume_factor
+	struct SDeathBlast { float damage = 0.f, radius = 0.f, edge = 0.f, volume = 0.f; const CV::SVolume* cv = nullptr; };
+	struct SChainUnit { springai::AIFloat3 pos; float value; float health; const CCircuitDef* cdef; int facing; };
+	static float AreaDamage(float damage, float radius, float edge, float dist);
+	SDeathBlast DeathBlastOf(const CCircuitDef* cdef);
+	// Planar distance from p to the unit's collision volume surface (the engine's area damage distance).
+	static float SurfaceDistance(const SDeathBlast& b, float volumeFactor, const springai::AIFloat3& unitPos, int facing, const springai::AIFloat3& p);
+	int FacingOf(ICoreUnit::Id id, const SDeathBlast& b);
+	float ChainKill(const CWeaponDef* wd, float radius, const springai::AIFloat3& aim, const std::vector<SChainUnit>& units);
+	std::unordered_map<const CCircuitDef*, SDeathBlast> deathBlasts;
+	std::unordered_map<ICoreUnit::Id, int> facings;  // enemy building facing, read once in LOS (buildings never turn)
+	// Known enemy interceptors (position, squared coverage + margin), and how many hold pos.
+	std::vector<std::pair<springai::AIFloat3, float>> KnownInterceptors();
+	static std::vector<springai::AIFloat3> CoverEdgeAims(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,
+			const std::vector<springai::AIFloat3>& targets);
+	static int CountInterceptorCover(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,
+			const springai::AIFloat3& pos);
 	bool IsPulse(CCircuitDef* cdef) const;
 	bool SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef);
+	int CountNukeSilos() const;  // finished nuke silos of every allied BARb (one super task each)
+	// Salvo (owner 2026-10-30): true once the stocking overnuke may open fire;
+	// scan is SelectNuclearTarget's aim-point scan (it moves targetPos).
+	bool ReleaseSalvo(int frame, const std::function<bool ()>& scan);
+	void StopNukeSilos();  // every allied BARb nuke silo: stop and drop the target
+	void StopStraySilos(const char* why);  // every other allied silo aiming off the overnuke: stop, re-aim at once
 	bool SelectFogTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	bool CanAimStrategic(CCircuitUnit* unit, const springai::AIFloat3& pos) const;
 	// Tactical launchers (Perdition, Catalyst): the richest blast in range.
@@ -104,7 +137,12 @@ private:
 	void CountTierShot(CCircuitUnit* unit, int frame);
 
 	int targetFrame;
+	std::unordered_map<const CCircuitDef*, float> interceptorCoverage;  // def -> coverage radius, 0 none
+	springai::AIFloat3 coverLogPos = springai::AIFloat3(-1.f, 0.f, -1.f);  // last aim point logged with its antinuke cover
 	int lastStock = -1;  // D-124: a nuke silo's stockpile at the last update: a drop is a launch
+	float areaReach = 0.f;  // SelectAreaTarget's blast plus chain reach at the last aim (StrikeLedger mark radius)
+	int strikeChecked = -1;  // last frame this silo's pending launches were resolved
+	void ResolveStrikes(CCircuitUnit* unit, int frame);
 public:
 	// D-124: where the silo aims: the attacked unit, else the aimed ground
 	springai::AIFloat3 GetAimPos() const;

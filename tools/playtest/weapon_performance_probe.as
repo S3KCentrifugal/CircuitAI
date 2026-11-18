@@ -31,6 +31,7 @@ namespace WeaponPerformanceProbe {
         Global::RoleSettings::Tech::WeaponMaxConcurrent = 4;
         for (uint i = 0; i < fixture.length(); ++i) fixture[i].pos = u.GetPos(ai.frame);
         TechWeapons::clusters = fixture;
+        TechWeapons::outstandingDirty = true;
         // ABBA ordering, ten unchanged asks per second. No order/site is reachable:
         // every slot has the validated definition the builder cannot construct.
         const bool old = rounds % 4 == 0 || rounds % 4 == 3;
@@ -42,6 +43,7 @@ namespace WeaponPerformanceProbe {
         }
         AiPerfEndLabel();
         TechWeapons::clusters = saved;
+        TechWeapons::outstandingDirty = true;
         Global::RoleSettings::Tech::WeaponClustersEnabled = enabled;
         Global::RoleSettings::Tech::ExperimentalBuild = experimental;
         Global::RoleSettings::Tech::WeaponStartMetalIncome = start;

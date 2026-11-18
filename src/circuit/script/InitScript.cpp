@@ -378,6 +378,16 @@ static CScriptArray* CCircuitAI_GetOwnedUnitIds(CCircuitAI* circuit)
 	return arr;
 }
 
+// Fill caller-owned storage: allocation capacity is reused; membership is sorted
+// exactly like GetOwnedUnitIds. Dynamic state must still be read from each unit.
+static void CCircuitAI_GetOwnedUnitIdsForDef(CCircuitAI* circuit, const CCircuitDef* def, CScriptArray* out)
+{
+    const auto& ids = circuit->GetOwnedUnitIdsForDef(def);
+    out->Resize(static_cast<asUINT>(ids.size()));
+    asUINT index = 0;
+    for (int id : ids) *static_cast<ICoreUnit::Id*>(out->At(index++)) = id;
+}
+
 static int CTerrainManager_ReserveGrid(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& frontCentre,
 		int facing, int cols, int rows, int gap, int ttlFrames)
 {
@@ -615,6 +625,20 @@ static AIFloat3 CCircuitAI_GeoSpot(CCircuitAI* circuit, int index) {
 static std::atomic<int> introDoneFrame(-1);
 static void AiMarkIntroDone(int frame) { introDoneFrame = frame; }
 static int AiIntroDoneFrame() { return introDoneFrame; }
+
+// Start-position pick: this ally team's AI teams running this AI, in team id order
+static CScriptArray* CSetupManager_GetAllySameAITeams(CSetupManager* setupMgr)
+{
+	asIScriptEngine* engine = asGetActiveContext()->GetEngine();
+	auto cache = static_cast<CScriptManager::STypeInfoCache*>(engine->GetUserData());
+	const std::vector<int> teams = setupMgr->GetAllySameAITeams();
+	CScriptArray* arr = CScriptArray::Create(cache->idArray, (asUINT)teams.size());
+	asUINT i = 0;
+	for (int teamId : teams) {
+		*(CAllyTeam::Id*)arr->At(i++) = teamId;
+	}
+	return arr;
+}
 
 static AIFloat3 CSetupManager_GetLanePos(CSetupManager* setupMgr)
 {
@@ -1313,6 +1337,8 @@ void CInitScript::RegisterCore()
 	r = engine->RegisterObjectMethod("CCircuitAI", "CCircuitUnit@ GetTeamUnit(Id)", asMETHOD(CCircuitAI, GetTeamUnit), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "array<Id>@ GetOwnedUnitIds() const", asFUNCTION(CCircuitAI_GetOwnedUnitIds), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CCircuitAI", "uint GetOwnedUnitRevision() const", asMETHOD(CCircuitAI, GetOwnedUnitRevision), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CCircuitAI", "void GetOwnedUnitIdsForDef(const CCircuitDef@, array<Id>& inout) const", asFUNCTION(CCircuitAI_GetOwnedUnitIdsForDef), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CCircuitAI", "uint64 GetOwnedDefinitionRevision(const CCircuitDef@) const", asMETHOD(CCircuitAI, GetOwnedDefinitionRevision), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "string GetMapName() const", asFUNCTION(CCircuitAI_GetMapName), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "int GetEnemyTeamSize() const", asMETHOD(CCircuitAI, GetEnemyTeamSize), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CCircuitAI", "bool IsLoadSave() const", asMETHOD(CCircuitAI, IsLoadSave), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1495,6 +1521,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanReserveNanoBlockAt(const CCircuitDef@ nanoDef, const CCircuitDef@ facDef, const AIFloat3& in facPos, int facing, int cols, int rows, int gap)", asFUNCTION(CTerrainManager_CanReserveNanoBlockAt), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveNanoBlock(CCircuitUnit@ factory, const CCircuitDef@ nanoDef, int cols, int rows, int gap)", asFUNCTION(CTerrainManager_ReserveNanoBlock), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool CanReserveBuilding(const CCircuitDef@, const AIFloat3& in, int facing)", asFUNCTION(CTerrainManager_CanReserveBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 CanonicalBuildPosition(const CCircuitDef@, const AIFloat3& in, int facing) const", asMETHOD(CTerrainManager, CanonicalBuildPosition), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "float BuildableFraction(const CCircuitDef@, const AIFloat3& in centre, float halfAcross, float halfAlong, int facing)", asFUNCTION(CTerrainManager_BuildableFraction), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleaseReservation(int)", asMETHOD(CTerrainManager, ReleaseReservation), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleaseGroup(int)", asMETHOD(CTerrainManager, ReleaseGroup), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1617,6 +1644,9 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CSetupManager", "int EnemyStartBoxAt(const AIFloat3& in) const", asMETHOD(CSetupManager, EnemyStartBoxAt), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
 	r = engine->RegisterObjectMethod("CSetupManager", "int FriendlyStartBoxAt(const AIFloat3& in) const", asMETHOD(CSetupManager, FriendlyStartBoxAt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSetupManager", "int GetScriptStartCount()", asMETHOD(CSetupManager, GetScriptStartCount), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
+	r = engine->RegisterObjectMethod("CSetupManager", "bool IsChooseInGame() const", asMETHOD(CSetupManager, IsChooseInGame), asCALL_THISCALL); ASSERT(r >= 0);  // start pick
+	r = engine->RegisterObjectMethod("CSetupManager", "array<Id>@ GetAllySameAITeams()", asFUNCTION(CSetupManager_GetAllySameAITeams), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSetupManager", "bool SendStartPos(const AIFloat3& in)", asMETHOD(CSetupManager, SendStartPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSetupManager", "AIFloat3 GetScriptStart(int)", asMETHOD(CSetupManager, GetScriptStart), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
 	r = engine->RegisterObjectMethod("CSetupManager", "bool IsScriptStartEnemy(int)", asMETHOD(CSetupManager, IsScriptStartEnemy), asCALL_THISCALL); ASSERT(r >= 0);  // D-127
 	r = engine->RegisterObjectMethod("CSetupManager", "float ConfigFloat(const string& in, float)", asFUNCTION(CSetupManager_ConfigFloat), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

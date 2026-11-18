@@ -28,6 +28,7 @@ enum Phase {
     ARTILLERY_UPDATE, ARTILLERY_QUERY, // D-493: artillery controller pass, one gun's snapshot query
     ESCORT_CONTROLLER, // D-509: anti-air escort controller loop
     REZZER_CONTROLLER, // D-514: repair crew controller loop
+    AIR_STRIKE_TARGET,
     PHASE_COUNT
 };
 extern const bool enabled;

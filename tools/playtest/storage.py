@@ -252,7 +252,7 @@ def publish(archive, screenshots=(), *, store=None):
     if not dest.resolve().is_relative_to(store):
         raise ValueError('Publication path escapes store')
     names = {'result.json','report.md','checks.json'}
-    names.update(p.name for p in archive.iterdir() if p.is_file() and p.suffix in ('.json','.as') and p.name != 'result.json')
+    names.update(p.name for p in archive.iterdir() if p.is_file() and p.suffix in ('.json','.as','.gz') and p.name != 'result.json')
     if (archive/'script.txt').is_file():
         names.add('script.txt')
     for name in screenshots:
