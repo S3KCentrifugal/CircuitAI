@@ -9,6 +9,21 @@ namespace SiloAntiNukes {
         // Never more antinukes from this rule than this, whatever the silo count.
         int Max = 6;
 
+        // Silos inferred from launches (owner 2026-11-18): an antinuke of ours or of an allied
+        // BARb whose stockpile drops has fired at an enemy nuke. Launches in the last
+        // LaunchWindowSeconds, against the most one silo can fire in that time (one per
+        // LaunchStockSeconds, the fastest silo's stockpile time (armsilo 120 s), plus one
+        // missile it may have saved), give the silos that must exist. Antinukes are owed for
+        // whichever is higher, silos scouted or silos inferred.
+        bool InferFromLaunches = true;
+        int LaunchScanSeconds = 2;
+        int LaunchWindowSeconds = 600;
+        int LaunchStockSeconds = 120;
+        // Interceptions within this of each other are one event; in an event each antinuke
+        // counts its own shots and the event is its busiest antinuke (overlapping antinukes
+        // firing at one missile count once).
+        int LaunchMergeSeconds = 8;
+
         // FRONT: the first antinuke covers the main base and the front together.
         // The front point is FrontFraction of the way from our start to the nearest
         // enemy start, at most 2 x CoverShare x coverage out; the block's centre must be

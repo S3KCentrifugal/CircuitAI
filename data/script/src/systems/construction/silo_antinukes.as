@@ -36,6 +36,14 @@
 // ring round the start, spread away from our other antinukes and from the enemy, every pad on the
 // map (MapEdgeMargin beyond half its footprint) and still covering the core.
 //
+// Inferred silos (owner 2026-11-18): enemy launches are seen as our own antinukes' stockpiles
+// dropping (an interception), scanned every LaunchScanSeconds and shared with every allied BARb
+// (siloanti|launch|unit|shots). Launches in the last LaunchWindowSeconds, divided by the most
+// one silo can fire in that time (window / LaunchStockSeconds + 1), rounded up, are the silos
+// that must exist. Wanted() takes the higher of scouted and inferred, so FRONT, TECH and AIR all
+// react. A launch that no antinuke fires at is not seen (the AI interface reports no enemy
+// projectiles), and a silo that saved many missiles and fires them together can read as two.
+//
 // Cost: the silo count once per CountSeconds (one pass over the published contacts/ghosts);
 // a FRONT site search once per block (backs off after a failure); a periphery search
 // (rings x spokes probes, cheap tests first) only while an antinuke is owed. Log [SiloAntiNuke].
@@ -96,11 +104,143 @@ namespace SiloAntiNukes {
         return n;
     }
 
-    // Antinukes owed: one per known silo, at most Max.
+    /**************************************************************************
+     Silos inferred from enemy launches (owner 2026-11-18)
+    **************************************************************************/
+    const string LaunchMsg = "siloanti|launch|";
+    array<int> antiIds;
+    bool antiReady = false;
+    dictionary stockOf;              // our finished antinuke id -> its last stockpile
+    int scannedAt = -1000000;
+    // events: interceptions within LaunchMergeSeconds of each other
+    array<int> eventLast;            // frame of the event's latest interception
+    array<dictionary@> eventShots;   // "team:unit" -> shots in the event
+    int inferred = 0, inferLogged = 0, launchesSeen = 0;
+
+    bool IsAntiNuke(int defId)
+    {
+        if (!antiReady) {
+            antiReady = true;
+            array<string> names = UnitHelpers::GetAllAntiNukes();
+            for (uint i = 0; i < names.length(); ++i) {
+                CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+                if (d !is null) antiIds.insertLast(d.id);
+            }
+        }
+        return defId >= 0 && antiIds.find(defId) >= 0;
+    }
+
+    int EventCount(uint k)
+    {
+        if (k >= eventShots.length() || eventShots[k] is null) return 0;
+        int most = 0;
+        array<string>@ keys = eventShots[k].getKeys();
+        for (uint i = 0; i < keys.length(); ++i) {
+            int n = 0;
+            if (eventShots[k].get(keys[i], n) && n > most) most = n;
+        }
+        return most;
+    }
+
+    // shots: interceptions by one antinuke (team, unit) since its last report
+    void AddShots(int team, int unit, int shots, const string &in from)
+    {
+        if (shots <= 0) return;
+        const int merge = Global::SiloAntiNukes::LaunchMergeSeconds * SECOND;
+        const uint k = eventLast.length();
+        const string key = "" + team + ":" + unit;
+        if (k > 0 && ai.frame - eventLast[k - 1] <= merge) {
+            const int before = EventCount(k - 1);
+            int n = 0;
+            eventShots[k - 1].get(key, n);
+            eventShots[k - 1].set(key, n + shots);
+            eventLast[k - 1] = ai.frame;
+            launchesSeen += EventCount(k - 1) - before;
+        } else {
+            dictionary@ e = dictionary();
+            e.set(key, shots);
+            eventLast.insertLast(ai.frame);
+            eventShots.insertLast(e);
+            launchesSeen += shots;
+        }
+        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] enemy nuke intercepted by " + from + " antinuke " + unit
+            + " (team " + team + ", " + shots + " shot" + (shots == 1 ? "" : "s") + "); " + launchesSeen + " launches seen", 1);
+    }
+
+    // Our finished antinukes' stockpiles, every LaunchScanSeconds (Team::CheckOrphaned).
+    void Tick()
+    {
+        if (!Global::SiloAntiNukes::Enabled || !Global::SiloAntiNukes::InferFromLaunches) return;
+        if (ai.frame - scannedAt < Global::SiloAntiNukes::LaunchScanSeconds * SECOND) return;
+        scannedAt = ai.frame;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        if (ids is null) return;
+        dictionary now;
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || u.circuitDef is null || !IsAntiNuke(u.circuitDef.id) || u.GetBuildProgress() < 1.0f) continue;
+            const int stock = u.GetStockpile();
+            const string key = "" + u.id;
+            int prev = 0;
+            if (stockOf.get(key, prev) && stock < prev) {
+                AddShots(ai.teamId, u.id, prev - stock, "our");
+                AiSendMessage(LaunchMsg + u.id + "|" + (prev - stock));
+            }
+            now.set(key, stock);
+        }
+        stockOf = now;
+    }
+
+    // siloanti|launch|unit|shots from an allied BARb (Team::HandleMessage).
+    bool Handle(const string &in msg, int fromTeamId)
+    {
+        if (msg.findFirst(LaunchMsg) != 0) return false;
+        if (!Global::SiloAntiNukes::Enabled || !Global::SiloAntiNukes::InferFromLaunches || fromTeamId == ai.teamId) return true;
+        array<string>@ parts = msg.split("|");
+        if (parts.length() < 4) return true;
+        const int unit = int(parseInt(parts[2])), shots = int(parseInt(parts[3]));
+        if (shots > 0 && shots <= 20) AddShots(fromTeamId, unit, shots, "an allied");
+        return true;
+    }
+
+    // Silos that must exist to fire the launches seen in the last LaunchWindowSeconds.
+    int InferredSilos()
+    {
+        if (!Global::SiloAntiNukes::InferFromLaunches) return 0;
+        const int window = AiMax(60, Global::SiloAntiNukes::LaunchWindowSeconds);
+        while (eventLast.length() > 0 && ai.frame - eventLast[0] > window * SECOND) {
+            eventLast.removeAt(0);
+            eventShots.removeAt(0);
+        }
+        int n = 0;
+        for (uint k = 0; k < eventLast.length(); ++k) n += EventCount(k);
+        const int perSilo = window / AiMax(1, Global::SiloAntiNukes::LaunchStockSeconds) + 1;
+        inferred = (n + perSilo - 1) / perSilo;
+        if (inferred != inferLogged) {
+            GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] enemy silos inferred from launches: " + inferred + " (" + n
+                + " launches in the last " + window + " s, at most " + perSilo + " per silo); scouted " + known, 1);
+            inferLogged = inferred;
+        }
+        if (inferred > 0 && firstSeen < 0) firstSeen = ai.frame;
+        return inferred;
+    }
+
+    // Silos counted: the higher of scouted and inferred.
+    int Silos()
+    {
+        return AiMax(KnownSilos(), InferredSilos());
+    }
+
+    string SiloNote()
+    {
+        return known + " scouted" + (inferred > known ? ", " + inferred + " inferred from launches" : "");
+    }
+
+    // Antinukes owed: one per silo (scouted or inferred), at most Max.
     int Wanted()
     {
         if (!Global::SiloAntiNukes::Enabled) return 0;
-        return AiMin(Global::SiloAntiNukes::Max, KnownSilos());
+        return AiMin(Global::SiloAntiNukes::Max, Silos());
     }
 
     // Raise (never lower) every antinuke's unit cap to n (corfmd / legabm ship with limit 5).
@@ -521,8 +661,8 @@ namespace SiloAntiNukes {
             nearFrom = -1;
             recruitId = b is u ? -1 : b.id; recruitTries = 0;
             pendingSlot = int(s); pendingFrame = ai.frame;
-            GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
-                + " silos known) on block slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
+            GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + SiloNote()
+                + ") on block slot " + s + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
                 + (relaxed ? " (relaxed gate)" : "") + (b is u ? "" : "; recruited " + b.circuitDef.GetName() + " " + b.id), 1);
             if (b is u) return t;
             aiBuilderMgr.AssignTask(b, t);
@@ -659,8 +799,8 @@ namespace SiloAntiNukes {
         padOrderedAt = ai.frame;
         padRecruitId = b is u ? -1 : b.id;
         const AIFloat3 at = aiTerrainMgr.GetReservationPos(slot);
-        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + known
-            + " silos known) on periphery pad " + slot + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
+        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] antinuke " + (have + 1) + " of " + want + " (" + SiloNote()
+            + ") on periphery pad " + slot + " at (" + int(at.x) + ", " + int(at.z) + "); income +" + int(mi) + "/+" + int(ei)
             + (b is u ? "" : "; recruited " + b.circuitDef.GetName() + " " + b.id), 1);
         if (b is u) return t;
         aiBuilderMgr.AssignTask(b, t);

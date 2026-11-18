@@ -19,6 +19,7 @@
 #include "../production/rez_replenish.as"
 #include "engineering_lanes.as"
 #include "catalyst_trade.as"
+#include "../construction/silo_antinukes.as"
 
 namespace Team {
     // Return true if the def represents a T2 constructor (land or air)
@@ -37,7 +38,7 @@ namespace Team {
     }
 
     // Shared experimental-role recovery, replacing spare-only orphan donations.
-    void CheckOrphaned() { Recovery::Update(); SeaTech::Tick(); AirEmergencyDefense::Tick(); }
+    void CheckOrphaned() { Recovery::Update(); SeaTech::Tick(); AirEmergencyDefense::Tick(); SiloAntiNukes::Tick(); }
 
     // True when teamId is on our ally team (ai.GetTeamIds() lists our own ally team).
     bool IsAlly(int teamId) {
@@ -60,6 +61,7 @@ namespace Team {
         }
         if (SeaTech::Handle(msg, fromTeamId)) return;
         if (NukeRecon::Handle(msg, fromTeamId)) return;
+        if (SiloAntiNukes::Handle(msg, fromTeamId)) return;   // owner, 2026-11-18: allied antinuke interceptions
         if (LolCannonRecon::Handle(msg, fromTeamId)) return;
         if (FrontRadar::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-10-27: allied long-range radars
         if (AntiSpam::HandleMessage(msg, fromTeamId)) return;     // owner, 2026-10-27: allied anti-spam lanes and counts
