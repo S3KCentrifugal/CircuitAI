@@ -36,13 +36,14 @@
 // ring round the start, spread away from our other antinukes and from the enemy, every pad on the
 // map (MapEdgeMargin beyond half its footprint) and still covering the core.
 //
-// Inferred silos (owner 2026-11-18): enemy launches are seen as our own antinukes' stockpiles
-// dropping (an interception), scanned every LaunchScanSeconds and shared with every allied BARb
-// (siloanti|launch|unit|shots). Launches in the last LaunchWindowSeconds, divided by the most
+// Inferred silos (owner 2026-11-18): enemy launches are counted from BAR's launch warning
+// (NukeLaunched -> gui_barb_team_link -> barb|nuclear-warning, the signal the commander group's
+// nuclear demand already uses) and from our own antinukes' stockpiles dropping (an
+// interception), scanned every LaunchScanSeconds and shared with every allied BARb
+// (siloanti|launch|unit|shots); the higher of the two counts stands. Launches in the last LaunchWindowSeconds, divided by the most
 // one silo can fire in that time (window / LaunchStockSeconds + 1), rounded up, are the silos
 // that must exist. Wanted() takes the higher of scouted and inferred, so FRONT, TECH and AIR all
-// react. A launch that no antinuke fires at is not seen (the AI interface reports no enemy
-// projectiles), and a silo that saved many missiles and fires them together can read as two.
+// react. Without a human host (no warnings) a launch that no antinuke fires at is not seen, and a silo that saved many missiles and fires them together can read as two.
 //
 // Cost: the silo count once per CountSeconds (one pass over the published contacts/ghosts);
 // a FRONT site search once per block (backs off after a failure); a periphery search
@@ -203,6 +204,21 @@ namespace SiloAntiNukes {
         return true;
     }
 
+    // BAR's launch warning (owner 2026-11-18, patterned on the commander group's nuclear demand):
+    // the "NukeLaunched" notification reaches the host player's gui_barb_team_link widget, which
+    // sends barb|nuclear-warning|<team> to every local BARb (Commands::Handle). Besides
+    // AllyTeam::NuclearWarning (CommanderDefense.cpp: nuclear demand, antinuke rule slot 7), each
+    // warning is one launch here, also from silos never scouted. No warnings without a human
+    // player hosting the AIs (the widget ignores spectators), so interceptions stay the fallback.
+    array<int> warnings;
+    void Warning()
+    {
+        if (!Global::SiloAntiNukes::Enabled || !Global::SiloAntiNukes::InferFromLaunches) return;
+        if (warnings.length() > 0 && warnings[warnings.length() - 1] == ai.frame) return;   // the widget relays once per frame
+        warnings.insertLast(ai.frame);
+        GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] enemy nuke launch warning; " + warnings.length() + " in the window", 1);
+    }
+
     // Silos that must exist to fire the launches seen in the last LaunchWindowSeconds.
     int InferredSilos()
     {
@@ -212,13 +228,18 @@ namespace SiloAntiNukes {
             eventLast.removeAt(0);
             eventShots.removeAt(0);
         }
-        int n = 0;
-        for (uint k = 0; k < eventLast.length(); ++k) n += EventCount(k);
+        int caught = 0;
+        for (uint k = 0; k < eventLast.length(); ++k) caught += EventCount(k);
+        while (warnings.length() > 0 && ai.frame - warnings[0] > window * SECOND) warnings.removeAt(0);
+        // a warned launch is usually also intercepted 10-30 s later: the two are counts of the
+        // same missiles, so the higher one stands
+        const int warned = int(warnings.length());
+        const int n = AiMax(warned, caught);
         const int perSilo = window / AiMax(1, Global::SiloAntiNukes::LaunchStockSeconds) + 1;
         inferred = (n + perSilo - 1) / perSilo;
         if (inferred != inferLogged) {
             GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] enemy silos inferred from launches: " + inferred + " (" + n
-                + " launches in the last " + window + " s, at most " + perSilo + " per silo); scouted " + known, 1);
+                + " launches in the last " + window + " s: " + warned + " warned, " + caught + " intercepted; at most " + perSilo + " per silo); scouted " + known, 1);
             inferLogged = inferred;
         }
         if (inferred > 0 && firstSeen < 0) firstSeen = ai.frame;

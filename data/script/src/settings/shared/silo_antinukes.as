@@ -9,8 +9,9 @@ namespace SiloAntiNukes {
         // Never more antinukes from this rule than this, whatever the silo count.
         int Max = 6;
 
-        // Silos inferred from launches (owner 2026-11-18): an antinuke of ours or of an allied
-        // BARb whose stockpile drops has fired at an enemy nuke. Launches in the last
+        // Silos inferred from launches (owner 2026-11-18): BAR's launch warning (the host player's
+        // team-link widget, barb|nuclear-warning) and interceptions (an antinuke of ours or of an
+        // allied BARb whose stockpile drops); the higher count stands. Launches in the last
         // LaunchWindowSeconds, against the most one silo can fire in that time (one per
         // LaunchStockSeconds, the fastest silo's stockpile time (armsilo 120 s), plus one
         // missile it may have saved), give the silos that must exist. Antinukes are owed for
