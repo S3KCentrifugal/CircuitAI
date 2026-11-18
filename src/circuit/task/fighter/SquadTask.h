@@ -58,6 +58,7 @@ protected:
 	std::map<float, std::set<CCircuitUnit*>> rangeUnits;
 
 	int groupFrame;
+	int noRegroupLogFrame = -100000;  // owner 2026-11-18: T3 squads skip regroup (log throttle)
 	// Squad attack cadence is separate from IFighterTask's individual orders.
 	// cppcheck-suppress duplInheritedMember
 	int attackFrame;

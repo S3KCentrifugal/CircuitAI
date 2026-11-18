@@ -306,12 +306,29 @@ bool ISquadTask::IsMustRegroup()
 	state = State::ROAM;
 
 	const float sqMaxDist = SQUARE(std::max<float>(SQUARE_SIZE * 8 * validUnits.size(), highestRange));
+	int spread = 0;
 	for (CCircuitUnit* unit : validUnits) {
 		const float sqDist = groupPos.SqDistance2D(unit->GetLastPos());
 		if (sqDist > sqMaxDist) {
 			state = State::REGROUP;
-			break;
+			++spread;
 		}
+	}
+	// Owner 2026-11-18 (Thors idled at the gantry until nuked): a T3 ground squad
+	// never regroups. REGROUP sent every member to the centre of the squad
+	// (Gather) and held it there while one member was stuck, so none went to the
+	// front. Each member keeps the squad's normal path to the front at the normal
+	// order cadence instead, and the engine's pathfinding gets them round.
+	if ((State::REGROUP == state) && (leader->GetCircuitDef()->GetTechLevel() >= 3.f) && !leader->GetCircuitDef()->IsPlane()) {
+		if (frame >= noRegroupLogFrame + FRAMES_PER_SEC * 30) {
+			noRegroupLogFrame = frame;
+			circuit->LOG("SQUAD: T3 squad %p leader=%s(%i) skips regroup: %i/%u members beyond %.0f of (%.0f, %.0f), leader at (%.0f, %.0f)",
+					(void*)this, leader->GetCircuitDef()->GetDef()->GetName(), leader->GetId(), spread, unsigned(validUnits.size()),
+					std::sqrt(sqMaxDist), groupPos.x, groupPos.z, leadPos.x, leadPos.z);
+		}
+		state = State::ROAM;
+		validUnits.clear();
+		return false;
 	}
 
 	if (!wasRegroup && (State::REGROUP == state)) {
