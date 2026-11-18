@@ -786,6 +786,10 @@ int CBuilderManager::UnitCaptured(CCircuitUnit* unit, int oldTeamId, int newTeam
 namespace {
 // A retreat point counts as reachable when the builder can get this close (elmos).
 constexpr float BRACE_REACH_RANGE = 32.f;
+// Owner 2026-11-18: how far past a known enemy porc's reach (range +
+// porc_margin) a builder hit inside it walks, and how close it must get.
+constexpr float BRACE_PORC_EXTRA = 150.f;
+constexpr float BRACE_PORC_REACH = 96.f;
 }
 
 // Mobile, ground: not an aircraft, a ship or a submarine. Hovercraft and
@@ -927,23 +931,41 @@ IBuilderTask* CBuilderManager::StartBrace(CCircuitUnit* unit, bool hasThreat, co
 	const AIFloat3 pos = unit->GetPos(frame);
 	const AIFloat3& base = circuit->GetSetupManager()->GetBasePos();
 	const brace::Point toward = brace::ThreatDirection({pos.x, pos.z}, hasThreat, {threat.x, threat.z}, {base.x, base.z});
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	CEconomyManager* economyMgr = circuit->GetEconomyManager();
+	const bool porcAware = !unit->GetCircuitDef()->IsRoleComm();  // commanders: their controller's keep-out
+
+	// Owner 2026-11-18 (Stronghold, T2 cons 11379 30978 17443 of AI 14): a
+	// builder hit inside the reach of a known enemy armed structure (seen, or a
+	// ghost not seen empty) was stepped back 100 and built a turret there,
+	// still in a Beamer's and an Annihilator's reach, and died: its wreck fed
+	// the enemy. It now walks out past every such reach and builds nothing.
+	AIFloat3 escape;
+	bool porcEscape = false;
+	if (porcAware && economyMgr->PorcEscapePoint(nullptr, pos, BRACE_PORC_EXTRA, escape)) {
+		escape.y = circuit->GetMap()->GetElevationAt(escape.x, escape.z);
+		porcEscape = terrainMgr->CanReachAt(unit, escape, BRACE_PORC_REACH);
+	}
 
 	// Step back; when straight back is blocked, 45 then 90 degrees to a side.
 	// None reachable: brace where it stands.
-	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 	AIFloat3 retreat = pos;
-	for (int i = 0; i < brace::RETREAT_CANDIDATES; ++i) {
-		const brace::Point p = brace::RetreatPoint({pos.x, pos.z}, toward, brace.retreatDistance, i);
-		AIFloat3 at(p.x, 0.f, p.z);
-		CTerrainManager::CorrectPosition(at);
-		at.y = circuit->GetMap()->GetElevationAt(at.x, at.z);
-		if (terrainMgr->CanReachAt(unit, at, BRACE_REACH_RANGE)) {
-			retreat = at;
-			break;
+	if (porcEscape) {
+		retreat = escape;
+	} else {
+		for (int i = 0; i < brace::RETREAT_CANDIDATES; ++i) {
+			const brace::Point p = brace::RetreatPoint({pos.x, pos.z}, toward, brace.retreatDistance, i);
+			AIFloat3 at(p.x, 0.f, p.z);
+			CTerrainManager::CorrectPosition(at);
+			at.y = circuit->GetMap()->GetElevationAt(at.x, at.z);
+			if (terrainMgr->CanReachAt(unit, at, BRACE_REACH_RANGE)) {
+				retreat = at;
+				break;
+			}
 		}
 	}
 
-	CCircuitDef* def = BraceDefence(unit);
+	CCircuitDef* def = porcEscape ? nullptr : BraceDefence(unit);
 	AIFloat3 site = retreat;
 	if (def != nullptr) {
 		CCircuitDef* cdef = unit->GetCircuitDef();
@@ -953,6 +975,12 @@ IBuilderTask* CBuilderManager::StartBrace(CCircuitUnit* unit, bool hasThreat, co
 		site = AIFloat3(s.x, 0.f, s.z);
 		CTerrainManager::CorrectPosition(site);
 		site.y = circuit->GetMap()->GetElevationAt(site.x, site.z);
+		// Never a turret inside known enemy porc reach: it dies unbuilt and the
+		// builder stays in range to build it (retreat only then).
+		if (porcAware && (economyMgr->EnemyPorcClearance(site) < 0.f)) {
+			def = nullptr;
+			site = retreat;
+		}
 	}
 
 	CBBraceTask* task = new CBBraceTask(this, def, retreat, site, BraceHold(unit->GetCircuitDef()), brace.timeout);
@@ -964,9 +992,10 @@ IBuilderTask* CBuilderManager::StartBrace(CCircuitUnit* unit, bool hasThreat, co
 		return nullptr;
 	}
 	braceUnits[unit->GetId()].lastStart = frame;
-	circuit->LOG("[Brace] unit=%i %s reason=%s threat=%i at=%.0f,%.0f back=%.0f,%.0f site=%.0f,%.0f defence=%s",
+	circuit->LOG("[Brace] unit=%i %s reason=%s threat=%i at=%.0f,%.0f back=%.0f,%.0f site=%.0f,%.0f defence=%s%s",
 			unit->GetId(), unit->GetCircuitDef()->GetDef()->GetName(), reason, hasThreat ? 1 : 0,
-			pos.x, pos.z, retreat.x, retreat.z, site.x, site.z, (def != nullptr) ? def->GetDef()->GetName() : "none");
+			pos.x, pos.z, retreat.x, retreat.z, site.x, site.z, (def != nullptr) ? def->GetDef()->GetName() : "none",
+			porcEscape ? " porc_escape=1" : "");
 	return task;
 }
 

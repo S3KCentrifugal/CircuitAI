@@ -196,12 +196,18 @@ public:
 	// The clearance for this unit: the rez keep-out for a rez bot, the porc
 	// reach for a construction vehicle, +inf for any other unit.
 	float EnemyPorcClearance(const CCircuitUnit* unit, const springai::AIFloat3& pos);
-	// Rez bots only: the straight leg from `from` to `to` cuts a keep-out disc.
-	// A disc that already holds `from` is skipped (the bot may walk out of it).
+	// Porc guarded units (rez bots; since 2026-11-18 construction vehicles and
+	// T2 cons too): the straight leg from `from` to `to` cuts a keep-out disc.
+	// A disc that already holds `from` is skipped (the unit may walk out of it).
 	bool IsPorcPathBlocked(const CCircuitUnit* unit, const springai::AIFloat3& from, const springai::AIFloat3& to);
-	// Rez bots only: the unit stands inside a keep-out disc; moves it out
+	// Porc guarded units: the unit stands inside a keep-out disc; moves it out
 	// (150 past the edge, away from the porc whose disc it is deepest in).
 	bool MoveOutOfPorc(CCircuitUnit* unit);
+	// Owner 2026-11-18: a point `extra` past the keep-out edge of every known
+	// enemy porc whose disc holds pos (away from the deepest; toward our start
+	// when on top of it). unit null: reach (range + porc_margin). False: pos
+	// lies in no disc.
+	bool PorcEscapePoint(const CCircuitUnit* unit, const springai::AIFloat3& pos, float extra, springai::AIFloat3& out);
 	void LogConPorc(const CCircuitUnit* unit, const springai::AIFloat3& pos, const char* where, const char* what);
 	// D-465: a geothermal vent no claimant ground start reaches (build stance, 3D).
 	bool IsGeoAirOnly(const springai::AIFloat3& pos);
@@ -548,6 +554,7 @@ private:
 		float threat = 1.f;          // THREAT_MIN; builder's threat layer at the spot above this is unsafe
 	} mexSafety;
 	struct SMexPorc { springai::AIFloat3 pos; float reachSq; float reach; CCircuitDef* def; float range; };
+	float PorcKeepRadius(const CCircuitUnit* unit, const SMexPorc& porc);
 	struct SRezPorcKeepout {
 		bool enabled = true;
 		float fraction = .9f;  // of the porc's weapon range

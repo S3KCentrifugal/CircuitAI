@@ -973,10 +973,12 @@ bool IBuilderTask::DropIfPorc(CCircuitUnit* unit, const char* where)
 	if (unit->GetTask() != this) return false;  // reassigned: not ours to drop
 	if (!IsPorcBlocked(unit)) {
 		// Owner 2026-11-15: a rez bot standing inside a keep-out (porc seen
-		// since it set out) leaves the job and walks out.
+		// since it set out) leaves the job and walks out. Owner 2026-11-18: a
+		// construction vehicle or T2 con too (Stronghold: T2 cons died inside
+		// Beamer/Annihilator reach on jobs whose own spot was outside it).
 		CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 		if ((buildType == BuildType::PATROL) || (buildType == BuildType::COMBAT) || (buildType == BuildType::WAIT)
-			|| !economyMgr->IsRezPorcGuarded(unit)) return false;
+			|| !economyMgr->IsPorcGuarded(unit)) return false;
 		const AIFloat3 at = unit->GetPos(manager->GetCircuit()->GetLastFrame());
 		if (!(economyMgr->EnemyPorcClearance(unit, at) < 0.f)) return false;
 		return LeavePorc(unit, at, where);
@@ -1001,8 +1003,9 @@ bool IBuilderTask::LeavePorc(CCircuitUnit* unit, const AIFloat3& spot, const cha
 		manager->FallbackTask(unit);  // its own job: dropped, the unit patrols where it is
 	}
 	// Owner 2026-11-15: a rez bot inside a keep-out walks out of it (after the
-	// fallback, so its patrol order does not hold it there).
-	if (!unit->IsDead() && economyMgr->IsRezPorcGuarded(unit)
+	// fallback, so its patrol order does not hold it there); 2026-11-18 every
+	// porc guarded con.
+	if (!unit->IsDead() && economyMgr->IsPorcGuarded(unit)
 		&& (economyMgr->EnemyPorcClearance(unit, unit->GetPos(circuit->GetLastFrame())) < 0.f))
 	{
 		economyMgr->MoveOutOfPorc(unit);

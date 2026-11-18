@@ -451,9 +451,12 @@ void CEconomyManager::ReadConfig(float& outMinEInc)
 				if (name.isString()) conPorcSafety.units.insert(name.asString());
 			}
 		} else {
-			// T1 and T2 construction vehicles, amphibious ones included
+			// T1 and T2 construction vehicles, amphibious ones included; owner
+			// 2026-11-18 (Stronghold): every land T2 con, bots and Legion's
+			// field and heavy cons too (wrecks in enemy porc feed its reclaim and rez)
 			conPorcSafety.units = {"armcv", "corcv", "legcv", "armbeaver", "cormuskrat", "legotter",
-				"armacv", "coracv", "legacv"};
+				"armacv", "coracv", "legacv", "legafcv", "leghacv",
+				"armack", "corack", "legack", "leghack", "armfark", "corfast", "armconsul"};
 		}
 	}
 	{	// Rez bot porc keep-out (owner 2026-11-15): economy.rez_porc_keepout {enabled, range_fraction, units}
