@@ -7,6 +7,7 @@
 
 #include "unit/action/MoveAction.h"
 #include "unit/CircuitUnit.h"
+#include "spring/SpringCallback.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
