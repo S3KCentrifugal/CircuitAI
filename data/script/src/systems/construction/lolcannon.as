@@ -429,6 +429,8 @@ namespace LolCannon {
     AIFloat3 evacFrom(-1.0f, 0.0f, -1.0f);
     int evacHome = 0;                // reached home since the last summary line
     int evacTimeout = 0;
+    int evacClaimed = 0;             // taken by a new lolcannon program on the way
+    int evacLost = 0;                // died or left us on the way
 
     bool IsEvacuating(int id) { return evacIds.find(id) >= 0; }
 
@@ -490,12 +492,12 @@ namespace LolCannon {
     // Once a second (Tick): moves re-issued, arrivals and timeouts back to the pool.
     void EvacTick()
     {
-        if (evacIds.length() == 0) return;
+        if (evacIds.length() == 0 && evacHome + evacTimeout + evacClaimed + evacLost == 0) return;
         const AIFloat3 home = Home();
         const float r = Global::LolCannon::EvacHomeRadius;
         for (int i = int(evacIds.length()) - 1; i >= 0; --i) {
             CCircuitUnit@ u = ai.GetTeamUnit(evacIds[i]);
-            if (u is null || CrewKind(evacIds[i]) >= 0) { EvacForget(uint(i), false); continue; }   // gone, or a new program took it
+            if (u is null) { ++evacLost; EvacForget(uint(i), false); continue; }
             const bool arrived = MapHelpers::SqDist(u.GetPos(ai.frame), home) <= r * r;
             if (arrived || ai.frame >= evacEnd[i]) {
                 if (arrived) ++evacHome; else ++evacTimeout;
@@ -506,10 +508,11 @@ namespace LolCannon {
             if (u.task is null || u.task.IsDead() || u.task !is evacTask[i]) continue;   // re-asked: EvacWork gives it a new walk
             if (evacMove[i] < 0 || ai.frame - evacMove[i] >= 8 * SECOND) { u.CmdMoveTo(home); evacMove[i] = ai.frame; }
         }
-        if (evacIds.length() == 0 && evacHome + evacTimeout > 0) {
+        if (evacIds.length() == 0 && evacHome + evacTimeout + evacClaimed + evacLost > 0) {
             GenericHelpers::LogUtil("[LolCannon] the walk home from (" + int(evacFrom.x) + ", " + int(evacFrom.z) + ") is over: "
-                + evacHome + " reached home, " + evacTimeout + " timed out; all back in the constructor pool", 1);
-            evacHome = 0; evacTimeout = 0;
+                + evacHome + " reached home, " + evacTimeout + " timed out (both back in the constructor pool), "
+                + evacClaimed + " taken by the next cannon site, " + evacLost + " lost", 1);
+            evacHome = 0; evacTimeout = 0; evacClaimed = 0; evacLost = 0;
         }
     }
 
@@ -635,7 +638,7 @@ namespace LolCannon {
     {
         if (u is null || kind < 0 || kind > GROUND) return false;
         crewOf.set(Key(u.id), int64(kind));
-        EvacDrop(u.id);   // a new program takes it off its walk home
+        if (IsEvacuating(u.id)) { ++evacClaimed; EvacDrop(u.id); }   // a new program takes it off its walk home
         ++crewCount[kind];
         GenericHelpers::LogUtil("[LolCannon] " + (kind == STARTER ? "starter" : (kind == STORE ? "storage crew " : (kind == GROUND ? "T1 ground crew " : "air crew ")))
             + (kind == STARTER ? "" : ("" + crewCount[kind] + " of " + Wanted(kind))) + ": " + u.circuitDef.GetName() + " " + u.id + " (" + how + ")", 1);
@@ -654,7 +657,7 @@ namespace LolCannon {
     void UnitRemoved(CCircuitUnit@ unit)
     {
         if (unit is null) return;
-        EvacDrop(unit.id);
+        if (IsEvacuating(unit.id)) { ++evacLost; EvacDrop(unit.id); }
         const int kind = CrewKind(unit.id);
         if (kind < 0) return;
         lastRemovedCrew = unit.id;   // AiUnitDestroyed (Destroyed) follows in the same call when it died
