@@ -416,6 +416,8 @@ void CMilitaryManager::ReadConfig()
 	raid.min = qraid.get((unsigned)0, 3.f).asFloat();
 	raid.avg = qraid.get((unsigned)1, 5.f).asFloat();
 	minAttackers = quotas.get("attack", 8.f).asFloat();
+	// owner 2026-11-18: squads with more T3 ground members than this never regroup
+	t3NoRegroup = quotas.get("t3_no_regroup", 3).asInt();
 	const Json::Value& qthrMod = quotas["thr_mod"];
 	const Json::Value& qthrAtk = qthrMod["attack"];
 	attackMod.min = qthrAtk.get((unsigned)0, 1.f).asFloat();

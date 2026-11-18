@@ -40,6 +40,8 @@ private:
 protected:
 	ISquadTask* GetMergeTask();
 	bool IsMustRegroup();
+	// a live straggler leaves the squad and gets a new task (never Garbage'd)
+	void ReleaseStragglers(const std::vector<CCircuitUnit*>& stragglers, const char* why);
 	void ActivePath(float speed = NO_SPEED_LIMIT);
 	NSMicroPather::HitFunc GetHitTest() const;
 	void Attack(const int frame);

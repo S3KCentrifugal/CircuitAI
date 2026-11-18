@@ -121,6 +121,9 @@ void CRaidTask::Update()
 	 */
 	bool wasRegroup = (State::REGROUP == state);
 	bool mustRegroup = IsMustRegroup();
+	if (IsDead() || (leader == nullptr)) {  // a straggler left and the squad was aborted
+		return;
+	}
 	if (State::REGROUP == state) {
 		if (mustRegroup) {
 			CCircuitAI* circuit = manager->GetCircuit();

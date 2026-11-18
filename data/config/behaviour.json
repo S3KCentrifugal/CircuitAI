@@ -6,6 +6,7 @@
 	"scout": 1,  // max scouts out of units with attribute "scout"
 	"raid": [9.0, 420.0],  // [<min>, <avg>] power of raider squad
 	"attack": 60.0,  // min power of attack group
+	"t3_no_regroup": 3,  // squads with more T3 ground members than this never regroup (no Gather back to the squad centre); they keep the squad path forward
 	"thr_mod": {
 		"attack": [1.0, 1.0],  // [<min>, <max>] enemy threat modifier for target selection of attack task
 		"defence": [1.0, 1.0],  // [<min>, <max>] enemy threat modifier for group size calculation of defence task

@@ -225,6 +225,27 @@ ISquadTask* ISquadTask::GetMergeTask()
 	return nullptr;
 }
 
+void ISquadTask::ReleaseStragglers(const std::vector<CCircuitUnit*>& stragglers, const char* why)
+{
+	// Owner 2026-11-18: a live unit is never Garbage'd from a squad (that ran
+	// UnitDestroyed + UnregisterTeamUnit, so the AI never ordered it again).
+	// It leaves the squad and its manager gives it a new task.
+	CCircuitAI* circuit = manager->GetCircuit();
+	for (CCircuitUnit* unit : stragglers) {
+		if (IsDead() || (units.find(unit) == units.end()) || !circuit->IsOwnedUnit(unit)) {
+			continue;
+		}
+		const AIFloat3& pos = unit->GetPos(circuit->GetLastFrame());
+		circuit->LOG("[INVARIANT] SQUAD: %p would have dropped live %s(%i) at (%.0f, %.0f) (%s); it gets a new task",
+				(void*)this, unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), pos.x, pos.z, why);
+		TRY_UNIT(circuit, unit,
+			unit->CmdStop();
+			unit->CmdSetMoveState(CCircuitDef::MoveType::ROAM);
+		)
+		manager->AssignTask(unit);
+	}
+}
+
 bool ISquadTask::IsMustRegroup()
 {
 	if ((State::ENGAGE == state) || (updCount % 16 != 15)) {
@@ -271,7 +292,9 @@ bool ISquadTask::IsMustRegroup()
 		groupPos = bestPlace->GetLastPos();
 		groupFrame = frame;
 	} else if (frame >= groupFrame + FRAMES_PER_SEC * 60) {
-		// eliminate buggy units
+		// eliminate buggy units: owner 2026-11-18, never forget a live unit
+		// (Garbage unregistered it and it stood until killed); it gets a new task
+		std::vector<CCircuitUnit*> dropped;
 		const float sqMaxDist = SQUARE(std::max<float>(SQUARE_SIZE * 8 * validUnits.size(), highestRange));
 		for (CCircuitUnit* unit : units) {
 			if (unit->GetCircuitDef()->IsPlane()) {
@@ -282,17 +305,13 @@ bool ISquadTask::IsMustRegroup()
 			if ((sqDist > sqMaxDist) &&
 				((unit->GetTaskFrame() < groupFrame) || !terrainMgr->CanMoveToPos(unit->GetArea(), pos)))
 			{
-				TRY_UNIT(circuit, unit,
-					unit->CmdStop();
-					unit->CmdSetMoveState(CCircuitDef::MoveType::ROAM);
-				)
-				circuit->Garbage(unit, "stuck");
-//				circuit->GetBuilderManager()->EnqueueTask(TaskB::Reclaim(IBuilderTask::Priority::HIGH, unit));
+				dropped.push_back(unit);
 			}
 		}
 
 		validUnits.clear();
 		state = State::ROAM;
+		ReleaseStragglers(dropped, "regroup timeout");
 		return false;
 	}
 
@@ -315,19 +334,20 @@ bool ISquadTask::IsMustRegroup()
 		}
 	}
 	// Owner 2026-11-18 (Thors idled until nuked; "change it when we get past 3
-	// Thors"): a squad with more than 3 T3 ground members never regroups.
+	// Thors"): a squad with more than quota.t3_no_regroup (default 3) T3 ground
+	// members never regroups.
 	// REGROUP sent every member to the centre of the squad (Gather) and held it
 	// there while one member was stuck, so none went to the front. Each member
 	// keeps the squad's normal path to the front at the normal order cadence
-	// instead, and the engine's pathfinding gets them round. Squads with 3 or
-	// fewer T3 members regroup as before.
+	// instead, and the engine's pathfinding gets them round. Smaller T3 squads
+	// regroup as before.
 	int heavies = 0;
 	for (CCircuitUnit* unit : validUnits) {
 		if (unit->GetCircuitDef()->GetTechLevel() >= 3.f) {
 			++heavies;
 		}
 	}
-	if ((State::REGROUP == state) && (heavies > 3)) {
+	if ((State::REGROUP == state) && (heavies > circuit->GetMilitaryManager()->GetT3NoRegroup())) {
 		if (frame >= noRegroupLogFrame + FRAMES_PER_SEC * 30) {
 			noRegroupLogFrame = frame;
 			circuit->LOG("SQUAD: T3 squad %p leader=%s(%i) heavies=%i skips regroup: %i/%u members beyond %.0f of (%.0f, %.0f), leader at (%.0f, %.0f)",
@@ -341,12 +361,12 @@ bool ISquadTask::IsMustRegroup()
 
 	if (!wasRegroup && (State::REGROUP == state)) {
 		if (geom::is_equal_pos(prevGroupPos, groupPos)) {
-			TRY_UNIT(circuit, leader,
-				leader->CmdStop();
-				leader->CmdSetMoveState(CCircuitDef::MoveType::ROAM);
-			)
-			circuit->Garbage(leader, "stuck");
-//			circuit->GetBuilderManager()->EnqueueTask(TaskB::Reclaim(IBuilderTask::Priority::HIGH, leader));
+			std::vector<CCircuitUnit*> stuckLeader = {leader};
+			prevGroupPos = groupPos;
+			validUnits.clear();
+			state = State::ROAM;
+			ReleaseStragglers(stuckLeader, "regroup repeats at the same point");
+			return false;
 		}
 		prevGroupPos = groupPos;
 	}
