@@ -56,10 +56,15 @@ static float StaticMargin(const RangedPolicy& p) { return (!p.coordinated && p.s
 static float StaticDanger(const RangedPolicy& p) { return (!p.coordinated && p.staticMargin>=0.f) ? p.staticMargin : -1.f; }
 // Owner 2026-11-12: static_exact_reach on for this hull's decisions/path checks.
 namespace {
+// Owner 2026-11-18: kite_min_tech / kite_ignore_fast_dots share the scope.
 struct ExactStaticScope {
-    const CRangedWorld& w; bool prev;
-    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()) { w.SetExactStatic(!p.coordinated && p.staticExactReach); }
-    ~ExactStaticScope() { w.SetExactStatic(prev); }
+    const CRangedWorld& w; bool prev; float prevTech, prevDot;
+    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()) {
+        w.SetExactStatic(!p.coordinated && p.staticExactReach);
+        w.SetKiteFilter(p.coordinated ? 0.f : p.kiteMinTech,
+            (!p.coordinated && p.kiteIgnoreFastDots) ? std::max(1.f,p.spamDotSpeed) : 0.f);
+    }
+    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); }
 };
 }
 
@@ -1156,6 +1161,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
                 if(forward) { SelectTarget(unit,-1,-1,0.f); reorient=true; }
                 orientUntil=0; // A newly closing threat preempts facing recovery.
                 withdrawalUntil=frame+std::max(30,int(escapeSeconds*30.f));
+                if(trace) ai->LOG("RANGED: escape unit=%d from=%d def=%s tech=%.0f mobile=%d urgency=%.0f",id,closing->id,
+                    closing->def?closing->def->GetDef()->GetName():"dot",closing->tech,int(closing->mobile),urgency);
                 Move(unit,escape,true,true);
             }
         }

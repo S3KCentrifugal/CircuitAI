@@ -174,6 +174,15 @@ struct RangedPolicy {
     // Owner 2026-11-06 21:23Z: only a never-identified dot MOVING beyond radar
     // jiggle is spam; a still dot stays a (blind) target. Elmos per second.
     float spamDotSpeed = 15.f;
+    // Owner 2026-11-18 (Astraeus): 0 = off. A mobile contact (not a commander)
+    // below this tech level (BAR customparams.techlevel, 1 when absent) is no
+    // hazard: the hull never backs off it, and it does not block firing sites
+    // or paths, so the hull pushes forward to max range on its targets. T2/T3
+    // mobiles, structures, porc (live and ghost) and blind hits keep the kite.
+    // kite_ignore_fast_dots: a never-identified ground radar dot moving faster
+    // than spam_dot_speed is no hazard either. Individual controller only.
+    float kiteMinTech = 0.f;
+    bool kiteIgnoreFastDots = false;
     bool HasSpam() const { return spamMaxCost>0.f || !spamDefs.empty() || spamRadarDots; }
     // Owner 2026-11-02: "stay out of weapon range of ghost images that are
     // porc and wait for other units to give LOS". 0 = off. An armed structure

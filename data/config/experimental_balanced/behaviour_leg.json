@@ -907,10 +907,13 @@
 				// picked target).
 				// low_trajectory: the cannon has the switchable default and fires low, so the ridge check applies.
 				// No hold_fireline: unlike the Medusa it backs off closing threats and keeps its health retreat.
+				// owner 2026-11-18: kite_min_tech 2 + kite_ignore_fast_dots: T1 mobiles (not commanders) and fast
+				// never-identified radar dots are no hazard, so it pushes to max range on its targets and never
+				// backs off them; it still backs off T2/T3 mobiles, commanders, buildings and porc (live or ghost).
 				"fire_state": 2,   // owner 2026-11-15: fire at will always (always_fire_at_will) so under lag the engine still fires; engine autofire may take spam, picks stay off spam
 				"role": ["artillery"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"always_fire_at_will": true, "target_mode": "bombardment", "range_fraction": 0.99, "spacing": 160, "safety_margin": 96, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "low_trajectory": true, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "spam_radar_dots": true, "commander_priority": 100, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"always_fire_at_will": true, "target_mode": "bombardment", "range_fraction": 0.99, "spacing": 160, "safety_margin": 96, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "low_trajectory": true, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "spam_radar_dots": true, "commander_priority": 100, "move_floor_seconds": 1, "max_waypoints": 4, "kite_min_tech": 2, "kite_ignore_fast_dots": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

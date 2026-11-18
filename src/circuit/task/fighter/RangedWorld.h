@@ -94,7 +94,15 @@ public:
     // are unchanged. Bounds stay conservative (exact <= hazardRadius).
     void SetExactStatic(bool on) const { exactStatic=on; }
     bool ExactStatic() const { return exactStatic; }
+    // Owner 2026-11-18 (Astraeus): kite_min_tech / kite_ignore_fast_dots, set
+    // like exactStatic by the engagement of a hull with those policy keys.
+    // Ignored contacts have no hazard (no kite, no blocked site or path).
+    void SetKiteFilter(float minTech, float dotSpeed) const { kiteMinTech=minTech; kiteDotSpeed=dotSpeed; }
+    float KiteMinTech() const { return kiteMinTech; }
+    float KiteDotSpeed() const { return kiteDotSpeed; }
+    bool KiteIgnored(const Contact& c) const;
     float Hz(const Contact& c, float press) const {
+        if((kiteMinTech>0.f || kiteDotSpeed>0.f) && KiteIgnored(c)) return 0.f;
         const float h=HazardFor(c,press);
         if(!exactStatic || !c.def || (c.mobile && !c.ghost) || Pressed(c,press)) return h;
         return std::min(h,std::max(c.armed ? c.groundRange : 0.f,c.explosionRadius));
@@ -176,6 +184,7 @@ private:
     int frame = -1;
     float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f;
     mutable bool exactStatic = false;
+    mutable float kiteMinTech = 0.f, kiteDotSpeed = 0.f;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;

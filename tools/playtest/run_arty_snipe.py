@@ -66,6 +66,7 @@ def main():
     p.add_argument('--host-blind', action='store_true', help='volley count test: the host gets no global LOS, so its porc cannot see (and shoot) the artillery; count volleys from the AI log')
     p.add_argument('--stage-only', action='store_true')
     p.add_argument('--speed', type=float, default=10)
+    p.add_argument('--bonus', default='', help='handicap percent for the AI under test (standing headless rule: 50)')
     p.add_argument('--scout-withdraw', action='store_true', help='Real scout reveals the target then withdraws before artillery arrives')
     a = p.parse_args()
     os.environ["BAR_PLAYTEST_LOW_PRIORITY"] = "1"
@@ -84,6 +85,8 @@ def main():
                    '--ai-option', 'profile=experimental_balanced',
                    '--mode', 'fast', '--speed', str(a.speed), '--minutes', str(minutes), '--headless', '--lean-render',
                    '--extra-widget', str(HERE / 'widgets/arty_snipe_fixture.lua')]
+    if a.bonus:
+        stage += ['--bonus', a.bonus]
     subprocess.run(stage, cwd=ROOT, check=True)
     script = d / 'script.txt'
     s = script.read_text(encoding='utf-8')

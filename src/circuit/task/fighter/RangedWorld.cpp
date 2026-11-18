@@ -295,6 +295,16 @@ void CRangedWorld::Nearby(const AIFloat3& pos,float radius,std::vector<int>& res
         if(contacts[i].pos.SqDistance2D(pos)<=radius*radius) result.push_back(i);
     });
 }
+bool CRangedWorld::KiteIgnored(const Contact& c) const
+{
+    if(c.ghost) return false;
+    if(c.def==nullptr) {
+        // Never-identified ground dot, moving beyond radar jiggle.
+        if(!(kiteDotSpeed>0.f) || c.airDot || c.seenDef!=nullptr) return false;
+        return c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>kiteDotSpeed*kiteDotSpeed;
+    }
+    return kiteMinTech>0.f && c.mobile && c.tech<kiteMinTech && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
+}
 bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping,float press,float ghostRange) const
 {
     const AIFloat3 center=(from+to)*.5f;
