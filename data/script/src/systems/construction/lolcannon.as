@@ -6,6 +6,7 @@
 #include "../../helpers/units/unit_helpers.as"
 #include "../../helpers/math/lolcannon_math.as"
 #include "lolcannon_scouts.as"
+#include "lolcannon_clear.as"
 
 /******************************************************************************
 
@@ -187,6 +188,7 @@ namespace LolCannon {
 
     const int IDLE = 0, BUILD = 1, STORES = 2;   // STORES: the cannon stands, its storage crew finishes the strip
     const int EXTRAS = 3;            // EXTRAS: all stand; the same crews build the cover (shields, heavy porc, flak)
+    const int CLEAR = 4;             // CLEAR (owner 2026-11-18): the crews reclaim a blocked site's T1 eco/porc/AA first (lolcannon_clear.as)
     const int STARTER = 0, AIR = 1, STORE = 2, GROUND = 3;   // GROUND: the T1 ground turret crew
     const array<string> CANNONS = { "armvulc", "corbuzz", "legstarfall" };
     const array<string> T2_GROUND = { "armack", "armacv", "corack", "coracv", "legack", "legacv" };
@@ -647,7 +649,7 @@ namespace LolCannon {
 
     void UnitAdded(CCircuitUnit@ unit)
     {
-        if (!Enabled() || phase != BUILD || unit is null || unit.circuitDef is null || crewOf.exists(Key(unit.id))) return;
+        if (!Enabled() || (phase != BUILD && phase != CLEAR) || unit is null || unit.circuitDef is null || crewOf.exists(Key(unit.id))) return;
         if (LrpcBlock::IsCrew(unit.id)) return;   // the TECH heavy LRPC block's crew (owner, 2026-11-02)
         const string name = unit.circuitDef.GetName();
         const bool standIn = groundLabs.exists(Key(unit.GetProducerId())) && unit.GetProductionFrame() >= started;
@@ -1134,17 +1136,46 @@ namespace LolCannon {
         bool found = false;
         skipResource = 0; skipLayout = 0; skipFailed = 0;
         int skipPorc = 0, firstPorc = -1, skipBar = 0;
+        // owner 2026-11-18: candidates refused only for what stands on them (footprint not free, ground
+        // score short, cannon not reserving, turrets short), nearest home first, for LolCannonClear
+        const bool mayClear = LolCannonClear::MayClear();
+        array<AIFloat3> clr; array<int> clrF, clrS; array<float> clrD;
+        const int clearKeep = mayClear ? AiMax(0, Global::LolCannon::ClearProbes) : 0;
+        bool clearTried = false;   // PickClear ran this search (a free site ClearPreferElmos further from home than a blocked one)
         for (uint i = 0; i < best.length() && !found && tried < Global::LolCannon::SiteProbes; ++i) {
             if (NearFailed(best[i])) { ++skipFailed; continue; }
             if (Barred(best[i])) { ++skipBar; continue; }
             const int porcAt = PorcOver(best[i]);
             if (porcAt >= 0) { if (skipPorc++ == 0) firstPorc = porcAt; continue; }
-            if (aiTerrainMgr.IsZoneAlly(best[i]) || !GunGroundFree(gun, best[i], bestF[i])) continue;
+            if (aiTerrainMgr.IsZoneAlly(best[i])) continue;
+            const bool keepForClear = int(clr.length()) < clearKeep && !LolCannonClear::Failed(best[i]);
+            const int layoutSkips = skipLayout;
+            if (!GunGroundFree(gun, best[i], bestF[i])) {
+                if (keepForClear && skipLayout > layoutSkips) {
+                    clr.insertLast(best[i]); clrF.insertLast(bestF[i]); clrS.insertLast(bestS[i]); clrD.insertLast(bestD[i]);
+                }
+                continue;
+            }
+            // a better (nearer) site behind the front: a blocked candidate ClearPreferElmos nearer home than
+            // this free-looking one is cleared instead, when one is clearable
+            if (!clearTried && clr.length() > 0 && sqrt(bestD[i]) > sqrt(clrD[0]) + Global::LolCannon::ClearPreferElmos) {
+                clearTried = true;
+                const float within = sqrt(bestD[i]) - Global::LolCannon::ClearPreferElmos;
+                if (PickClear(gun, nano, st, clr, clrF, clrS, clrD, starts, targetWhy + backWhy, within * within)) {
+                    LolCannonClear::Log("clearing instead of the free candidate at (" + int(best[i].x) + ", " + int(best[i].z) + "), "
+                        + int(sqrt(bestD[i])) + " from home");
+                    break;
+                }
+            }
             ++scored;
             const float score = GroundScore(gun, nano, st, best[i], bestF[i]);
-            if (score < Global::LolCannon::SiteMinScore) continue;
+            if (score < Global::LolCannon::SiteMinScore) {
+                if (keepForClear) { clr.insertLast(best[i]); clrF.insertLast(bestF[i]); clrS.insertLast(bestS[i]); clrD.insertLast(bestD[i]); }
+                continue;
+            }
             ++tried;
             found = TrySite(gun, nano, st, best[i], bestF[i], layoutOn);
+            if (!found && keepForClear) { clr.insertLast(best[i]); clrF.insertLast(bestF[i]); clrS.insertLast(bestS[i]); clrD.insertLast(bestD[i]); }
             if (found) {
                 // the turret block and the storage strip stand beside the cannon: under porc they die first.
                 // owner 2026-11-15: every footprint of the layout is checked, and a site in a barred
@@ -1180,6 +1211,8 @@ namespace LolCannon {
                 + firstRefusedF + ": " + (probe >= 0 ? "reserves without the pre-check (zone, ally layout or exit lane)" : "see the RESERVE line above"), 1);
         }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
+        // owner 2026-11-18: no free site; the nearest blocked one our crews may clear starts a round
+        if (!found && clr.length() > 0 && !LolCannonClear::Active()) PickClear(gun, nano, st, clr, clrF, clrS, clrD, starts, targetWhy + backWhy, 1.0e30f);
         if (!found)
             GenericHelpers::LogUtil("[LolCannon] no site for " + gun.GetName() + " (range " + int(range) + ") just inside reach of "
                 + starts.length() + " enemy start(s): " + best.length() + " candidates, " + scored + " scored, " + tried
@@ -1187,8 +1220,150 @@ namespace LolCannon {
                 + Global::LolCannon::MinTurrets + "); skipped: " + skipResource + " on metal/geo spots, " + skipLayout
                 + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site, " + skipPorc + " under enemy porc, "
                 + skipBar + " in a barred area"
+                + (clr.length() > 0 ? "; " + clr.length() + " blocked by structures kept for clearing"
+                    + (LolCannonClear::Active() ? " (clearing " + LolCannonClear::At(LolCannonClear::site) + ")" : " (none clearable)") : "")
                 + (firstPorc >= 0 ? " (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "") + backWhy + "; retry in 30 s", 1);
         return found;
+    }
+
+    // ---------------------------------------------------------------- clearing (owner 2026-11-18)
+
+    // The site's rectangle as GroundScore measures it (the cannon, the turret block on either hand and
+    // the storage strip), + 16 elmos: half across / along the facing, and the same as world half x / z.
+    void SiteRect(CCircuitDef@ gun, CCircuitDef@ nano, CCircuitDef@ st, int f, float &out halfAcross, float &out halfAlong,
+        float &out hx, float &out hz)
+    {
+        const float gunHalf = LolCannonMath::Pitch(Layout::Across(gun, f)) * 0.5f;
+        const float blockW = float(Global::LolCannon::TurretCols) * LolCannonMath::Pitch(Layout::Across(nano, f));
+        const float stripW = float(Global::LolCannon::StorageCols) * LolCannonMath::Pitch(Layout::Across(st, f));
+        halfAcross = gunHalf + BlockGap() + AiMax(blockW, stripW) + 16.0f;
+        const float blockL = float(Global::LolCannon::TurretRows) * LolCannonMath::Pitch(Layout::Along(nano, f));
+        const float stripL = float(LolCannonMath::Rows(StoresNeeded(), Global::LolCannon::StorageCols)) * LolCannonMath::Pitch(Layout::Along(st, f));
+        halfAlong = AiMax(LolCannonMath::Pitch(Layout::Along(gun, f)), AiMax(blockL, stripL)) * 0.5f + 16.0f;
+        hx = ((f & 1) == 0) ? halfAcross : halfAlong;
+        hz = ((f & 1) == 0) ? halfAlong : halfAcross;
+    }
+
+    // From Plan, no free site: the nearest kept candidate that stands behind the front, on flat ground off
+    // metal/geo spots, with only clearable structures of ours (or, once a cannon, none of ours: the allied
+    // SMRTBARbs are asked) starts a clearing round. O(our units) once + O(cells) per candidate.
+    bool allyOnlyAsked = false;
+    bool PickClear(CCircuitDef@ gun, CCircuitDef@ nano, CCircuitDef@ st, const array<AIFloat3> &in cand, const array<int> &in candF,
+        const array<int> &in candS, const array<float> &in candD, const array<AIFloat3> &in starts, const string &in why, float maxSqD)
+    {
+        LolCannonClear::Index();
+        LolCannonClear::pFirstKept = "";
+        int front = 0, kept = 0, many = 0, ground = 0, allyOnly = 0;
+        bool allies = false;   // an allied SMRTBARb that could answer an "lc." request
+        array<Team::Roster::Entry@>@ roster = Team::Roster::All();
+        for (uint i = 0; i < roster.length() && !allies; ++i) allies = roster[i] !is null && roster[i].teamId != ai.teamId;
+        array<int> hit;
+        for (uint i = 0; i < cand.length() && candD[i] < maxSqD; ++i) {
+            const AIFloat3 p = cand[i];
+            const int f = candF[i];
+            float hA, hL, hx, hz;
+            SiteRect(gun, nano, st, f, hA, hL, hx, hz);
+            const float gA = LolCannonMath::Pitch(Layout::Across(gun, f)) * 0.5f, gL = LolCannonMath::Pitch(Layout::Along(gun, f)) * 0.5f;
+            if (aiTerrainMgr.IsResourceAreaBlocked(p, f, gA, gL)
+                || aiTerrainMgr.FlatFraction(p, f, hA, hL, Global::RoleSettings::Tech::LayoutBoxMaxSlope) < Global::LolCannon::SiteMinScore) { ++ground; continue; }
+            float metal = 0.0f;
+            const int n = LolCannonClear::Assess(p, starts[candS[i]], p, hx, hz, hit, metal);
+            if (n == -2) { ++front; continue; }
+            if (n == -1) { ++kept; continue; }
+            if (n == -3) { ++many; continue; }
+            if (n == 0) {
+                // nothing of ours there: an allied SMRTBARb's building, or a reservation, or the ground. Ask the
+                // allies once per cannon, and only where no ally layout reservation sits (reclaim cannot clear one)
+                if (!allies || allyOnlyAsked || !aiTerrainMgr.IsAlliedSpaceFree(gun, p, f)) { ++allyOnly; continue; }
+                allyOnlyAsked = true;
+            }
+            ++LolCannonClear::nPicks;
+            const string pick = "candidate " + (i + 1) + " of " + cand.length() + ", " + int(sqrt(candD[i])) + " from home, "
+                + int(LolCannonClear::FrontDepth(p, starts[candS[i]])) + " behind the front, against (" + int(starts[candS[i]].x) + ", "
+                + int(starts[candS[i]].z) + "), " + LolCannonClear::CannonsStanding() + " lolcannon(s) on our team"
+                + (i > 0 ? "; nearer: " + front + " in front, " + kept + " with a kept structure"
+                + (LolCannonClear::pFirstKept.length() > 0 ? " (" + LolCannonClear::pFirstKept + ")" : "") + ", " + many + " too many, "
+                + ground + " ground, " + allyOnly + " none of ours" : "");
+            if (LolCannonClear::Start(p, f, candS[i], starts[candS[i]], p, hx, hz, hit, pick)) return true;
+        }
+        LolCannonClear::Log("no clearable site among " + cand.length() + " blocked candidates" + (maxSqD < 1.0e29f ? " within "
+            + int(sqrt(maxSqD)) + " of home (a free one further out)" : "") + ": " + front + " in front of the front line, "
+            + kept + " with a structure we keep" + (LolCannonClear::pFirstKept.length() > 0 ? " (first: " + LolCannonClear::pFirstKept + ")" : "")
+            + ", " + many + " with too many or too dear blockers, " + ground + " on steep ground or a metal/geo spot, "
+            + allyOnly + " with nothing of ours on them");
+        return false;
+    }
+
+    // The cleared site, tried as Plan tries a candidate (FRONT: the layout on for its reservations only)
+    bool TryCleared()
+    {
+        CCircuitDef@ gun = Gun();
+        CCircuitDef@ nano = Nano();
+        CCircuitDef@ st = Store();
+        if (gun is null || nano is null || st is null) return false;
+        const AIFloat3 p = LolCannonClear::site;
+        const int f = LolCannonClear::facing;
+        const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
+        unpinnedOrders = !layoutOn;
+        if (!layoutOn && !aiTerrainMgr.SetLayoutEnabled(true)) return false;
+        refusedGun = 0; shortTurrets = 0; bestTurrets = 0;
+        bool found = TrySite(gun, nano, st, p, f, layoutOn);
+        if (found && (Barred(site) || Barred(blockCentre) || Barred(stripCentre) || LayoutPorc() >= 0)) {
+            aiTerrainMgr.ReleaseReservation(gunRes); gunRes = -1;
+            ReleaseAll(turretRes); ReleaseAll(storeRes);
+            turretRes.resize(0); storeRes.resize(0);
+            found = false;
+        }
+        if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
+        if (!found) {
+            LolCannonClear::Log("cleared site " + LolCannonClear::At(p) + " facing " + f + " refused: cannon refused " + refusedGun
+                + ", turrets short " + shortTurrets + " (best " + bestTurrets + "/" + Global::LolCannon::MinTurrets + ")");
+            return false;
+        }
+        siteTarget = LolCannonClear::target;
+        siteLevel = Level();
+        GenericHelpers::LogUtil("[LolCannon] site for " + gun.GetName() + " (range " + int(gun.GetMaxRange()) + ") at (" + int(site.x) + ", " + int(site.z)
+            + "), facing " + facing + ", " + int(site.distance2D(Home())) + " from home, cleared; " + turretPos.length() + " turrets and "
+            + storePos.length() + " " + st.GetName() + " beside it (" + storesReserved + " storage slots reserved)"
+            + (layoutOn ? " (reserved)" : " (FRONT: cannon, turret block and storage strip held, orders unpinned)") + "; against the enemy spawn at ("
+            + int(siteTarget.x) + ", " + int(siteTarget.z) + "), " + int(site.distance2D(siteTarget)) + " away", 1);
+        return true;
+    }
+
+    void BeginClear(const string &in why)
+    {
+        phase = CLEAR;
+        if (crewOf.isEmpty()) started = ai.frame;   // StarterGraceSeconds counts from the first round
+        nextCrewOrder = 0;
+        turretsOpen = true;
+        GenericHelpers::LogUtil("[LolCannon] clearing a site first (" + why + "): crews of 1 + " + Wanted(AIR) + " air + " + Wanted(STORE)
+            + " storage + " + Wanted(GROUND) + " T1 ground reclaim its blockers, then build there", 1);
+    }
+
+    // Once a second in CLEAR: the crews reclaim; when the round is over the site is tried, else the next
+    // search runs at once (a free site, or another round), else the crews go.
+    void AdvanceClear()
+    {
+        if (!LolCannonClear::Active()) {
+            ReleaseCrew("no clearing round");
+            phase = IDLE;
+            nextPlan = ai.frame + 30 * SECOND;
+            return;
+        }
+        OrderCrews();
+        LolCannonClear::Tick(crewCount[STARTER] + crewCount[AIR] + crewCount[STORE] + crewCount[GROUND]);
+        const int porc = PorcOver(LolCannonClear::site);
+        if (porc < 0 && LolCannonClear::Busy()) return;
+        LolCannonClear::End(porc >= 0 ? "enemy porc reaches it: " + aiBattle.DescribeEnemy(porc) : "blockers gone or time up");
+        const bool ok = porc < 0 && TryCleared();
+        LolCannonClear::Result(ok);
+        if (ok) { Begin(false); return; }
+        if (Plan()) { Begin(false); return; }
+        if (LolCannonClear::Active()) return;   // Plan started another round: the crews stay
+        ++fails;
+        ReleaseCrew("no lolcannon site after clearing");
+        phase = IDLE;
+        nextPlan = ai.frame + 30 * SECOND;
     }
 
     void ResetSlots()
@@ -1912,6 +2087,9 @@ namespace LolCannon {
             GenericHelpers::LogUtil("[LolCannon] site moved back from (" + int(old.x) + ", " + int(old.z) + ") to (" + int(site.x) + ", " + int(site.z)
                 + "), back level " + siteLevel + "; the crews stay", 1);
             return;
+        } else if (LolCannonClear::Active()) {
+            BeginClear("the site moved from (" + int(old.x) + ", " + int(old.z) + ")");
+            return;
         }
         if (casualty) EvacuateCrew(old);   // owner 2026-11-18: the crew of an unsafe site leaves it
         ReleaseCrew("the cannon's site moved");
@@ -1927,9 +2105,14 @@ namespace LolCannon {
     // starter and storage crew the storages.
     IUnitTask@ BuilderTask(CCircuitUnit@ u)
     {
-        if (!Enabled() || (phase != BUILD && phase != STORES && phase != EXTRAS) || u is null || u.circuitDef is null || crewOf.isEmpty()) return null;
+        if (!Enabled() || (phase != BUILD && phase != STORES && phase != EXTRAS && phase != CLEAR) || u is null || u.circuitDef is null || crewOf.isEmpty()) return null;
         const int kind = CrewKind(u.id);
         if (kind < 0) return null;
+        if (phase == CLEAR) {
+            // owner 2026-11-18: the site's blockers first (the nearest with room on its reclaim), else wait for the round
+            IUnitTask@ c = LolCannonClear::CrewTask(u);
+            return (c is null) ? Wait(3) : c;
+        }
         if (phase == EXTRAS) {
             IUnitTask@ w = ExtraWork(u);
             return (w is null) ? Wait(3) : w;   // the phase ends in FinishExtras
@@ -2164,6 +2347,8 @@ namespace LolCannon {
         }
         rebuild = false;
         fails = 0; siteLevel = 0; moveBack = false; failedSites.resize(0);
+        LolCannonClear::NewCannon();   // the next cannon gets its own clearing rounds
+        allyOnlyAsked = false;
         CountSite();
         const int stores = AiMax(CountStanding(Store(), storePos, 32.0f), storesNear);
         const int turrets = AiMax(CountStanding(Nano(), turretPos, 24.0f), nanosNear);
@@ -2805,6 +2990,7 @@ namespace LolCannon {
     {
         // owner 2026-11-11: a cannon killed while its strip or cover still went up is rebuilt at once
         if ((phase == STORES || phase == EXTRAS) && LostBeforeIdle()) return;
+        if (phase == CLEAR) { AdvanceClear(); return; }
         if (phase == BUILD) AskRestore();
         if (phase == BUILD || phase == STORES) {
             CountSite();
@@ -2841,6 +3027,7 @@ namespace LolCannon {
             nextPlan = ai.frame + 30 * SECOND;
             if (Gun() is null || Store() is null) return;
             if (!Plan()) {
+                if (LolCannonClear::Active()) { BeginClear("gates open: " + why); return; }
                 ++fails;   // BackOffAfter of these move the next search's rings further out
                 // nothing even at the last level: start over from the first rings (the
                 // ground and the layouts change as the game goes); failed sites stay avoided

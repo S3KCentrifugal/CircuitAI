@@ -66,9 +66,13 @@ namespace AllyClear {
         const int round = (f.length() >= 3) ? parseInt(f[2]) + 1 : 1;
         return IsSquadKey(key) ? T3Unstick::SquadClearable(name, round) : T3Unstick::Clearable(name, round);
     }
+    // Lolcannon site clearing (owner, 2026-11-18; lolcannon_clear.as): key "lc.<team>.<round>" from FRONT or
+    // TECH; the owner gives only what LolCannonClear::Kind allows (T1 eco without energy storage, T1/T1.5 porc and AA)
+    bool lcRequests = false;
+    bool IsLolKey(const string &in key) { return key.findFirst("lc.") == 0; }
     bool IsRequester()
     {
-        return Enabled() && (t3Requests || Global::AISettings::Role == AiRole::TECH || Global::AISettings::Role == AiRole::AIR);
+        return Enabled() && (t3Requests || lcRequests || Global::AISettings::Role == AiRole::TECH || Global::AISettings::Role == AiRole::AIR);
     }
     bool Allowed(const string &in name)
     {
@@ -102,7 +106,7 @@ namespace AllyClear {
         // An offer can arrive before UnitGiven. Admit only an eligible blocker,
         // and remember the first owned identity for the lifetime of this request.
         const string name = u.circuitDef.GetName();
-        if (!(Allowed(name) || T3Eligible(r.key, name))) return null;
+        if (IsLolKey(r.key) ? !LolCannonClear::Kind(name) : !(Allowed(name) || T3Eligible(r.key, name))) return null;
         r.received.set("" + id, @u);
         return u;
     }
@@ -114,6 +118,7 @@ namespace AllyClear {
     {
         // T3Unstick (owner, 2026-10-20): any role may ask to free a penned T3
         if (Enabled() && IsT3Key(key)) t3Requests = true;
+        if (Enabled() && IsLolKey(key)) lcRequests = true;
         if (!IsRequester()) return false;
         Req@ r = null;
         if (reqs.get(key, @r) && r !is null) {
@@ -230,7 +235,8 @@ namespace AllyClear {
             if (!Enabled() || sender == ai.teamId) return true;
             Team::Roster::Entry@ who = Team::Roster::Get(sender);
             const bool t3 = IsT3Key(f[2]);   // T3Unstick: any SMRTBARb role, and its wider list (turrets, T2 flak/arty)
-            if (who is null || (!t3 && who.role != AiRole::TECH && who.role != AiRole::AIR)) return true;
+            const bool lc = IsLolKey(f[2]);   // lolcannon site (FRONT or TECH asks): LolCannonClear::Kind only
+            if (who is null || (!t3 && !lc && who.role != AiRole::TECH && who.role != AiRole::AIR)) return true;
             if (f[2].length() == 0 || f[2].findFirst(",") >= 0) return true;   // a malformed key could not be granted back
             const float x = float(parseInt(f[3])), z = float(parseInt(f[4]));
             const float hx = float(parseInt(f[5])), hz = float(parseInt(f[6]));
@@ -243,7 +249,8 @@ namespace AllyClear {
                 if (!ai.IsOwnedUnit(u) || u.circuitDef.IsMobile()) continue;
                 const string name = u.circuitDef.GetName();
                 const bool fusion = UnitHelpers::IsAnyFusionReactor(name);
-                if (!(Allowed(name) || T3Eligible(f[2], name)) || (keepEnergy && (IsEco(name) || fusion))) continue;
+                const bool eligible = lc ? LolCannonClear::Kind(name) : (Allowed(name) || T3Eligible(f[2], name));
+                if (!eligible || (keepEnergy && (IsEco(name) || fusion))) continue;
                 if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) continue;   // never hand over what we may not reclaim ourselves
                 const AIFloat3 p = u.GetPos(ai.frame);
                 const float rx = float(u.circuitDef.GetFootprintX()) * SQUARE_SIZE;   // half the footprint, elmos

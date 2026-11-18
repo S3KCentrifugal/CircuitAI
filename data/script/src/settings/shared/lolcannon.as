@@ -238,5 +238,24 @@ namespace LolCannon {
     int ExtraRepicks = 2;
     int ExtraRepickRings = 8;
     float ExtraShieldReach = 420.0f;
+    // site clearing (owner, 2026-11-18; systems/construction/lolcannon_clear.as): with no free
+    // site, a candidate blocked only by our own T1 eco and T1/T1.5 porc and AA (TECH's weapon
+    // clusters too; never fusions, AFUS, antinukes, long-range AA, launchers, nukes, LRPC,
+    // lolcannons, factories, energy storage, T2 porc) is cleared by the crews, the allied
+    // SMRTBARbs asked for theirs, and tried again. Only while fewer than ClearMaxCannons
+    // lolcannons stand on our ally team, and only for a site behind the front line: at least
+    // ClearFrontMargin further from the enemy start it is sited against than the line drawn
+    // ClearFrontShare of the way from that start to the allied start nearest it.
+    bool ClearSites = true;
+    int ClearMaxCannons = 2;
+    float ClearFrontShare = 0.5f;
+    float ClearFrontMargin = 0.0f;
+    int ClearProbes = 24;           // blocked candidates kept per search, nearest home first
+    float ClearPreferElmos = 500.0f;   // a clearable site this much nearer home than the first free one is cleared and used instead
+    int ClearMaxBlockers = 16;      // structures of ours a site may be cleared of
+    float ClearMaxMetal = 4000.0f;  // ... and their metal at most
+    int ClearRoundSeconds = 120;    // a round's reclaims are given up after this
+    int ClearMaxRounds = 4;         // rounds per cannon
+    int ClearCrewPerBlocker = 3;    // crew members on one blocker's reclaim
 }
 }
