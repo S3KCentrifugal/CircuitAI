@@ -1251,6 +1251,7 @@ namespace LolCannon {
     bool PickClear(CCircuitDef@ gun, CCircuitDef@ nano, CCircuitDef@ st, const array<AIFloat3> &in cand, const array<int> &in candF,
         const array<int> &in candS, const array<float> &in candD, const array<AIFloat3> &in starts, const string &in why, float maxSqD)
     {
+        LolCannonClear::keepAround = doneSites;   // our finished cannons keep their turret blocks
         LolCannonClear::Index();
         LolCannonClear::pFirstKept = "";
         int front = 0, kept = 0, many = 0, ground = 0, allyOnly = 0;

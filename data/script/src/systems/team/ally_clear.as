@@ -67,7 +67,8 @@ namespace AllyClear {
         return IsSquadKey(key) ? T3Unstick::SquadClearable(name, round) : T3Unstick::Clearable(name, round);
     }
     // Lolcannon site clearing (owner, 2026-11-18; lolcannon_clear.as): key "lc.<team>.<round>" from FRONT or
-    // TECH; the owner gives only what LolCannonClear::Kind allows (T1 eco without energy storage, T1/T1.5 porc and AA)
+    // TECH; the owner gives only what LolCannonClear::KeyKind allows (T1 eco without energy storage, T1/T1.5 porc and AA;
+    // with ".d", a site well behind the front, also construction turrets and T2 pop-up porc and artillery)
     bool lcRequests = false;
     bool IsLolKey(const string &in key) { return key.findFirst("lc.") == 0; }
     bool IsRequester()
@@ -106,7 +107,7 @@ namespace AllyClear {
         // An offer can arrive before UnitGiven. Admit only an eligible blocker,
         // and remember the first owned identity for the lifetime of this request.
         const string name = u.circuitDef.GetName();
-        if (IsLolKey(r.key) ? !LolCannonClear::Kind(name) : !(Allowed(name) || T3Eligible(r.key, name))) return null;
+        if (IsLolKey(r.key) ? !LolCannonClear::KeyKind(r.key, name) : !(Allowed(name) || T3Eligible(r.key, name))) return null;
         r.received.set("" + id, @u);
         return u;
     }
@@ -249,7 +250,7 @@ namespace AllyClear {
                 if (!ai.IsOwnedUnit(u) || u.circuitDef.IsMobile()) continue;
                 const string name = u.circuitDef.GetName();
                 const bool fusion = UnitHelpers::IsAnyFusionReactor(name);
-                const bool eligible = lc ? LolCannonClear::Kind(name) : (Allowed(name) || T3Eligible(f[2], name));
+                const bool eligible = lc ? LolCannonClear::KeyKind(f[2], name) : (Allowed(name) || T3Eligible(f[2], name));
                 if (!eligible || (keepEnergy && (IsEco(name) || fusion))) continue;
                 if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) continue;   // never hand over what we may not reclaim ourselves
                 const AIFloat3 p = u.GetPos(ai.frame);

@@ -129,16 +129,33 @@ namespace LolCannonClear {
         return Global::Team::AllyClearPorc.find(n) >= 0 || Global::Team::AllyClearEco.find(n) >= 0
             || Global::LolCannon::ClearExtraKinds.find(n) >= 0;
     }
-    bool Judge(CCircuitUnit@ u, string &out why)
+    // ... and, on a site well behind the front line (ClearDeepMargin past the line), the commander group's
+    // construction turrets and T2 pop-up porc and heavy pop-up artillery (owner, 2026-11-18): Global::LolCannon::
+    // ClearDeepKinds (Pit Bull, Viper, Chimera; Rattlesnake, Persecutor, Eviscerator; T1 construction turrets)
+    bool DeepKind(const string &in n)
+    {
+        if (Critical(n).length() > 0) return false;
+        return Global::LolCannon::ClearDeepKinds.find(n) >= 0;
+    }
+    // What an "lc." request may take (ally_clear.as): Kind, and DeepKind when the key ends ".d"
+    bool KeyKind(const string &in key, const string &in n)
+    {
+        if (Kind(n)) return true;
+        return key.length() > 2 && key.substr(key.length() - 2) == ".d" && DeepKind(n);
+    }
+    // 1 clearable on any site behind the front line, 2 only on a deep one, 0 kept (why says what)
+    int Judge(CCircuitUnit@ u, string &out why)
     {
         why = "";
-        if (!ai.IsOwnedUnit(u) || u.circuitDef is null || u.circuitDef.IsMobile()) { why = "gone"; return false; }
+        if (!ai.IsOwnedUnit(u) || u.circuitDef is null || u.circuitDef.IsMobile()) { why = "gone"; return 0; }
         const string n = u.circuitDef.GetName();
         const string crit = Critical(n);
-        if (crit.length() > 0) { why = crit; return false; }
-        if (!Kind(n)) { why = "not on the list"; return false; }
-        if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) { why = "protected"; return false; }
-        return true;
+        if (crit.length() > 0) { why = crit; return 0; }
+        if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) { why = "protected"; return 0; }
+        if (Kind(n)) return 1;
+        if (DeepKind(n)) { why = "only well behind the front"; return 2; }
+        why = "not on the list";
+        return 0;
     }
 
     // Lolcannons standing on our ally team (every SMRTBARb on it, us included). O(3).
@@ -190,6 +207,8 @@ namespace LolCannonClear {
     int nPicks = 0, nRounds = 0, nCleared = 0, nBlocked = 0, nReclaimed = 0;
 
     bool Active() { return active; }
+    bool deepSite = false;           // the round's site is well behind the front: DeepKind too
+    bool Allowed(const string &in n) { return Kind(n) || (deepSite && DeepKind(n)); }
     bool Failed(const AIFloat3 &in p)
     {
         for (uint i = 0; i < failed.length(); ++i) if (p.SqDistance2D(failed[i]) < 300.0f * 300.0f) return true;
@@ -213,7 +232,7 @@ namespace LolCannonClear {
     array<CCircuitUnit@> sUnit;
     array<AIFloat3> sPos;
     array<float> sHalf, sCost;
-    array<bool> sOk;
+    array<int> sOk;                  // Judge: 1 any site, 2 deep sites only, 0 kept
     array<string> sWhy;
     dictionary grid;                 // "cx:cz" -> array<int>@
     int indexFrame = -1;
@@ -231,7 +250,7 @@ namespace LolCannonClear {
             CCircuitUnit@ u = ai.GetTeamUnit(own[i]);
             if (!ai.IsOwnedUnit(u) || u.circuitDef is null || u.circuitDef.IsMobile()) continue;
             string why;
-            const bool ok = Judge(u, why);
+            const int ok = Judge(u, why);
             const int k = int(sUnit.length());
             sUnit.insertLast(u);
             const AIFloat3 p = u.GetPos(ai.frame);
@@ -240,7 +259,7 @@ namespace LolCannonClear {
             sHalf.insertLast(h);
             sCost.insertLast(u.circuitDef.costM);
             sOk.insertLast(ok);
-            sWhy.insertLast(ok ? "" : u.circuitDef.GetName() + " " + why);
+            sWhy.insertLast(ok == 1 ? "" : u.circuitDef.GetName() + " " + why);
             const int x0 = int((p.x - h) / Cell), x1 = int((p.x + h) / Cell);
             const int z0 = int((p.z - h) / Cell), z1 = int((p.z + h) / Cell);
             for (int cx = x0; cx <= x1; ++cx) for (int cz = z0; cz <= z1; ++cz) {
@@ -250,7 +269,35 @@ namespace LolCannonClear {
                 list.insertLast(k);
             }
         }
+        // Construction turrets count only as the commander group's porc turrets: one beside our porc or pop-up
+        // artillery (within NanoPorcRadius) and not beside a factory (a factory's cluster) nor round a
+        // lolcannon this program built (its own turret block). O(nanos x structures in their cells).
+        array<int> near;
+        const float r = NanoPorcRadius;
+        for (uint k = 0; k < sUnit.length(); ++k) {
+            if (sOk[k] != 2 || !UnitHelpers::IsT1Nano(sUnit[k].circuitDef.GetName())) continue;
+            string why = "";
+            for (uint g = 0; g < keepAround.length() && why.length() == 0; ++g)
+                if (sPos[k].SqDistance2D(keepAround[g]) < 900.0f * 900.0f) why = "a lolcannon's turret block";
+            bool porc = false;
+            if (why.length() == 0) {
+                Blockers(sPos[k], r, r, near);
+                for (uint i = 0; i < near.length() && why.length() == 0; ++i) {
+                    if (!ai.IsOwnedUnit(sUnit[near[i]])) continue;
+                    const string n = sUnit[near[i]].circuitDef.GetName();
+                    if (IsFactory(n)) why = "a factory's turret";
+                    else if (Global::Team::AllyClearPorc.find(n) >= 0 || Global::LolCannon::ClearExtraKinds.find(n) >= 0
+                        || (DeepKind(n) && !UnitHelpers::IsT1Nano(n))) porc = true;
+                }
+                if (why.length() == 0 && !porc) why = "not beside our porc";
+            }
+            if (why.length() == 0) continue;
+            sOk[k] = 0;
+            sWhy[k] = sUnit[k].circuitDef.GetName() + " " + why;
+        }
     }
+    const float NanoPorcRadius = 400.0f;
+    array<AIFloat3> keepAround;      // LolCannon's finished cannons (doneSites): their turret blocks are kept
     // Our structures overlapping the rectangle (each once). O(structures in its cells).
     void Blockers(const AIFloat3 &in c, float hx, float hz, array<int>@ res)
     {
@@ -279,10 +326,12 @@ namespace LolCannonClear {
     int Assess(const AIFloat3 &in p, const AIFloat3 &in tgt, const AIFloat3 &in c, float hx, float hz, array<int>@ hit, float &out metal)
     {
         metal = 0.0f;
-        if (FrontDepth(p, tgt) < Global::LolCannon::ClearFrontMargin) return -2;
+        const float depth = FrontDepth(p, tgt);
+        if (depth < Global::LolCannon::ClearFrontMargin) return -2;
+        const bool deep = depth >= Global::LolCannon::ClearFrontMargin + Global::LolCannon::ClearDeepMargin;
         Blockers(c, hx, hz, hit);
         for (uint i = 0; i < hit.length(); ++i) {
-            if (!sOk[hit[i]]) { if (pFirstKept.length() == 0) pFirstKept = sWhy[hit[i]] + " at " + At(sPos[hit[i]]); return -1; }
+            if (sOk[hit[i]] == 0 || (sOk[hit[i]] == 2 && !deep)) { if (pFirstKept.length() == 0) pFirstKept = sWhy[hit[i]] + " at " + At(sPos[hit[i]]); return -1; }
             metal += sCost[hit[i]];
         }
         if (int(hit.length()) > Global::LolCannon::ClearMaxBlockers || metal > Global::LolCannon::ClearMaxMetal) return -3;
@@ -306,6 +355,7 @@ namespace LolCannonClear {
         const array<int> &in hit, const string &in why)
     {
         Release(false);
+        deepSite = FrontDepth(p, tgt) >= Global::LolCannon::ClearFrontMargin + Global::LolCannon::ClearDeepMargin;
         site = p; facing = f; startIndex = s; target = tgt;
         rectCentre = c; rectHX = hx; rectHZ = hz;
         const int timeout = Global::LolCannon::ClearRoundSeconds * SECOND;
@@ -317,7 +367,7 @@ namespace LolCannonClear {
             const int bid = b.id;
             const string name = b.circuitDef.GetName();
             // owner, 2026-11-18 (as T3Unstick): past TECH's bank gate, never an energy storage (Kind keeps those)
-            if (!Kind(name) || aiBuilderMgr.IsReclaimProtected(b.circuitDef)) { list += " " + name + "(kept)"; continue; }
+            if (!Allowed(name) || aiBuilderMgr.IsReclaimProtected(b.circuitDef)) { list += " " + name + "(kept)"; continue; }
             Attribute(b);   // the [RECLAIM] audit line
             IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, b, timeout));
             if (t is null || t.IsDead()) { list += " " + name + "(no task)"; continue; }
@@ -331,10 +381,10 @@ namespace LolCannonClear {
             blockerUnit.set(key, @b);
             reclaimTask.set(key, @t);
             metal += b.circuitDef.costM;
-            list += " " + name + " " + bid;
+            list += " " + name + " " + bid + (Kind(name) ? "" : "(deep)");
         }
         ++roundsThisCannon; ++nRounds;
-        allyKey = "lc." + ai.teamId + "." + nRounds;
+        allyKey = "lc." + ai.teamId + "." + nRounds + (deepSite ? ".d" : "");
         const bool asked = Team::AllyClear::Hold(allyKey, rectCentre, rectHX, rectHZ);
         if (blockers.length() == 0 && !asked) {
             failed.insertLast(site);
@@ -346,7 +396,7 @@ namespace LolCannonClear {
         lastPull = -100000;
         nextLog = ai.frame + 30 * SECOND;
         Log("round " + roundsThisCannon + " of " + Global::LolCannon::ClearMaxRounds + " at " + At(site) + " facing " + facing
-            + " (" + why + "): reclaiming " + blockers.length() + " (" + int(metal) + " M) [" + list + " ]"
+            + (deepSite ? " [deep: construction turrets, T2 pop-up porc and artillery too]" : "") + " (" + why + "): reclaiming " + blockers.length() + " (" + int(metal) + " M) [" + list + " ]"
             + (asked ? ", allied SMRTBARbs asked (" + allyKey + ")" : ""));
         return true;
     }
@@ -458,7 +508,7 @@ namespace LolCannonClear {
         const int bid = best.id, uid = u.id;
         IUnitTask@ live = null;
         if (reclaimTask.get("" + bid, @live) && Team::AllyClear::LiveReclaim(live, best)) return live;
-        if (!Kind(best.circuitDef.GetName())) return null;
+        if (!Allowed(best.circuitDef.GetName())) return null;
         Attribute(best);
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, Global::LolCannon::ClearRoundSeconds * SECOND));
         if (t is null || t.IsDead()) return null;
