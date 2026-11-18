@@ -14,6 +14,7 @@
 #include "glyphs.as"
 #include "../combat/aggression.as"
 #include "debug_strike.as"
+#include "../construction/silo_antinukes.as"
 
 /******************************************************************************
 
@@ -201,6 +202,7 @@ namespace Commands {
 
         if (cmd == "nuclear-warning" && parts.length() == 3) {
             aiBuilderMgr.SetDefenseRule(-1,"nuclear_warning",1);
+            SiloAntiNukes::Warning();   // owner 2026-11-18: launch frequency -> inferred silos
             return true;
         }
         if (cmd == "theatres") { Lanes::RequestOverlay(parts.length() > 3 && parts[3] == "refresh"); return true; }
