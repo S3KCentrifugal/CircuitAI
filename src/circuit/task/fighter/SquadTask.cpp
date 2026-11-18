@@ -17,6 +17,8 @@
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
+#include "Log.h"
+
 #include <cmath>
 
 namespace circuit {
