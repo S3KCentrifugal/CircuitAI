@@ -6,6 +6,7 @@
  */
 
 #include "task/fighter/SquadTask.h"
+#include "task/IdleTask.h"
 #include "map/InfluenceMap.h"
 #include "map/ThreatMap.h"
 #include "module/BuilderManager.h"
@@ -244,7 +245,13 @@ void ISquadTask::ReleaseStragglers(const std::vector<CCircuitUnit*>& stragglers,
 			unit->CmdStop();
 			unit->CmdSetMoveState(CCircuitDef::MoveType::ROAM);
 		)
-		manager->AssignTask(unit);
+		// Leave this squad first: AssignTask(unit) alone only takes the unit off
+		// the idle list, so it stayed in this squad's units while its new task
+		// owned (and later deleted) its travel action -> ActivePath crash.
+		manager->AssignTask(unit, manager->GetIdleTask());
+		if (circuit->IsOwnedUnit(unit) && (unit->GetTask() == manager->GetIdleTask())) {
+			manager->AssignTask(unit);
+		}
 	}
 }
 
