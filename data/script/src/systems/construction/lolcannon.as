@@ -1254,6 +1254,7 @@ namespace LolCannon {
         LolCannonClear::keepAround = doneSites;   // our finished cannons keep their turret blocks
         LolCannonClear::Index();
         LolCannonClear::pFirstKept = "";
+        LolCannonClear::pKeptShown = 0;
         int front = 0, kept = 0, many = 0, ground = 0, allyOnly = 0;
         bool allies = false;   // an allied SMRTBARb that could answer an "lc." request
         array<Team::Roster::Entry@>@ roster = Team::Roster::All();
@@ -1279,8 +1280,9 @@ namespace LolCannon {
                 allyOnlyAsked = true;
             }
             ++LolCannonClear::nPicks;
+            string how;
             const string pick = "candidate " + (i + 1) + " of " + cand.length() + ", " + int(sqrt(candD[i])) + " from home, "
-                + int(LolCannonClear::FrontDepth(p, starts[candS[i]])) + " behind the front, against (" + int(starts[candS[i]].x) + ", "
+                + int(LolCannonClear::SiteBehind(p, starts[candS[i]], how)) + " behind the front (" + how + "), against (" + int(starts[candS[i]].x) + ", "
                 + int(starts[candS[i]].z) + "), " + LolCannonClear::CannonsStanding() + " lolcannon(s) on our team"
                 + (i > 0 ? "; nearer: " + front + " in front, " + kept + " with a kept structure"
                 + (LolCannonClear::pFirstKept.length() > 0 ? " (" + LolCannonClear::pFirstKept + ")" : "") + ", " + many + " too many, "

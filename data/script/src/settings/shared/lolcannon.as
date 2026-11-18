@@ -260,9 +260,11 @@ namespace LolCannon {
     // cleared on top of Global::Team::AllyClearPorc and AllyClearEco (owner 2026-11-18: "good spots taken up by
     // LLTs, hives, amputators"): the T1 plasma batteries Gauntlet, Agitator, Amputator
     array<string> ClearExtraKinds = { "armguard", "corpun", "legcluster" };
-    // on a site well behind the front line, at least ClearDeepMargin past it (owner 2026-11-18): also the commander
+    // well behind our porc front line, at least ClearDeepMargin behind it (owner 2026-11-18): also the commander
     // group's construction turrets, T2 pop-up porc (Pit Bull, Viper, Chimera) and heavy pop-up artillery
-    // (Rattlesnake, Persecutor, Eviscerator)
+    // (Rattlesnake, Persecutor, Eviscerator). T1/T1.5 porc, AA and plasma batteries need
+    // Global::PorcFrontLine::BehindMargin (500) behind it (systems/world/porc_front_line.as); none on the line
+    // itself (the furthest-forward defences alive 2+ min) is ever cleared
     float ClearDeepMargin = 1500.0f;
     array<string> ClearDeepKinds = { "armnanotc", "cornanotc", "legnanotc", "armpb", "corvipe", "legapopupdef",
         "armamb", "cortoast", "legacluster" };

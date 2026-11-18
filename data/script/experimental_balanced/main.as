@@ -257,6 +257,7 @@ namespace Main {
         CommanderCombat::Update();
         FrontWaveEscort::Update();   // T2 tank wave escorts follow their wave (no-op without a wave)
         FrontArtySquad::Update();   // T2 artillery squads follow their lead (no-op without a squad)
+        PorcFrontLine::Tick();  // owner 2026-11-18: our porc front line for site clearing (systems/world/porc_front_line.as)
         T3Unstick::Tick();      // free T3 units penned in by our T1 porc, eco and construction turrets
 
 		if (Global::profileController !is null) {

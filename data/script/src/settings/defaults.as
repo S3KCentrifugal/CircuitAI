@@ -6,6 +6,7 @@
 #include "shared/commander.as"
 #include "shared/ally_clear.as"
 #include "shared/t3_unstick.as"
+#include "shared/porc_front_line.as"
 #include "shared/pinpointer.as"
 #include "shared/spam.as"
 #include "shared/edge_porc.as"

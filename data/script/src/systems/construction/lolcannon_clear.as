@@ -7,6 +7,7 @@
 #include "../../helpers/common/generic_helpers.as"
 #include "../../helpers/units/unit_helpers.as"
 #include "../world/lanes.as"
+#include "../world/porc_front_line.as"
 #include "../team/ally_clear.as"
 #include "../combat/t3_unstick.as"
 
@@ -27,13 +28,13 @@ is found, or the first free-looking one stands ClearPreferElmos (500) further
 from home than the nearest kept one, LolCannon::PickClear takes the first of
 them that
 
-  - stands behind the front line: at least ClearFrontMargin further from the
-    enemy start it is sited against than the line drawn ClearFrontShare (0.5)
-    of the way from that start to the allied start nearest it
-    (Lanes::AllyStarts: ours and every allied SMRTBARb's). A cannon sits just
-    inside its range (5750-6100) of an enemy FRONT spawn, so on the lobby maps
-    (front rows ~6000 apart) its sites stand a little ahead of our front row
-    and far behind the middle;
+  - stands behind the front line: our porc front line (PorcFrontLine,
+    systems/world/porc_front_line.as, shared with FRONT gantry clearing: the
+    furthest-forward point toward the enemy where our defensive buildings
+    have stood 2+ minutes, measured within 3000 of the site) at least
+    ClearFrontMargin (0) behind it; with no defensive building of ours near
+    it, the line drawn ClearFrontShare (0.5) of the way from the enemy start
+    to the allied start nearest it;
   - holds only structures of ours of the allowed kinds (Kind) inside the
     site's rectangle (the cannon, the turret block and the storage strip, both
     hands, as LolCannon::GroundScore measures it), one to ClearMaxBlockers of
@@ -45,16 +46,22 @@ and only while fewer than ClearMaxCannons lolcannons stand on our ally team
 ClearMaxRounds rounds were run for this cannon.
 
 Allowed (Kind): Global::Team::AllyClearPorc (T1 and T1.5 porc and AA: LLT,
-Beamer/HLLT, HLT, Claw/Maw/Dragon's Breath, the T1 and T1.5 AA, Hive) and
+Beamer/HLLT, HLT, Claw/Maw/Dragon's Breath, the T1 and T1.5 AA, Hive),
 Global::LolCannon::ClearExtraKinds (the T1 plasma batteries Gauntlet,
-Agitator, Amputator), whoever
-placed them (TECH's weapon clusters too: roles/tech/tech_weapons.as kill
-zones and coast), and Global::Team::AllyClearEco (wind, solar, T1 converter)
-except energy storage. Never (Critical, logged by kind): fusions and advanced
-fusions, antinukes, long-range AA, tactical and EMP launchers, nukes,
-long-range plasma, lolcannons, factories, energy storage; every other
-structure (T2 porc, heavy porc, construction turrets, mexes, radar ...) is
-not on the list and keeps the site.
+Agitator, Amputator) and Global::Team::AllyClearEco (wind, solar, T1
+converter) except energy storage; DeepKind: ClearDeepKinds (T2 pop-up porc
+Pit Bull / Viper / Chimera, heavy pop-up artillery Rattlesnake / Persecutor /
+Eviscerator, and T1 construction turrets that stand beside our porc, never
+a factory's nor a finished lolcannon's block). Whoever placed them, TECH's
+weapon clusters included (roles/tech/tech_weapons.as kill zones and coast).
+Owner, 2026-11-18: porc on the front line is never reclaimed; porc, AA and
+plasma batteries go only Global::PorcFrontLine::BehindMargin (500) or more
+behind the porc line at their own spot, the deep kinds only ClearDeepMargin
+(1500) or more behind it, and with no line known near them they stay
+(LineKeeps). Never (Critical, logged by kind): fusions and advanced fusions,
+antinukes, long-range AA, tactical and EMP launchers, nukes, long-range
+plasma, lolcannons, factories, energy storage; every other structure (heavy
+porc, T2 flak, mexes, radar ...) is not on the list and keeps the site.
 
 The round (LolCannon phase CLEAR, before BUILD): one native reclaim per
 blocker (T3Unstick's path: TaskB::Reclaim HIGH, ClearRoundSeconds),
@@ -137,11 +144,39 @@ namespace LolCannonClear {
         if (Critical(n).length() > 0) return false;
         return Global::LolCannon::ClearDeepKinds.find(n) >= 0;
     }
-    // What an "lc." request may take (ally_clear.as): Kind, and DeepKind when the key ends ".d"
-    bool KeyKind(const string &in key, const string &in n)
+    // Porc (and pop-up artillery): what the porc front line protects (PorcFrontLine)
+    bool IsPorcKind(const string &in n)
     {
-        if (Kind(n)) return true;
-        return key.length() > 2 && key.substr(key.length() - 2) == ".d" && DeepKind(n);
+        return Global::Team::AllyClearPorc.find(n) >= 0 || Global::LolCannon::ClearExtraKinds.find(n) >= 0
+            || (Global::LolCannon::ClearDeepKinds.find(n) >= 0 && !UnitHelpers::IsT1Nano(n));
+    }
+    // What an "lc." request may hand over (ally_clear.as, requester side: the kinds only)
+    bool KeyKind(const string &in key, const string &in n) { return Kind(n) || DeepKind(n); }
+
+    // Owner, 2026-11-18: "leave alive all porc on the front line, the furthest forward that defensive buildings
+    // are alive and have been alive more than 2 minutes; only reclaim the left-behind porc 500+ behind that".
+    // A building of a clearable kind at p: "" when it may go, else why it stays. Porc and pop-up artillery must be
+    // Global::PorcFrontLine::BehindMargin (500) behind our porc line there (PorcFrontLine::Behind; no line near
+    // it: kept); the deep kinds (T2 pop-up porc and artillery, construction turrets) ClearDeepMargin behind it.
+    // Eco is judged by the site alone. O(defensive buildings) per porc building asked (PorcFrontLine::LineAt).
+    string LineKeeps(const string &in n, const AIFloat3 &in p)
+    {
+        const bool deep = !Kind(n) && DeepKind(n);
+        if (!deep && !IsPorcKind(n)) return "";
+        bool known = false;
+        const float b = PorcFrontLine::Behind(p, known);
+        if (!known) return "no porc front line near it (kept)";
+        const float need = deep ? Global::LolCannon::ClearDeepMargin : Global::PorcFrontLine::BehindMargin;
+        if (b >= need) return "";
+        return (b < 0.0f ? "on the front line, " + int(-b) + " ahead of" : "front porc, " + int(b) + " behind")
+            + " the porc line (needs " + int(need) + ")";
+    }
+    // Owner side of an "lc." request (ally_clear.as): our own building u, judged against our own porc line
+    bool AllyGive(CCircuitUnit@ u)
+    {
+        if (!ai.IsOwnedUnit(u) || u.circuitDef is null) return false;
+        const string n = u.circuitDef.GetName();
+        return (Kind(n) || DeepKind(n)) && LineKeeps(n, u.GetPos(ai.frame)).length() == 0;
     }
     // 1 clearable on any site behind the front line, 2 only on a deep one, 0 kept (why says what)
     int Judge(CCircuitUnit@ u, string &out why)
@@ -153,7 +188,7 @@ namespace LolCannonClear {
         if (crit.length() > 0) { why = crit; return 0; }
         if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) { why = "protected"; return 0; }
         if (Kind(n)) return 1;
-        if (DeepKind(n)) { why = "only well behind the front"; return 2; }
+        if (DeepKind(n)) return 2;
         why = "not on the list";
         return 0;
     }
@@ -170,9 +205,16 @@ namespace LolCannonClear {
         return n;
     }
 
-    // How far behind the front line p stands, against the enemy start `target`. The front line is drawn
-    // ClearFrontShare of the way from that start to the allied start nearest it (0.5: half way between the
-    // two frontmost starts, the middle of no man's land); >= 0 is on our side of it.
+    // How far behind the front line the site p stands, against the enemy start `target`: behind our porc front
+    // line (PorcFrontLine::Behind) where one is known; else (no defensive building of ours near it) behind the
+    // line drawn ClearFrontShare of the way from that start to the allied start nearest it. >= 0: our side.
+    float SiteBehind(const AIFloat3 &in p, const AIFloat3 &in target, string &out how)
+    {
+        bool known = false;
+        const float b = PorcFrontLine::Behind(p, known);
+        how = known ? "porc line" : "no porc line near, midpoint";
+        return known ? b : FrontDepth(p, target);
+    }
     float FrontDepth(const AIFloat3 &in p, const AIFloat3 &in target)
     {
         const array<AIFloat3> allies = Lanes::AllyStarts();
@@ -207,8 +249,7 @@ namespace LolCannonClear {
     int nPicks = 0, nRounds = 0, nCleared = 0, nBlocked = 0, nReclaimed = 0;
 
     bool Active() { return active; }
-    bool deepSite = false;           // the round's site is well behind the front: DeepKind too
-    bool Allowed(const string &in n) { return Kind(n) || (deepSite && DeepKind(n)); }
+    bool Allowed(const string &in n) { return Kind(n) || DeepKind(n); }   // a round's blockers were judged by Assess
     bool Failed(const AIFloat3 &in p)
     {
         for (uint i = 0; i < failed.length(); ++i) if (p.SqDistance2D(failed[i]) < 300.0f * 300.0f) return true;
@@ -232,7 +273,8 @@ namespace LolCannonClear {
     array<CCircuitUnit@> sUnit;
     array<AIFloat3> sPos;
     array<float> sHalf, sCost;
-    array<int> sOk;                  // Judge: 1 any site, 2 deep sites only, 0 kept
+    array<int> sOk;                  // Judge: 1 Kind, 2 DeepKind, 0 kept (LineKeeps may still keep a 1 or 2)
+    array<bool> sLined;              // LineKeeps already applied
     array<string> sWhy;
     dictionary grid;                 // "cx:cz" -> array<int>@
     int indexFrame = -1;
@@ -243,7 +285,7 @@ namespace LolCannonClear {
     {
         if (indexFrame == ai.frame) return;
         indexFrame = ai.frame;
-        sUnit.resize(0); sPos.resize(0); sHalf.resize(0); sCost.resize(0); sOk.resize(0); sWhy.resize(0);
+        sUnit.resize(0); sPos.resize(0); sHalf.resize(0); sCost.resize(0); sOk.resize(0); sWhy.resize(0); sLined.resize(0);
         grid.deleteAll();
         array<Id>@ own = ai.GetOwnedUnitIds();
         for (uint i = 0; i < own.length(); ++i) {
@@ -259,6 +301,7 @@ namespace LolCannonClear {
             sHalf.insertLast(h);
             sCost.insertLast(u.circuitDef.costM);
             sOk.insertLast(ok);
+            sLined.insertLast(false);
             sWhy.insertLast(ok == 1 ? "" : u.circuitDef.GetName() + " " + why);
             const int x0 = int((p.x - h) / Cell), x1 = int((p.x + h) / Cell);
             const int z0 = int((p.z - h) / Cell), z1 = int((p.z + h) / Cell);
@@ -320,19 +363,30 @@ namespace LolCannonClear {
     // Pick counters of the last call (the "no clearable site" line)
     int pTested = 0, pFront = 0, pKept = 0, pMany = 0, pAllyOnly = 0;
     string pFirstKept = "";
+    int pKeptShown = 0;
 
     // Is candidate p (facing f, rectangle c/hx/hz, against `tgt`) clearable? -1 kept, -2 front, -3 too many,
     // -4 ally-only already asked; else the number of our blockers (0: ask the allies only). Needs Index().
     int Assess(const AIFloat3 &in p, const AIFloat3 &in tgt, const AIFloat3 &in c, float hx, float hz, array<int>@ hit, float &out metal)
     {
         metal = 0.0f;
-        const float depth = FrontDepth(p, tgt);
-        if (depth < Global::LolCannon::ClearFrontMargin) return -2;
-        const bool deep = depth >= Global::LolCannon::ClearFrontMargin + Global::LolCannon::ClearDeepMargin;
+        string how;
+        if (SiteBehind(p, tgt, how) < Global::LolCannon::ClearFrontMargin) return -2;
         Blockers(c, hx, hz, hit);
         for (uint i = 0; i < hit.length(); ++i) {
-            if (sOk[hit[i]] == 0 || (sOk[hit[i]] == 2 && !deep)) { if (pFirstKept.length() == 0) pFirstKept = sWhy[hit[i]] + " at " + At(sPos[hit[i]]); return -1; }
-            metal += sCost[hit[i]];
+            const int k = hit[i];
+            if (sOk[k] > 0 && !sLined[k]) {
+                // the porc front line, once per structure per Index (cached)
+                sLined[k] = true;
+                const string keep = LineKeeps(sUnit[k].circuitDef.GetName(), sPos[k]);
+                if (keep.length() > 0) { sOk[k] = 0; sWhy[k] = sUnit[k].circuitDef.GetName() + " " + keep; }
+            }
+            if (sOk[k] == 0) {
+                // the first kept structure of up to 4 candidates, for the "no clearable site" line
+                if (pKeptShown < 4) { pFirstKept += (pKeptShown > 0 ? "; " : "") + sWhy[k] + " at " + At(sPos[k]); ++pKeptShown; }
+                return -1;
+            }
+            metal += sCost[k];
         }
         if (int(hit.length()) > Global::LolCannon::ClearMaxBlockers || metal > Global::LolCannon::ClearMaxMetal) return -3;
         return int(hit.length());
@@ -355,7 +409,6 @@ namespace LolCannonClear {
         const array<int> &in hit, const string &in why)
     {
         Release(false);
-        deepSite = FrontDepth(p, tgt) >= Global::LolCannon::ClearFrontMargin + Global::LolCannon::ClearDeepMargin;
         site = p; facing = f; startIndex = s; target = tgt;
         rectCentre = c; rectHX = hx; rectHZ = hz;
         const int timeout = Global::LolCannon::ClearRoundSeconds * SECOND;
@@ -381,10 +434,12 @@ namespace LolCannonClear {
             blockerUnit.set(key, @b);
             reclaimTask.set(key, @t);
             metal += b.circuitDef.costM;
-            list += " " + name + " " + bid + (Kind(name) ? "" : "(deep)");
+            bool lk = false;
+            const float behind = IsPorcKind(name) || DeepKind(name) ? PorcFrontLine::Behind(blockerAt[blockerAt.length() - 1], lk) : 0.0f;
+            list += " " + name + " " + bid + (Kind(name) ? "" : "(deep)") + (lk ? "(+" + int(behind) + ")" : "");
         }
         ++roundsThisCannon; ++nRounds;
-        allyKey = "lc." + ai.teamId + "." + nRounds + (deepSite ? ".d" : "");
+        allyKey = "lc." + ai.teamId + "." + nRounds;
         const bool asked = Team::AllyClear::Hold(allyKey, rectCentre, rectHX, rectHZ);
         if (blockers.length() == 0 && !asked) {
             failed.insertLast(site);
@@ -396,7 +451,7 @@ namespace LolCannonClear {
         lastPull = -100000;
         nextLog = ai.frame + 30 * SECOND;
         Log("round " + roundsThisCannon + " of " + Global::LolCannon::ClearMaxRounds + " at " + At(site) + " facing " + facing
-            + (deepSite ? " [deep: construction turrets, T2 pop-up porc and artillery too]" : "") + " (" + why + "): reclaiming " + blockers.length() + " (" + int(metal) + " M) [" + list + " ]"
+            + " (" + why + "): reclaiming " + blockers.length() + " (" + int(metal) + " M) [" + list + " ]"
             + (asked ? ", allied SMRTBARbs asked (" + allyKey + ")" : ""));
         return true;
     }
