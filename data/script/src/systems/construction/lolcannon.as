@@ -249,6 +249,7 @@ namespace LolCannon {
     int unsafeFrom = -1;             // the frame the site was first found unsafe for an order, -1 safe
     int nextUnsafeLog = 0;
     int nextPorcCheck = 0;           // owner 2026-11-15: next height-aware enemy porc check of an unframed site
+    bool casualtyMove = false;       // owner 2026-11-18: this MoveBack follows a casualty abandon (released crews go home)
     bool forceMove = false;          // owner 2026-11-15: MoveBack may abandon an unfinished frame (porc under CannonKeepProgress, casualties)
     // owner 2026-11-15: losses round the site while the cannon goes up (Destroyed), and barred areas
     array<int> lossFrame, lossKind;  // kind: 0 crew, 1 turret, 2 storage, 3 cannon frame
@@ -408,8 +409,109 @@ namespace LolCannon {
         }
     }
 
-    // Public: a lolcannon crew member (other systems leave these alone).
-    bool IsCrew(int id) { return phase != IDLE && CrewKind(id) >= 0; }
+    // Public: a lolcannon crew member (other systems leave these alone), or one
+    // released from a site abandoned for its casualties on its way home.
+    bool IsCrew(int id) { return (phase != IDLE && CrewKind(id) >= 0) || IsEvacuating(id); }
+
+    // ---------------------------------------------------------------- the walk home (owner 2026-11-18)
+
+    // Stronghold 11-18, TECH team 8: the site (2184, 2728) was abandoned at 34:18 for its
+    // casualties, no other site was found and the 55 crew were released where they hovered:
+    // their aborted orders left them idle at the unsafe site, and native kept them there.
+    // A crew released after a casualty abandon now flies home on an explicit move (a held wait
+    // plus CmdMoveTo, re-issued every 8 s; the front_recovery.as WalkHome pattern) and goes back
+    // to the normal constructor pool once within EvacHomeRadius of home, or after EvacSeconds.
+    // A new program may claim it on the way. At most the crew count (~60) of entries.
+    array<int> evacIds;
+    array<IUnitTask@> evacTask;
+    array<int> evacEnd;
+    array<int> evacMove;
+    AIFloat3 evacFrom(-1.0f, 0.0f, -1.0f);
+    int evacHome = 0;                // reached home since the last summary line
+    int evacTimeout = 0;
+
+    bool IsEvacuating(int id) { return evacIds.find(id) >= 0; }
+
+    void EvacForget(uint i, bool abortWait)
+    {
+        IUnitTask@ w = evacTask[i];
+        evacIds.removeAt(i); evacTask.removeAt(i); evacEnd.removeAt(i); evacMove.removeAt(i);
+        if (abortWait && w !is null && !w.IsDead()) aiBuilderMgr.AbortTask(w);
+    }
+
+    void EvacDrop(int id)
+    {
+        const int i = evacIds.find(id);
+        if (i >= 0) EvacForget(uint(i), false);
+    }
+
+    IUnitTask@ EvacWalk(uint i)
+    {
+        IUnitTask@ w = aiBuilderMgr.Enqueue(TaskB::Wait(20 * SECOND));
+        if (w is null) return null;
+        @evacTask[i] = w;
+        evacMove[i] = -1;   // the move goes out on the next Tick, once the wait is its task
+        return w;
+    }
+
+    // Before ReleaseCrew, after a casualty abandon: every crew member alive leaves for home.
+    void EvacuateCrew(const AIFloat3 &in from)
+    {
+        if (!Global::LolCannon::EvacuateOnAbandon) return;
+        evacFrom = from;
+        array<string>@ keys = crewOf.getKeys();
+        int sent = 0;
+        for (uint k = 0; k < keys.length(); ++k) {
+            const int id = parseInt(keys[k]);
+            CCircuitUnit@ u = ai.GetTeamUnit(id);
+            if (u is null || u.circuitDef is null || !u.circuitDef.IsMobile() || IsEvacuating(id)) continue;
+            if (u.task !is null && !u.task.IsDead() && u.task.GetType() == int(Task::Type::PLAYER)) continue;
+            evacIds.insertLast(id); evacTask.insertLast(null);
+            evacEnd.insertLast(ai.frame + Global::LolCannon::EvacSeconds * SECOND); evacMove.insertLast(-1);
+            IUnitTask@ w = EvacWalk(evacIds.length() - 1);
+            if (w !is null) aiBuilderMgr.AssignTask(u, w);
+            ++sent;
+        }
+        GenericHelpers::LogUtil("[LolCannon] " + sent + " crew sent home from the abandoned site (" + int(from.x) + ", " + int(from.z)
+            + "); each rejoins the constructor pool within " + int(Global::LolCannon::EvacHomeRadius) + " of home or after "
+            + Global::LolCannon::EvacSeconds + " s", 1);
+    }
+
+    // Builder AiMakeTask, asked first: an evacuating crew member keeps its walk home.
+    IUnitTask@ EvacWork(CCircuitUnit@ u)
+    {
+        if (u is null || evacIds.length() == 0) return null;
+        const int i = evacIds.find(u.id);
+        if (i < 0) return null;
+        if (evacTask[i] !is null && !evacTask[i].IsDead() && u.task is evacTask[i]) return evacTask[i];
+        return EvacWalk(uint(i));   // its wait ran out (20 s) or was taken from it: a new one
+    }
+
+    // Once a second (Tick): moves re-issued, arrivals and timeouts back to the pool.
+    void EvacTick()
+    {
+        if (evacIds.length() == 0) return;
+        const AIFloat3 home = Home();
+        const float r = Global::LolCannon::EvacHomeRadius;
+        for (int i = int(evacIds.length()) - 1; i >= 0; --i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(evacIds[i]);
+            if (u is null || CrewKind(evacIds[i]) >= 0) { EvacForget(uint(i), false); continue; }   // gone, or a new program took it
+            const bool arrived = MapHelpers::SqDist(u.GetPos(ai.frame), home) <= r * r;
+            if (arrived || ai.frame >= evacEnd[i]) {
+                if (arrived) ++evacHome; else ++evacTimeout;
+                // its wait is aborted: idle, and native (or any program) hands it its next job
+                EvacForget(uint(i), u.task is evacTask[i]);
+                continue;
+            }
+            if (u.task is null || u.task.IsDead() || u.task !is evacTask[i]) continue;   // re-asked: EvacWork gives it a new walk
+            if (evacMove[i] < 0 || ai.frame - evacMove[i] >= 8 * SECOND) { u.CmdMoveTo(home); evacMove[i] = ai.frame; }
+        }
+        if (evacIds.length() == 0 && evacHome + evacTimeout > 0) {
+            GenericHelpers::LogUtil("[LolCannon] the walk home from (" + int(evacFrom.x) + ", " + int(evacFrom.z) + ") is over: "
+                + evacHome + " reached home, " + evacTimeout + " timed out; all back in the constructor pool", 1);
+            evacHome = 0; evacTimeout = 0;
+        }
+    }
 
     // The starter taken off its cannon order by another system (c18e812e test:
     // FRONT's mex upgrades pulled it as a "helper" of the shared order, for up to
@@ -533,6 +635,7 @@ namespace LolCannon {
     {
         if (u is null || kind < 0 || kind > GROUND) return false;
         crewOf.set(Key(u.id), int64(kind));
+        EvacDrop(u.id);   // a new program takes it off its walk home
         ++crewCount[kind];
         GenericHelpers::LogUtil("[LolCannon] " + (kind == STARTER ? "starter" : (kind == STORE ? "storage crew " : (kind == GROUND ? "T1 ground crew " : "air crew ")))
             + (kind == STARTER ? "" : ("" + crewCount[kind] + " of " + Wanted(kind))) + ": " + u.circuitDef.GetName() + " " + u.id + " (" + how + ")", 1);
@@ -551,6 +654,7 @@ namespace LolCannon {
     void UnitRemoved(CCircuitUnit@ unit)
     {
         if (unit is null) return;
+        EvacDrop(unit.id);
         const int kind = CrewKind(unit.id);
         if (kind < 0) return;
         lastRemovedCrew = unit.id;   // AiUnitDestroyed (Destroyed) follows in the same call when it died
@@ -1768,6 +1872,8 @@ namespace LolCannon {
         moveBack = false;
         const bool force = forceMove;
         forceMove = false;
+        const bool casualty = casualtyMove;
+        casualtyMove = false;
         // never abandon a frame already associated with this project, except (owner 2026-11-15)
         // one under enemy porc below CannonKeepProgress, or a site losing its crews (forceMove)
         if (!force && ProjectGun() !is null) return;
@@ -1804,6 +1910,7 @@ namespace LolCannon {
                 + "), back level " + siteLevel + "; the crews stay", 1);
             return;
         }
+        if (casualty) EvacuateCrew(old);   // owner 2026-11-18: the crew of an unsafe site leaves it
         ReleaseCrew("the cannon's site moved");
         phase = IDLE;
         nextPlan = ai.frame + 30 * SECOND;
@@ -2687,6 +2794,7 @@ namespace LolCannon {
         lossFrame.resize(0); lossKind.resize(0); lossPos.resize(0);
         moveBack = true;
         forceMove = true;
+        casualtyMove = true;
         return true;
     }
 
@@ -2803,6 +2911,7 @@ namespace LolCannon {
         for (int i = int(mine.length()) - 1; i >= 0; --i)
             if (mine[i] is null || mine[i].IsDead()) mine.removeAt(i);
         if (RoleMay()) Advance();
+        EvacTick();
         if (watchIds.length() > 0) WatchFirstTargets();
         ScoutAreas();
         LolCannonScouts::Tick();

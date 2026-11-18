@@ -79,6 +79,11 @@ namespace LolCannon {
     int CasualtyMinTurretLosses = 2;
     int SiteBarSeconds = 90;
     float SiteBarRadius = 1500.0f;
+    // owner 2026-11-18: when an abandoned site's crews are released (no new site found), each
+    // flies home and rejoins the constructor pool within EvacHomeRadius of home or after EvacSeconds
+    bool EvacuateOnAbandon = true;
+    float EvacHomeRadius = 1200.0f;
+    int EvacSeconds = 90;
     // further back (owner 2026-10-27): every BackOffAfter failures for one cannon (a site
     // search that found nothing, or a cannon order that came to nothing) move the rings
     // SiteBackStep further out from the enemy start, past the cannon's reach if need be,

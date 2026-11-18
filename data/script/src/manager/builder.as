@@ -2005,6 +2005,8 @@ namespace Builder {
 		if (Team::Ferry::IsGift(u.id)) return Team::Ferry::GiftTask(u);
 		if (Team::Recovery::IsGift(u.id))
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
+		// owner, 2026-11-18: crew released from a lolcannon site abandoned for its casualties fly home first
+		{ IUnitTask@ ev = LolCannon::EvacWork(u); if (ev !is null) return ev; }
 		// owner, 2026-11-15: antinukes against scouted enemy silos come first (silo_antinukes.as). Played (v5):
 		// asked from Front_BuilderAiMakeTask they came after the seat work, mex upgraders and radars, so
 		// FRONT's T2 constructors never reached them and recruits were taken back.
