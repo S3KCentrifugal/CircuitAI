@@ -1171,6 +1171,13 @@ namespace UnitHelpers {
         return ids;
     }
 
+    // Fusion reactors of all three factions, land and naval (not the advanced ones)
+    bool IsAnyFusionReactor(const string &in name)
+    {
+        return name == "armfus" || name == "corfus" || name == "legfus"
+            || name == "armuwfus" || name == "coruwfus" || name == "leganavalfusion";
+    }
+
     array<string> GetAllAdvancedFusionReactors() {
         array<string> ids;
         ids = { "armafus", "corafus", "legafus" };

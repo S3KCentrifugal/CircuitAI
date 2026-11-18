@@ -34,4 +34,19 @@ namespace Global { namespace T3Unstick {
     // penning a T3 is reclaimed like T1 eco; its spot is free for a T2 mex.
     array<string> MexClear = {
         "armmex", "cormex", "legmex", "armamex" };
+    // Wider list (owner, 2026-11-18, after the Nuclear Winter Thors): own and allied, every round.
+    array<string> IntelClear = {          // T2 radars and T2 jammers
+        "armarad", "corarad", "legarad", "armveil", "corshroud", "legajam" };
+    array<string> ConverterClear = {      // T2 converters, land and naval
+        "armmmkr", "cormmkr", "legadveconv", "armuwmmm", "coruwmmm" };
+    array<string> WallClear = {           // dragon's teeth and fortification walls, land and floating
+        "armdrag", "cordrag", "legdrag", "armfdrag", "corfdrag", "legfdrag", "armfort", "corfort", "legforti" };
+    array<string> StorageClear = {        // metal storage (energy storage stays protected for TECH, D-290)
+        "armmstor", "cormstor", "legmstor", "armuwms", "coruwms" };
+    // From round PopupRound: T2 pop-up porc (Pit Bull, Scorpion, Chimera)
+    int PopupRound = 2;
+    array<string> PopupClear = { "armpb", "corvipe", "legapopupdef" };
+    // From round FusionRound: fusion reactors, all factions, land and naval (never the advanced fusion).
+    // TECH's T3 reclaim squad (tech_air_squads.as) takes them from round 1.
+    int FusionRound = 3;
 } }

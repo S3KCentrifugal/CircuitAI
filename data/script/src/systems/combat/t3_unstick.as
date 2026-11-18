@@ -61,6 +61,7 @@ namespace T3Unstick {
         int anchorFrame = 0;
         AIFloat3 roundPos;       // where the last round started
         int rounds = 0;
+        int squadRounds = 0;     // rounds while TECH's T3 reclaim squad is on (TechAirSquads)
         int nextRound = 0;
         int roundStart = -1;     // >= 0 while a round runs
         int lastPull = -100000;
@@ -114,6 +115,9 @@ namespace T3Unstick {
     dictionary blockerUnit;      // active blocker id -> current CCircuitUnit@
     dictionary blockerUsers;     // matching active rounds per current identity
     array<int> activeBlockers;   // every blocker of every running round
+    // Blockers only TECH's T3 reclaim squad may take (owner, 2026-11-18; tech_air_squads.as): id -> 2, a
+    // fusion reactor before FusionRound. Normal constructors and construction turrets skip it.
+    dictionary squadOnly;
     int lastTick = -100000;
 
     bool Enabled() { return Global::T3Unstick::Enabled; }
@@ -136,6 +140,7 @@ namespace T3Unstick {
             reclaimTask.delete(key);
             blockerUnit.delete(key);
             blockerUsers.delete(key);
+            squadOnly.delete(key);
         }
         h.blockers.resize(0);
         h.blockerAt.resize(0);
@@ -199,12 +204,23 @@ namespace T3Unstick {
             + " reclaimed; aborting that and clearing round it instead", 1);
     }
 
-    // A blocker is one of the kinds the owner allows us to clear
-    bool Clearable(const string &in name)
+    // A blocker is one of the kinds the owner allows us to clear in this round (1-based; later rounds
+    // add pop-up porc and fusions). O(list length), called once per structure in the ring.
+    bool Clearable(const string &in name, int round = 1)
     {
-        return Global::Team::AllyClearPorc.find(name) >= 0 || Global::Team::AllyClearEco.find(name) >= 0
+        if (Global::Team::AllyClearPorc.find(name) >= 0 || Global::Team::AllyClearEco.find(name) >= 0
             || UnitHelpers::IsT1Nano(name) || Global::T3Unstick::ExtraClear.find(name) >= 0
-            || Global::T3Unstick::MexClear.find(name) >= 0;
+            || Global::T3Unstick::MexClear.find(name) >= 0 || Global::T3Unstick::IntelClear.find(name) >= 0
+            || Global::T3Unstick::ConverterClear.find(name) >= 0 || Global::T3Unstick::WallClear.find(name) >= 0
+            || Global::T3Unstick::StorageClear.find(name) >= 0) return true;
+        if (round >= Global::T3Unstick::PopupRound && Global::T3Unstick::PopupClear.find(name) >= 0) return true;
+        return round >= Global::T3Unstick::FusionRound && UnitHelpers::IsAnyFusionReactor(name);
+    }
+
+    // ... and what TECH's T3 reclaim squad may take on top (owner, 2026-11-18): fusion reactors, all factions
+    bool SquadClearable(const string &in name, int round = 1)
+    {
+        return Clearable(name, round) || UnitHelpers::IsAnyFusionReactor(name);
     }
 
     float HalfSize(const CCircuitDef@ d)   // half the footprint, elmos (as WallHelpers)
@@ -216,9 +232,13 @@ namespace T3Unstick {
     void StartRound(Hull@ h, CCircuitUnit@ u, const AIFloat3 &in pos)
     {
         if (h is null || !ai.IsOwnedUnit(u) || h.unit !is u) return;
-        const float ring = Global::T3Unstick::PenGap * float(h.rounds + 1);
+        // squad rounds past MaxRounds keep the widest normal ring
+        const float ring = Global::T3Unstick::PenGap * float(AiMin(h.rounds + 1, AiMax(1, Global::T3Unstick::MaxRounds)));
         const float self = HalfSize(u.circuitDef);
         const bool tech = Global::AISettings::Role == AiRole::TECH;
+        // owner, 2026-11-18: TECH maxed on metal with AI-to-AI donations paused calls the T3 reclaim squad;
+        // while it is on, its wider list and no bank gate (tech_air_squads.as)
+        const bool squad = tech && TechAirSquads::StuckT3(u);
         ReleaseBlockers(h);
         string kept = "", cleared = "";
         array<Id>@ own = ai.GetOwnedUnitIds();
@@ -229,9 +249,20 @@ namespace T3Unstick {
             const float reach = self + HalfSize(b.circuitDef) + ring;
             if (abs(p.x - pos.x) > reach || abs(p.z - pos.z) > reach) continue;
             const string name = b.circuitDef.GetName();
-            if (!Clearable(name) || aiBuilderMgr.IsReclaimProtected(b.circuitDef) || (tech && !TechReclaim::Allowed(b, "t3unstick"))) {
+            int only = 0;   // 0 anyone, 2 the squad only (a fusion before FusionRound)
+            const int round = h.rounds + 1;
+            if (aiBuilderMgr.IsReclaimProtected(b.circuitDef) || !(Clearable(name, round) || (squad && SquadClearable(name, round)))) {
                 kept += " " + name;
                 continue;
+            }
+            if (!Clearable(name, round)) only = 2;
+            // Owner, 2026-11-18: a stuck T3's reclaims ignore TECH's bank gate (the refund may overflow);
+            // energy storage is still never reclaimed. An ungated reclaim is not tracked, so the gate's
+            // pause (TechReclaim::Tick) cannot abort it.
+            bool gated = false;
+            if (tech && !TechReclaim::Allowed(b, "t3unstick")) {
+                if (TechReclaim::IsEnergyStorage(b)) { kept += " " + name; continue; }
+                gated = true;
             }
             IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, b, int(Global::T3Unstick::ReclaimSeconds) * SECOND));
             if (!ai.IsOwnedUnit(u) || h.unit !is u) {
@@ -240,9 +271,10 @@ namespace T3Unstick {
                 return;
             }
             if (t is null || t.IsDead() || !ai.IsOwnedUnit(b)) { kept += " " + name; continue; }
-            if (tech) TechReclaim::Track(b, t, "t3unstick");
+            if (tech && !gated) TechReclaim::Track(b, t, "t3unstick");
             reclaimTask.set("" + b.id, @t);
             const string key = "" + b.id;
+            if (only > 0) squadOnly.set(key, only);
             CCircuitUnit@ previousBlocker = null;
             int users = 0;
             if (blockerUnit.get(key, @previousBlocker) && previousBlocker is b) blockerUsers.get(key, users);
@@ -253,16 +285,19 @@ namespace T3Unstick {
             h.blockerAt.insertLast(p);
             h.blockerHalf.insertLast(HalfSize(b.circuitDef));
             if (activeBlockers.find(b.id) < 0) activeBlockers.insertLast(b.id);
-            cleared += " " + name;
+            cleared += " " + name + (only == 2 ? "(squad)" : "") + (gated ? "(bank full)" : "");
         }
-        h.allyKey = "t3." + u.id + "." + h.rounds;
+        // ".s": the allied SMRTBARbs give fusion reactors too (AllyClear::IsSquadKey)
+        h.allyKey = "t3." + u.id + "." + h.rounds + (squad ? ".s" : "");
         const bool asked = Team::AllyClear::Hold(h.allyKey, pos, self + ring, self + ring);
         h.rounds++;
+        if (squad) h.squadRounds++;
         h.roundStart = ai.frame;
         h.roundPos = pos;
         h.lastPull = -100000;
         GenericHelpers::LogUtil("[T3Unstick] " + u.circuitDef.GetName() + " " + u.id + " stuck at (" + int(pos.x) + "," + int(pos.z)
             + ")" + (h.signalled ? " (engine gave up on it)" : " for " + ((ai.frame - h.anchorFrame) / SECOND) + " s")
+            + (squad ? " [T3 squad " + TechAirSquads::T3SquadSize() + "]" : "")
             + ", round " + h.rounds + " ring " + int(ring) + ": reclaiming [" + cleared + " ] kept [" + kept + " ]"
             + (asked ? ", allied SMRTBARbs asked" : ""), 1);
         h.signalled = false;
@@ -277,7 +312,9 @@ namespace T3Unstick {
             CCircuitUnit@ b = null;
             if (!h.blockerUnits.get("" + h.blockers[i], @b) || !ai.IsOwnedUnit(b)) continue;
             any = true;
-            if (ai.frame - h.lastPull >= 10 * SECOND)
+            int only = 0;
+            squadOnly.get("" + h.blockers[i], only);
+            if (only != 2 && ai.frame - h.lastPull >= 10 * SECOND)
                 aiBuilderMgr.TurretsOnReclaim(h.blockers[i], Global::T3Unstick::TurretMargin, true, false);
         }
         if (any && ai.frame - h.lastPull >= 10 * SECOND) h.lastPull = ai.frame;
@@ -346,13 +383,18 @@ namespace T3Unstick {
                 continue;
             }
             if (pos.SqDistance2D(h.anchor) > stuckSq) {
-                if (h.rounds > 0 && pos.SqDistance2D(h.roundPos) > 16.0f * stuckSq) h.rounds = 0;
+                if (h.rounds > 0 && pos.SqDistance2D(h.roundPos) > 16.0f * stuckSq) { h.rounds = 0; h.squadRounds = 0; }
                 h.anchor = pos;
                 h.anchorFrame = ai.frame;
                 continue;
             }
             if (ai.frame < h.added + int(Global::T3Unstick::GraceSeconds) * SECOND) { h.anchorFrame = ai.frame; continue; }
-            if (h.rounds >= Global::T3Unstick::MaxRounds || ai.frame < h.nextRound) continue;
+            if (ai.frame < h.nextRound) continue;
+            if (h.rounds >= Global::T3Unstick::MaxRounds) {
+                // the T3 reclaim squad keeps trying (owner, 2026-11-18): it may still be on its way or being built
+                if (Global::AISettings::Role != AiRole::TECH || !TechAirSquads::StuckT3(u)
+                    || h.squadRounds >= Global::RoleSettings::Tech::T3SquadMaxRounds) continue;
+            }
             if (!h.signalled) {
                 const bool fighting = u.task !is null && u.task.GetType() == Task::Type::FIGHTER;
                 if (!fighting) { h.anchorFrame = ai.frame; continue; }
@@ -376,6 +418,7 @@ namespace T3Unstick {
         for (uint i = 0; i < activeBlockers.length(); ++i) {
             CCircuitUnit@ b = null;
             if (!blockerUnit.get("" + activeBlockers[i], @b) || !ai.IsOwnedUnit(b) || b is u) continue;
+            if (squadOnly.exists("" + b.id)) continue;   // TECH's T3 reclaim squad only (tech_air_squads.as)
             const AIFloat3 bpos = b.GetPos(ai.frame);
             const float sq = upos.SqDistance2D(bpos);
             if (sq > bestSq) continue;
@@ -389,14 +432,53 @@ namespace T3Unstick {
         if (best is null) return null;
         IUnitTask@ live = null;
         if (reclaimTask.get("" + best.id, @live) && Team::AllyClear::LiveReclaim(live, best)) return live;
-        if (Global::AISettings::Role == AiRole::TECH && !TechReclaim::Allowed(best, "t3unstick")) return null;
+        // owner, 2026-11-18: past TECH's bank gate (energy storage excepted); tracked only when the gate admits it
+        bool track = false;
+        if (Global::AISettings::Role == AiRole::TECH) {
+            if (TechReclaim::IsEnergyStorage(best)) return null;
+            track = TechReclaim::Allowed(best, "t3unstick");
+        }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, int(Global::T3Unstick::ReclaimSeconds) * SECOND));
         if (t is null || t.IsDead()) return null;
         if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }   // the blocker went (or was given away) meanwhile
-        if (Global::AISettings::Role == AiRole::TECH) TechReclaim::Track(best, t, "t3unstick");
+        if (track) TechReclaim::Track(best, t, "t3unstick");
         reclaimTask.set("" + best.id, @t);
         blockerUnit.set("" + best.id, @best);
         // the task is recorded either way: if this builder went, others join it
         return ai.IsOwnedUnit(u) ? t : null;
+    }
+    // TECH's T3 reclaim squad member (tech_air_squads.as): the nearest running blocker with fewer than
+    // T3SquadPerBlocker on its reclaim, any kind (squad-only included), past TECH's bank gate; then a
+    // building an allied SMRTBARb gave us for a T3. Null: nothing to reclaim.
+    IUnitTask@ SquadTask(CCircuitUnit@ u)
+    {
+        if (!Enabled() || !ai.IsOwnedUnit(u)) return null;
+        const int cap = AiMax(1, Global::RoleSettings::Tech::T3SquadPerBlocker);
+        const AIFloat3 upos = u.GetPos(ai.frame);
+        CCircuitUnit@ best = null;
+        float bestSq = 1.0e30f;
+        for (uint i = 0; i < activeBlockers.length(); ++i) {
+            CCircuitUnit@ b = null;
+            if (!blockerUnit.get("" + activeBlockers[i], @b) || !ai.IsOwnedUnit(b) || b is u) continue;
+            IUnitTask@ live = null;
+            if (reclaimTask.get("" + b.id, @live) && Team::AllyClear::LiveReclaim(live, b)) {
+                if (live is u.task) return live;   // already on it
+                if (int(live.GetUnits().length()) >= cap) continue;
+            }
+            const float sq = upos.SqDistance2D(b.GetPos(ai.frame));
+            if (sq < bestSq) { bestSq = sq; @best = b; }
+        }
+        if (best !is null) {
+            IUnitTask@ live = null;
+            if (reclaimTask.get("" + best.id, @live) && Team::AllyClear::LiveReclaim(live, best)) return live;
+            if (aiBuilderMgr.IsReclaimProtected(best.circuitDef) || TechReclaim::IsEnergyStorage(best)) return null;
+            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, int(Global::T3Unstick::ReclaimSeconds) * SECOND));
+            if (t is null || t.IsDead()) return null;
+            if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }
+            reclaimTask.set("" + best.id, @t);
+            blockerUnit.set("" + best.id, @best);
+            return ai.IsOwnedUnit(u) ? t : null;
+        }
+        return Team::AllyClear::SquadTask(u, cap);
     }
 }  // namespace T3Unstick

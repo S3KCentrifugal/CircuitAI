@@ -55,6 +55,17 @@ namespace AllyClear {
     bool Enabled() { return Global::Team::AllyClearEnabled; }
     bool t3Requests = false;  // T3Unstick asked from this AI (any role)
     bool IsT3Key(const string &in key) { return key.findFirst("t3.") == 0; }
+    // TECH's T3 reclaim squad is on for this request (owner, 2026-11-18; tech_air_squads.as): fusion
+    // reactors are given too (T3Unstick::SquadClearable), and only that squad reclaims them
+    bool IsSquadKey(const string &in key) { return IsT3Key(key) && key.length() > 2 && key.substr(key.length() - 2) == ".s"; }
+    // key "t3.<unit>.<round, 0-based>[.s]": the round's wider list applies to allied buildings too
+    bool T3Eligible(const string &in key, const string &in name)
+    {
+        if (!IsT3Key(key)) return false;
+        array<string>@ f = key.split(".");
+        const int round = (f.length() >= 3) ? parseInt(f[2]) + 1 : 1;
+        return IsSquadKey(key) ? T3Unstick::SquadClearable(name, round) : T3Unstick::Clearable(name, round);
+    }
     bool IsRequester()
     {
         return Enabled() && (t3Requests || Global::AISettings::Role == AiRole::TECH || Global::AISettings::Role == AiRole::AIR);
@@ -91,7 +102,7 @@ namespace AllyClear {
         // An offer can arrive before UnitGiven. Admit only an eligible blocker,
         // and remember the first owned identity for the lifetime of this request.
         const string name = u.circuitDef.GetName();
-        if (!(Allowed(name) || (IsT3Key(r.key) && T3Unstick::Clearable(name)))) return null;
+        if (!(Allowed(name) || T3Eligible(r.key, name))) return null;
         r.received.set("" + id, @u);
         return u;
     }
@@ -154,6 +165,8 @@ namespace AllyClear {
             for (uint i = 0; i < r.units.length(); ++i) {
                 CCircuitUnit@ g = Received(r, r.units[i]);
                 if (g is null || g is u) continue;
+                if (UnitHelpers::IsAnyFusionReactor(g.circuitDef.GetName()) && IsSquadKey(keys[k])
+                    && !T3Eligible(keys[k].substr(0, keys[k].length() - 2), g.circuitDef.GetName())) continue;   // squad-only fusion (SquadTask)
                 IUnitTask@ live = null;
                 if (reclaimTask.get("" + g.id, @live) && LiveReclaim(live, g)) {
                     if (live.GetUnits().length() < 2) return live;
@@ -170,6 +183,39 @@ namespace AllyClear {
         if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }   // given back or gone meanwhile
         reclaimTask.set("" + best.id, @t);
         // recorded either way: if this builder went, others join the task
+        return ai.IsOwnedUnit(u) ? t : null;
+    }
+
+    // TECH's T3 reclaim squad (T3Unstick::SquadTask): the nearest building an ally gave us for a T3,
+    // fusions included, at most `cap` on one. O(requests x given).
+    IUnitTask@ SquadTask(CCircuitUnit@ u, int cap)
+    {
+        if (!ai.IsOwnedUnit(u) || reqs.getSize() == 0) return null;
+        CCircuitUnit@ best = null;
+        float bestSq = 1.0e30f;
+        array<string>@ keys = reqs.getKeys();
+        for (uint k = 0; k < keys.length(); ++k) {
+            Req@ r = null;
+            if (!IsT3Key(keys[k]) || !reqs.get(keys[k], @r) || r is null) continue;
+            for (uint i = 0; i < r.units.length(); ++i) {
+                CCircuitUnit@ g = Received(r, r.units[i]);
+                if (g is null || g is u) continue;
+                IUnitTask@ live = null;
+                if (reclaimTask.get("" + g.id, @live) && LiveReclaim(live, g)) {
+                    if (live is u.task) return live;
+                    if (int(live.GetUnits().length()) >= cap) continue;
+                }
+                const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), g.GetPos(ai.frame));
+                if (sq < bestSq) { bestSq = sq; @best = g; }
+            }
+        }
+        if (best is null) return null;
+        IUnitTask@ live = null;
+        if (reclaimTask.get("" + best.id, @live) && LiveReclaim(live, best)) return live;
+        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, 60 * SECOND));
+        if (t is null || t.IsDead()) return null;
+        if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }
+        reclaimTask.set("" + best.id, @t);
         return ai.IsOwnedUnit(u) ? t : null;
     }
 
@@ -196,7 +242,8 @@ namespace AllyClear {
                 CCircuitUnit@ u = ai.GetTeamUnit(own[i]);
                 if (!ai.IsOwnedUnit(u) || u.circuitDef.IsMobile()) continue;
                 const string name = u.circuitDef.GetName();
-                if (!(Allowed(name) || (t3 && T3Unstick::Clearable(name))) || (keepEnergy && IsEco(name))) continue;
+                const bool fusion = UnitHelpers::IsAnyFusionReactor(name);
+                if (!(Allowed(name) || T3Eligible(f[2], name)) || (keepEnergy && (IsEco(name) || fusion))) continue;
                 if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) continue;   // never hand over what we may not reclaim ourselves
                 const AIFloat3 p = u.GetPos(ai.frame);
                 const float rx = float(u.circuitDef.GetFootprintX()) * SQUARE_SIZE;   // half the footprint, elmos

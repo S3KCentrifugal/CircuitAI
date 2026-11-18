@@ -23,6 +23,7 @@
 #include "../systems/construction/idle_reclaim.as"
 #include "../systems/construction/lolcannon.as"
 #include "../systems/construction/early_mex_upgraders.as"
+#include "../systems/construction/tech_air_squads.as"
 #include "../systems/construction/lrpc_block.as"
 
 namespace Builder {
@@ -2017,6 +2018,14 @@ namespace Builder {
 			if (keepUp) return null;
 			if (up !is null) return up;
 		}
+        // owner, 2026-11-18: TECH maxed on metal with AI-to-AI donations paused: the T3 reclaim squad and the
+        // gantry guard (tech_air_squads.as); their members never reach the rows below
+        if (Global::AISettings::Role == AiRole::TECH) {
+            bool keepSquad = false;
+            IUnitTask@ sq = TechAirSquads::Work(u, keepSquad);
+            if (keepSquad) return u.task;   // null would let native swap the member off its task
+            if (sq !is null) return sq;
+        }
         // owner, 2026-11-17: a due gantry keeps one T2 land constructor of its own (tech_gantry.as TechGantryCrew);
         // played Plains and Passes 11-17, every T2 constructor was held by a row above gantry.scale for 7+ min
         if (Global::AISettings::Role == AiRole::TECH) {
@@ -2897,6 +2906,7 @@ namespace Builder {
 		LolCannon::UnitRemoved(unit);
 		LrpcBlock::UnitRemoved(unit);
 		EarlyMexUpgraders::UnitRemoved(unit);
+		TechAirSquads::UnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
         CommanderGroup::OnRemoved(unit);
 

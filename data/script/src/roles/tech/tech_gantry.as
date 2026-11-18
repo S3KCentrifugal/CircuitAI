@@ -1034,7 +1034,7 @@ namespace TechGantryCrew {
     // Held by a program that owns it outright (another crew, a gift, a dedicated job)
     bool OwnedElsewhere(CCircuitUnit@ u) {
         const int id = u.id;
-        return EarlyMexUpgraders::IsClaimed(id) || LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id)
+        return EarlyMexUpgraders::IsClaimed(id) || TechAirSquads::Owns(id) || LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id)
             || TechAirFoundry::Owns(id) || TechFlank::Owns(u) || CommanderGroup::Owns(id)
             || Team::Ferry::IsGift(id) || Team::Recovery::IsGift(id);
     }

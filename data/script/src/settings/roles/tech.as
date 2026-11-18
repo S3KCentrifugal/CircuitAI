@@ -436,6 +436,20 @@ namespace Tech {
             float TeamShareMinAmount = 25.0f;               // D-106: smaller gifts are not sent
             float TeamShareAiPauseAbove = 0.80f;            // owner 2026-10-24: every allied AI (us included) at or over this metal fill stops AI-to-AI donations
             float TeamShareAiResumeBelow = 0.50f;           // owner 2026-10-24: ... until one allied AI drops under this fill
+            // Air squads (owner, 2026-11-18; systems/construction/tech_air_squads.as): while our metal bank is at
+            // AirSquadsMetalFill or more and AI-to-AI donations are paused (every allied AI full, the ping-pong guard
+            // above), the T1/T2 air plants build two reserved squads of air constructors:
+            bool AirSquadsEnabled = true;
+            float AirSquadsMetalFill = 0.90f;               // "TECH maxed on metal": bank / storage at or over this
+            // 1. a stuck T3 (T3Unstick) starts the T3 reclaim squad: its only job is the reclaims around stuck T3s,
+            //    with the T3Unstick list plus all fusion reactors (own and allied SMRTBARb), past TECH's bank gate
+            int T3SquadT1 = 20;                             // T1 air constructors
+            int T3SquadT2 = 20;                             // T2 air constructors
+            int T3SquadPerBlocker = 10;                     // squad members on one blocker's reclaim at most
+            int T3SquadMaxRounds = 10;                      // rounds per T3 while the squad is on (normal: T3Unstick::MaxRounds)
+            // 2. the gantry guard: GantryGuardPerGantry mixed T1/T2 air constructors guard (assist) each finished gantry
+            int GantryGuardPerGantry = 50;
+            float GantryGuardSeconds = 60.0f;               // guard order timeout; renewed at each ask
             float AfusFundedShare = 0.85f;                  // D-105: the advanced lab is not reclaimed when bank + income x the advanced fusion's remaining build time covers this share of its cost
             float AfusBuildTime = 330000.0f;                // D-105: the advanced fusion's buildtime (corafus 329200, armafus 312500, legafus 340000 in BAR's unitdefs)
             float AfusProjectionRadius = 600.0f;            // D-105: build power within this of the advanced fusion frame counts for its finish time

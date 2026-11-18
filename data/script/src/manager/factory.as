@@ -167,6 +167,10 @@ namespace Factory {
 		if (Global::AISettings::Role == AiRole::TECH) {
 			IUnitTask@ crew = TechGantryCrew::FactoryMakeTask(u);
 			if (crew !is null) return crew;
+			// owner, 2026-11-18: during a metal overflow the air plants build the T3 reclaim squad and the
+			// gantry guard (tech_air_squads.as)
+			IUnitTask@ squads = TechAirSquads::FactoryMakeTask(u);
+			if (squads !is null) return squads;
 		}
 		// owner, 2026-10-27: spam-lane turrets repair the lane
 		IUnitTask@ anti = AntiSpam::FactoryMakeTask(u);
