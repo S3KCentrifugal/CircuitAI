@@ -159,7 +159,7 @@ void CRetreatTask::Start(CCircuitUnit* unit)
 	AIFloat3 endPos;
 	float range;
 
-	if (unit->GetTravelAct()->GetPath() == nullptr) {
+	if ((unit->GetTravelAct() != nullptr) && (unit->GetTravelAct()->GetPath() == nullptr)) {
 		std::shared_ptr<CPathInfo> pPath = std::make_shared<CPathInfo>();
 		pPath->PushPos(startPos, pathfinder);
 		unit->GetTravelAct()->SetPath(pPath);
@@ -502,12 +502,21 @@ void CRetreatTask::ApplyPath(const CQueryPathSingle* query)
 {
 	const std::shared_ptr<CPathInfo>& pPath = query->GetPathInfo();
 	CCircuitUnit* unit = query->GetUnit();
+	// 2026-11-18 (t3squad stress crash, TravelAction.cpp:67): the path lands after the unit left the
+	// retreat or lost its actions; SetPath on a null travel action was an access violation.
+	if ((unit == nullptr) || IsDead() || unit->IsDead() || (unit->GetTask() != this)) {
+		return;
+	}
+	ITravelAction* travelAct = unit->GetTravelAct();
+	if (travelAct == nullptr) {
+		return;
+	}
     if(HoldInJam(unit)) return;
 
 	if (pPath->posPath.empty()) {
 		pPath->PushPos(query->GetEndPos(), manager->GetCircuit()->GetPathfinder());
 	}
-	unit->GetTravelAct()->SetPath(pPath);
+	travelAct->SetPath(pPath);
 }
 
 CCircuitUnit* CRetreatTask::ValidateNewRepairer(const IPathQuery* query, int newRepId) const

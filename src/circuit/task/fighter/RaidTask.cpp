@@ -96,7 +96,7 @@ void CRaidTask::Start(CCircuitUnit* unit)
 	if ((State::REGROUP == state) || (State::ENGAGE == state)) {
 		return;
 	}
-	if (!pPath->posPath.empty()) {
+	if (!pPath->posPath.empty() && (unit->GetTravelAct() != nullptr)) {  // 2026-11-18: no travel action, no path
 		unit->GetTravelAct()->SetPath(pPath);
 	}
 }
