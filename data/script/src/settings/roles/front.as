@@ -650,10 +650,14 @@ namespace Front {
                 "legmg", "leghive" };                                        // Cacophony, Hive (Legion's HLT slot)
             // owner 2026-11-15: T2 pop-ups count too when in range (PorcClusterRadius) of one of the turrets above; a cluster
             // holding one always gets a T2 gun (no income gate, no T1 fallback)
+            // owner 2026-11-18: the heavy laser towers Overwatch, Warden and Cacophony count PorcClusterHeavyWeight points
+            // each toward PorcClusterMinCount; Beamer, Twin Guard, Hive and pop-ups count 1 (2 Cacophonies = 4 Twin Guards)
+            array<string> PorcClusterHeavyTurrets = { "armhlt", "corhlt", "legmg" };   // Overwatch, Warden, Cacophony
+            int PorcClusterHeavyWeight = 2;
             array<string> PorcClusterPopups = { "armpb", "corvipe", "legapopupdef" };      // Pit Bull, Scorpion, Chimera
             array<string> PorcClusterT1Guns = { "armguard", "corpun", "legcluster" };     // Gauntlet, Agitator, Amputator
             array<string> PorcClusterT2Guns = { "armamb", "cortoast", "legacluster" };    // Rattlesnake, Persecutor, Eviscerator
-            int PorcClusterMinCount = 4;                  // "more than 3"
+            int PorcClusterMinCount = 4;                  // points (owner 2026-11-18): heavy 2 each, others 1 each
             float PorcClusterRadius = 350.0f;
             float PorcClusterBack = 300.0f;               // the half disc behind the forward turret: this deep
             float PorcClusterSide = 300.0f;               // and this far to either side

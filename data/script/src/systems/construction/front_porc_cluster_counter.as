@@ -9,8 +9,9 @@
 // defenses and augmenting those defenses with t1.5 static arti or t2 heavy static arti." (An earlier version of this
 // file triggered on ENEMY clusters; kept on branch porc-cluster-enemy-76min2.)
 //
-// Cluster: this AI's own finished PorcClusterTurrets (Beamer, Overwatch, Twin Guard, Warden, Cacophony, Hive). A
-// turret with PorcClusterMinCount - 1 or more others within PorcClusterRadius seeds a cluster of itself and those
+// Cluster: this AI's own finished PorcClusterTurrets (Beamer, Overwatch, Twin Guard, Warden, Cacophony, Hive), in
+// points (owner 2026-11-18): PorcClusterHeavyTurrets (Overwatch, Warden, Cacophony) PorcClusterHeavyWeight each, the rest 1. A
+// turret with PorcClusterMinCount points or more (itself + others) within PorcClusterRadius seeds a cluster of itself and those
 // others (most neighbours first, each turret in one cluster). Every allied SMRTBARb FRONT runs this over its own
 // turrets: script has no def-aware view of an ally's units, so a cluster made of two allies' turrets is not seen.
 // Owner 2026-11-15: "Also count any combination of t2 pitbulls/scorpions/chimeras in range of any of the t1.5 ...
@@ -46,8 +47,9 @@ namespace FrontPorcClusterCounter {
         AIFloat3 pos;
         string name;
         bool popup = false;    // a T2 pop-up (Pit Bull / Scorpion / Chimera)
+        int weight = 1;        // points toward PorcClusterMinCount: heavy laser towers PorcClusterHeavyWeight
         int cluster = -1;
-        int near = 0;
+        int near = 0;          // points of the turrets within PorcClusterRadius (-1 once used as a seed)
     }
     class Cluster {
         string key;
@@ -59,7 +61,7 @@ namespace FrontPorcClusterCounter {
         string names;
     }
 
-    array<CCircuitDef@> turretDefs, popupDefs, t1Defs, t2Defs;
+    array<CCircuitDef@> turretDefs, heavyDefs, popupDefs, t1Defs, t2Defs;
     array<Turret@> turrets;
     array<Cluster@> clusters;
     array<AIFloat3> gunPos;    // known enemy static ground guns (scan)
@@ -84,7 +86,7 @@ namespace FrontPorcClusterCounter {
     bool On() { return Global::RoleSettings::Front::PorcClusterCounter && Global::AISettings::Role == AiRole::FRONT; }
 
     void Reset() {
-        turretDefs.resize(0); popupDefs.resize(0); t1Defs.resize(0); t2Defs.resize(0);
+        turretDefs.resize(0); heavyDefs.resize(0); popupDefs.resize(0); t1Defs.resize(0); t2Defs.resize(0);
         turrets.resize(0); clusters.resize(0); gunPos.resize(0); gunReach.resize(0); guns.resize(0);
         standing = 0; lastScan = -100000; defsDone = false;
         holds.deleteAll(); waits.deleteAll();
@@ -99,6 +101,7 @@ namespace FrontPorcClusterCounter {
         if (defsDone) return;
         defsDone = true;
         AddDefs(Global::RoleSettings::Front::PorcClusterTurrets, turretDefs);
+        AddDefs(Global::RoleSettings::Front::PorcClusterHeavyTurrets, heavyDefs);
         AddDefs(Global::RoleSettings::Front::PorcClusterPopups, popupDefs);
         AddDefs(Global::RoleSettings::Front::PorcClusterT1Guns, t1Defs);
         AddDefs(Global::RoleSettings::Front::PorcClusterT2Guns, t2Defs);
@@ -147,6 +150,7 @@ namespace FrontPorcClusterCounter {
     void Scan() {
         lastScan = ai.frame;
         turrets.resize(0); clusters.resize(0); gunPos.resize(0); gunReach.resize(0); guns.resize(0); standing = 0;
+        int points = 0;
         array<AIFloat3> enemies = Lanes::EnemyStarts();
         if (enemies.length() == 0) return;
         array<Id>@ ids = ai.GetOwnedUnitIds();
@@ -161,20 +165,22 @@ namespace FrontPorcClusterCounter {
             if (!pop && !In(turretDefs, d)) continue;
             Turret@ t = Turret();
             t.pos = u.GetPos(ai.frame); t.name = d.GetName(); t.popup = pop;
+            if (!pop && In(heavyDefs, d)) t.weight = Global::RoleSettings::Front::PorcClusterHeavyWeight;
             turrets.insertLast(t);
+            points += t.weight;
         }
         const int need = Global::RoleSettings::Front::PorcClusterMinCount;
-        if (int(turrets.length()) < need) return;
+        if (points < need) return;
         const float r = Global::RoleSettings::Front::PorcClusterRadius;
         const float r2 = r * r;
         for (uint i = 0; i < turrets.length(); ++i)
             for (uint j = i + 1; j < turrets.length(); ++j)
-                if (MapHelpers::SqDist(turrets[i].pos, turrets[j].pos) <= r2) { ++turrets[i].near; ++turrets[j].near; }
+                if (MapHelpers::SqDist(turrets[i].pos, turrets[j].pos) <= r2) { turrets[i].near += turrets[j].weight; turrets[j].near += turrets[i].weight; }
         const float cover = Global::RoleSettings::Front::PorcClusterCoverRadius;
         for (;;) {
             int seed = -1;
             for (uint i = 0; i < turrets.length(); ++i) {
-                if (turrets[i].cluster >= 0 || turrets[i].near + 1 < need) continue;
+                if (turrets[i].cluster >= 0 || turrets[i].near < 0 || turrets[i].near + turrets[i].weight < need) continue;
                 if (seed < 0 || turrets[i].near > turrets[seed].near) seed = int(i);
             }
             if (seed < 0) break;
@@ -184,7 +190,9 @@ namespace FrontPorcClusterCounter {
                 if (int(j) != seed && turrets[j].cluster < 0 && MapHelpers::SqDist(turrets[seed].pos, turrets[j].pos) <= r2)
                     c.members.insertLast(int(j));
             turrets[seed].near = -1;   // consumed as a seed
-            if (int(c.members.length()) < need) continue;   // its neighbours already went to an earlier cluster
+            int got = 0;
+            for (uint k = 0; k < c.members.length(); ++k) got += turrets[c.members[k]].weight;
+            if (got < need) continue;   // its neighbours already went to an earlier cluster
             // owner 2026-11-15: pop-ups count only in range of one of the T1.5 turrets: a cluster needs one
             int t15 = 0;
             for (uint k = 0; k < c.members.length(); ++k) if (!turrets[c.members[k]].popup) ++t15;
