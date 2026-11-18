@@ -412,7 +412,9 @@ namespace TechWeapons {
             candidate.key=Key(KILL,candidate.pos,512.0f);
             candidate.why="selected lane "+selectedLane+" behind observed front";
             if (OnMap(candidate.pos) && candidate.pos.distance2D(base)>=Global::RoleSettings::Tech::WeaponBaseRadius) {
-                found.insertLast(candidate);
+                // TEMPORARILY OFF (owner 2026-11-18): kill zone clusters were denying proper spots to build
+                // important land structures. The lane point is still used to place the artillery cluster below.
+                // found.insertLast(candidate);
                 Candidate@ artillery = Candidate();
                 artillery.kind = ARTY;
                 artillery.pos = Along(candidate.pos, direction, -Global::RoleSettings::Tech::WeaponLaneFrontReserve, 0.0f);
@@ -422,19 +424,20 @@ namespace TechWeapons {
                 if (OnMap(artillery.pos)) found.insertLast(artillery);
             }
         }
-        // kill zones: chokes on the routes, our side of the middle
-        for (int i = 0; i < aiBattle.GetChokeCount(); ++i) {
-            if (Global::AISettings::Role==AiRole::TECH) break; // TECH uses the chosen forward lane above
-            const float sh = aiBattle.GetChokeShare(i);
-            if (sh < Global::RoleSettings::Tech::WeaponKillShareMin || sh > Global::RoleSettings::Tech::WeaponKillShareMax) continue;
-            const AIFloat3 p = aiBattle.GetChokePos(i);
-            Candidate@ c = Candidate();
-            c.kind = KILL; c.pos = p; c.dir = aiBattle.GetChokeDir(i);
-            c.score = (1.0f + aiBattle.GetChokeHeat(i)) * (1.0f + 0.02f * aiBattle.CombatHeat(p, 1024.0f)) / (1.0f + aiBattle.SurfThreat(p) * 0.01f);
-            c.key = Key(KILL, p, 512.0f);
-            c.why = "choke " + int(aiBattle.GetChokeWidth(i)) + " wide, " + int(aiBattle.GetChokeHeat(i)) + " route(s), " + int(sh * 100) + "% out";
-            found.insertLast(c);
-        }
+        // TEMPORARILY OFF (owner 2026-11-18): kill zone clusters were denying proper spots to build important land structures.
+        // // kill zones: chokes on the routes, our side of the middle
+        // for (int i = 0; i < aiBattle.GetChokeCount(); ++i) {
+            // if (Global::AISettings::Role==AiRole::TECH) break; // TECH uses the chosen forward lane above
+            // const float sh = aiBattle.GetChokeShare(i);
+            // if (sh < Global::RoleSettings::Tech::WeaponKillShareMin || sh > Global::RoleSettings::Tech::WeaponKillShareMax) continue;
+            // const AIFloat3 p = aiBattle.GetChokePos(i);
+            // Candidate@ c = Candidate();
+            // c.kind = KILL; c.pos = p; c.dir = aiBattle.GetChokeDir(i);
+            // c.score = (1.0f + aiBattle.GetChokeHeat(i)) * (1.0f + 0.02f * aiBattle.CombatHeat(p, 1024.0f)) / (1.0f + aiBattle.SurfThreat(p) * 0.01f);
+            // c.key = Key(KILL, p, 512.0f);
+            // c.why = "choke " + int(aiBattle.GetChokeWidth(i)) + " wide, " + int(aiBattle.GetChokeHeat(i)) + " route(s), " + int(sh * 100) + "% out";
+            // found.insertLast(c);
+        // }
         // air defence: the assets enemy aircraft come for, weighted by the air heat near them
         array<AIFloat3> assets = {base};
         if (Layout::factoryCentre.x > 0.0f) assets.insertLast(Layout::factoryCentre);
@@ -484,20 +487,21 @@ namespace TechWeapons {
         // long range and super cannon: the band behind the active combat zone
         BandCandidates(LRPC, Def("lrpc"), Global::RoleSettings::Tech::WeaponLrpcBandMin, Global::RoleSettings::Tech::WeaponLrpcBandMax, found);
         BandCandidates(SUPER, Def("super"), Global::RoleSettings::Tech::SuperBandMin, Global::RoleSettings::Tech::SuperBandMax, found);
-        // coast: beach segments that face hostile water or carry a landing route
-        for (int i = 0; i < aiBattle.GetBeachCount(); ++i) {
-            const int cls = aiBattle.GetBeachClass(i);
-            if ((cls & (B_SHIP | B_DEEP | B_HOVER | B_WADING)) == 0) continue;
-            if ((cls & B_WADING) != 0 && (cls & (B_SHIP | B_DEEP)) == 0 && aiBattle.GetBeachHeat(i) <= 0.0f) continue;   // a quiet shallow shore: the land routes cover it
-            const AIFloat3 p = aiBattle.GetBeachPos(i);
-            Candidate@ c = Candidate();
-            c.kind = COAST; c.pos = p; c.dir = aiBattle.GetBeachSeaward(i);
-            c.score = (1.0f + aiBattle.GetBeachHeat(i)) * (((cls & B_DEEP) != 0) ? 1.5f : 1.0f) * 3000.0f / Mx(1000.0f, p.distance2D(base));
-            c.key = Key(COAST, p, 512.0f);
-            c.why = "beach" + (((cls & B_CLIFF) != 0) ? " cliff" : "") + (((cls & B_WADING) != 0) ? " wading" : "") + (((cls & B_SHIP) != 0) ? " ship-water" : "")
-                + (((cls & B_DEEP) != 0) ? " deep-water" : "") + (((cls & B_HOVER) != 0) ? " hover" : "") + ", " + int(aiBattle.GetBeachHeat(i)) + " landing route(s)";
-            found.insertLast(c);
-        }
+        // TEMPORARILY OFF (owner 2026-11-18): coast clusters were denying proper spots to build important land structures.
+        // // coast: beach segments that face hostile water or carry a landing route
+        // for (int i = 0; i < aiBattle.GetBeachCount(); ++i) {
+            // const int cls = aiBattle.GetBeachClass(i);
+            // if ((cls & (B_SHIP | B_DEEP | B_HOVER | B_WADING)) == 0) continue;
+            // if ((cls & B_WADING) != 0 && (cls & (B_SHIP | B_DEEP)) == 0 && aiBattle.GetBeachHeat(i) <= 0.0f) continue;   // a quiet shallow shore: the land routes cover it
+            // const AIFloat3 p = aiBattle.GetBeachPos(i);
+            // Candidate@ c = Candidate();
+            // c.kind = COAST; c.pos = p; c.dir = aiBattle.GetBeachSeaward(i);
+            // c.score = (1.0f + aiBattle.GetBeachHeat(i)) * (((cls & B_DEEP) != 0) ? 1.5f : 1.0f) * 3000.0f / Mx(1000.0f, p.distance2D(base));
+            // c.key = Key(COAST, p, 512.0f);
+            // c.why = "beach" + (((cls & B_CLIFF) != 0) ? " cliff" : "") + (((cls & B_WADING) != 0) ? " wading" : "") + (((cls & B_SHIP) != 0) ? " ship-water" : "")
+                // + (((cls & B_DEEP) != 0) ? " deep-water" : "") + (((cls & B_HOVER) != 0) ? " hover" : "") + ", " + int(aiBattle.GetBeachHeat(i)) + " landing route(s)";
+            // found.insertLast(c);
+        // }
     }
 
     // the owner's band: 20% to 40% of the weapon's range back from the active combat zone
@@ -580,25 +584,26 @@ namespace TechWeapons {
         if (Global::AISettings::Role == AiRole::TECH && (c.kind == KILL || c.kind == ARTY)) AddFactionSupport(c);
         const bool heavy = aiBattle.EnemyCost(E_HEAVY) > 0.0f;
         const bool t2air = aiBattle.EnemyCost(E_AIR) > 3000.0f;
-        if (c.kind == KILL) {
-            // turrets on an arc behind the choke, facing it; fields of fire overlap on its centre
-            array<string> ring = {"llt", "llt", "beamer", "llt", "llt", "hlt", "popup", "hlt"};
-            if (t2) { ring.insertLast("t2pop"); ring.insertLast("t2pop"); }
-            if (heavy) ring.insertLast("heavy");
-            for (uint k = 0; k < ring.length(); ++k) {
-                const float lat = ((k % 2 == 0) ? -1.0f : 1.0f) * (70.0f + 70.0f * (k / 2));
-                AIFloat3 at = Along(p, back, 260.0f + 40.0f * (k % 3), lat);
-                if (!OnMap(at) || aiBattle.IsFriendlyLane(at)) continue;
-                c.slots.insertLast(Slot(ring[k], at));
-                if (ring[k] == "heavy") AddRing(c,"fort",at,112.0f,32.0f);
-                else if (DirectFire(ring[k])) AddFrontRows(c, at, d);
-            }
-            AIFloat3 ar = Along(p, back, 700.0f, 0.0f);
-            if (OnMap(ar) && !aiBattle.IsFriendlyLane(ar)) { c.slots.insertLast(Slot("art2", ar)); AddRing(c, "teeth", ar, 72.0f, 32.0f); }
-            c.slots.insertLast(Slot("aah", Along(p, back, 420.0f, 160.0f)));
-            c.slots.insertLast(Slot("radar", Along(p, back, 480.0f, -180.0f)));
-            AddNanos(c, Global::RoleSettings::Tech::WeaponNanoPerCluster);
-        } else if (c.kind == AIR) {
+        // TEMPORARILY OFF (owner 2026-11-18): kill zone clusters were denying proper spots to build important land structures.
+        // if (c.kind == KILL) {
+            // // turrets on an arc behind the choke, facing it; fields of fire overlap on its centre
+            // array<string> ring = {"llt", "llt", "beamer", "llt", "llt", "hlt", "popup", "hlt"};
+            // if (t2) { ring.insertLast("t2pop"); ring.insertLast("t2pop"); }
+            // if (heavy) ring.insertLast("heavy");
+            // for (uint k = 0; k < ring.length(); ++k) {
+                // const float lat = ((k % 2 == 0) ? -1.0f : 1.0f) * (70.0f + 70.0f * (k / 2));
+                // AIFloat3 at = Along(p, back, 260.0f + 40.0f * (k % 3), lat);
+                // if (!OnMap(at) || aiBattle.IsFriendlyLane(at)) continue;
+                // c.slots.insertLast(Slot(ring[k], at));
+                // if (ring[k] == "heavy") AddRing(c,"fort",at,112.0f,32.0f);
+                // else if (DirectFire(ring[k])) AddFrontRows(c, at, d);
+            // }
+            // AIFloat3 ar = Along(p, back, 700.0f, 0.0f);
+            // if (OnMap(ar) && !aiBattle.IsFriendlyLane(ar)) { c.slots.insertLast(Slot("art2", ar)); AddRing(c, "teeth", ar, 72.0f, 32.0f); }
+            // c.slots.insertLast(Slot("aah", Along(p, back, 420.0f, 160.0f)));
+            // c.slots.insertLast(Slot("radar", Along(p, back, 480.0f, -180.0f)));
+            // AddNanos(c, Global::RoleSettings::Tech::WeaponNanoPerCluster);
+        if (c.kind == AIR) {
             // AA between the asset and the air approach, spaced so one pass kills one piece
             const float sp = Global::RoleSettings::Tech::WeaponAirSpacing;
             const int flak = t2 ? 3 : 0;
@@ -629,8 +634,8 @@ namespace TechWeapons {
             AddNanos(c, Global::RoleSettings::Tech::WeaponNanoPerCluster);
         } else if (c.kind == SUPER) {
             ShapeSuper(c);
-        } else if (c.kind == COAST) {
-            ShapeCoast(c);
+        // } else if (c.kind == COAST) {   // TEMPORARILY OFF (owner 2026-11-18): coast clusters denied land build spots
+        //     ShapeCoast(c);
         }
     }
 
@@ -707,60 +712,61 @@ namespace TechWeapons {
     }
 
     // the coast (W8): layers from the sea to the beach's emergence band
-    void ShapeCoast(WCluster@ c)
-    {
-        int idx = -1;
-        for (int i = 0; i < aiBattle.GetBeachCount(); ++i) if (aiBattle.GetBeachPos(i).distance2D(c.pos) < 32.0f) { idx = i; break; }
-        const int cls = (idx >= 0) ? aiBattle.GetBeachClass(idx) : 0;
-        const AIFloat3 p = c.pos, sea = c.dir, land(-sea.x, 0.0f, -sea.z);
-        const bool t2 = MetalIncome() >= Global::RoleSettings::Tech::WeaponArtyMinIncome;
-        const bool heavy = aiBattle.EnemyCost(E_HEAVY) > 0.0f;
-        // the beach: direct fire behind the shore over the emergence band, walls at the land exit
-        c.slots.insertLast(Slot("hlt", Along(p, land, 90.0f, -120.0f)));
-        c.slots.insertLast(Slot("hlt", Along(p, land, 90.0f, 120.0f)));
-        c.slots.insertLast(Slot("llt", Along(p, land, 70.0f, 0.0f)));
-        if (t2) c.slots.insertLast(Slot("t2pop", Along(p, land, 140.0f, 0.0f)));
-        if (heavy) c.slots.insertLast(Slot("heavy", Along(p, land, 200.0f, 200.0f)));
-        for (int k = -2; k <= 2; ++k) c.slots.insertLast(Slot("teeth", Along(p, land, 30.0f, 48.0f * k)));
-        if ((cls & (B_SHIP | B_DEEP)) != 0) {
-            // ship water: surface guns afloat, artillery on the high ground behind
-            for (float dist = 80.0f; dist <= 400.0f; dist += 40.0f) {
-                AIFloat3 w = Along(p, sea, dist, 0.0f);
-                if (aiBattle.Depth(w) >= 6.0f) { c.slots.insertLast(Slot("fhlt", w)); break; }
-            }
-            c.slots.insertLast(Slot("art2", Along(p, land, 450.0f, 0.0f)));
-            for (int k = -1; k <= 1; k += 2) {
-                AIFloat3 w = Along(p, sea, 120.0f, 160.0f * k);
-                if (aiBattle.Depth(w) >= 2.0f && aiBattle.Depth(w) < 20.0f) c.slots.insertLast(Slot("fteeth", w));
-            }
-        }
-        if ((cls & B_DEEP) != 0) {
-            // deep water: torpedoes (the owner's rule: only where subs can come), depth charges, two sonars
-            int torps = 0;
-            for (float dist = 100.0f; dist <= 900.0f && torps < 2; dist += 32.0f) {
-                for (int k = -1; k <= 1 && torps < 2; k += 2) {
-                    AIFloat3 w = Along(p, sea, dist, 120.0f * k);
-                    CCircuitDef@ td = Def(t2 ? "torp2" : "torp1");
-                    if (td !is null && aiBattle.TorpedoSiteOK(td, w, td.GetMaxRange(RANGE_WATER) > 0.0f ? td.GetMaxRange(RANGE_WATER) : 500.0f, false)) {
-                        c.slots.insertLast(Slot(t2 ? "torp2" : "torp1", w));
-                        ++torps;
-                    }
-                }
-            }
-            c.slots.insertLast(Slot("dcharge", Along(p, land, 40.0f, -80.0f)));
-            c.slots.insertLast(Slot("dcharge", Along(p, land, 40.0f, 80.0f)));
-            int sonars = 0;
-            for (float dist = 60.0f; dist <= 600.0f && sonars < 2; dist += 60.0f) {
-                AIFloat3 w = Along(p, sea, dist, (sonars == 0 ? -1.0f : 1.0f) * 200.0f);
-                if (aiBattle.Depth(w) >= 12.0f) { c.slots.insertLast(Slot("sonar", w)); ++sonars; }
-            }
-        }
-        c.slots.insertLast(Slot("aah", Along(p, land, 260.0f, 0.0f)));
-        c.slots.insertLast(Slot("radar", Along(p, land, 320.0f, 200.0f)));
-        // nanos behind the beach, toward the land
-        c.dir = sea;
-        AddNanos(c, Global::RoleSettings::Tech::WeaponNanoPerCluster);
-    }
+    // TEMPORARILY OFF (owner 2026-11-18): coast clusters were denying proper spots to build important land structures.
+    // void ShapeCoast(WCluster@ c)
+    // {
+        // int idx = -1;
+        // for (int i = 0; i < aiBattle.GetBeachCount(); ++i) if (aiBattle.GetBeachPos(i).distance2D(c.pos) < 32.0f) { idx = i; break; }
+        // const int cls = (idx >= 0) ? aiBattle.GetBeachClass(idx) : 0;
+        // const AIFloat3 p = c.pos, sea = c.dir, land(-sea.x, 0.0f, -sea.z);
+        // const bool t2 = MetalIncome() >= Global::RoleSettings::Tech::WeaponArtyMinIncome;
+        // const bool heavy = aiBattle.EnemyCost(E_HEAVY) > 0.0f;
+        // // the beach: direct fire behind the shore over the emergence band, walls at the land exit
+        // c.slots.insertLast(Slot("hlt", Along(p, land, 90.0f, -120.0f)));
+        // c.slots.insertLast(Slot("hlt", Along(p, land, 90.0f, 120.0f)));
+        // c.slots.insertLast(Slot("llt", Along(p, land, 70.0f, 0.0f)));
+        // if (t2) c.slots.insertLast(Slot("t2pop", Along(p, land, 140.0f, 0.0f)));
+        // if (heavy) c.slots.insertLast(Slot("heavy", Along(p, land, 200.0f, 200.0f)));
+        // for (int k = -2; k <= 2; ++k) c.slots.insertLast(Slot("teeth", Along(p, land, 30.0f, 48.0f * k)));
+        // if ((cls & (B_SHIP | B_DEEP)) != 0) {
+            // // ship water: surface guns afloat, artillery on the high ground behind
+            // for (float dist = 80.0f; dist <= 400.0f; dist += 40.0f) {
+                // AIFloat3 w = Along(p, sea, dist, 0.0f);
+                // if (aiBattle.Depth(w) >= 6.0f) { c.slots.insertLast(Slot("fhlt", w)); break; }
+            // }
+            // c.slots.insertLast(Slot("art2", Along(p, land, 450.0f, 0.0f)));
+            // for (int k = -1; k <= 1; k += 2) {
+                // AIFloat3 w = Along(p, sea, 120.0f, 160.0f * k);
+                // if (aiBattle.Depth(w) >= 2.0f && aiBattle.Depth(w) < 20.0f) c.slots.insertLast(Slot("fteeth", w));
+            // }
+        // }
+        // if ((cls & B_DEEP) != 0) {
+            // // deep water: torpedoes (the owner's rule: only where subs can come), depth charges, two sonars
+            // int torps = 0;
+            // for (float dist = 100.0f; dist <= 900.0f && torps < 2; dist += 32.0f) {
+                // for (int k = -1; k <= 1 && torps < 2; k += 2) {
+                    // AIFloat3 w = Along(p, sea, dist, 120.0f * k);
+                    // CCircuitDef@ td = Def(t2 ? "torp2" : "torp1");
+                    // if (td !is null && aiBattle.TorpedoSiteOK(td, w, td.GetMaxRange(RANGE_WATER) > 0.0f ? td.GetMaxRange(RANGE_WATER) : 500.0f, false)) {
+                        // c.slots.insertLast(Slot(t2 ? "torp2" : "torp1", w));
+                        // ++torps;
+                    // }
+                // }
+            // }
+            // c.slots.insertLast(Slot("dcharge", Along(p, land, 40.0f, -80.0f)));
+            // c.slots.insertLast(Slot("dcharge", Along(p, land, 40.0f, 80.0f)));
+            // int sonars = 0;
+            // for (float dist = 60.0f; dist <= 600.0f && sonars < 2; dist += 60.0f) {
+                // AIFloat3 w = Along(p, sea, dist, (sonars == 0 ? -1.0f : 1.0f) * 200.0f);
+                // if (aiBattle.Depth(w) >= 12.0f) { c.slots.insertLast(Slot("sonar", w)); ++sonars; }
+            // }
+        // }
+        // c.slots.insertLast(Slot("aah", Along(p, land, 260.0f, 0.0f)));
+        // c.slots.insertLast(Slot("radar", Along(p, land, 320.0f, 200.0f)));
+        // // nanos behind the beach, toward the land
+        // c.dir = sea;
+        // AddNanos(c, Global::RoleSettings::Tech::WeaponNanoPerCluster);
+    // }
 
     // ---------------------------------------------------------------- replan: found again, re-ranked
 
