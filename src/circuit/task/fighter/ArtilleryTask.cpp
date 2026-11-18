@@ -262,6 +262,23 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		}
 	}
 
+
+	// Owner 2026-11-04 16:58Z: target lock. A commander / heavy pick breaks it
+	// for now (it resumes after); else the locked target is kept until dead.
+	{
+		float lockDist = 0.f;
+		CEnemyInfo* locked = ArtyLockGet(circuit, unit, frame, lockDist);
+		const CMilitaryManager::SArtyCommInfo& lockInfo = circuit->GetMilitaryManager()->GetArtyCommInfo();
+		const bool pickPriority = (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS() && LockPriority(lockInfo, bestTarget);
+		const bool safeHere = !ArtyUnsafeHere(circuit, unit, pos, frame);
+		if ((locked != nullptr) && safeHere && !(pickPriority && (bestTarget != locked) && !LockPriority(lockInfo, locked))) {
+			if (ArtyLockDrive(circuit, unit, frame, locked, lockDist)) return;
+		}
+		if ((locked == nullptr) && (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS()) {  // a priority pick leaves the lock to resume
+			ArtyLockSet(circuit, unit, frame, bestTarget);
+		}
+	}
+
 	{
 		CMilitaryManager* gm = circuit->GetMilitaryManager();
 		const CMilitaryManager::SArtySnipeInfo& gsi = gm->GetArtySnipeInfo();
@@ -347,6 +364,16 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 				}
 			} else {
 				gst.ghostTickAim = -1;
+			}
+		}
+		TRY_UNIT(circuit, unit,
+			if (ghost) {
+				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+			} else if (bestTarget->GetUnit() != nullptr) {  // owner 16:57Z: the engine drops it on death, also when cheating
+				unit->GetUnit()->Attack(bestTarget->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);
+			} else {  // no unit handle: a short ground-fire order, re-issued while it lives
+				unit->CmdAttackGround(bestTarget->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, std::min(timeout, frame + FRAMES_PER_SEC * 4));
+			}
 			}
 		}
 		TRY_UNIT(circuit, unit,
