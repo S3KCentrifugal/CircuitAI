@@ -212,12 +212,39 @@ namespace T3Unstick {
             || UnitHelpers::IsT1Nano(name) || Global::T3Unstick::ExtraClear.find(name) >= 0
             || Global::T3Unstick::MexClear.find(name) >= 0 || Global::T3Unstick::IntelClear.find(name) >= 0
             || Global::T3Unstick::ConverterClear.find(name) >= 0 || Global::T3Unstick::WallClear.find(name) >= 0
-            || Global::T3Unstick::StorageClear.find(name) >= 0) return true;
+            || Global::T3Unstick::StorageClear.find(name) >= 0 || Global::T3Unstick::AdvSolarClear.find(name) >= 0
+            || Global::T3Unstick::EnergyStorageT1.find(name) >= 0) return true;
         if (round >= Global::T3Unstick::PopupRound && Global::T3Unstick::PopupClear.find(name) >= 0) return true;
         return round >= Global::T3Unstick::FusionRound && UnitHelpers::IsAnyFusionReactor(name);
     }
 
     // ... and what TECH's T3 reclaim squad may take on top (owner, 2026-11-18): fusion reactors, all factions
+    bool IsT1EnergyStorage(const string &in name) { return Global::T3Unstick::EnergyStorageT1.find(name) >= 0; }
+
+    // One reclaim for a stuck T3 (owner, 2026-11-18). On TECH a T1 energy storage is natively
+    // reclaim-protected (D-290): the protection is lifted for this Enqueue only and put back at once, so
+    // no other path (watchdog, turret joins) can take one. `sanctioned`: TECH's reclaim audit (INV-201,
+    // INV-209) is told this one is the owner's exception. O(1).
+    IUnitTask@ EnqueueReclaim(CCircuitUnit@ b, int timeout, bool sanctioned)
+    {
+        if (!ai.IsOwnedUnit(b)) return null;
+        const bool tech = Global::AISettings::Role == AiRole::TECH;
+        const bool lift = tech && IsT1EnergyStorage(b.circuitDef.GetName()) && aiBuilderMgr.IsReclaimProtected(b.circuitDef);
+        if (tech && (sanctioned || lift)) TechReclaim::Sanction(b.id);
+        if (lift) aiBuilderMgr.SetReclaimProtected(b.circuitDef, false);
+        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, b, timeout));
+        if (lift) aiBuilderMgr.SetReclaimProtected(b.circuitDef, true);
+        if (lift && t !is null && !t.IsDead())
+            GenericHelpers::LogUtil("[T3Unstick] T1 energy storage " + b.circuitDef.GetName() + " " + b.id + " reclaimed for a stuck T3 (protection lifted for this order)", 1);
+        return t;
+    }
+    // Protected by the native set and not the owner's T1 energy storage exception
+    bool StaysProtected(CCircuitUnit@ b)
+    {
+        if (!aiBuilderMgr.IsReclaimProtected(b.circuitDef)) return false;
+        return !(Global::AISettings::Role == AiRole::TECH && IsT1EnergyStorage(b.circuitDef.GetName()));
+    }
+
     bool SquadClearable(const string &in name, int round = 1)
     {
         return Clearable(name, round) || UnitHelpers::IsAnyFusionReactor(name);
@@ -251,7 +278,7 @@ namespace T3Unstick {
             const string name = b.circuitDef.GetName();
             int only = 0;   // 0 anyone, 2 the squad only (a fusion before FusionRound)
             const int round = h.rounds + 1;
-            if (aiBuilderMgr.IsReclaimProtected(b.circuitDef) || !(Clearable(name, round) || (squad && SquadClearable(name, round)))) {
+            if (StaysProtected(b) || !(Clearable(name, round) || (squad && SquadClearable(name, round)))) {
                 kept += " " + name;
                 continue;
             }
@@ -261,10 +288,10 @@ namespace T3Unstick {
             // pause (TechReclaim::Tick) cannot abort it.
             bool gated = false;
             if (tech && !TechReclaim::Allowed(b, "t3unstick")) {
-                if (TechReclaim::IsEnergyStorage(b)) { kept += " " + name; continue; }
+                if (TechReclaim::IsEnergyStorage(b) && !IsT1EnergyStorage(name)) { kept += " " + name; continue; }
                 gated = true;
             }
-            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, b, int(Global::T3Unstick::ReclaimSeconds) * SECOND));
+            IUnitTask@ t = EnqueueReclaim(b, int(Global::T3Unstick::ReclaimSeconds) * SECOND, gated);
             if (!ai.IsOwnedUnit(u) || h.unit !is u) {
                 // the T3 went during the enqueue: no untracked reclaim is left behind
                 if (t !is null && !t.IsDead()) aiBuilderMgr.AbortTask(t);
@@ -435,10 +462,11 @@ namespace T3Unstick {
         // owner, 2026-11-18: past TECH's bank gate (energy storage excepted); tracked only when the gate admits it
         bool track = false;
         if (Global::AISettings::Role == AiRole::TECH) {
-            if (TechReclaim::IsEnergyStorage(best)) return null;
+            if (TechReclaim::IsEnergyStorage(best) && !IsT1EnergyStorage(best.circuitDef.GetName())) return null;
+            if (StaysProtected(best)) return null;
             track = TechReclaim::Allowed(best, "t3unstick");
         }
-        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, int(Global::T3Unstick::ReclaimSeconds) * SECOND));
+        IUnitTask@ t = EnqueueReclaim(best, int(Global::T3Unstick::ReclaimSeconds) * SECOND, !track);
         if (t is null || t.IsDead()) return null;
         if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }   // the blocker went (or was given away) meanwhile
         if (track) TechReclaim::Track(best, t, "t3unstick");
@@ -471,8 +499,8 @@ namespace T3Unstick {
         if (best !is null) {
             IUnitTask@ live = null;
             if (reclaimTask.get("" + best.id, @live) && Team::AllyClear::LiveReclaim(live, best)) return live;
-            if (aiBuilderMgr.IsReclaimProtected(best.circuitDef) || TechReclaim::IsEnergyStorage(best)) return null;
-            IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, int(Global::T3Unstick::ReclaimSeconds) * SECOND));
+            if (StaysProtected(best) || (TechReclaim::IsEnergyStorage(best) && !IsT1EnergyStorage(best.circuitDef.GetName()))) return null;
+            IUnitTask@ t = EnqueueReclaim(best, int(Global::T3Unstick::ReclaimSeconds) * SECOND, true);
             if (t is null || t.IsDead()) return null;
             if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }
             reclaimTask.set("" + best.id, @t);

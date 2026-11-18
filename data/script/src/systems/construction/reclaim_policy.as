@@ -56,6 +56,10 @@ namespace TechReclaim {
         return ai.frame - int(at) <= int(Global::RoleSettings::Tech::ReclaimDeferredStaleSeconds) * SECOND;
     }
     dictionary audited;           // id -> true: the audit line is written once per target
+    // Owner's exceptions (2026-11-18, T3Unstick::EnqueueReclaim): a reclaim freeing a stuck T3 may take a
+    // T1 energy storage and may overflow the bank; the audit does not report those as INV-201 / INV-209.
+    dictionary sanctioned;        // id -> true
+    void Sanction(int id) { sanctioned.set("" + id, true); }
 
     // Script reclaims in flight, parallel arrays (swap-removed, no per-tick allocation).
     array<int> trackedIds;
@@ -246,11 +250,12 @@ namespace TechReclaim {
         string source = "native";
         if (lastTarget == target.id) source = lastSource;
         else if (Invariants::constructionAdmissionRule.length() > 0) source = Invariants::constructionAdmissionRule;
-        if (IsEnergyStorage(target))
+        const bool excepted = sanctioned.exists(key);
+        if (IsEnergyStorage(target) && !excepted)
             Invariants::Violation("INV-201", key, "reclaim of energy storage " + target.circuitDef.GetName() + " " + target.id + " ordered by " + source);
         string why;
         const bool fits = Fits(target, why);
-        if (!fits && source != "native")
+        if (!fits && source != "native" && !excepted)
             Invariants::Violation("INV-209", key, "reclaim of " + target.circuitDef.GetName() + " " + target.id + " ordered by " + source + " overflows: " + why);
         if (audited.exists(key)) return;
         audited.set(key, true);

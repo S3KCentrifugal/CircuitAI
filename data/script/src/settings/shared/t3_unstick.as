@@ -9,7 +9,7 @@ namespace Global { namespace T3Unstick {
     float StuckRadius = 96.0f;            // elmos
     float GraceSeconds = 15.0f;           // after it is finished, before the clock starts
     float PenGap = 64.0f;                 // a structure is penning it when its footprint is within this of the unit's
-    int MaxRounds = 3;                    // each round widens the ring by PenGap; then the unit is left alone
+    int MaxRounds = 5;                    // each round widens the ring by PenGap (64 ... 320); then the unit is left alone (owner 2026-11-18: 3 -> 5, Stronghold Astraeus)
     float RetrySeconds = 45.0f;           // between rounds for the same unit
     float ReclaimSeconds = 90.0f;         // a round gives up on its reclaims after this
     float BuilderRange = 2000.0f;         // mobile T1/T2 constructors this close to a blocker help
@@ -41,8 +41,13 @@ namespace Global { namespace T3Unstick {
         "armmmkr", "cormmkr", "legadveconv", "armuwmmm", "coruwmmm" };
     array<string> WallClear = {           // dragon's teeth and fortification walls, land and floating
         "armdrag", "cordrag", "legdrag", "armfdrag", "corfdrag", "legfdrag", "armfort", "corfort", "legforti" };
-    array<string> StorageClear = {        // metal storage (energy storage stays protected for TECH, D-290)
+    array<string> StorageClear = {        // metal storage
         "armmstor", "cormstor", "legmstor", "armuwms", "coruwms" };
+    // Owner, 2026-11-18 (Stronghold: legadvsol 5143 and a legestor penned Astraeus 18128): advanced solars,
+    // and T1 energy storage even for TECH, whose D-290 protection is lifted for that one reclaim only
+    // (T3Unstick::EnqueueReclaim). Advanced energy storage stays protected.
+    array<string> AdvSolarClear = { "armadvsol", "coradvsol", "legadvsol" };
+    array<string> EnergyStorageT1 = { "armestor", "corestor", "legestor", "armuwes", "coruwes", "leguwestore" };
     // From round PopupRound: T2 pop-up porc (Pit Bull, Scorpion, Chimera)
     int PopupRound = 2;
     array<string> PopupClear = { "armpb", "corvipe", "legapopupdef" };

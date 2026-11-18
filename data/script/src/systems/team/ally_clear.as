@@ -163,6 +163,7 @@ namespace AllyClear {
         IBuilderTask@ current = u.task is null ? null : cast<IBuilderTask>(u.task);
         if (current !is null && Task::BuildType(current.GetBuildType()) < Task::BuildType::REPAIR) return null;
         CCircuitUnit@ best = null;
+        bool bestT3 = false;
         float bestSq = 1.0e30f;
         array<string>@ keys = reqs.getKeys();
         for (uint k = 0; k < keys.length(); ++k) {
@@ -180,11 +181,13 @@ namespace AllyClear {
                 }
                 if (!aiTerrainMgr.CanReachAt(u, g.GetPos(ai.frame), u.circuitDef.GetBuildDistance())) continue;
                 const float sq = MapHelpers::SqDist(u.GetPos(ai.frame), g.GetPos(ai.frame));
-                if (sq < bestSq) { bestSq = sq; @best = g; }
+                if (sq < bestSq) { bestSq = sq; @best = g; bestT3 = IsT3Key(keys[k]); }
             }
         }
         if (best is null) return null;
-        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, 60 * SECOND));
+        // a building given for a stuck T3: TECH's T1 energy storage exception applies (owner, 2026-11-18)
+        IUnitTask@ t = bestT3 ? T3Unstick::EnqueueReclaim(best, 60 * SECOND, false)
+                              : aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, 60 * SECOND));
         if (t is null || t.IsDead()) return null;
         if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }   // given back or gone meanwhile
         reclaimTask.set("" + best.id, @t);
@@ -218,7 +221,7 @@ namespace AllyClear {
         if (best is null) return null;
         IUnitTask@ live = null;
         if (reclaimTask.get("" + best.id, @live) && LiveReclaim(live, best)) return live;
-        IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, 60 * SECOND));
+        IUnitTask@ t = T3Unstick::EnqueueReclaim(best, 60 * SECOND, true);
         if (t is null || t.IsDead()) return null;
         if (!ai.IsOwnedUnit(best)) { aiBuilderMgr.AbortTask(t); return null; }
         reclaimTask.set("" + best.id, @t);
