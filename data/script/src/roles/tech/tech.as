@@ -594,6 +594,7 @@ namespace RoleTech
 		GenericHelpers::LogUtil("[TECH] Enter Tech_MainUpdate", 4);
 		Tech_UpdateNukeFirstStrike();
         NukeRecon::Tick();
+        TechGantryFill::Tick();   // owner 2026-11-19: every finished gantry fills to 40 turrets
 	}
 
 	// Release the first-strike override once the silo has had time to fire, so its
@@ -2007,6 +2008,7 @@ namespace RoleTech
 		GenericHelpers::LogUtil("[TECH] Enter Tech_BuilderAiTaskRemoved", 4);
 		if (task is null)
 			return;
+		TechGantryFill::TaskRemoved(task, done);
 
 		IBuilderTask @builderTask = cast<IBuilderTask>(task);
 		if (builderTask !is null)

@@ -305,7 +305,8 @@ namespace TechGantry {
         int cap = AiMin(t3Turrets, cluster.slots);
         const int ramp = Global::RoleSettings::Tech::T3RushTurretsRampSeconds;
         const int top = AiMin(Global::RoleSettings::Tech::T3RushTurretsRampTo, cluster.slots);
-        if (ramp > 0 && top > cap && factory !is null && factory.GetBuildProgress() >= 1.0f) {
+        // owner 2026-11-19: with the gantry fill on (tech_gantry_fill.as) the standing gantry's climb to 40 is its job
+        if (ramp > 0 && top > cap && factory !is null && factory.GetBuildProgress() >= 1.0f && !TechGantryFill::On()) {
             if (t3RampStart < 0) {
                 t3RampStart = ai.frame;
                 GenericHelpers::LogUtil("[TECH][T3Rush] the gantry stands: its turrets climb from " + cap + " to " + top

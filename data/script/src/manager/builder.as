@@ -24,6 +24,7 @@
 #include "../systems/construction/lolcannon.as"
 #include "../systems/construction/early_mex_upgraders.as"
 #include "../systems/construction/tech_air_squads.as"
+#include "../systems/construction/tech_gantry_fill.as"
 #include "../systems/construction/lrpc_block.as"
 
 namespace Builder {
@@ -2022,6 +2023,12 @@ namespace Builder {
 		}
         // owner, 2026-11-18: TECH maxed on metal with AI-to-AI donations paused: the T3 reclaim squad and the
         // gantry guard (tech_air_squads.as); their members never reach the rows below
+        // owner, 2026-11-19: a T1 constructor requisitioned to fill a finished gantry to its 40 turrets keeps
+        // that work (tech_gantry_fill.as); none left: null and it goes on below as usual
+        if (Global::AISettings::Role == AiRole::TECH) {
+            IUnitTask@ fill = TechGantryFill::Work(u);
+            if (fill !is null) return fill;
+        }
         if (Global::AISettings::Role == AiRole::TECH) {
             bool keepSquad = false;
             IUnitTask@ sq = TechAirSquads::Work(u, keepSquad);

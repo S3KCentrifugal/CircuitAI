@@ -390,6 +390,19 @@ namespace Tech {
             int GantryCrewClaimSeconds = 60;
             int GantryCrewRecruitSeconds = 90;
             int GantryCrewRecruitRetrySeconds = 120;   // a recruit that never reached the crew: another after this
+            // Gantry fill (owner, 2026-11-19; tech_gantry_fill.as): every finished TECH gantry climbs to
+            // GantryFillTurrets construction turrets within GantryFillSeconds of its finish. Played Scylla and
+            // Charybdis 11-19: the t3rush gantry stopped near 24 of a 32-slot block (the ramp topped out at the
+            // block and its orders sat behind the shared turret cap), the later gantries at 10. The cluster's
+            // block first, then blocks reserved beside the gantry, then engine-sited turrets; up to
+            // GantryFillCons T1 constructors (land or air) are requisitioned for it. 0 = off.
+            int GantryFillTurrets = 40;
+            int GantryFillSeconds = 300;              // the deadline the +2/+5 min log lines measure
+            int GantryFillCons = 10;                  // T1 constructors requisitioned at once (over all gantries)
+            int GantryFillParallel = 10;              // turret orders open at once per gantry
+            float GantryFillReach = 4000.0f;          // land constructors this near the gantry are requisitioned (air: any distance)
+            float GantryFillRadius = 550.0f;          // a turret this near the gantry (and nearer it than any other factory) is its
+            int GantryFillScanSeconds = 2;            // count and requisition refresh while a gantry is short
             int FrontT3TurretsFirst = 10;                  // D-119: the gantry is ordered once this many of its turrets stand; the rest keep filling
             // T3RushTurretsMin / T3RushTurretsMax (owner, 2026-10-11, back on 2026-10-18): the t3rush gantry's cluster
             // gets a random number of turrets in [Min, Max], rolled once a game, while its gantry goes up
