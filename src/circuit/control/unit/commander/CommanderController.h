@@ -636,12 +636,14 @@ private:
         int group=0; springai::AIFloat3 centre{-1,0,-1}; float radius=0;
         float axisX=0,axisZ=1,across=0,along=0;
         int launcher=0,launcherTries=0; springai::AIFloat3 launcherSite{-1,0,-1};
+        bool launcherStood=false; int abandonUntil=0;  // owner 2026-11-19: stood once / abandoned block cooldown
     };
     std::map<int,TacticalBlock> tacticalBlocks;
     int BlockArtilleryBuilt(const TacticalBlock& block,bool frames=false) const;
     // Owner 2026-11-19: no block gun unless this team has a finished EMP launcher
     // (armemp, cortron, legperdition) standing anywhere; answer cached per frame.
     bool TeamEmpLauncherStanding() const;
+    void BlockAbandon(CCircuitDef* def,TacticalBlock& block,int frame);
     mutable int empStandFrame=-1,empGateLog=-100000; mutable bool empStand=false;
     bool BlockLauncherNear(const springai::AIFloat3& site,const CCircuitDef* def) const;
     CCircuitDef* BlockLauncherDef(CCircuitUnit* unit) const;

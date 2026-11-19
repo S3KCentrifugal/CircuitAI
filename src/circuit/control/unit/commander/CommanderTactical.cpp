@@ -59,6 +59,11 @@ constexpr int TACTICAL_SIDE_STEPS=5;
 constexpr float TACTICAL_SIDE[TACTICAL_SIDE_STEPS]={0.f,-1.f,1.f,-2.f,2.f};
 // Lane look-ahead (elmos) that gives the forward direction.
 constexpr float TACTICAL_LANE_AHEAD=256.f;
+// Owner 2026-11-19: block launcher sites tried before the block is abandoned, the step outward per ring of
+// five sites, and how long an abandoned block's definition waits before a new block is reserved.
+constexpr int BLOCK_LAUNCHER_TRIES=20;
+constexpr float BLOCK_LAUNCHER_STEP=64.f;
+constexpr int BLOCK_ABANDON_SECONDS=120;
 commander::Point TacticalP(const AIFloat3& p) { return {p.x,p.z}; }
 AIFloat3 TacticalF(commander::Point p) { return {p.x,0.f,p.z}; }
 }
@@ -191,7 +196,7 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
         block.group=group; block.centre=centre;
         block.radius=.5f*std::sqrt(across*across+along*along)+size;
         block.axisX=axis.x; block.axisZ=axis.z; block.across=across; block.along=along;
-        block.launcher=0; block.launcherTries=0; block.launcherSite=AIFloat3(-1.f,0.f,-1.f);
+        block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherSite=AIFloat3(-1.f,0.f,-1.f);
         ai->LOG("[CommanderGroup] tactical_block group=%i slots=%i def=%s at=%.0f,%.0f facing=%i",group,
             terrain->GetGroupCount(group,false),def->GetDef()->GetName(),centre.x,centre.z,facing);
         return true;
@@ -258,6 +263,7 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         terrain->ReleaseGroup(block.group);
         block.group=0;
     }
+    if(block.group<=0 && frame<block.abandonUntil) return nullptr;  // owner 2026-11-19: an abandoned block cools down
     if(block.group<=0 && !ReserveTacticalBlock(unit,anchor,def,frame)) return nullptr;
     // Owner 2026-11-13: two T2 artillery up -> the launcher flush beside / behind the block, then more artillery
     if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && block.launcher<2) {
@@ -266,19 +272,25 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     }
     // Owner 2026-11-19 (Scylla, AI 15 kept filling Persecutor blocks with no Catalyst up): a block gets no new
     // gun unless this team has a finished EMP launcher (armemp, cortron, legperdition) standing. With none, the
-    // block's own launcher is ordered first (no two-gun wait); one that stood and has died is ordered again
-    // (at most 4 tries a block, as before).
+    // block's own launcher is ordered first (no two-gun wait); one that stood and has died is ordered again.
+    // A block whose launcher could not be placed after BLOCK_LAUNCHER_TRIES sites is abandoned (BlockAbandon):
+    // no more guns there, even with a launcher standing elsewhere.
+    if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && block.launcher==2 && !block.launcherStood) {
+        BlockAbandon(def,block,frame);
+        return nullptr;
+    }
     if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && !TeamEmpLauncherStanding()) {
-        if(block.launcher==2 && block.launcherTries<3 && block.launcherSite.x>=0.f && !(tacticalJob && !tacticalJob->IsDead())) {
-            block.launcher=0; ++block.launcherTries;
+        if(block.launcher==2 && block.launcherStood && !(tacticalJob && !tacticalJob->IsDead())) {
+            block.launcher=0; block.launcherStood=false; ++block.launcherTries;
             ai->LOG("[CommanderGroup] block_launcher lost block=%i tries=%i",block.group,block.launcherTries);
         }
         if(block.launcher<2)
             if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame,true)) return launcherTask;
+        if(block.launcher==2 && !block.launcherStood) { BlockAbandon(def,block,frame); return nullptr; }
         if(frame>=empGateLog+30*FRAMES_PER_SEC) {
             empGateLog=frame;
-            ai->LOG("[CommanderGroup] block_gun held def=%s block=%i guns=%i launcher=%i: no finished EMP launcher standing team=%i",
-                def->GetDef()->GetName(),block.group,BlockArtilleryBuilt(block,true),block.launcher,ai->GetTeamId());
+            ai->LOG("[CommanderGroup] block_gun held def=%s block=%i guns=%i launcher=%i tries=%i: no finished EMP launcher standing team=%i",
+                def->GetDef()->GetName(),block.group,BlockArtilleryBuilt(block,true),block.launcher,block.launcherTries,ai->GetTeamId());
         }
         return nullptr;
     }
@@ -333,10 +345,17 @@ bool CCommanderController::BlockLauncherNear(const AIFloat3& site,const CCircuit
     bool found=false;
     auto& units=clb->GetFriendlyUnitsIn(site,64.f);
     for(springai::Unit* u:units) {
-        if(u && !found && u->GetTeam()==team && def && clb->Unit_GetDefId(u->GetUnitId())==def->GetId()) found=true;
+        if(u && !found && u->GetTeam()==team && def && !u->IsBeingBuilt() && clb->Unit_GetDefId(u->GetUnitId())==def->GetId()) found=true;  // finished only (owner 2026-11-19)
         delete u;
     }
     return found;
+}
+void CCommanderController::BlockAbandon(CCircuitDef* def,TacticalBlock& block,int frame) {
+    ai->LOG("[CommanderGroup] block_abandoned def=%s block=%i guns=%i tries=%i team=%i: no launcher placed",
+        def->GetDef()->GetName(),block.group,BlockArtilleryBuilt(block,true),block.launcherTries,ai->GetTeamId());
+    ai->GetTerrainManager()->ReleaseGroup(block.group);
+    block.group=0; block.launcher=0; block.launcherTries=0; block.launcherStood=false;
+    block.abandonUntil=frame+BLOCK_ABANDON_SECONDS*FRAMES_PER_SEC;
 }
 bool CCommanderController::TeamEmpLauncherStanding() const {
     const int frame=ai->GetLastFrame();
@@ -371,32 +390,41 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
     CCircuitDef* ldef=BlockLauncherDef(unit);
     if(block.launcher==1) {
         if(ldef && BlockLauncherNear(block.launcherSite,ldef)) {
-            block.launcher=2;
+            block.launcher=2; block.launcherStood=true;
             ai->LOG("[CommanderGroup] block_launcher standing def=%s at=%.0f,%.0f block=%i",ldef->GetDef()->GetName(),
                 block.launcherSite.x,block.launcherSite.z,block.group);
             return nullptr;
         }
         if(tacticalJob && !tacticalJob->IsDead()) return nullptr;
         block.launcher=0;
-        if(++block.launcherTries>=4) {
+        if(++block.launcherTries>=BLOCK_LAUNCHER_TRIES) {
             block.launcher=2;
             ai->LOG("[CommanderGroup] block_launcher given_up block=%i tries=%i",block.group,block.launcherTries);
             return nullptr;
         }
     }
     if(!first && BlockArtilleryBuilt(block)<2) return nullptr;
-    if(!ldef) { block.launcher=2; ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i",block.group); return nullptr; }
+    if(!ldef) {
+        // A launcher of this team standing elsewhere (the unit cap makes none buildable) covers the block.
+        block.launcher=2; block.launcherStood=TeamEmpLauncherStanding();
+        ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i covered=%i",block.group,int(block.launcherStood));
+        return nullptr;
+    }
     auto* terrain=ai->GetTerrainManager();
     auto* builder=ai->GetBuilderManager();
     const float ls=float(std::max(ldef->GetDef()->GetXSize(),ldef->GetDef()->GetZSize()))*SQUARE_SIZE;
     const float ax=block.axisX,az=block.axisZ,sx=-az,sz=ax;   // side = (-axis.z, axis.x)
     const float sideOff=.5f*block.across+.5f*ls,backOff=.5f*block.along+.5f*ls;
-    const float dirs[3][2]={{sx,sz},{-sx,-sz},{-ax,-az}};
-    const float offs[3]={sideOff,sideOff,backOff};
-    for(int k=block.launcherTries;k<6;++k) {
-        const int d=k%3;
-        const float off=offs[d]+(k>=3?32.f:0.f);
-        AIFloat3 site(block.centre.x+dirs[d][0]*off,0.f,block.centre.z+dirs[d][1]*off);
+    // Owner 2026-11-19: sites go round left, right, back, back-left, back-right of the block, each ring
+    // BLOCK_LAUNCHER_STEP elmos further out than the last, so failed orders keep moving the launcher away.
+    const float dirs[5][2]={{sx,sz},{-sx,-sz},{-ax,-az},{sx-ax,sz-az},{-sx-ax,-sz-az}};
+    const float offs[5]={sideOff,sideOff,backOff,std::max(sideOff,backOff),std::max(sideOff,backOff)};
+    for(int k=block.launcherTries;k<BLOCK_LAUNCHER_TRIES;++k) {
+        const int d=k%5;
+        const float ring=float(k/5)*BLOCK_LAUNCHER_STEP;
+        const float len=(d>=3)?std::sqrt(2.f):1.f;
+        const float off=offs[d]+ring;
+        AIFloat3 site(block.centre.x+dirs[d][0]/len*off,0.f,block.centre.z+dirs[d][1]/len*off);
         if(!OnMap(site)) continue;
         site.y=ai->GetMap()->GetElevationAt(site.x,site.z);
         if(!terrain->CanBeBuiltAt(ldef,site) || !terrain->CanReachAtSafe(unit,site,unit->GetCircuitDef()->GetBuildDistance(),
@@ -406,8 +434,8 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
         if(!task) continue;
         tacticalJob=task;
         block.launcher=1; block.launcherSite=site; block.launcherTries=k;
-        ai->LOG("[CommanderGroup] block_launcher order def=%s at=%.0f,%.0f side=%s block=%i artillery=%s unit=%i team=%i",
-            ldef->GetDef()->GetName(),site.x,site.z,d==2?"back":(d==0?"left":"right"),block.group,def->GetDef()->GetName(),
+        ai->LOG("[CommanderGroup] block_launcher order def=%s at=%.0f,%.0f side=%s try=%i block=%i artillery=%s unit=%i team=%i",
+            ldef->GetDef()->GetName(),site.x,site.z,d==2?"back":d==0?"left":d==1?"right":d==3?"back_left":"back_right",k,block.group,def->GetDef()->GetName(),
             unit->GetId(),ai->GetTeamId());
         return task;
     }
