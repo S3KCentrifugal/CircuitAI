@@ -166,6 +166,11 @@ protected:
 	// The unit leaves this job (others keep it; its own job is dropped).
 	// Only when the unit is alive and still on this task; true when it left.
 	bool LeavePorc(CCircuitUnit* unit, const springai::AIFloat3& spot, const char* where);
+	// Owner 2026-11-18 (Stronghold): a con whose walk to this job led it into
+	// known porc reach (the job's own spot outside it) left it; the job stays
+	// porc blocked for that con until this frame, so it does not walk the same
+	// path straight back in. Unit id -> frame.
+	std::map<int, int> porcWalkBlocked;
 	// Experimental build mode (D-064): the manager's flag; the engine's build
 	// range for this unit and site (reach + buildee radius, x0.9); the command
 	// timeout (none in the mode); engage when inside the range, or inside the

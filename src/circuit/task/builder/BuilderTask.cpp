@@ -950,6 +950,10 @@ bool IBuilderTask::IsPorcBlocked(CCircuitUnit* unit) const
 	if (IsDead() || (manager == nullptr)) return false;
 	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
 	if ((economyMgr == nullptr) || !economyMgr->IsPorcGuarded(unit)) return false;
+	{
+		auto it = porcWalkBlocked.find(unit->GetId());
+		if ((it != porcWalkBlocked.end()) && (manager->GetCircuit()->GetLastFrame() < it->second)) return true;
+	}
 	// buildPos: the site, or the frame / reclaim target where one is set;
 	// position: the order's place (area reclaim centre, guard spot)
 	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;
@@ -981,6 +985,8 @@ bool IBuilderTask::DropIfPorc(CCircuitUnit* unit, const char* where)
 			|| !economyMgr->IsPorcGuarded(unit)) return false;
 		const AIFloat3 at = unit->GetPos(manager->GetCircuit()->GetLastFrame());
 		if (!(economyMgr->EnemyPorcClearance(unit, at) < 0.f)) return false;
+		// Owner 2026-11-18: its path led it in; not this job again for a while
+		porcWalkBlocked[unit->GetId()] = manager->GetCircuit()->GetLastFrame() + FRAMES_PER_SEC * 60;
 		return LeavePorc(unit, at, where);
 	}
 	const AIFloat3 spot = geom::is_valid(buildPos) ? buildPos : position;  // copy: Abort resets buildPos
