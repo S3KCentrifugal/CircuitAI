@@ -168,6 +168,29 @@ namespace Front {
             // TECH's T3Rush<Side> list (Razorback/Vanguard, Shiva/Catapult, Daedalus/Myrmidon), in turn, every
             // FRONT gantry together; then the heavies above. 0 = off.
             int GantryRushUnits = 10;
+            // Gantry site clearing (owner, 2026-11-18; systems/construction/front_gantry_clear.as): when no reservable
+            // gantry footprint is found round the gantry anchors, the nearest site whose only blockers are a few of
+            // our own non-critical structures (rear T1 porc, T1 eco, T1 construction turrets, walls, T2 radar/jammer)
+            // inside the footprint or the strip in front of its exit is cleared (allied SMRTBARbs give theirs, then
+            // ours are reclaimed), checked reservable again and the gantry ordered there, facing that exit. Never
+            // reclaimed: fusions, advanced fusions, antinukes, long-range AA, tactical/EMP launchers, nukes,
+            // long-range plasma, factories, mexes, geos, energy storage, porc less than Global::PorcFrontLine::BehindMargin
+            // (500) behind our porc front line (systems/world/porc_front_line.as) and porc in a cluster round one of
+            // our factories. Log [GantryClear].
+            bool GantryClear = true;
+            int GantryClearMaxBlockers = 8;           // "a few": more of ours in the rectangle and the site is skipped
+            float GantryClearMaxMetal = 2500.0f;      // ... or more metal than this in them
+            float GantryClearExitLength = 160.0f;     // elmos of the strip in front of the gantry's exit side
+            float GantryClearMargin = 16.0f;          // elmos round the footprint and the strip
+            float GantryClearFactoryRadius = 640.0f;  // porc this close to one of our factories ...
+            int GantryClearFactoryCluster = 4;        // ... with this many porc round that factory is its cluster: kept
+            float GantryClearMaxSlope = 0.02f;        // engine slope (1 - cos) for the terrain pre-check
+            float GantryClearMinFlat = 0.9f;          // share of the footprint at or under it
+            float GantryClearReclaimSeconds = 120.0f; // a clearing round gives up after this
+            float GantryClearBuilderRange = 2500.0f;  // mobile constructors this close to a blocker help
+            int GantryClearBuildersPerBlocker = 2;
+            int GantryClearMaxSites = 4;              // clearing rounds per FRONT before only engine-sited orders are left
+            float GantryClearRetrySeconds = 60.0f;    // a search that found no site waits this long
 
             // FRONT nuclear silos (SiloGrid, NukeLimit 8, NukeMinSeconds 35 min, 175 M / 5000 E gates, SiloGrid* site search)
             // removed (owner 2026-11-18), to be refactored into another situation; restore from 040a722e7.

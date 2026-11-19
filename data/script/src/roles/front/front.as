@@ -24,6 +24,7 @@
 #include "../../systems/construction/front_overflow.as"
 #include "../../systems/construction/front_factory_nanos.as"
 #include "../../systems/construction/front_gantry_nanos.as"
+#include "../../systems/construction/front_gantry_clear.as"
 #include "../../systems/construction/front_lab_porc.as"
 #include "../../systems/construction/front_agitator.as"
 #include "../../systems/construction/front_tactical.as"
@@ -229,6 +230,7 @@ namespace RoleFront {
     void Front_MainUpdate() {
         FrontConstructors::Watch();   // D-465: stale geothermal orders of the energy seat, every second
         FrontGantryNanos::Tick();     // owner 2026-11-12: gantry caretakers, T1 constructors requisitioned (front_gantry_nanos.as)
+        FrontGantryClear::Tick();     // owner 2026-11-18: a gantry site cleared of our rear porc / eco (front_gantry_clear.as)
         // Delay dynamic quota adjustments until 5 minutes into the game to avoid
         // early-game oscillations while armies and caches are still forming.
         if (ai.frame < FRONT_DYNAMIC_QUOTA_DELAY_FRAMES) {
@@ -1208,7 +1210,25 @@ namespace RoleFront {
         if (!gantry.IsAvailable(ai.frame))
             return Front_LadderGantryHeld(gantry.GetName() + " unavailable (count " + gantry.count + ", cap " + gantry.maxThisUnit + ")");
         AIFloat3 site;
-        bool sited = Front_LadderGantrySite(gantry, site);
+        // owner 2026-11-18: a site cleared of our rear porc / eco (front_gantry_clear.as) comes first once ready
+        int clearFacing = 0;
+        const int clearing = FrontGantryClear::Pending(gantry, site, clearFacing);
+        if (clearing == 1) {
+            IUnitTask@ rt = FrontGantryClear::BuilderTask(u);
+            if (rt !is null) return rt;
+            return Front_LadderGantryHeld("clearing a gantry site at " + int(site.x) + "," + int(site.z));
+        }
+        const bool cleared = clearing == 2;
+        bool sited = cleared || Front_LadderGantrySite(gantry, site);
+        if (!sited && Global::Map::HasStart) {
+            // no reservable footprint round the anchors: the nearest site only our rear porc / eco blocks is cleared first
+            const AIFloat3 centre(float(aiTerrainMgr.GetTerrainWidth()) * MapCenterFraction, 0.0f, float(aiTerrainMgr.GetTerrainHeight()) * MapCenterFraction);
+            if (FrontGantryClear::Try(gantry, LayoutHelpers::FacingToward(Global::Map::StartPos, centre))) {
+                IUnitTask@ rt = FrontGantryClear::BuilderTask(u);
+                if (rt !is null) return rt;
+                return Front_LadderGantryHeld("clearing a gantry site");
+            }
+        }
         float shake = SQUARE_SIZE * 4;
         if (!sited) {
             // no reservable footprint found: the engine places it itself, round the next fallback anchor
@@ -1217,6 +1237,7 @@ namespace RoleFront {
         }
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Factory(Task::Priority::NOW, gantry, site, gantry, shake, false, true, 600 * SECOND));
         if (t is null) {
+            if (cleared) FrontGantryClear::OrderFailed();
             g_frontLadderGantryRetry = ai.frame + 60 * SECOND;
             GenericHelpers::LogUtil("[FRONT][Eco] gantry could not be ordered at " + int(site.x) + "," + int(site.z) + (sited ? "" : " (engine-sited, try " + g_frontLadderGantryTry + ")") + "; retry in 60 s", 1);
             return null;
@@ -1233,7 +1254,8 @@ namespace RoleFront {
         g_frontGantryCorridorOff = true;
         Builder::MarkGantryEnqueued();
         @g_frontLadderGantryTask = t; g_frontLadderGantrySite = site;
-        GenericHelpers::LogUtil("[FRONT][Eco] gantry " + gantry.GetName() + " ordered at " + int(site.x) + "," + int(site.z) + (sited ? " (reserved site)" : " (engine-sited, try " + g_frontLadderGantryTry + ")")
+        if (cleared) FrontGantryClear::Ordered(t);
+        GenericHelpers::LogUtil("[FRONT][Eco] gantry " + gantry.GetName() + " ordered at " + int(site.x) + "," + int(site.z) + (cleared ? " (cleared site)" : sited ? " (reserved site)" : " (engine-sited, try " + g_frontLadderGantryTry + ")")
             + " | M +" + int(mi) + " E +" + int(ei) + " bank " + int(aiEconomyMgr.metal.current) + " by " + u.circuitDef.GetName() + " " + u.id, 1);
         return t;
     }

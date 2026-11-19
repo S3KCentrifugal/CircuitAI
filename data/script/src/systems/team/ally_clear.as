@@ -72,9 +72,14 @@ namespace AllyClear {
     // turrets ClearDeepMargin behind it)
     bool lcRequests = false;
     bool IsLolKey(const string &in key) { return key.findFirst("lc.") == 0; }
+    // FRONT gantry site clearing (owner, 2026-11-18; front_gantry_clear.as): key "fg.<team>.<round>"; the
+    // owner gives what FrontGantryClear::Judge allows on its side (porc 500+ behind its own porc front line, eco,
+    // turrets, walls, T2 intel)
+    bool fgRequests = false;
+    bool IsGantryKey(const string &in key) { return key.findFirst("fg.") == 0; }
     bool IsRequester()
     {
-        return Enabled() && (t3Requests || lcRequests || Global::AISettings::Role == AiRole::TECH || Global::AISettings::Role == AiRole::AIR);
+        return Enabled() && (t3Requests || lcRequests || fgRequests || Global::AISettings::Role == AiRole::TECH || Global::AISettings::Role == AiRole::AIR);
     }
     bool Allowed(const string &in name)
     {
@@ -108,7 +113,8 @@ namespace AllyClear {
         // An offer can arrive before UnitGiven. Admit only an eligible blocker,
         // and remember the first owned identity for the lifetime of this request.
         const string name = u.circuitDef.GetName();
-        if (IsLolKey(r.key) ? !LolCannonClear::KeyKind(r.key, name) : !(Allowed(name) || T3Eligible(r.key, name))) return null;
+        if (IsLolKey(r.key) ? !LolCannonClear::KeyKind(r.key, name)
+            : IsGantryKey(r.key) ? !FrontGantryClear::Kind(name) : !(Allowed(name) || T3Eligible(r.key, name))) return null;
         r.received.set("" + id, @u);
         return u;
     }
@@ -121,6 +127,7 @@ namespace AllyClear {
         // T3Unstick (owner, 2026-10-20): any role may ask to free a penned T3
         if (Enabled() && IsT3Key(key)) t3Requests = true;
         if (Enabled() && IsLolKey(key)) lcRequests = true;
+        if (Enabled() && IsGantryKey(key)) fgRequests = true;
         if (!IsRequester()) return false;
         Req@ r = null;
         if (reqs.get(key, @r) && r !is null) {
@@ -241,7 +248,9 @@ namespace AllyClear {
             Team::Roster::Entry@ who = Team::Roster::Get(sender);
             const bool t3 = IsT3Key(f[2]);   // T3Unstick: any SMRTBARb role, and its wider list (turrets, T2 flak/arty)
             const bool lc = IsLolKey(f[2]);   // lolcannon site (FRONT or TECH asks): LolCannonClear::Kind only
-            if (who is null || (!t3 && !lc && who.role != AiRole::TECH && who.role != AiRole::AIR)) return true;
+            const bool fg = IsGantryKey(f[2]);   // FRONT gantry site: FrontGantryClear::Judge decides on our side
+            if (who is null || (!t3 && !lc && !fg && who.role != AiRole::TECH && who.role != AiRole::AIR)) return true;
+            if (fg) FrontGantryClear::PrepareJudge();
             if (f[2].length() == 0 || f[2].findFirst(",") >= 0) return true;   // a malformed key could not be granted back
             const float x = float(parseInt(f[3])), z = float(parseInt(f[4]));
             const float hx = float(parseInt(f[5])), hz = float(parseInt(f[6]));
@@ -254,13 +263,21 @@ namespace AllyClear {
                 if (!ai.IsOwnedUnit(u) || u.circuitDef.IsMobile()) continue;
                 const string name = u.circuitDef.GetName();
                 const bool fusion = UnitHelpers::IsAnyFusionReactor(name);
-                const bool eligible = lc ? LolCannonClear::AllyGive(u) : (Allowed(name) || T3Eligible(f[2], name));
+                const bool eligible = lc ? LolCannonClear::AllyGive(u) : fg ? FrontGantryClear::Kind(name) : (Allowed(name) || T3Eligible(f[2], name));
                 if (!eligible || (keepEnergy && (IsEco(name) || fusion))) continue;
                 if (aiBuilderMgr.IsReclaimProtected(u.circuitDef)) continue;   // never hand over what we may not reclaim ourselves
                 const AIFloat3 p = u.GetPos(ai.frame);
                 const float rx = float(u.circuitDef.GetFootprintX()) * SQUARE_SIZE;   // half the footprint, elmos
                 const float rz = float(u.circuitDef.GetFootprintZ()) * SQUARE_SIZE;
                 if (abs(p.x - x) > hx + rx || abs(p.z - z) > hz + rz) continue;
+                if (fg) {
+                    // never our front porc, a factory's porc cluster or a critical structure (same rules as the asker's)
+                    string why;
+                    if (!FrontGantryClear::Judge(u, why)) continue;
+                    GenericHelpers::LogUtil("[GantryClear] giving " + name + " " + u.id + " at (" + int(p.x) + "," + int(p.z) + ")"
+                        + (FrontGantryClear::IsPorc(name) || FrontGantryClear::IsWall(name) ? " behind line +" + int(FrontGantryClear::RearDepth(p)) : "")
+                        + " to team " + sender + " for its gantry (" + f[2] + ")", 1);
+                }
                 give.insertLast(u); ids.insertLast(u.id);
             }
             if (give.length() == 0) return true;

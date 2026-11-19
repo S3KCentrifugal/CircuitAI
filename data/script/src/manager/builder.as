@@ -2141,6 +2141,7 @@ namespace Builder {
 		if (t is null) @t = ForwardGeo::Work(u); // D-488: FRONT and AIR fortify forward vents first
 		if (t is null) @t = SeaCoast::Build(u); // SEA-only lost-water recovery precedes discretionary spam.
 		if (t is null) @t = T3Unstick::BuilderTask(u); // preserve pending-all T3 recovery
+		if (t is null) @t = FrontGantryClear::BuilderTask(u); // owner, 2026-11-18: clear a FRONT gantry site of our rear porc / eco
 		if (t is null) @t = Team::AllyClear::BuilderTask(u); // owner, 2026-10-17: reclaim allied buildings given to us
 		if (t is null) @t = AntiSpam::BuilderTask(u); // owner, 2026-10-27: the FRONT nearest an enemy spam lane holds it
 		if (t is null) @t = EdgeLanes::BuilderTask(u); // owner, 2026-10-17: two FRONTs build the edge lane labs
