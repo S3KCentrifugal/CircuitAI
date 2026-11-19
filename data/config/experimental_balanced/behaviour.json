@@ -80,13 +80,7 @@
 			"heavy_cost": 600, "heavy_share": 0.5, "close_under_fire": 0, "log": 1
 		},
 		"artillery_popup": {"extends": "artillery_battery", "close_under_fire": 1, "close_seconds": 6, "hit_seconds": 2},
-		"artillery_fortified": {"extends": "artillery_battery"},
-		// Owner 2026-11-18 (Esker): the Eviscerator's close sinks its muzzle 75 below the
-		// ground, and from there the engine never aims it again, so it never reopens (5 of 8
-		// guns that game). Never close it on purpose; after keep_open_seconds without a shot
-		// a 1 s attack-ground order 70 degrees off the facing restarts its 10 s close timer.
-		"artillery_popup_deep": {"extends": "artillery_popup", "close_under_fire": 0,
-			"keep_open_seconds": 7, "keep_open_order_seconds": 1, "keep_open_turn": 70, "keep_open_reach": 0.6}
+		"artillery_fortified": {"extends": "artillery_battery"}
 	},
 	"roles": {"commander": "commander"}
 },

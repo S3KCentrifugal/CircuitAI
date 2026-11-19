@@ -12,12 +12,8 @@
 #include "unit/ally/AllyTeam.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "spring/SpringUnit.h"
-#include "spring/SpringCallback.h"
-#include "spring/SpringMap.h"
-#include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
 #include "AISCommands.h"
-#include "Weapon.h"
 #include "util/Utils.h"
 #include "util/Performance.h"
 #include "Log.h"
@@ -49,10 +45,6 @@ const control::CConfigTable<ArtilleryConfig>& ArtilleryTable()
 		Lever<&AC::closeSeconds>("close_seconds", 0, 60),
 		Lever<&AC::hitSeconds>("hit_seconds", .1f, 10),
 		Lever<&AC::log>("log", 0, 1),
-		Lever<&AC::keepOpenSeconds>("keep_open_seconds", 0, 60),
-		Lever<&AC::keepOpenOrderSeconds>("keep_open_order_seconds", .2f, 5),
-		Lever<&AC::keepOpenTurn>("keep_open_turn", 0, 180),
-		Lever<&AC::keepOpenReach>("keep_open_reach", .1f, 1),
 	});
 	return table;
 }
@@ -183,18 +175,9 @@ void CArtilleryController::Decide(CCircuitUnit* unit, control::ArtilleryState& s
 		}
 	}
 
-	// A shot is a rising main-weapon reload frame (sampled once per decision). O(1).
-	if (cfg->keepOpenSeconds > 0.f) {
-		springai::Weapon* weapon = unit->GetMainWeapon();
-		const int reload = (weapon != nullptr) ? weapon->GetReloadFrame() : -1;
-		if (s.reload >= 0 && reload > s.reload) s.shot = frame;
-		s.reload = reload;
-	}
-
 	const int chosen = artillery::Choose(s.target, scratch);
 	if (chosen < 0) {
 		if (s.target >= 0) Release(unit, s, "none in reach: engine targeting");
-		if (!closed) KeepOpen(unit, s, frame);
 		return;
 	}
 	const auto& c = scratch[chosen];
@@ -233,62 +216,6 @@ void CArtilleryController::Release(CCircuitUnit* unit, control::ArtilleryState& 
 	TRY_UNIT(ai, unit, unit->CmdStop();)
 	if (cfg->log > 0.f) ai->LOG("[Artillery] release unit=%i target=%i: %s", unit->GetId(), s.target, why);
 	s.target = -1; s.kind = 0; s.issued = 0;
-}
-
-/*
- * Keep-open pulse (see ArtilleryConfig): only for a gun we are not aiming, at
- * most once per keep_open_seconds, and only after that long without a seen
- * shot. The pulse point is keep_open_reach of the range out, keep_open_turn
- * degrees either side of the building facing (alternating), and moves to the
- * other side or a nearer point when a friendly unit stands within 200 elmos of
- * it (in case the order lasts long enough to fire). The friendly query
- * allocates, so it runs only on a pulse: O(pulses), not per decision.
- */
-void CArtilleryController::KeepOpen(CCircuitUnit* unit, control::ArtilleryState& s, int frame)
-{
-	if (cfg->keepOpenSeconds <= 0.f) return;
-	const int wait = int(cfg->keepOpenSeconds * FRAMES_PER_SEC);
-	if (frame - std::max(s.shot, s.pulse) < wait) return;
-
-	const AIFloat3 at = unit->GetPos(frame);
-	float fx = 0.f, fz = 1.f;  // UNIT_FACING_SOUTH
-	switch (unit->GetUnit()->GetBuildingFacing()) {
-		case UNIT_FACING_EAST:  fx = 1.f;  fz = 0.f; break;
-		case UNIT_FACING_NORTH: fx = 0.f;  fz = -1.f; break;
-		case UNIT_FACING_WEST:  fx = -1.f; fz = 0.f; break;
-		default: break;
-	}
-	auto* clb = ai->GetCallback();
-	const float range = unit->GetCircuitDef()->GetMaxRange();
-	const float turn = cfg->keepOpenTurn * 3.14159265f / 180.f;
-	AIFloat3 pick = -RgtVector, first = -RgtVector;
-	for (int attempt = 0; attempt < 4 && pick.x < 0.f; ++attempt) {
-		const int side = (attempt % 2 == 0) ? s.side : -s.side;
-		const float reach = range * cfg->keepOpenReach * (attempt < 2 ? 1.f : .5f);
-		const float a = turn * float(side), c = std::cos(a), sn = std::sin(a);
-		AIFloat3 p(at.x + (fx * c - fz * sn) * reach, 0.f, at.z + (fx * sn + fz * c) * reach);
-		CTerrainManager::CorrectPosition(p);
-		p.y = ai->GetMap()->GetElevationAt(p.x, p.z);
-		if (attempt == 0) first = p;
-		bool friendly = false;
-		auto& units = clb->GetFriendlyUnitsIn(p, 200.f);
-		for (springai::Unit* u : units) {
-			if (u != nullptr && u->GetUnitId() != unit->GetId()) friendly = true;
-			delete u;
-		}
-		if (!friendly) { pick = p; s.side = -side; }
-	}
-	// No point clear of friendlies: pulse anyway (a closed gun is lost for good;
-	// the order usually expires before the turret turns far enough to fire).
-	if (pick.x < 0.f) { pick = first; s.side = -s.side; }
-	s.pulse = frame;
-	const int timeout = frame + std::max(1, int(cfg->keepOpenOrderSeconds * FRAMES_PER_SEC));
-	TRY_UNIT(ai, unit, unit->CmdAttackGround(pick, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);)
-	++s.pulses;
-	// The first pulse of a gun, then every 20th: a gun idles for minutes.
-	if (cfg->log > 0.f && (s.pulses == 1 || s.pulses % 20 == 0))
-		ai->LOG("[Artillery] keep_open unit=%i pulse=%i at=%.0f,%.0f idle=%is", unit->GetId(), s.pulses, pick.x, pick.z,
-			(frame - std::max(s.shot, 0)) / FRAMES_PER_SEC);
 }
 
 int CArtilleryController::CountNear(const AIFloat3& site, float radius) const
