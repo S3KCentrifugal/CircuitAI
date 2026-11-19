@@ -104,7 +104,7 @@ public:
 	using AttrT = std::underlying_type<AttrType>::type;
 	using AttrM = std::underlying_type<AttrMask>::type;
 
-	enum FireType: int {HOLD = 0, RETURN = 1, OPEN = 2};
+	enum FireType: int {HOLD = 0, RETURN = 1, OPEN = 2, NEUTRAL = 3};  // NEUTRAL: open fire + engine auto-targets neutral objects (BAR walls) last
 	using FireT = std::underlying_type<FireType>::type;
 
 	enum MoveType: int {HOLD_POS = 0, MANEUVRE = 1, ROAM = 2};
@@ -199,7 +199,7 @@ public:
 
 	bool IsHoldFire()   const { return fireState == FireType::HOLD; }
 	bool IsReturnFire() const { return fireState == FireType::RETURN; }
-	bool IsOpenFire()   const { return fireState == FireType::OPEN; }
+	bool IsOpenFire()   const { return fireState >= FireType::OPEN; }
 
 	const std::unordered_set<Id>& GetBuildOptions() const { return buildOptions; }
 	float GetBuildDistance() const { return buildDistance; }

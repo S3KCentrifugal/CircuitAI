@@ -741,6 +741,12 @@ void CCircuitUnit::CmdSetFireState(CCircuitDef::FireT state)
 {
     if (IsSlowMissileLauncher(circuitDef->GetDef()->GetName())) state = CCircuitDef::FireType::HOLD;
     requestedFire=state;
+	// A def whose profile fire state is fire-at-neutral (3: FRONT T1, T2 direct
+	// fire, SEA/TACTICAL T1) keeps it whenever a task opens fire, so walls stay
+	// a lowest-priority engine target during micro; requestedFire stays OPEN.
+	if ((state == CCircuitDef::FireType::OPEN) && (circuitDef->GetFireState() == CCircuitDef::FireType::NEUTRAL)) {
+		state = CCircuitDef::FireType::NEUTRAL;
+	}
 	if (RepeatState(sentFire, sentFireFrame, state)) return;
 	unit->SetFireState(state);
 }

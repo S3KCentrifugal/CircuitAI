@@ -143,6 +143,8 @@ namespace RoleConfigs {
         if (Global::profileController.RoleCfg.InitHandler !is null) {
             Global::profileController.RoleCfg.InitHandler();
         }
+        // Every role: T2 mobile non-artillery units shoot T2 walls as their lowest target.
+        GenericHelpers::LogUtil("[WallFire] T2 defs set to fire at walls: " + UnitHelpers::ApplyT2WallFire(), 2);
         GenericHelpers::LogUtil("Applied role-specific startup limits", 2);
     }
 

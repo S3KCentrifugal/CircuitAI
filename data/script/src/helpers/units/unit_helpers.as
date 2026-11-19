@@ -401,6 +401,36 @@ namespace UnitHelpers {
         return result;
     }
 
+    // T2 fortification walls (armfort/corfort/legforti) are BAR objects: neutral
+    // units that the engine's auto-targeting skips unless the shooter's fire
+    // state is 3 (fire at neutral), and then ranks below every real enemy. FRONT
+    // already gives T1 combat units fire state 3 for dragon's teeth; this gives
+    // the same to T2 mobile direct-fire units of every faction, in every role.
+    // Left out: artillery (would lob shells at walls from range), crawling
+    // bombs (would blow themselves up on a wall), stealth/spy/EMP units, and
+    // units whose profile fire state is not plain fire at will (2).
+    array<string> T2WallFireExcluded = {
+        "armmerl", "armmart", "armvader", "armspid", "armgremlin",
+        "cormart", "corvroc", "cortrem", "cormort", "corhrk", "corroach", "corsktl", "corspy",
+        "leghrk", "legbart", "leginf", "legavroc", "legamcluster", "legsnapper", "legaspy"
+    };
+
+    int ApplyT2WallFire()
+    {
+        array<string> ids = GetAllT2CombatUnits();
+        int applied = 0;
+        for (uint i = 0; i < ids.length(); ++i) {
+            if (T2WallFireExcluded.find(ids[i]) >= 0) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(ids[i]);
+            if (d is null || !d.IsMobile() || d.IsAbleToFly()) continue;
+            if (d.IsRoleAny(Unit::Role::ARTY.mask)) continue;
+            if (d.GetFireState() != 2) continue;   // 3 already, or a deliberate hold/return
+            d.SetFireState(3);
+            ++applied;
+        }
+        return applied;
+    }
+
     // Armada T2 combat units (armalab + armavp buildoptions, combat only)
     array<string> GetArmadaT2CombatUnits() {
         array<string> ids = { 
