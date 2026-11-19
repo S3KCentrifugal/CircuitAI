@@ -406,8 +406,15 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
     if(!first && BlockArtilleryBuilt(block)<2) return nullptr;
     if(!ldef) {
         // A launcher of this team standing elsewhere (the unit cap makes none buildable) covers the block.
-        block.launcher=2; block.launcherStood=TeamEmpLauncherStanding();
-        ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i covered=%i",block.group,int(block.launcherStood));
+        // With none standing, this builder (a seat that cannot make the launcher, or the cap) only waits:
+        // another group constructor may build it (headless 11-19: two blocks were abandoned at once here).
+        const bool covered=TeamEmpLauncherStanding();
+        if(covered) { block.launcher=2; block.launcherStood=true; }
+        if(frame>=empGateLog+30*FRAMES_PER_SEC) {
+            empGateLog=frame;
+            ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i covered=%i unit=%s",block.group,int(covered),
+                unit->GetCircuitDef()->GetDef()->GetName());
+        }
         return nullptr;
     }
     auto* terrain=ai->GetTerrainManager();
