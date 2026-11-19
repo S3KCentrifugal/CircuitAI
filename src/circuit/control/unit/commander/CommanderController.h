@@ -638,10 +638,14 @@ private:
         int launcher=0,launcherTries=0; springai::AIFloat3 launcherSite{-1,0,-1};
     };
     std::map<int,TacticalBlock> tacticalBlocks;
-    int BlockArtilleryBuilt(const TacticalBlock& block) const;
+    int BlockArtilleryBuilt(const TacticalBlock& block,bool frames=false) const;
+    // Owner 2026-11-19: no block gun unless this team has a finished EMP launcher
+    // (armemp, cortron, legperdition) standing anywhere; answer cached per frame.
+    bool TeamEmpLauncherStanding() const;
+    mutable int empStandFrame=-1,empGateLog=-100000; mutable bool empStand=false;
     bool BlockLauncherNear(const springai::AIFloat3& site,const CCircuitDef* def) const;
     CCircuitDef* BlockLauncherDef(CCircuitUnit* unit) const;
-    IUnitTask* BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame);
+    IUnitTask* BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame,bool first=false);
     // D-495 (CommanderArtilleryT1.cpp): the T1 gun's plan, a justified target
     // and a site in its reach outside every known enemy weapon. Built from the
     // side's combat snapshot at most once per artilleryT1EvalSeconds; mutable

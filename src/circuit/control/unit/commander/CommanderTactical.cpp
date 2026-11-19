@@ -264,6 +264,24 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame)) return launcherTask;
         if(block.launcher==1) return nullptr;
     }
+    // Owner 2026-11-19 (Scylla, AI 15 kept filling Persecutor blocks with no Catalyst up): a block gets no new
+    // gun unless this team has a finished EMP launcher (armemp, cortron, legperdition) standing. With none, the
+    // block's own launcher is ordered first (no two-gun wait); one that stood and has died is ordered again
+    // (at most 4 tries a block, as before).
+    if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && !TeamEmpLauncherStanding()) {
+        if(block.launcher==2 && block.launcherTries<3 && block.launcherSite.x>=0.f && !(tacticalJob && !tacticalJob->IsDead())) {
+            block.launcher=0; ++block.launcherTries;
+            ai->LOG("[CommanderGroup] block_launcher lost block=%i tries=%i",block.group,block.launcherTries);
+        }
+        if(block.launcher<2)
+            if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame,true)) return launcherTask;
+        if(frame>=empGateLog+30*FRAMES_PER_SEC) {
+            empGateLog=frame;
+            ai->LOG("[CommanderGroup] block_gun held def=%s block=%i guns=%i launcher=%i: no finished EMP launcher standing team=%i",
+                def->GetDef()->GetName(),block.group,BlockArtilleryBuilt(block,true),block.launcher,ai->GetTeamId());
+        }
+        return nullptr;
+    }
     const int slot=terrain->NextSlotAny(block.group,unit->GetPos(frame));
     if(slot<0) return nullptr;
     // A builder task aborts at once, silently, when the walk to its site is not
@@ -295,13 +313,13 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
  * same 32 elmos further out. An order that ends with no launcher there tries the next site; after four the
  * block is left to its artillery. Cost: two friendly-unit radius queries per call while the launcher is due.
  */
-int CCommanderController::BlockArtilleryBuilt(const TacticalBlock& block) const {
+int CCommanderController::BlockArtilleryBuilt(const TacticalBlock& block,bool frames) const {
     auto* clb=ai->GetCallback();
     const int team=ai->GetTeamId();
     int built=0;
     auto& units=clb->GetFriendlyUnitsIn(block.centre,block.radius);
     for(springai::Unit* u:units) {
-        if(u && u->GetTeam()==team && !u->IsBeingBuilt()) {
+        if(u && u->GetTeam()==team && (frames || !u->IsBeingBuilt())) {
             const CCircuitDef* d=ai->GetCircuitDefSafe(clb->Unit_GetDefId(u->GetUnitId()));
             if(d && IsArtilleryDef(d) && !IsArtilleryT1Def(d)) ++built;
         }
@@ -320,6 +338,21 @@ bool CCommanderController::BlockLauncherNear(const AIFloat3& site,const CCircuit
     }
     return found;
 }
+bool CCommanderController::TeamEmpLauncherStanding() const {
+    const int frame=ai->GetLastFrame();
+    if(frame==empStandFrame) return empStand;
+    empStandFrame=frame; empStand=false;
+    static const char* names[3]={"armemp","cortron","legperdition"};
+    int ids[3]={-1,-1,-1};
+    for(int i=0;i<3;++i) if(CCircuitDef* d=ai->GetCircuitDef(names[i])) ids[i]=d->GetId();
+    for(const auto& kv:ai->GetTeamUnits()) {
+        const CCircuitUnit* u=kv.second;
+        if(!u || u->IsDead() || !u->IsFinished()) continue;
+        const int id=u->GetCircuitDef()->GetId();
+        if(id==ids[0] || id==ids[1] || id==ids[2]) { empStand=true; break; }
+    }
+    return empStand;
+}
 CCircuitDef* CCommanderController::BlockLauncherDef(CCircuitUnit* unit) const {
     static const char* names[3]={"armemp","cortron","legperdition"};
     const int frame=ai->GetLastFrame();
@@ -333,7 +366,7 @@ CCircuitDef* CCommanderController::BlockLauncherDef(CCircuitUnit* unit) const {
     }
     return other;
 }
-IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame) {
+IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame,bool first) {
     if(block.launcher>=2) return nullptr;
     CCircuitDef* ldef=BlockLauncherDef(unit);
     if(block.launcher==1) {
@@ -351,7 +384,7 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
             return nullptr;
         }
     }
-    if(BlockArtilleryBuilt(block)<2) return nullptr;
+    if(!first && BlockArtilleryBuilt(block)<2) return nullptr;
     if(!ldef) { block.launcher=2; ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i",block.group); return nullptr; }
     auto* terrain=ai->GetTerrainManager();
     auto* builder=ai->GetBuilderManager();
