@@ -1500,6 +1500,13 @@ namespace RoleFront {
             )) {
                 IUnitTask@ tFus2 = Builder::EnqueueFUS(unitSide, anchor, SQUARE_SIZE * 32, SECOND * 300);
                 if (tFus2 !is null) return tFus2;
+                // Owner 2026-11-19: a fusion already queued (native, build chain) that nobody builds blocked
+                // EnqueueFUS all game; the primary T2 constructor takes that order instead
+                IUnitTask@ queuedFus = Builder::UnstaffedFusionTask(u);
+                if (queuedFus !is null) {
+                    if (!(u.task is queuedFus)) GenericHelpers::LogUtil("[FRONT][Fusion] queued fusion had nobody on it: " + u.circuitDef.GetName() + " " + u.id + " takes it | M +" + int(metalIncome) + " E +" + int(energyIncome), 1);
+                    return queuedFus;
+                }
             }
         } 
 
