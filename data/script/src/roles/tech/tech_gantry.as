@@ -478,7 +478,7 @@ namespace TechGantry {
         const bool able = builder.circuitDef.CanBuild(definition)
             && builder.circuitDef.GetBuildSpeed() >= Global::RoleSettings::Tech::GantryMinimumBuilderPower;
         // D-364 (owner): a gantry the income step made due (one per
-        // GantryScaleMetalStep) is ordered as soon as it is funded on that income and
+        // GantryScale gate, 400 + 150 x n since 2026-11-19) is ordered as soon as it is funded on that income and
         // this builder can build it; its turret block keeps filling behind it
         // (gantry.support, lab.front) and the turrets assist the frame. Played: the
         // T2 constructors that run gantry.scale cannot build the T1 turret, so the
@@ -798,13 +798,14 @@ namespace TechHeavyChoice {
 }
 
 // D-288 (owner): the first gantry at GantryScaleFirstMetal (t3rush:
-// GantryScaleFirstMetalT3Rush), then one more per further GantryScaleMetalStep.
+// GantryScaleFirstMetalT3Rush); owner 2026-11-19: with n gantries had, the next at
+// GantryScaleBaseMetal + GantryScaleExtraMetal x n (550, 700, 850), at most GantryScaleMax (4).
 // The single owner of TECH's gantry target, cap and due flag; rule
 // gantry.scale and the legacy T2 rung only read Due(). Every other gantry path
 // (D-281 early gantry, chain steps, cluster recovery) counts toward Have().
 namespace TechGantryScale {
     const string TargetKey = "tech.gantry.target";
-    int highWater = 0;           // persisted target: floor(income / step), capped, never lowered
+    int highWater = 0;           // persisted target: gantries the best income so far allowed, capped, never lowered
     bool loaded = false, due = false, capRaised = false;
     bool prebuild = false;       // GantryNanoPrebuildShare: the next gantry's block may go up ahead of its step
     int have = 0, mapCeiling = -1;
@@ -833,13 +834,26 @@ namespace TechGantryScale {
     bool PrebuildDue() { return Enabled() && prebuild && !due; }
 
     // The first gantry's income: GantryScaleFirstMetal, or on the t3rush plan
-    // GantryScaleFirstMetalT3Rush (owner, 2026-10-22) (0 = the step), never
-    // above the step.
-    float FirstMetal(float step) {
+    // GantryScaleFirstMetalT3Rush (owner, 2026-10-22) (0 = the base), never
+    // above the base.
+    float FirstMetal(float base) {
         const float first = TechPlan::plan == "t3rush" ? Global::RoleSettings::Tech::GantryScaleFirstMetalT3Rush
             : Global::RoleSettings::Tech::GantryScaleFirstMetal;
-        if (first <= 0.0f) return step;
-        return AiMin(first, step);
+        if (first <= 0.0f) return base;
+        return AiMin(first, base);
+    }
+    // Owner 2026-11-19: the income that orders the next gantry with `n` already had:
+    // the first at FirstMetal(), then GantryScaleBaseMetal + GantryScaleExtraMetal x n
+    // (second 550, third 700, fourth 850).
+    float GateFor(int n) {
+        const float base = AiMax(1.0f, Global::RoleSettings::Tech::GantryScaleBaseMetal);
+        if (n <= 0) return FirstMetal(base);
+        return base + AiMax(0.0f, Global::RoleSettings::Tech::GantryScaleExtraMetal) * float(n);
+    }
+    // The per-AI ceiling: GantryScaleMax (owner 2026-11-19: 4), and a map limit under it.
+    int Ceiling() {
+        const int top = AiMax(0, Global::RoleSettings::Tech::GantryScaleMax);
+        return mapCeiling >= 0 ? AiMin(top, mapCeiling) : top;
     }
 
     // Standing gantries and frames (def.count counts frames), plus land orders
@@ -869,7 +883,7 @@ namespace TechGantryScale {
     void RaiseCaps() {
         int wanted = highWater;
         if (prebuild && !due) wanted = AiMax(wanted, have + 1);   // the prebuild's cluster plans under the cap; its order waits for Due()
-        if (mapCeiling >= 0) wanted = AiMin(wanted, mapCeiling);
+        wanted = AiMin(wanted, Ceiling());
         if (landDef is null || landDef.maxThisUnit >= wanted) return;
         if (capRaised)
             Invariants::Violation("INV-199", "cap", landDef.GetName() + " cap " + landDef.maxThisUnit
@@ -884,10 +898,10 @@ namespace TechGantryScale {
         Load();
         if (landDef is null || !Economy::IncomeWindowReady()) { due = false; return; }
         const float mi = Economy::GetMinMetalIncomeLast10s();   // 10 s minimum: a spike never raises the target
-        const float step = AiMax(1.0f, Global::RoleSettings::Tech::GantryScaleMetalStep);
-        // Owner (2026-10-19, t3rush 2026-10-22): the first gantry at FirstMetal()
-        const float first = FirstMetal(step);
-        const int raw = AiMin(AiMax(0, Global::RoleSettings::Tech::GantryScaleMax), AiMax(int(mi / step), mi >= first ? 1 : 0));
+        // Owner 2026-11-19: gantry k+1 at GateFor(k) (first at FirstMetal(), then 400 + 150 x k), at most Ceiling()
+        const int ceiling = Ceiling();
+        int raw = 0;
+        while (raw < ceiling && mi >= GateFor(raw)) ++raw;
         if (raw > highWater) {
             highWater = raw;
             aiTerrainMgr.SetLayoutInt(TargetKey, highWater);
@@ -906,21 +920,17 @@ namespace TechGantryScale {
         // get: played, a T3-plan TECH with the heavy strategy rolled sat at a full
         // bank from +560 to +600 metal for twenty minutes, `blocked=rush`, no gantry.
         const bool blocked = TechChain::NukeRush() || TechChain::nukeFundingSilo >= 0;
-        // Hysteresis: the high-water target never cancels work; a new order also
-        // needs the income to hold (have + 1) x step x share right now.
-        // A map limit on the gantry is the ceiling of what can be due.
-        const int target = mapCeiling >= 0 ? AiMin(highWater, mapCeiling) : highWater;
-        const bool newDue = have < target && energyOk && !blocked
-            && mi >= (have == 0 ? first : float(have + 1) * step) * Global::RoleSettings::Tech::GantryScaleDropShare;
+        // Owner 2026-11-19: the next order needs its gate right now (no drop share); the
+        // high-water target only keeps the cap from falling, it never cancels work.
+        const bool newDue = have < ceiling && energyOk && !blocked && mi >= GateFor(have);
         if (newDue && !due) { dueSince = ai.frame; progressFrame = ai.frame; }
         due = newDue;
         // GantryNanoPrebuildShare: the next step's turret block opens from this share of its income
         const float share = Global::RoleSettings::Tech::GantryNanoPrebuildShare;
-        const int ceiling = mapCeiling >= 0 ? AiMin(Global::RoleSettings::Tech::GantryScaleMax, mapCeiling) : Global::RoleSettings::Tech::GantryScaleMax;
         // (the t3rush plan's first gantry at GantryScaleFirstMetalT3Rush too: played, its order comes from
         // gantry.scale at +175 before the chain's earlygantry step asks)
         const bool newPrebuild = share > 0.0f && !due && !blocked && energyOk && have < ceiling;
-        const float prebuildAt = share * (have == 0 ? first : float(have + 1) * step);
+        const float prebuildAt = share * GateFor(have);
         if (newPrebuild && mi >= prebuildAt && !prebuild)
             GenericHelpers::LogUtil("[TECH][GantryScale] prebuild due: mi=" + int(mi) + " >= " + int(prebuildAt) + " (have=" + have + ")", 1);
         prebuild = newPrebuild && mi >= prebuildAt;

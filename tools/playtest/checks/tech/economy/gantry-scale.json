@@ -1,5 +1,5 @@
 {
-  "_doc": "D-288 natural-economy quick test: run with --set GantryScaleMetalStep=150 so the one-gantry-per-step rule shows inside 30 minutes. Target 2 needs a natural 10 s minimum of 300 M/s by minute 30; a run that never gets there is a scenario miss, not a code failure (read the GantryScale lines).",
+  "_doc": "D-288 natural-economy quick test: run with --set GantryScaleBaseMetal=150 --set GantryScaleExtraMetal=75 so the next-gantry gates (first 150, then 150 + 75 x n) show inside 30 minutes. Target 2 needs a natural 10 s minimum of 225 M/s by minute 30; a run that never gets there is a scenario miss, not a code failure (read the GantryScale lines).",
   "stop_minute": 30,
   "expect": [
     {"key": "target 1", "pattern": "\\[TECH\\]\\[GantryScale\\] target=1 ", "by_minute": 20, "scope": "tech"},

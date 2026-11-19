@@ -368,17 +368,18 @@ namespace Tech {
             array<string> HeavyMoatedArmada = {};
             array<string> HeavyMoatedCortex = {};
             array<string> HeavyMoatedLegion = {};
-            // D-288 (owner), step 400 since D-364: one land gantry per GantryScaleMetalStep of 10 s minimum
-            // metal income (floor(income / step), capped at GantryScaleMax). The target
-            // is a persisted high-water mark (a dip never lowers it); a new order also
-            // needs income >= (have + 1) x step x GantryScaleDropShare right now.
+            // Gantry scale (owner, 2026-11-19; replaces D-288's floor(income / 400) and its drop share):
+            // with n land gantries standing or ordered (n >= 1), the next one is ordered at a 10 s minimum
+            // metal income of GantryScaleBaseMetal + GantryScaleExtraMetal x n: the second at 550, the
+            // third at 700, the fourth at 850. The first stays at GantryScaleFirstMetal (t3rush: ...T3Rush).
+            // At most GantryScaleMax gantries per AI (owner: 4), never above a map limit.
             bool GantryScaleEnabled = true;
-            float GantryScaleMetalStep = 400.0f;        // owner, 2026-10-22: 400 (was 500)
-            float GantryScaleFirstMetal = 400.0f;       // owner, 2026-10-19: the first gantry at this income (not the t3rush plan, see below); 0 = the step
-            float GantryScaleFirstMetalT3Rush = 175.0f; // owner, 2026-10-22: the t3rush plan's first gantry at this 10 s minimum income; 0 = the step
-            float GantryScaleDropShare = 0.80f;
+            float GantryScaleBaseMetal = 400.0f;        // owner, 2026-11-19
+            float GantryScaleExtraMetal = 150.0f;       // owner, 2026-11-19: + this per gantry we already have
+            float GantryScaleFirstMetal = 400.0f;       // owner, 2026-10-19: the first gantry at this income (not the t3rush plan, see below); 0 = GantryScaleBaseMetal
+            float GantryScaleFirstMetalT3Rush = 175.0f; // owner, 2026-10-22: the t3rush plan's first gantry at this 10 s minimum income; 0 = GantryScaleBaseMetal
             float GantryScaleEnergyFloor = 0.0f;        // optional absolute E/s floor (0 = metal only, the owner's rule)
-            int GantryScaleMax = 6;
+            int GantryScaleMax = 4;                     // owner, 2026-11-19: 4 per AI (was 6)
             int GantryScaleGraceSeconds = 300;          // INV-199: due this long without progress (cooldown 120 s + turrets + order)
             // Gantry crew (owner, 2026-11-17): played Plains and Passes 11-17, team 8's gantry was due 7+ min
             // with two sites held and never ordered: every T2 constructor was held by a row above gantry.scale

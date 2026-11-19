@@ -93,9 +93,9 @@ namespace TechPlan {
         const int gate500 = int(Global::RoleSettings::Tech::PlanT3RushCombatGate);
         const int lrpcAt = int(Global::RoleSettings::Tech::PlanLrpcMetal);
         // owner, 2026-10-25: a plan's gantry step waits for the gantry scale's first income (400; the next
-        // gantries come from TechGantryScale at 800, 1200 ...), not the 500 combat gate
+        // gantries come from TechGantryScale at 550, 700, 850, owner 2026-11-19), not the 500 combat gate
         const int gantryAt = int(Global::RoleSettings::Tech::GantryScaleFirstMetal > 0.0f
-            ? Global::RoleSettings::Tech::GantryScaleFirstMetal : Global::RoleSettings::Tech::GantryScaleMetalStep);
+            ? Global::RoleSettings::Tech::GantryScaleFirstMetal : Global::RoleSettings::Tech::GantryScaleBaseMetal);
         if (plan == "nuke") {
             if (phase == 1) {
                 if (objective != "nuke" && !TechHeavyRush::SiloReady()) s.insertLast(TechChain::Step("silo", TechChain::DefFor("silo"), 1));
