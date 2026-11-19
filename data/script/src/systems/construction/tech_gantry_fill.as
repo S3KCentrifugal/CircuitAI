@@ -369,8 +369,9 @@ namespace TechGantryFill {
                     }
                 }
                 if (slot < 0 || g.fails >= FallbackFailLimit) {
-                    IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, Task::Priority::HIGH, nanoDef, g.pos,
-                        SQUARE_SIZE * 24, true, OrderTimeoutSeconds * SECOND));
+                    // sited from a point behind or beside the gantry, never its front: the exit stays clear
+                    IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO, Task::Priority::HIGH, nanoDef, SitePoint(g),
+                        SQUARE_SIZE * 16, true, OrderTimeoutSeconds * SECOND));
                     if (t !is null) {
                         GenericHelpers::LogUtil("[TECH][GantryFill] turret " + (Committed(g) + 1) + "/" + g.want + " for " + g.defName + " " + g.id
                             + " engine-sited by " + u.circuitDef.GetName() + " " + u.id, 2);
@@ -385,6 +386,19 @@ namespace TechGantryFill {
         IUnitTask@ r = aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, frame, HelpTimeoutSeconds * SECOND));
         if (r !is null && helps.findByRef(r) < 0) { helps.insertLast(r); helpGantry.insertLast(g.id); }
         return r;
+    }
+
+    // Engine-sited turrets start their search behind the gantry, then beside it (left, right), in turn.
+    // Facing (Spring): 0 south +z, 1 east +x, 2 north -z, 3 west -x; the exit is the facing side.
+    AIFloat3 SitePoint(Gantry@ g) {
+        const array<int> turns = { 2, 1, 3 };
+        const int dir = (g.facing + turns[g.sited % 3]) % 4;
+        const float d = 240.0f;
+        AIFloat3 p = g.pos;
+        if (dir == 0) p.z += d; else if (dir == 1) p.x += d; else if (dir == 2) p.z -= d; else p.x -= d;
+        p.x = AiMax(0.0f, AiMin(float(aiTerrainMgr.GetTerrainWidth()), p.x));
+        p.z = AiMax(0.0f, AiMin(float(aiTerrainMgr.GetTerrainHeight()), p.z));
+        return p;
     }
 
     bool InReach(CCircuitUnit@ u, Gantry@ g, float &out sq) {
