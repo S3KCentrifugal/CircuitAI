@@ -646,6 +646,8 @@ public:
 		int skipLogFrame = -1;    // ghost-skip reason lines, at most one per 10 s per unit
 		bool moveHeld = false;    // holding: the move / FIGHT under way was stopped once
 		bool recruited = false; // joined by recruitment (does not recruit in turn)
+		int areaWaitFor = -1;   // 2026-11-19: double heavy last logged as waiting for 3 in the area ...
+		int areaWaitLog = -1;   // ... and when (one line per threat or per 10 s)
 		int hvUntil = -1;       // shooting a commander / heavy unit: volleys not counted
 		int nextHvScan = -1;    // priority target scans at most every 0.5 s while none
 		bool go = false;        // stage 2: left the gathering spot (or no need to gather)

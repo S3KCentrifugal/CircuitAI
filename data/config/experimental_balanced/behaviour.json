@@ -396,7 +396,11 @@
 			"hold_margin": 150,           // units that must enter a threat's reach gather this far outside it ...
 			"group_wait_seconds": 240,    // ... and go in together when all on that threat are there (settled 10 s); past this,
 			"min_group": 3,               // with min_group gathered; fewer: the threat is given up for repeat_seconds
-			"recruit_radius": 1200,       // owner 2026-11-04 15:23Z: from the first trigger on (and at the go-in), Boreas/Negotiator/Ambassador this close to the gather point (or a gathered member) join, FRONT squads included
+			// Owner 2026-11-19 (Stronghold, AI 10 Boreas idle at hold points): a double heavy has no gather step any more.
+			// It starts when 3 Boreas/Negotiators/Ambassadors are within recruit_radius of the triggering unit or of the
+			// threat; all of them go in at once with the synced volley, later ones join it (or fire on arrival after the
+			// release). hold_margin / group_* levers now apply only outside the double-heavy case.
+			"recruit_radius": 2000,       // 2026-11-19: was 1200 (larger search). Boreas/Negotiator/Ambassador this close to the triggering unit or the threat count for the 3 and join, FRONT squads included
 			"double_heavy_overlap": 0.5,   // owner 2026-11-03: weapon-range half-discs of the aimed heavy and another (facing the hold point) sharing more than this of the smaller: go in only with 3+ gathered, together
 			"close_in_min_range": 1290,   // owner option 2026-11-03: below this range (Thanatos 1200, Arbiter 1210) prep porc
 			                              // only, no close-in on a threat that outranges the snipe spot

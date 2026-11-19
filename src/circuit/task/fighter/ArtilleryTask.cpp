@@ -539,7 +539,7 @@ static bool GhostGone(CCircuitAI* circuit, int enemyId)
  * anchors) per call: every 0.5 s per gathering unit, and once per go-in.
  */
 static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& anchors, int threatId, bool direct,
-		bool go, int goFrame, int frame, int& squad)
+		bool go, int goFrame, int frame, int& squad, bool apply = true)
 {
 	CMilitaryManager* military = circuit->GetMilitaryManager();
 	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
@@ -567,6 +567,7 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 		ids.push_back(r->GetId());
 		if (inRoute) ++squad;
 	}
+	if (!apply) return int(ids.size());  // 2026-11-19: count only (stage 0 area check)
 	for (const int id : ids) {
 		CMilitaryManager::SArtySnipeState& rs = military->GetArtySnipeState(id, frame);
 		rs.stage = 2;
@@ -1620,7 +1621,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			unit->CmdStop();
 		)
 	}
-    if (IsSlowMissileLauncher(cdef->GetDef()->GetName())) {
+	// Owner 2026-11-19: a launcher in a double-heavy group (stage 2+) keeps the
+	// group's target: no slow-launcher live pick, no commander / heavy priority.
+	const bool groupOwns = isSnipe && (st.stage >= 2);
+    if (IsSlowMissileLauncher(cdef->GetDef()->GetName()) && !groupOwns) {
         unit->TrySetFireState(CCircuitDef::FireType::HOLD);
         if (st.missileTarget >= 0) {
             CEnemyInfo* cur = circuit->GetEnemyInfo(st.missileTarget);
@@ -1676,7 +1680,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
             )
         }
     }
-	if (isPriority && ArtyPriorityStep(circuit, unit, frame, st, pos, range)) {
+	if (isPriority && !groupOwns && ArtyPriorityStep(circuit, unit, frame, st, pos, range)) {
 		return true;
 	}
 	if (!isSnipe || (range < info.closeMinRange)) {
@@ -1817,6 +1821,29 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			const CEnemyUnit* with = nullptr;
 			const float share = DoubleHeavyShare(military, enemyMgr, best, pos, frame, with);
 			if ((with == nullptr) || (share <= info.doubleHeavyOverlap)) {
+				return false;
+			}
+		}
+		// Owner 2026-11-19: no gather point; a double heavy starts only with 3
+		// launchers in the area: this one, free ones within recruit_radius of it or
+		// of the threat, and those already on it. Fewer: the default target choice
+		// keeps the unit (one log line per threat or per 10 s). O(team units +
+		// snipe states) per 0.5 s scan, only with a double heavy near.
+		{
+			int squad = 0;
+			int area = 1 + RecruitArtillery(circuit, {pos, best->GetPos()}, best->GetId(), bestDirect, false, -1, frame, squad, false);
+			for (const auto& kv : military->GetArtySnipeStates()) {
+				const CMilitaryManager::SArtySnipeState& o = kv.second;
+				if ((kv.first != unit->GetId()) && (o.threat == best->GetId()) && (o.stage != 0)
+					&& (frame - o.lastCall <= FRAMES_PER_SEC * 10)) ++area;
+			}
+			if (area < 3) {
+				if ((st.areaWaitFor != best->GetId()) || (frame - st.areaWaitLog >= FRAMES_PER_SEC * 10)) {
+					st.areaWaitFor = best->GetId();
+					st.areaWaitLog = frame;
+					circuit->LOG("SNIPE: %s %i waits on double heavy %s %i: %i of 3 launchers in the area",
+							cdef->GetDef()->GetName(), unit->GetId(), SnipeName(best), best->GetId(), area);
+				}
 				return false;
 			}
 		}
@@ -2191,163 +2218,73 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			}
 			return true;
 		} else {
-			const float holdRadius = reach + info.holdMargin;
-			const float d = pos.distance2D(threat->GetPos());
-			// Test round 8: units arriving from prep were already at the hold
-			// radius, so the snipe spot below was never chosen and they went in
-			// from their own side. Choose it once on entering this stage; only the
-			// hold point on its line counts as gathered.
+			// Owner 2026-11-19 (Stronghold, AI 10): the gather step is gone. Boreas
+			// stood at hold points 1500-1800 from an Eviscerator (own range 1300) for
+			// 10-195 s each, waiting for a settled quorum; one that arrived 8 s after
+			// its group left waited 195 s for a new group of 3. Now: stage 0 starts a
+			// double heavy only with 3 launchers in the area (see ArtySnipeStep stage
+			// 0), every one of them is ordered in at once (no hold point), and the
+			// synced volley below fires them together. A launcher that joins later
+			// (recruited, or triggering itself) goes in at once and, while the group
+			// still holds fire, syncs with its volley; after the release it fires
+			// on arrival. O(snipe states) per call while not yet going.
 			const bool fresh = (st.spotFor != st.threat);
-			const bool at = !fresh && safeAt(pos, -1, true) && (d <= holdRadius + 250.f)
-				&& (pos.SqDistance2D(st.spot) <= SQUARE(300.f));
-			st.atHold = at;
-			// Owner 2026-11-04 15:23Z: from the first trigger on, every 0.5 s until
-			// the go-in, launchers within recruit_radius of the gather point or of this
-			// (triggered) unit join: the least-overlap gather point can be on the
-			// far side of the threat (test 11-04: two near-side Ambassadors missed).
-			// Only a unit that triggered itself recruits (test 11-04: recruits that
-			// recruited chained the radius across the map).
-			if (!fresh && !st.recruited && (frame >= st.recruitScan)) {
+			if (fresh) {
+				// The firing spot, once: the least-overlap side (as at the old go-in).
+				st.spotFor = st.threat;
+				const float snipeR2 = range * info.snipeFraction;
+				st.hasSnipeSpot = findSpot(threat->GetPos(), snipeR2, threat->GetId(), false, st.snipeSpot,
+						rangeOf(threat, snipeR2));
+			}
+			// Owner 2026-11-04 15:23Z recruitment, every 0.5 s by a unit that
+			// triggered itself: free launchers within recruit_radius of it or of the
+			// threat join (and go in on their next call).
+			if (!st.recruited && (frame >= st.recruitScan)) {
 				st.recruitScan = frame + FRAMES_PER_SEC / 2;
 				int squad = 0;
-				const int n = RecruitArtillery(circuit, {st.spot, pos}, st.threat, st.direct, false, -1, frame, squad);
+				const int n = RecruitArtillery(circuit, {pos, threat->GetPos()}, st.threat, st.direct, false, -1, frame, squad);
 				if (n > 0) {
 					circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i (squad %i)", cdef->GetDef()->GetName(),
 							unit->GetId(), n, info.recruitRadius, SnipeName(threat), st.threat, squad);
 				}
 			}
-			if (!at) {
-				st.holdSince = -1;
-				if (fresh || (st.orderKey != -5 - st.threat)) {
-					// Round 6: the threat pick found a clear snipe spot (maybe behind
-					// the threat) but the group gathered and went in on its own side,
-					// through the other threat's reach. Gather on the line out from the
-					// checked snipe spot instead; else as before. Owner 16:30Z: with
-					// no fully safe spot, the side with the least shared overlap.
-					st.spotFor = st.threat;
-					const float snipeR2 = range * info.snipeFraction;
-					st.hasSnipeSpot = findSpot(threat->GetPos(), snipeR2, threat->GetId(), false, st.snipeSpot,
-							rangeOf(threat, snipeR2));
-					bool placed = false;
-					if (st.hasSnipeSpot) {
-						const AIFloat3& tp = threat->GetPos();
-						const float dx = st.snipeSpot.x - tp.x, dz = st.snipeSpot.z - tp.z;
-						const float len = std::sqrt(dx * dx + dz * dz);
-						if (len > 1.f) {
-							AIFloat3 h(tp.x + dx / len * holdRadius, 0.f, tp.z + dz / len * holdRadius);
-							CTerrainManager::CorrectPosition(h);
-							if (terrain->CanMoveToPos(unit->GetArea(), h) && safeAt(h, -1, false)) {
-								st.spot = h;
-								placed = true;
-							}
-						}
-					}
-					if (!placed) findSpot(threat->GetPos(), holdRadius, -1, false, st.spot, rangeOf(threat, holdRadius));
-					// Diagnostic (test round 7: no unit used a far-side spot): once per gather order.
-					circuit->LOG("SNIPE: %s %i spot for %s %i: snipe %s (%.0f, %.0f), hold %s (%.0f, %.0f), unit at (%.0f, %.0f)",
-							cdef->GetDef()->GetName(), unit->GetId(), SnipeName(threat), st.threat,
-							st.hasSnipeSpot ? "least-overlap" : "none", st.hasSnipeSpot ? st.snipeSpot.x : 0.f,
-							st.hasSnipeSpot ? st.snipeSpot.z : 0.f, placed ? "on its line" : "fallback",
-							st.spot.x, st.spot.z, pos.x, pos.z);
-				}
-				if ((st.orderKey != -5 - st.threat) || (frame >= st.orderUntil)) {
-					st.orderKey = -5 - st.threat;
-					st.orderUntil = frame + FRAMES_PER_SEC * 8;
-					if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
-					TRY_UNIT(circuit, unit,
-						unit->CmdMoveTo(st.spot, 0, frame + FRAMES_PER_SEC * 12);
-					)
-				}
-				return true;
-			}
-			if (st.holdSince < 0) {
-				st.holdSince = frame;
-				if (st.gatherStart < 0) st.gatherStart = frame;
-				circuit->LOG("SNIPE: %s %i gathers %.0f from %s %i", cdef->GetDef()->GetName(), unit->GetId(),
-						d, SnipeName(threat), st.threat);
-			}
-			int members = 0, gathered = 0, going = 0;
-			int firstGo = std::numeric_limits<int>::max();  // when the group already going in left
-			int settledSince = st.holdSince;  // when the last gatherer arrived
-			int groupStart = st.gatherStart;  // first arrival of any gathered member
+			int members = 0, going = 0;
+			int syncGo = -1;  // goFrame of the group still walking in with fire held
 			for (const auto& kv : military->GetArtySnipeStates()) {
 				const CMilitaryManager::SArtySnipeState& o = kv.second;
 				if ((o.threat != st.threat) || (o.stage == 0) || (frame - o.lastCall > FRAMES_PER_SEC * 10)) continue;
 				++members;
 				if ((o.stage >= 2) && o.go) {
 					++going;
-					firstGo = std::min(firstGo, o.goFrame);
-				} else if ((o.stage == 2) && o.atHold) {
-					++gathered;
-					settledSince = std::max(settledSince, o.holdSince);
-					if (o.gatherStart >= 0) groupStart = std::min(groupStart, o.gatherStart);
+					if ((o.stage == 2) && o.syncWait) syncGo = std::max(syncGo, o.goFrame);
 				}
 			}
-			// Test round 3: min_group of gathered+going let part of the group in
-			// while the rest was still on prep. Now: everyone on the threat
-			// gathered (and settled), or past group_wait_seconds min_group
-			// gathered; late arrivals join a group already going in.
-			const int need = std::min(info.minGroup, members);
-			const bool allGathered = (gathered >= members);
-			const bool settled = (frame - settledSince >= info.groupSettleFrames);
-			// Smolders 2026-11-13: holdSince restarts after every spam retreat, so
-			// the give-up clock never ran out; count from the first arrival.
-			const bool waitOver = (frame - st.gatherStart >= info.groupWaitFrames);
-			// Members that never reach the hold (a far-side spot, fresh recruits)
-			// no longer hold back a gathered quorum past group_go_seconds.
-			const bool quorumWait = (frame - groupStart >= info.groupGoFrames);
-			// Double heavy (port of the cluster-branch 5e482338 rule): at least 3
-			// gathered, the whole gathered group goes in together (they join within
-			// 5 s of the first leaving); no lone or late single; fewer than 3 after
-			// group_wait gives the threat up. Otherwise exactly as before.
 			const int doubleMin = 3;
-			const bool groupLeaving = (going > 0) && (frame - firstGo <= FRAMES_PER_SEC * 5)
-				&& (gathered + going >= doubleMin);
-			const bool go = doubleHeavy
-				? (groupLeaving || ((gathered >= doubleMin) && (((allGathered || quorumWait) && settled) || waitOver)))
-				: ((going > 0) || (allGathered && (settled || members == 1)) || (quorumWait && settled && (gathered >= need))
-					|| (waitOver && (gathered >= need)));
-			if (!go) {
-				if (waitOver) {
-					return finish(doubleHeavy ? "double heavy, fewer than 3 gathered" : "too few gathered to go in");
-				}
-				if (st.orderKey != -6 - st.threat) {
-					st.orderKey = -6 - st.threat;
-					TRY_UNIT(circuit, unit,
-						unit->CmdStop();
-					)
-				}
-				return true;  // others still on their way or on prep porc
+			if ((going == 0) && (members < doubleMin)) {
+				// Recruits not yet called count as members; fewer than 3 left (deaths,
+				// spam retreat): the threat is given up for repeat_seconds.
+				return finish("double heavy, fewer than 3 in the area");
 			}
-			// Owner 2026-11-03 21:58Z recruitment: when the group leaves, every
-			// Boreas/Negotiator/Ambassador of this AI within recruit_radius of
-			// the hold point or of a gathered member, not already on this
-			// threat, joins it (pulled off its default target) and the synced
-			// volley. O(team units x group) once per go-in.
 			if (going == 0) {
-				std::vector<AIFloat3> anchors{st.spot};
-				for (const auto& kv : military->GetArtySnipeStates()) {
-					const CMilitaryManager::SArtySnipeState& o = kv.second;
-					if ((o.threat != st.threat) || (o.stage != 2) || !o.atHold) continue;
-					CCircuitUnit* m = circuit->GetTeamUnit(kv.first);
-					if (m != nullptr) anchors.push_back(m->GetPos(frame));
-				}
+				// First in: every free launcher in the area joins this volley group.
 				int squad = 0;
-				const int n = RecruitArtillery(circuit, anchors, st.threat, st.direct, true, frame, frame, squad);
-				circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i (squad %i)", cdef->GetDef()->GetName(),
-						unit->GetId(), n, info.recruitRadius, SnipeName(threat), st.threat, squad);
+				const int n = RecruitArtillery(circuit, {pos, threat->GetPos()}, st.threat, st.direct, true, frame, frame, squad);
+				if (n > 0) {
+					circuit->LOG("SNIPE: %s %i recruits %i within %.0f for %s %i (squad %i)", cdef->GetDef()->GetName(),
+							unit->GetId(), n, info.recruitRadius, SnipeName(threat), st.threat, squad);
+				}
 			}
 			st.go = true;
-			st.goFrame = frame;
-			st.syncWait = true;  // owner 21:04Z: walk in with fire held, one synced volley
+			st.goFrame = (syncGo >= 0) ? syncGo : frame;  // a late one joins the waiting group's volley
+			st.syncWait = (going == 0) || (syncGo >= 0);   // owner 21:04Z: walk in with fire held, one synced volley
 			st.atSpot = false;
 			st.hitFrame = -1;
 			st.stageFrame = frame;
 			st.volleys = 0;
 			st.orderKey = -1;
-			circuit->LOG("SNIPE: %s %i goes in on %s %i: %i gathered, %i going, %i on it%s", cdef->GetDef()->GetName(),
-					unit->GetId(), SnipeName(threat), st.threat, gathered, going, members,
-					doubleHeavy ? " (double heavy)" : "");
+			circuit->LOG("SNIPE: %s %i goes in on %s %i: %i on it, %i going%s (double heavy)", cdef->GetDef()->GetName(),
+					unit->GetId(), SnipeName(threat), st.threat, members, going,
+					(going == 0) ? ", first" : ((syncGo >= 0) ? ", joins the volley" : ", fires on arrival"));
 		}
 	}
 	if (st.stage == 2) {
