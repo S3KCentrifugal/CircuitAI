@@ -832,7 +832,10 @@ namespace RoleFront {
             float energyIncome = Economy::GetMinEnergyIncomeLast10s();
             float metalCurrent = aiEconomyMgr.metal.current;
             bool isEnergyLessThan90Percent = aiEconomyMgr.energy.current < aiEconomyMgr.energy.storage * Global::RoleSettings::Front::EnergyStorageLowPercent;
-            if (builder is Builder::primaryT2BotConstructor || builder is Builder::secondaryT2BotConstructor || builder is Builder::freelanceT2BotConstructor) {
+            // Owner (2026-11-19): vehicle T2 constructors follow the same fusion rule as bots (All That Glitters:
+            // an Armada vehicle FRONT built 1 fusion in 30 min on a 22k metal bank; armacv never reached this rule)
+            if (builder is Builder::primaryT2BotConstructor || builder is Builder::secondaryT2BotConstructor || builder is Builder::freelanceT2BotConstructor
+             || builder is Builder::primaryT2VehConstructor || builder is Builder::secondaryT2VehConstructor || builder is Builder::freelanceT2VehConstructor) {
                 return Front_T2Constructor_AiMakeTask(builder, defaultTask, isEnergyFull, metalIncome, energyIncome, metalCurrent, isEnergyLessThan90Percent);
             }
         }
@@ -1476,7 +1479,7 @@ namespace RoleFront {
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
 
         // Freelance T2 constructors just do default tasks
-        if (u is Builder::freelanceT2BotConstructor) {
+        if (u is Builder::freelanceT2BotConstructor || u is Builder::freelanceT2VehConstructor) {
             return defaultTask;
         }
 
