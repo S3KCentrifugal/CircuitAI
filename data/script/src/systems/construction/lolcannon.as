@@ -134,12 +134,13 @@ this program (owner, 2026-10-26):
           below and sets FireState (2, fire at will, owner 2026-10-26; kept
           once a minute); a roster target in range is ordered, best tier first:
             1 advanced fusions, advanced geothermals
-            2 Pulsar, Bulwark, Bastion
-            3 Keeper, Overseer, Soteria; anti-nukes (Citadel, Prevailer,
+            2 fusions, land and naval (owner 2026-11-19: above the heavy porc)
+            3 Pulsar, Bulwark, Bastion
+            4 Keeper, Overseer, Soteria; anti-nukes (Citadel, Prevailer,
               Aegis, Rampart)
-            4 commanders, fusions, advanced energy converters
-            5 T3 units (what a gantry builds), T2 porc
-            6 T1 porc, T1 economy
+            5 commanders, advanced energy converters
+            6 T3 units (what a gantry builds), T2 porc
+            7 T1 porc, T1 economy
           Porc is any armed structure that is not a super weapon; T1 is what a
           T1 constructor or commander can build, T2 what only a T2
           constructor can. Native picks the best tier in range, keeps its
@@ -269,7 +270,7 @@ namespace LolCannon {
     array<AIFloat3> badStoreSpots;   // storage spots whose orders kept failing: not chosen again
     array<AIFloat3> failedSites;     // sites this cannon moved back from: later searches keep SiteAvoidRadius off them
 
-    // the fire roster: def id -> tier 1..6, 0 none
+    // the fire roster: def id -> tier 1..7, 0 none
     array<int> tierByDef;
     bool rosterReady = false;
 
@@ -2187,23 +2188,24 @@ namespace LolCannon {
         // 1 advanced fusions and advanced geothermals
         TierNames(1, UnitHelpers::GetAllAdvancedFusionReactors());
         TierNames(1, array<string> = { "armageo", "corageo", "legageo", "armuwageo", "coruwageo", "leganavaladvgeo" });
-        // 2 Pulsar, Bulwark, Bastion
-        TierNames(2, array<string> = { "armanni", "cordoom", "legbastion" });
-        // 3 Keeper, Overseer, Soteria; the anti-nukes (Citadel, Prevailer, Aegis, Rampart)
-        TierNames(3, array<string> = { "armgate", "corgate", "legdeflector", "legrampart" });
-        TierNames(3, UnitHelpers::GetAllAntiNukes());
-        // 4 commanders, fusions, advanced energy converters
+        // 2 fusions (owner 2026-11-19: all 3 factions' fusions above the T2 heavy porc)
+        TierNames(2, UnitHelpers::GetAllFusionReactors());
+        TierNames(2, array<string> = { "armckfus", "armuwfus", "coruwfus", "leganavalfusion" });
+        // 3 Pulsar, Bulwark, Bastion
+        TierNames(3, array<string> = { "armanni", "cordoom", "legbastion" });
+        // 4 Keeper, Overseer, Soteria; the anti-nukes (Citadel, Prevailer, Aegis, Rampart)
+        TierNames(4, array<string> = { "armgate", "corgate", "legdeflector", "legrampart" });
+        TierNames(4, UnitHelpers::GetAllAntiNukes());
+        // 5 commanders, advanced energy converters
         for (int i = 1; i < n; ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(i);
-            if (UnitHelpers::IsCommander(d)) Tier(4, d);
+            if (UnitHelpers::IsCommander(d)) Tier(5, d);
         }
-        TierNames(4, UnitHelpers::GetAllFusionReactors());
-        TierNames(4, array<string> = { "armckfus", "armuwfus", "coruwfus" });
         for (uint s = 0; s < sides.length(); ++s) {
-            Tier(4, ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(sides[s])));
-            Tier(4, ai.GetCircuitDef(UnitHelpers::GetAdvNavalEnergyConverterNameForSide(sides[s])));
+            Tier(5, ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(sides[s])));
+            Tier(5, ai.GetCircuitDef(UnitHelpers::GetAdvNavalEnergyConverterNameForSide(sides[s])));
         }
-        // 5 and 6 from the build trees: who can build it decides its tech level
+        // 6 and 7 from the build trees: who can build it decides its tech level
         array<CCircuitDef@> t1, t2, gantries;
         for (int i = 1; i < n; ++i) {
             CCircuitDef@ d = ai.GetCircuitDef(i);
@@ -2224,19 +2226,19 @@ namespace LolCannon {
             CCircuitDef@ d = ai.GetCircuitDef(i);
             if (d is null || tierByDef[i] != 0) continue;
             if (d.IsMobile()) {
-                if (BuiltBy(d, gantries)) Tier(5, d);   // T3 units
+                if (BuiltBy(d, gantries)) Tier(6, d);   // T3 units
                 continue;
             }
             const bool armed = d.HasSurfToLand() || d.HasSurfToWater() || d.HasSubToWater() || d.HasSurfToAir();
             const bool porc = armed && !d.IsRoleAny(Unit::Role::SUPER.mask);
             const bool eco = !armed && (d.GetExtractsMetal() > 0.0f || t1Eco.find(d.GetName()) >= 0);
             if (!porc && !eco) continue;
-            if (BuiltBy(d, t1)) Tier(6, d);             // T1 porc, T1 economy
-            else if (porc && BuiltBy(d, t2)) Tier(5, d);   // T2 porc
+            if (BuiltBy(d, t1)) Tier(7, d);             // T1 porc, T1 economy
+            else if (porc && BuiltBy(d, t2)) Tier(6, d);   // T2 porc
         }
-        array<int> per(7, 0);
-        for (int i = 0; i < n; ++i) if (tierByDef[i] > 0 && tierByDef[i] < 7) ++per[tierByDef[i]];
-        for (int t = 1; t <= 6 && ai.teamId == ai.GetLeadTeamId(); ++t) {   // the names, once per ally team
+        array<int> per(8, 0);
+        for (int i = 0; i < n; ++i) if (tierByDef[i] > 0 && tierByDef[i] < 8) ++per[tierByDef[i]];
+        for (int t = 1; t <= 7 && ai.teamId == ai.GetLeadTeamId(); ++t) {   // the names, once per ally team
             string names = "";
             for (int i = 0; i < n; ++i) {
                 if (tierByDef[i] != t) continue;
@@ -2246,7 +2248,7 @@ namespace LolCannon {
             GenericHelpers::LogUtil("[LolCannon] fire roster tier " + t + " (" + per[t] + "): " + names, 1);
         }
         GenericHelpers::LogUtil("[LolCannon] fire roster: tier 1 " + per[1] + ", 2 " + per[2] + ", 3 " + per[3] + ", 4 " + per[4]
-            + ", 5 " + per[5] + ", 6 " + per[6] + " defs (" + t1.length() + " T1 and " + t2.length() + " T2 constructor defs, "
+            + ", 5 " + per[5] + ", 6 " + per[6] + ", 7 " + per[7] + " defs (" + t1.length() + " T1 and " + t2.length() + " T2 constructor defs, "
             + gantries.length() + " gantries)", 1);
     }
 
