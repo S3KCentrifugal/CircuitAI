@@ -666,6 +666,9 @@ namespace Front {
             float PorcClusterCoverRadius = 450.0f;        // a gun of ours this near the forward turret covers the cluster
             float PorcClusterT2JoinRadius = 1200.0f;      // a T2 seat this near the group centre has reached it
             float PorcClusterT2MinMetalIncome = 65.0f;    // 10 s minimum, exclusive ("> 65")
+            // owner 2026-11-18: a T1 gun this rule built is flagged; once the T2 gate passes and a T2 seat is at the group,
+            // the faction's T2 gun goes behind that cluster, and once it stands the flagged T1 gun is reclaimed
+            bool PorcClusterUpgrade = true;
             int PorcClusterT2WaitSeconds = 60;            // T2 seat on its way: the T1 waits this long, then builds
             float PorcClusterShake = 32.0f;
             float PorcClusterReach = 3000.0f;             // the builder must be this near the forward turret

@@ -42,6 +42,11 @@ namespace FrontPorcClusterCounter {
     const float EdgeGap = 96.0f;
     const float SiteStep = 50.0f;
     const float MinBack = 64.0f;            // clear of the turret's own footprint
+    const float FlagRadius = 128.0f;        // a built T1 job's gun: ours this near its site (native shake + footprint)
+    const int FlagSiteSeconds = 60;         // ... looked for this long
+    const int ReclaimSeconds = 180;         // reclaim order timeout
+    const int ReclaimTries = 5;             // a flagged gun still standing after this many reclaim orders is unflagged
+    const int ReclaimRetrySeconds = 20;     // a reclaim that ended with the gun standing is queued again after this
 
     class Turret {
         AIFloat3 pos;
@@ -59,6 +64,15 @@ namespace FrontPorcClusterCounter {
         bool covered = false;
         bool popup = false;    // holds a T2 pop-up: always a T2 gun (owner 2026-11-15)
         string names;
+        bool coveredT2 = false;   // a T2 gun of ours (finished or framed) within PorcClusterCoverRadius
+        bool t2Stands = false;    // ... and one of them finished
+        int oldGun = -1;          // a finished flagged T1 gun (this rule's) within PorcClusterCoverRadius
+    }
+    class Gun {
+        AIFloat3 pos;
+        int id = -1;
+        bool t2 = false;
+        bool done = false;     // finished
     }
 
     array<CCircuitDef@> turretDefs, heavyDefs, popupDefs, t1Defs, t2Defs;
@@ -66,17 +80,30 @@ namespace FrontPorcClusterCounter {
     array<Cluster@> clusters;
     array<AIFloat3> gunPos;    // known enemy static ground guns (scan)
     array<float> gunReach;
-    array<AIFloat3> guns;      // our artillery (T1 + T2 lists), finished or framed (scan)
+    array<Gun@> guns;          // our artillery (T1 + T2 lists), finished or framed (scan)
     int standing = 0;          // clusters already covered
     int lastScan = -100000;
     bool defsDone = false;
     dictionary holds;          // cluster key -> frame the hold ends
     dictionary waits;          // cluster key -> frame the T2 wait began
+    // owner 2026-11-18: a T1 gun this rule built is flagged; once the T2 gate passes and a T2 seat is at the
+    // group, the faction's T2 gun goes behind that cluster, and once it stands the flagged gun is reclaimed
+    dictionary flagged;        // T1 gun unit id -> reclaim attempts so far
+    array<AIFloat3> flagSites; // T1 jobs built: the next scan flags our T1 gun nearest each
+    array<int> flagSiteUntil;
 
     // the job
     int stage = 0;             // 0 none, 1 order open, 4 ended (hand back)
     int jobUnit = -1;
     bool jobT2 = false;
+    int jobKind = 0;           // 0 gun for an open cluster, 1 T2 upgrade gun
+    int jobOld = -1;           // kind 1: the flagged T1 gun
+    // the reclaim of a flagged T1 gun whose T2 gun stands: queued for native builders and nanos, like the stuck-T3
+    // reclaims (t3_unstick.as); no seat is put on it (a reclaim order dies the moment its only builder is pulled off)
+    IUnitTask@ rcTask;
+    int rcOld = -1;
+    string rcKey = "";
+    int rcFrame = 0;
     IUnitTask@ order;
     IUnitTask@ prevTask;
     string jobKey = "";
@@ -90,7 +117,9 @@ namespace FrontPorcClusterCounter {
         turrets.resize(0); clusters.resize(0); gunPos.resize(0); gunReach.resize(0); guns.resize(0);
         standing = 0; lastScan = -100000; defsDone = false;
         holds.deleteAll(); waits.deleteAll();
-        stage = 0; jobUnit = -1; jobT2 = false; @order = null; @prevTask = null; jobKey = "";
+        flagged.deleteAll(); flagSites.resize(0); flagSiteUntil.resize(0);
+        @rcTask = null; rcOld = -1; rcKey = "";
+        stage = 0; jobUnit = -1; jobT2 = false; jobKind = 0; jobOld = -1; @order = null; @prevTask = null; jobKey = "";
     }
 
     void AddDefs(const array<string>@ names, array<CCircuitDef@>@ into) {
@@ -147,6 +176,30 @@ namespace FrontPorcClusterCounter {
         return AIFloat3(-1.0f, 0.0f, -1.0f);
     }
 
+    // Scan, after the owned-unit pass: our T1 gun nearest each built T1 job's site (within FlagRadius) is flagged
+    // for a later T2 upgrade; flags of guns no longer ours are dropped
+    void FlagGuns() {
+        for (int i = int(flagSites.length()) - 1; i >= 0; --i) {
+            int best = -1;
+            float bestSq = FlagRadius * FlagRadius;
+            for (uint g = 0; g < guns.length(); ++g) {
+                if (guns[g] is null || guns[g].t2 || !guns[g].done) continue;
+                const float sq = MapHelpers::SqDist(guns[g].pos, flagSites[i]);
+                if (sq <= bestSq) { bestSq = sq; best = guns[g].id; }
+            }
+            if (best >= 0 && !flagged.exists("" + best)) {
+                flagged.set("" + best, 0);
+                Log("T1 gun " + best + " at " + At(flagSites[i]) + " flagged for a T2 upgrade");
+            }
+            if (best >= 0 || ai.frame > flagSiteUntil[i]) { flagSites.removeAt(i); flagSiteUntil.removeAt(i); }
+        }
+        array<string>@ keys = flagged.getKeys();
+        for (uint k = 0; k < keys.length(); ++k) {
+            CCircuitUnit@ u = ai.GetTeamUnit(int(parseInt(keys[k])));
+            if (u is null || !ai.IsOwnedUnit(u)) flagged.delete(keys[k]);
+        }
+    }
+
     void Scan() {
         lastScan = ai.frame;
         turrets.resize(0); clusters.resize(0); gunPos.resize(0); gunReach.resize(0); guns.resize(0); standing = 0;
@@ -159,7 +212,12 @@ namespace FrontPorcClusterCounter {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null) continue;
             const CCircuitDef@ d = u.circuitDef;
-            if (In(t1Defs, d) || In(t2Defs, d)) { guns.insertLast(u.GetPos(ai.frame)); continue; }
+            if (In(t1Defs, d) || In(t2Defs, d)) {
+                Gun@ g = Gun();
+                g.pos = u.GetPos(ai.frame); g.id = u.id; g.t2 = In(t2Defs, d); g.done = u.GetBuildProgress() >= 1.0f;
+                guns.insertLast(g);
+                continue;
+            }
             if (u.GetBuildProgress() < 1.0f) continue;
             const bool pop = In(popupDefs, d);
             if (!pop && !In(turretDefs, d)) continue;
@@ -169,6 +227,7 @@ namespace FrontPorcClusterCounter {
             turrets.insertLast(t);
             points += t.weight;
         }
+        FlagGuns();
         const int need = Global::RoleSettings::Front::PorcClusterMinCount;
         if (points < need) return;
         const float r = Global::RoleSettings::Front::PorcClusterRadius;
@@ -210,8 +269,13 @@ namespace FrontPorcClusterCounter {
                 }
             }
             c.key = Key(c.forward);
-            for (uint g = 0; g < guns.length() && !c.covered; ++g)
-                c.covered = MapHelpers::SqDist(guns[g], c.forward) <= cover * cover;
+            for (uint g = 0; g < guns.length(); ++g) {
+                Gun@ gun = guns[g];
+                if (gun is null || MapHelpers::SqDist(gun.pos, c.forward) > cover * cover) continue;
+                c.covered = true;
+                if (gun.t2) { c.coveredT2 = true; if (gun.done) c.t2Stands = true; }
+                else if (gun.done && c.oldGun < 0 && flagged.exists("" + gun.id)) c.oldGun = gun.id;
+            }
             if (c.covered) ++standing;
             clusters.insertLast(c);
         }
@@ -338,15 +402,47 @@ namespace FrontPorcClusterCounter {
     }
 
     // Front_BuilderAiTaskRemoved
+    // The reclaim order ended (TaskRemoved) or vanished (Update): the gun gone = done; still standing = tried again
+    // after ReclaimRetrySeconds, at most ReclaimTries times
+    void ReclaimEnded(const string &in how) {
+        const int id = rcOld;
+        const string key = rcKey;
+        const int took = (ai.frame - rcFrame) / SECOND;
+        @rcTask = null; rcOld = -1; rcKey = "";
+        if (id < 0) return;
+        CCircuitUnit@ old = ai.GetTeamUnit(id);
+        const string k = "" + id;
+        if (old is null || !ai.IsOwnedUnit(old)) {
+            flagged.delete(k);
+            Log("flagged T1 gun " + id + " reclaimed behind cluster " + key + " in " + took + " s");
+            lastScan = -100000;
+            return;
+        }
+        int64 tries = 0;
+        flagged.get(k, tries);
+        ++tries;
+        if (tries >= ReclaimTries) { flagged.delete(k); Log("flagged T1 gun " + id + " still stands after " + tries + " reclaim orders: unflagged"); return; }
+        flagged.set(k, tries);
+        holds.set(key, ai.frame + ReclaimRetrySeconds * SECOND);
+        Log("reclaim of flagged T1 gun " + id + " " + how + " after " + took + " s with the gun standing; again in " + ReclaimRetrySeconds + " s (try " + (tries + 1) + " of " + ReclaimTries + ")");
+    }
+
     void TaskRemoved(IUnitTask@ task, bool done) {
-        if (task is null || stage == 0 || !(order is task)) return;
+        if (task is null) return;
+        if (rcTask !is null && rcTask is task) { ReclaimEnded(done ? "done" : "dropped"); return; }
+        if (stage == 0 || !(order is task)) return;
         @order = null;
         if (!done) {
             holds.set(jobKey, ai.frame + HoldSeconds * SECOND);
             Finish("order died without a gun; cluster held " + HoldSeconds + " s");
             return;
         }
-        Log("gun built at " + At(jobSite) + " behind cluster " + jobKey + " in " + ((ai.frame - orderFrame) / SECOND) + " s");
+        Log((jobKind == 1 ? "T2 upgrade gun" : "gun") + " built at " + At(jobSite) + " behind cluster " + jobKey + " in " + ((ai.frame - orderFrame) / SECOND) + " s"
+            + (jobKind == 1 ? "; flagged T1 gun " + jobOld + " is reclaimed once it stands" : ""));
+        // owner 2026-11-18: a T1 gun of this rule is flagged for a later T2 upgrade
+        if (jobKind == 0 && !jobT2 && Global::RoleSettings::Front::PorcClusterUpgrade) {
+            flagSites.insertLast(jobSite); flagSiteUntil.insertLast(ai.frame + FlagSiteSeconds * SECOND);
+        }
         lastScan = -100000;
         Finish("built");
     }
@@ -364,6 +460,8 @@ namespace FrontPorcClusterCounter {
     void Update() {
         if (!On()) { if (stage == 4) Return(true); else if (stage != 0) Abort("off"); return; }
         Defs();
+        if (rcTask !is null && rcTask.IsDead()) ReclaimEnded("ended");
+        else if (rcTask is null && rcOld >= 0) ReclaimEnded("lost");
         if (stage == 4) { Return(true); return; }
         if (stage != 0) {
             CCircuitUnit@ u = ai.GetTeamUnit(jobUnit);
@@ -388,6 +486,7 @@ namespace FrontPorcClusterCounter {
         if (ai.frame - lastScan < Global::RoleSettings::Front::PorcClusterScanSeconds * SECOND) return;
         Scan();
         Start();
+        if (stage == 0) FollowUp();
     }
 
     // The nearest free T2 seat at the group that can build a T2 gun; `any` whether the group has such a seat at all
@@ -406,6 +505,81 @@ namespace FrontPorcClusterCounter {
             bestSq = sq; @best = u;
         }
         return best;
+    }
+
+    // Job bookkeeping shared by the follow-ups: the builder is unpublished from native group work and put on `o`
+    void Launch(CCircuitUnit@ b, IUnitTask@ o, bool t2, int kind, int old, const string &in key, const AIFloat3 &in site) {
+        if (b is null || o is null) return;
+        @prevTask = (b.task !is null && !b.task.IsDead()) ? b.task : null;
+        @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKind = kind; jobOld = old; jobKey = key; jobSite = site; orderFrame = ai.frame;
+        if (t2) {
+            for (uint s = 0; s < 3 && s < CommanderGroup::members.length(); ++s)
+                if (CommanderGroup::members[s] == b.id) aiBuilderMgr.SetCommanderCombatOption("commander_group_member" + s, -1.0f);
+        } else aiBuilderMgr.SetCommanderCombatOption("commander_group_unit", -1.0f);
+        CCircuitUnit@ again = ai.GetTeamUnit(jobUnit);
+        if (again !is null && OrderLive() && !(again.task is order)) aiBuilderMgr.AssignTask(again, order);
+    }
+
+    // Owner 2026-11-18: clusters this rule gave a T1 gun (flagged) get the faction's T2 gun once the T2 gate passes
+    // and a T2 seat is at the group (no wait, no T1 fallback); once that T2 gun stands, the flagged T1 gun is
+    // reclaimed (queued for native builders and nanos). One job and one reclaim at a time, after open clusters.
+    void FollowUp() {
+        if (!Global::RoleSettings::Front::PorcClusterUpgrade) return;
+        const AIFloat3 centre = GroupCentre();
+        if (centre.x < 0.0f) return;
+        const float mi = Economy::GetMinMetalIncomeLast10s();
+        const bool t2Gate = mi > Global::RoleSettings::Front::PorcClusterT2MinMetalIncome;
+        const float reach = Global::RoleSettings::Front::PorcClusterReach;
+        for (uint i = 0; i < clusters.length(); ++i) {
+            Cluster@ c = clusters[i];
+            if (c is null || c.oldGun < 0) continue;
+            int64 until = -1;   // dictionary ints read through int64 (pending-all 2215c25c1)
+            if (holds.get(c.key, until) && int64(ai.frame) < until) continue;
+            CCircuitUnit@ old = ai.GetTeamUnit(c.oldGun);
+            if (old is null || old.circuitDef is null || !ai.IsOwnedUnit(old) || old.GetBuildProgress() < 1.0f) continue;
+            const AIFloat3 op = old.GetPos(ai.frame);
+            const int oid = old.id;
+            if (c.t2Stands) {
+                if (aiBuilderMgr.IsReclaimProtected(old.circuitDef)) {
+                    flagged.delete("" + oid);
+                    Log("flagged T1 gun " + oid + " " + old.circuitDef.GetName() + " is reclaim-protected: unflagged");
+                    continue;
+                }
+                if (rcTask !is null || rcOld >= 0) continue;   // one reclaim at a time
+                IUnitTask@ o = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, old, ReclaimSeconds * SECOND));
+                if (o is null || o.IsDead()) {
+                    holds.set(c.key, ai.frame + HoldSeconds * SECOND);
+                    Log("cluster " + c.key + ": reclaim of flagged T1 gun " + oid + " refused natively; held " + HoldSeconds + " s");
+                    continue;
+                }
+                @rcTask = o; rcOld = oid; rcKey = c.key; rcFrame = ai.frame;
+                Log("reclaim of flagged T1 gun " + old.circuitDef.GetName() + " " + oid + " at " + At(op) + " queued for our builders: the T2 gun of cluster "
+                    + c.key + " [" + c.names + "] stands");
+                continue;
+            }
+            if (c.coveredT2 || !t2Gate) continue;
+            bool anyT2 = false;
+            CCircuitUnit@ b = T2Seat(centre, anyT2);
+            if (b is null || MapHelpers::SqDist(b.GetPos(ai.frame), c.forward) > reach * reach) continue;
+            CCircuitDef@ d = Pick(t2Defs, b);
+            if (d is null) continue;
+            float clear = 0.0f;
+            const AIFloat3 site = Site(d, b, c, clear);
+            if (site.x < 0.0f) {
+                holds.set(c.key, ai.frame + HoldSeconds * SECOND);
+                Log("cluster " + c.key + ": no " + d.GetName() + " upgrade site behind " + At(c.forward) + "; held " + HoldSeconds + " s");
+                continue;
+            }
+            if (d.maxThisUnit >= 0 && d.maxThisUnit <= d.count) d.maxThisUnit = d.count + 1;
+            if (!d.IsAvailable(ai.frame)) return;
+            IUnitTask@ o = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH, d, site,
+                Global::RoleSettings::Front::PorcClusterShake, true, OrderTimeoutSeconds * SECOND));
+            if (o is null) { holds.set(c.key, ai.frame + HoldSeconds * SECOND); Log("cluster " + c.key + ": " + d.GetName() + " upgrade order refused"); continue; }
+            Log("T2 " + b.circuitDef.GetName() + " " + b.id + " orders upgrade " + d.GetName() + " at " + At(site) + " for cluster " + c.key
+                + " [" + c.names + "], replacing flagged T1 gun " + old.circuitDef.GetName() + " " + oid + " at " + At(op) + "; mi +" + int(mi));
+            Launch(b, o, true, 1, oid, c.key, site);
+            return;
+        }
     }
 
     void Start() {
@@ -477,7 +651,7 @@ namespace FrontPorcClusterCounter {
                 Global::RoleSettings::Front::PorcClusterShake, true, OrderTimeoutSeconds * SECOND));
             if (o is null) { holds.set(c.key, ai.frame + HoldSeconds * SECOND); Log("cluster " + c.key + ": " + d.GetName() + " order refused"); continue; }
             @prevTask = (b.task !is null && !b.task.IsDead()) ? b.task : null;
-            @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKey = c.key; jobSite = site; orderFrame = ai.frame;
+            @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKind = 0; jobOld = -1; jobKey = c.key; jobSite = site; orderFrame = ai.frame;
             // unpublish before the assign: native group work takes a still-published seat straight back
             if (t2) {
                 for (uint s = 0; s < 3 && s < CommanderGroup::members.length(); ++s)
