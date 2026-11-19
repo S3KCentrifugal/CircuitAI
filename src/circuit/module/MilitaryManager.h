@@ -568,6 +568,7 @@ public:
 		bool spamRetreat = true;           // 2026-11-06: Ambassador/Negotiator/Boreas back off from spam
 		float spamRetreatDistance = 500.f;
 		int spamRetreatQuietFrames = 120;  // 4 s
+		int volleyRetreatWaitFrames = 6 * 30;  // 2026-11-19: hit going in on a double heavy: retreat after its volley, at most this long after the hit
 		// Owner 2026-11-08: no Approach99 / old path-query FIGHT while a known
 		// target (LOS, identified or unidentified radar, slow) or a ghost
 		// structure still owed its blind volleys is in weapon range.
@@ -632,6 +633,8 @@ public:
 		int pickTarget = -1;    // 2026-11-06: last default live pick (T1 exemption drop)
 		int rangeTarget = -1;   // 2026-11-06: last route range micro target (T1 exemption drop)
 		bool retreating = false;  // 2026-11-06: spam retreat
+		bool retreatPending = false;  // 2026-11-19: hit going in on a double heavy: retreat after the volley ...
+		int retreatPendingFrame = -1; // ... the hit frame (3 s cap)
 		springai::AIFloat3 retreatPoint;
 		int retreatDamage = -1;   // last spam damage frame
 		int retreatAimed = -1;    // last re-aim frame

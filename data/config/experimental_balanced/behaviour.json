@@ -385,6 +385,7 @@
 			"spam_retreat": true,
 			"spam_retreat_distance": 500,
 			"spam_retreat_quiet_seconds": 4,
+			"spam_retreat_volley_wait_seconds": 6,   // 2026-11-19: hit going in on a double heavy: the group volley fires at once, retreat after its own volley or this long after the hit
 			// Owner 2026-11-08: the old CircuitAI path / FIGHT and APPROACH99 move these units only when no LOS,
 			// identified or unidentified slow (<= 12 elmos/s) radar contact is in range and no ghost structure
 			// in range is still owed its blind volleys (1, heavy porc 3); a skipped ghost is fired on before moving.

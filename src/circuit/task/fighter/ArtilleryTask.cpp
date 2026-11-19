@@ -539,7 +539,7 @@ static bool GhostGone(CCircuitAI* circuit, int enemyId)
  * anchors) per call: every 0.5 s per gathering unit, and once per go-in.
  */
 static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& anchors, int threatId, bool direct,
-		bool go, int goFrame, int frame, int& squad, bool apply = true)
+		bool go, int goFrame, int frame, int& squad, bool apply = true, int exclude = -1)
 {
 	CMilitaryManager* military = circuit->GetMilitaryManager();
 	const CMilitaryManager::SArtySnipeInfo& info = military->GetArtySnipeInfo();
@@ -547,7 +547,7 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 	std::vector<int> ids;
 	for (const auto& kv : circuit->GetTeamUnits()) {
 		CCircuitUnit* r = kv.second;
-		if ((r == nullptr) || r->IsDead() || r->IsDestroying() || !r->IsFinished()) continue;
+		if ((r == nullptr) || r->IsDead() || r->IsDestroying() || !r->IsFinished() || (r->GetId() == exclude)) continue;  // exclude: the counting unit itself
 		const CCircuitDef* rdef = r->GetCircuitDef();
 		if ((rdef == nullptr) || (info.defs.count(rdef->GetId()) == 0)
 			|| (rdef->GetMaxRange(CCircuitDef::RangeType::LAND) < info.closeMinRange)) continue;
@@ -585,6 +585,7 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 		rs.holdSince = -1;
 		rs.gatherStart = -1;
 		rs.hitFrame = -1;
+		rs.lastHp = -1.f;
 		rs.hasSnipeSpot = false;
 		rs.spotFor = -1;
 		rs.holding = false;
@@ -1145,6 +1146,24 @@ void ArtySpamRetreatDamaged(CCircuitAI* circuit, CCircuitUnit* unit, CEnemyInfo*
 			if (t < bestThreat) { bestThreat = t; best = p; }
 		}
 	}
+	// Owner 2026-11-19 22:18Z: hit while going in on a double heavy and not yet
+	// fired (walking in with fire held, or released but no volley since): the
+	// group's synced volley fires at once (hitFrame releases every member on
+	// the next snipe call) and this unit retreats right after its own volley,
+	// at most spam_retreat volley wait later (ArtySnipeStep). Headless 11-19
+	// (ghost Persecutor): all 4 launchers were hit walking in and retreated
+	// without one shot.
+	if (!st.retreating && (st.stage == 2) && st.go && (st.syncWait || (st.lastVolley < st.goFrame))) {
+		if (!st.retreatPending) {
+			circuit->LOG("SPAMRETREAT: %s %i hit going in on %i, fires the group's volley first", cdef->GetDef()->GetName(),
+					unit->GetId(), st.threat);
+			st.retreatPending = true;
+			st.retreatPendingFrame = frame;
+			st.hitFrame = frame;
+		}
+		st.retreatPoint = best;
+		return;
+	}
 	if (!st.retreating) {
 		circuit->LOG("SPAMRETREAT: start %s %i from %s %i, to (%.0f, %.0f)", cdef->GetDef()->GetName(), unit->GetId(),
 				(adef != nullptr) ? adef->GetDef()->GetName() : "unknown", (attacker != nullptr) ? attacker->GetId() : -1, best.x, best.z);
@@ -1607,6 +1626,23 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		}
 	}
 
+	// Owner 2026-11-19 22:18Z: a deferred spam retreat starts once this unit has
+	// fired (a volley after the hit), or spam_retreat_volley_wait_seconds after the hit without one.
+	if (st.retreatPending && ((st.lastVolley >= st.retreatPendingFrame) || (frame - st.retreatPendingFrame >= info.volleyRetreatWaitFrames)
+			|| (st.stage != 2)))
+	{
+		st.retreatPending = false;
+		st.retreating = true;
+		st.retreatAimed = frame;
+		st.retreatOrderUntil = -1;
+		circuit->LOG("SPAMRETREAT: start %s %i %s, to (%.0f, %.0f)", cdef->GetDef()->GetName(), unit->GetId(),
+				(st.lastVolley >= st.retreatPendingFrame) ? "after its volley" : "(no volley in time)", st.retreatPoint.x, st.retreatPoint.z);
+		if (st.fireHeld) {
+			st.fireHeld = false;
+			unit->TrySetFireState(cdef->GetFireState());
+		}
+		return true;  // ArtySpamRetreatStep takes it from the next call (false let a ghost pick re-aim it for a call)
+	}
 	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
 	const AIFloat3 pos = unit->GetPos(frame);
 	// Owner 2026-11-04 00:29Z: the default ghost pick's image is gone (scouted
@@ -1831,7 +1867,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		// snipe states) per 0.5 s scan, only with a double heavy near.
 		{
 			int squad = 0;
-			int area = 1 + RecruitArtillery(circuit, {pos, best->GetPos()}, best->GetId(), bestDirect, false, -1, frame, squad, false);
+			int area = 1 + RecruitArtillery(circuit, {pos, best->GetPos()}, best->GetId(), bestDirect, false, -1, frame, squad, false, unit->GetId());
 			for (const auto& kv : military->GetArtySnipeStates()) {
 				const CMilitaryManager::SArtySnipeState& o = kv.second;
 				if ((kv.first != unit->GetId()) && (o.threat == best->GetId()) && (o.stage != 0)
@@ -2279,6 +2315,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.syncWait = (going == 0) || (syncGo >= 0);   // owner 21:04Z: walk in with fire held, one synced volley
 			st.atSpot = false;
 			st.hitFrame = -1;
+			st.lastHp = -1.f;  // headless 11-19: a stale health from minutes ago read as "hit" and released a lone volley at once
 			st.stageFrame = frame;
 			st.volleys = 0;
 			st.orderKey = -1;
