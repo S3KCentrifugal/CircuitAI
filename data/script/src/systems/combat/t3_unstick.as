@@ -269,9 +269,17 @@ namespace T3Unstick {
         ReleaseBlockers(h);
         string kept = "", cleared = "";
         array<Id>@ own = ai.GetOwnedUnitIds();
+        // D (owner, 2026-11-18): our own units parked around the stuck T3, collected in the same pass
+        array<CCircuitUnit@> movers;
+        const float clearSq = Global::T3Unstick::ClearMobilesRadius * Global::T3Unstick::ClearMobilesRadius;
         for (uint i = 0; i < own.length(); ++i) {
             CCircuitUnit@ b = ai.GetTeamUnit(own[i]);
-            if (!ai.IsOwnedUnit(b) || b.circuitDef.IsMobile()) continue;
+            if (!ai.IsOwnedUnit(b)) continue;
+            if (b.circuitDef.IsMobile()) {
+                if (b !is u && int(movers.length()) < Global::T3Unstick::ClearMobilesMax && Clears(b)
+                    && b.GetPos(ai.frame).SqDistance2D(pos) <= clearSq) movers.insertLast(b);
+                continue;
+            }
             const AIFloat3 p = b.GetPos(ai.frame);
             const float reach = self + HalfSize(b.circuitDef) + ring;
             if (abs(p.x - pos.x) > reach || abs(p.z - pos.z) > reach) continue;
@@ -314,6 +322,14 @@ namespace T3Unstick {
             if (activeBlockers.find(b.id) < 0) activeBlockers.insertLast(b.id);
             cleared += " " + name + (only == 2 ? "(squad)" : "") + (gated ? "(bank full)" : "");
         }
+        string moved = "";
+        for (uint i = 0; i < movers.length(); ++i) {
+            if (!ai.IsOwnedUnit(movers[i])) continue;
+            if (Move(movers[i], movers[i].GetPos(ai.frame), Global::T3Unstick::ClearMobilesDistance)) moved += " " + movers[i].circuitDef.GetName();
+        }
+        if (moved.length() > 0)
+            GenericHelpers::LogUtil("[T3Unstick] " + u.circuitDef.GetName() + " " + u.id + " round " + (h.rounds + 1)
+                + ": moved our units out of its way [" + moved + " ]", 1);
         // ".s": the allied SMRTBARbs give fusion reactors too (AllyClear::IsSquadKey)
         h.allyKey = "t3." + u.id + "." + h.rounds + (squad ? ".s" : "");
         const bool asked = Team::AllyClear::Hold(h.allyKey, pos, self + ring, self + ring);
@@ -362,9 +378,27 @@ namespace T3Unstick {
         Nudge(u, pos);
     }
 
+    // A unit that may be moved out of a stuck T3's way: ground, not a builder or commander, not steered
+    bool Clears(CCircuitUnit@ b)
+    {
+        const CCircuitDef@ d = b.circuitDef;
+        if (d.IsAbleToFly() || d.IsRoleAny(Unit::Role::BUILDER.mask) || UnitHelpers::IsCommander(d)) return false;
+        IUnitTask@ t = b.task;
+        if (t !is null && (t.IsExternalControlled() || t.GetType() == int(Task::Type::PLAYER)
+            || t.GetType() == int(Task::Type::RETREAT))) return false;
+        return true;
+    }
+
     void Nudge(CCircuitUnit@ u, const AIFloat3 &in pos)
     {
-        if (!ai.IsOwnedUnit(u)) return;
+        if (Move(u, pos, Global::T3Unstick::NudgeDistance))
+            GenericHelpers::LogUtil("[T3Unstick] " + u.circuitDef.GetName() + " " + u.id + " sent toward the front", 2);
+    }
+
+    // One move of `distance` toward the nearest enemy start. O(enemy starts).
+    bool Move(CCircuitUnit@ u, const AIFloat3 &in pos, float distance)
+    {
+        if (!ai.IsOwnedUnit(u)) return false;
         array<AIFloat3> starts = Lanes::EnemyStarts();
         float best = 1.0e30f;
         int bi = -1;
@@ -372,15 +406,15 @@ namespace T3Unstick {
             const float sq = pos.SqDistance2D(starts[i]);
             if (sq < best) { best = sq; bi = int(i); }
         }
-        if (bi < 0) return;
+        if (bi < 0) return false;
         const float dist = sqrt(best);
         AIFloat3 goal = starts[bi];
-        if (dist > Global::T3Unstick::NudgeDistance) {
-            const float f = Global::T3Unstick::NudgeDistance / dist;
+        if (dist > distance) {
+            const float f = distance / dist;
             goal = AIFloat3(pos.x + (goal.x - pos.x) * f, pos.y, pos.z + (goal.z - pos.z) * f);
         }
         u.CmdMoveTo(goal);
-        GenericHelpers::LogUtil("[T3Unstick] " + u.circuitDef.GetName() + " " + u.id + " sent toward (" + int(goal.x) + "," + int(goal.z) + ")", 2);
+        return true;
     }
 
     // Main::AiUpdate (every 30 frames); self-limited to every 2 s

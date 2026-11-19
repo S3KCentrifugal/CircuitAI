@@ -16,6 +16,13 @@ namespace Global { namespace T3Unstick {
     float TurretMargin = 32.0f;           // construction turrets within build range + this join each reclaim
     int BuildersPerBlocker = 2;
     float NudgeDistance = 600.0f;         // after a round, one move this far toward the nearest enemy start
+    // Owner, 2026-11-18 (Stronghold: 3 more Astraeus parked in the gantry-exit pocket with the stuck one):
+    // at each round start our own mobile ground units within ClearMobilesRadius of the stuck T3 (not
+    // builders, aircraft, commanders, or units under player control or retreating) get one move of
+    // ClearMobilesDistance toward the nearest enemy start, at most ClearMobilesMax per round.
+    float ClearMobilesRadius = 250.0f;
+    float ClearMobilesDistance = 500.0f;
+    int ClearMobilesMax = 20;
     // A cleared blocker's site leaves TECH's plans (owner, 2026-10-22): the
     // native layout slot is forgotten on reclaim (D-101); the script plans
     // (weapon slots, fortifications, forward defence, eco flak) skip these.
