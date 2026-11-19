@@ -226,6 +226,8 @@ namespace LolCannon {
     int ExtraShields = 2;
     int ExtraHeavyPorc = 2;
     int ExtraFlak = 3;      // owner 2026-11-12: 3 T2 flak (was 1), 160 elmos apart
+    int ExtraJammers = 1;   // owner 2026-11-18: a T2 jammer (Veil, Shroud, legajam) near the middle of the site
+    float ExtraJammerReach = 320.0f;    // ... within this of that middle (the nearest free spot round it)
     float ExtraShieldSpread = 320.0f;   // elmos between the two shields, across the facing
     float ExtraPorcAhead = 200.0f;      // elmos from the shields' front edge to the heavy porc
     float ExtraPorcSpread = 480.0f;     // elmos between the heavy porc, across the facing

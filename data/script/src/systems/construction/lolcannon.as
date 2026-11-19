@@ -121,7 +121,10 @@ this program (owner, 2026-10-26):
           ExtraPorcAhead (200) further towards the enemy start the cannon is
           sited against, ExtraPorcSpread (480) apart across the facing, and
           ExtraFlak (3) T2 flak (armflak / corflak / legflak) behind the
-          cannon. Each slot reserves the nearest free spot round its place;
+          cannon, and (owner 2026-11-18) ExtraJammers (1) T2 jammer (armveil
+          Veil / corshroud Shroud / legajam) near the middle of the site (the
+          cannon, its turret block and its storage strip), within
+          ExtraJammerReach of it. Each slot reserves the nearest free spot round its place;
           T2 constructors order, the rest help the frames. Once all stand
           (or each short slot failed three orders, or no crew member can
           build them, or ExtrasFinishSeconds (900) pass) the crews are
@@ -197,6 +200,9 @@ namespace LolCannon {
     const array<string> SHIELDS = { "armgate", "corgate", "legdeflector" };
     const array<string> HEAVY_PORC = { "armanni", "cordoom", "legbastion" };
     const array<string> T2_FLAK = { "armflak", "corflak", "legflak" };
+    // owner 2026-11-18: a T2 jammer (Veil / Shroud / Legion's T2 jammer) near the middle of the cannon's site
+    const array<string> T2_JAMMERS = { "armveil", "corshroud", "legajam" };
+    const int COVER_GROUPS = 4;      // the cover: 0 shields, 1 heavy porc, 2 T2 flak, 3 T2 jammer
 
     int phase = IDLE;
     int built = 0;                   // cannons finished by the program (the gate index)
@@ -285,13 +291,13 @@ namespace LolCannon {
     int nextGunHoldLog = 0;
     int nanosNear = 0, nanosNearAll = 0, storesNear = 0, storesNearAll = 0;   // CountSite
     // the cover (owner 2026-10-31): group 0 shields, 1 heavy porc, 2 T2 flak
-    array<array<AIFloat3>> extraPos(3);
-    array<array<int>> extraRes(3);
-    array<array<IUnitTask@>> extraTask(3);
-    array<array<int>> extraMiss(3);
-    array<array<AIFloat3>> extraBase(3), extraSide(3), extraAlong(3);   // each slot's laid-out spot and axes, for a re-pick
-    array<array<bool>> extraAhead(3);
-    array<array<int>> extraRepicks(3);
+    array<array<AIFloat3>> extraPos(COVER_GROUPS);
+    array<array<int>> extraRes(COVER_GROUPS);
+    array<array<IUnitTask@>> extraTask(COVER_GROUPS);
+    array<array<int>> extraMiss(COVER_GROUPS);
+    array<array<AIFloat3>> extraBase(COVER_GROUPS), extraSide(COVER_GROUPS), extraAlong(COVER_GROUPS);   // each slot's laid-out spot and axes, for a re-pick
+    array<array<bool>> extraAhead(COVER_GROUPS);
+    array<array<int>> extraRepicks(COVER_GROUPS);
     array<AIFloat3> badExtraSpots;
     AIFloat3 extraFwd(0.0f, 0.0f, 1.0f);   // the line to the enemy start the cover is laid along
     int nextExtraFix = 0;
@@ -333,18 +339,20 @@ namespace LolCannon {
         const int i = (s == "legion") ? 2 : (s == "cortex" ? 1 : 0);
         if (g == 0) return ai.GetCircuitDef(SHIELDS[i]);
         if (g == 1) return ai.GetCircuitDef(HEAVY_PORC[i]);
-        return ai.GetCircuitDef(T2_FLAK[i]);
+        if (g == 2) return ai.GetCircuitDef(T2_FLAK[i]);
+        return ai.GetCircuitDef(T2_JAMMERS[i]);
     }
     int ExtraWanted(int g)
     {
         if (g == 0) return AiMax(0, Global::LolCannon::ExtraShields);
         if (g == 1) return AiMax(0, Global::LolCannon::ExtraHeavyPorc);
-        return AiMax(0, Global::LolCannon::ExtraFlak);
+        if (g == 2) return AiMax(0, Global::LolCannon::ExtraFlak);
+        return AiMax(0, Global::LolCannon::ExtraJammers);
     }
-    string ExtraWhat(int g) { return g == 0 ? "shield" : (g == 1 ? "heavy porc" : "T2 flak"); }
+    string ExtraWhat(int g) { return g == 0 ? "shield" : (g == 1 ? "heavy porc" : (g == 2 ? "T2 flak" : "T2 jammer")); }
     bool ExtrasOn()
     {
-        return Global::LolCannon::Extras && ExtraWanted(0) + ExtraWanted(1) + ExtraWanted(2) > 0;
+        return Global::LolCannon::Extras && ExtraWanted(0) + ExtraWanted(1) + ExtraWanted(2) + ExtraWanted(3) > 0;
     }
     bool IsT2Air(const string &in n) { return n == "armaca" || n == "coraca" || n == "legaca"; }
     bool IsT1Air(const string &in n) { return n == "armca" || n == "corca" || n == "legca"; }
@@ -2004,7 +2012,7 @@ namespace LolCannon {
     {
         CCircuitDef@ gun = Gun();
         if (gun is null || site.x < 0.0f || aiBuilderMgr.FindOwnNear(site, 96.0f, gun) !is null) return false;
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             for (uint k = 0; k < extraTask[g].length(); ++k)
                 if (extraTask[g][k] !is null && !extraTask[g][k].IsDead()) aiBuilderMgr.AbortTask(extraTask[g][k]);
             ReleaseAll(extraRes[g]);
@@ -2457,6 +2465,7 @@ namespace LolCannon {
         if (q.distance2D(site) > Global::LolCannon::ExtraCountRadius - 64.0f) return false;
         if (ahead && siteTarget.x >= 0.0f && q.distance2D(siteTarget) > site.distance2D(siteTarget) - 64.0f) return false;
         if (g == 0 && q.distance2D(site) > Global::LolCannon::ExtraShieldReach) return false;
+        if (g == 3 && q.distance2D(base) > Global::LolCannon::ExtraJammerReach) return false;   // the jammer stays by the middle
         if (g == 1) {
             const float qa = (q.x - site.x) * extraFwd.x + (q.z - site.z) * extraFwd.z;
             const float ba = (base.x - site.x) * extraFwd.x + (base.z - site.z) * extraFwd.z;
@@ -2531,7 +2540,7 @@ namespace LolCannon {
         nextExtraFix = ai.frame + 10 * SECOND;
         const bool layoutOn = aiTerrainMgr.IsLayoutEnabled();
         bool switched = false;
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             CCircuitDef@ d = ExtraDef(g);
             if (d is null) continue;
             for (uint k = 0; k < extraPos[g].length(); ++k) {
@@ -2574,7 +2583,7 @@ namespace LolCannon {
         CCircuitDef@ gun = Gun();
         CCircuitDef@ nano = Nano();
         CCircuitDef@ st = Store();
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             extraPos[g].resize(0); extraRes[g].resize(0); extraTask[g].resize(0); extraMiss[g].resize(0);
             extraBase[g].resize(0); extraSide[g].resize(0); extraAlong[g].resize(0); extraAhead[g].resize(0); extraRepicks[g].resize(0);
         }
@@ -2635,8 +2644,19 @@ namespace LolCannon {
             for (int k = 0; k < n; ++k)
                 PlaceExtra(flak, At(site, side, LolCannonMath::Offset(k, n, 160.0f), fwd, -(front + half)), 2, side, fwd, false);
         }
+        CCircuitDef@ jammer = ExtraDef(3);
+        if (jammer !is null) {
+            // owner 2026-11-18: near the middle of the site (the cannon, its turret block and its storage strip),
+            // so its jamming radius hides all of them; the nearest free spot round that middle
+            AIFloat3 mid = site;
+            if (blockCentre.x >= 0.0f && stripCentre.x >= 0.0f)
+                mid = AIFloat3((site.x + blockCentre.x + stripCentre.x) / 3.0f, 0.0f, (site.z + blockCentre.z + stripCentre.z) / 3.0f);
+            const int n = ExtraWanted(3);
+            for (int k = 0; k < n; ++k)
+                PlaceExtra(jammer, At(mid, side, LolCannonMath::Offset(k, n, 160.0f), fwd, 0.0f), 3, side, fwd, false);
+        }
         if (!layoutOn) aiTerrainMgr.SetLayoutEnabled(false);
-        for (int g = 0; g < 3; ++g)
+        for (int g = 0; g < COVER_GROUPS; ++g)
             for (uint k = 0; k < extraPos[g].length(); ++k) { extraTask[g].insertLast(null); extraMiss[g].insertLast(0); }
     }
 
@@ -2702,7 +2722,7 @@ namespace LolCannon {
         coverPlaced = true;
         int slots = 0, reserved = 0;
         string at = "";
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             slots += int(extraPos[g].length());
             for (uint k = 0; k < extraPos[g].length(); ++k) {
                 if (extraRes[g][k] >= 0) ++reserved;
@@ -2719,8 +2739,10 @@ namespace LolCannon {
         CCircuitDef@ d0 = ExtraDef(0);
         CCircuitDef@ d1 = ExtraDef(1);
         CCircuitDef@ d2 = ExtraDef(2);
+        CCircuitDef@ d3 = ExtraDef(3);
         GenericHelpers::LogUtil("[LolCannon] cover begins (" + why + "): " + ExtraWanted(0) + " " + (d0 is null ? "?" : d0.GetName()) + ", "
             + ExtraWanted(1) + " " + (d1 is null ? "?" : d1.GetName()) + ", " + ExtraWanted(2) + " " + (d2 is null ? "?" : d2.GetName())
+            + ", " + ExtraWanted(3) + " " + (d3 is null ? "?" : d3.GetName())
             + " facing " + facing + " towards (" + int(siteTarget.x) + ", " + int(siteTarget.z) + "), " + reserved + " of " + slots
             + " slots reserved: " + at + "; crews kept " + crewCount[STARTER] + "+" + crewCount[AIR] + "+" + crewCount[STORE] + "+" + crewCount[GROUND], 1);
         return true;
@@ -2731,7 +2753,7 @@ namespace LolCannon {
     // in flight helped; null when nothing is left for this unit.
     IUnitTask@ ExtraWork(CCircuitUnit@ u)
     {
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             CCircuitDef@ d = ExtraDef(g);
             if (d is null || !u.circuitDef.CanBuild(d)) continue;
             int done, all;
@@ -2753,6 +2775,7 @@ namespace LolCannon {
                     aiTerrainMgr.ReleaseReservation(extraRes[g][k]);
                     extraRes[g][k] = -1;
                 }
+                // the jammer as DEFENCE too: a RADAR task was left at once by its builder every time (headless 11-18)
                 const Task::BuildType type = (g == 1) ? Task::BuildType::BUNKER : Task::BuildType::DEFENCE;
                 @extraTask[g][k] = OrderAt(type, d, extraPos[g][k], extraRes[g][k]);
                 orphanHand.delete("cover " + ExtraWhat(g) + ":" + k); orphanSince.delete("cover " + ExtraWhat(g) + ":" + k);
@@ -2763,11 +2786,11 @@ namespace LolCannon {
                 return extraTask[g][k];
             }
         }
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             CCircuitUnit@ unf = (ExtraDef(g) is null) ? null : aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g));
             if (unf !is null) return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, unf, 30 * SECOND));
         }
-        for (int g = 0; g < 3; ++g) {
+        for (int g = 0; g < COVER_GROUPS; ++g) {
             CCircuitDef@ d = ExtraDef(g);
             if (d is null || !u.circuitDef.CanBuild(d)) continue;
             for (uint k = 0; k < extraTask[g].length(); ++k)
@@ -2780,27 +2803,27 @@ namespace LolCannon {
     // no crew member can build any of it, or ExtrasFinishSeconds pass.
     void FinishExtras()
     {
-        array<int> done(3, 0);
+        array<int> done(COVER_GROUPS, 0);
         bool all = true;
-        for (int g = 0; g < 3; ++g) if (!ExtraGroupDone(g, done[g])) all = false;
+        for (int g = 0; g < COVER_GROUPS; ++g) if (!ExtraGroupDone(g, done[g])) all = false;
         bool able = false;
         array<string>@ keys = crewOf.getKeys();
         for (uint i = 0; i < keys.length() && !able; ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
             if (u is null || u.circuitDef is null) continue;
-            for (int g = 0; g < 3 && !able; ++g) if (ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g))) able = true;
+            for (int g = 0; g < COVER_GROUPS && !able; ++g) if (ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g))) able = true;
         }
         bool frames = false;
-        for (int g = 0; g < 3 && !frames; ++g)
+        for (int g = 0; g < COVER_GROUPS && !frames; ++g)
             frames = ExtraDef(g) !is null && aiBuilderMgr.FindUnfinishedNear(site, Global::LolCannon::ExtraCountRadius, ExtraDef(g)) !is null;
         const bool stuck = !all && !able && !frames;
         const bool late = ai.frame >= extrasUntil;
         const string tally = "shields=" + done[0] + "/" + extraPos[0].length() + " heavy=" + done[1] + "/" + extraPos[1].length()
-            + " flak=" + done[2] + "/" + extraPos[2].length();
+            + " flak=" + done[2] + "/" + extraPos[2].length() + " jammer=" + done[3] + "/" + extraPos[3].length();
         if (!all && !stuck && !late) {
             if (ai.frame >= nextExtrasLog) {
                 nextExtrasLog = ai.frame + 60 * SECOND;
-                GenericHelpers::LogUtil("[LolCannon] cover: " + tally + ", " + (ExtraFlying(0) + ExtraFlying(1) + ExtraFlying(2)) + " order(s) in flight, crews "
+                GenericHelpers::LogUtil("[LolCannon] cover: " + tally + ", " + (ExtraFlying(0) + ExtraFlying(1) + ExtraFlying(2) + ExtraFlying(3)) + " order(s) in flight, crews "
                     + crewCount[STARTER] + "+" + crewCount[AIR] + "+" + crewCount[STORE] + "+" + crewCount[GROUND], 1);
             }
             return;
@@ -2808,7 +2831,7 @@ namespace LolCannon {
         const string why = all ? "done" : (stuck ? "no crew member can build the rest" : "gave up after " + Global::LolCannon::ExtrasFinishSeconds + " s");
         GenericHelpers::LogUtil("[LolCannon] REPORT cover " + tally + " at=" + (ai.frame / SECOND) + "s took=" + ((ai.frame - extrasStarted) / SECOND) + "s (" + why + ")", 1);
         // slots never ordered still hold their reservation (TECH too: an ordered one is -1, owned by its order)
-        for (int g = 0; g < 3; ++g) { ReleaseAll(extraRes[g]); for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1; }
+        for (int g = 0; g < COVER_GROUPS; ++g) { ReleaseAll(extraRes[g]); for (uint k = 0; k < extraRes[g].length(); ++k) extraRes[g][k] = -1; }
         ReleaseCrew("cover " + why + " (" + built + " built; the next at " + int(Gate()) + " metal/s, "
             + Global::LolCannon::NextCannonDelaySeconds + " s from now at the earliest)");
         ProgramEnded();
@@ -2824,7 +2847,7 @@ namespace LolCannon {
             CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
             bool able = false;
             if (u !is null && u.circuitDef !is null)
-                for (int g = 0; g < 3 && !able; ++g) able = ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g));
+                for (int g = 0; g < COVER_GROUPS && !able; ++g) able = ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g));
             if (able) continue;
             int64 v = -1;
             crewOf.get(keys[i], v);
@@ -2872,7 +2895,7 @@ namespace LolCannon {
     bool CanCover(CCircuitUnit@ u)
     {
         if (u is null || u.circuitDef is null) return false;
-        for (int g = 0; g < 3; ++g) if (ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g))) return true;
+        for (int g = 0; g < COVER_GROUPS; ++g) if (ExtraDef(g) !is null && u.circuitDef.CanBuild(ExtraDef(g))) return true;
         return false;
     }
 
