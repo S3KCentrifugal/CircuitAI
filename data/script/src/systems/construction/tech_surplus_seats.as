@@ -164,11 +164,27 @@ namespace TechSurplusSeats {
 
     // EcoPlanner::TechConversionAdmission: the metal-full, capacity, parallel and income
     // tests are waived for the converter seat and the D-107 converter aircraft while energy is in excess.
+    // Owner 2026-11-19 (played: Stronghold, Legion TECH floated energy from 11 to 29 min):
+    // once T1 energy retirement starts, TechGrowth dedicates the T2 constructors and a
+    // dedicated one is never eligible for the converter seat, so the seat was never
+    // claimed again and the growth converter worker built under the full admission,
+    // refused for capacity (headroom 591 against a 600 E/s converter) while the bank
+    // was full. The growth converter worker is a converter seat too.
+    bool ConverterWorker(CCircuitUnit@ worker)
+    {
+        if (worker is null) return false;
+        return worker.id == converter.id || worker.id == TechBuild::airConvId
+            || (TechGrowth::active && worker.id == TechGrowth::converterId);
+    }
     bool ConverterSeatWaived(CCircuitUnit@ worker)
     {
         if (!Enabled() || worker is null) return false;
-        return SurplusSeatMath::ConverterWaived(worker.id == converter.id || worker.id == TechBuild::airConvId, EnergySurplus());
+        return SurplusSeatMath::ConverterWaived(ConverterWorker(worker), EnergySurplus());
     }
+    // A converter worker is not lent to other duties (Pinpointers) while energy is in
+    // excess (played, same game: the growth converter worker was sent off for a
+    // Pinpointer four times between 12:55 and 18:40, and the AFUS worker once).
+    bool ConverterWorkerReserved(CCircuitUnit@ u) { return ConverterSeatWaived(u); }
 
     // From Invariants::Tick. A holder lost, retreating or sent away is vacated
     // here (played, b52). A holder idle SurplusSeatIdleReleaseSeconds never took

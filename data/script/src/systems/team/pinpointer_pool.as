@@ -100,6 +100,8 @@ namespace Team { namespace PinpointerPool {
     {
         if (!Enabled() || u is null || u.circuitDef is null || !u.circuitDef.IsMobile()) return null;
         Broadcast();
+        // owner 2026-11-19: TECH's converter worker stays on converters while energy floats
+        if (TechSurplusSeats::ConverterWorkerReserved(u)) return null;
         // owner, 2026-10-19: native re-asks a constructor walking to a build it was
         // just given; never pull it off (played: Hotlips, TECH's second AFUS order
         // was abandoned twice, 2-9 s after it was given, for a pinpointer)

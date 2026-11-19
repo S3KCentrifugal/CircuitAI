@@ -101,6 +101,7 @@ namespace TechPinpointers {
     IUnitTask@ Work(CCircuitUnit@ u)
     {
         if (!wanted || u is null) return null;
+        if (TechSurplusSeats::ConverterWorkerReserved(u)) return null;   // owner 2026-11-19: converters first while energy floats
         CCircuitDef@ def = Def();
         if (def is null || !u.circuitDef.CanBuild(def)) return null;
         const string name = def.GetName();
