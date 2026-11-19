@@ -44,6 +44,9 @@ const control::CConfigTable<ArtilleryConfig>& ArtilleryTable()
 		Lever<&AC::closeUnderFire>("close_under_fire", 0, 1),
 		Lever<&AC::closeSeconds>("close_seconds", 0, 60),
 		Lever<&AC::hitSeconds>("hit_seconds", .1f, 10),
+		Lever<&AC::ghostFire>("ghost_fire", 0, 1),
+		Lever<&AC::noShotSeconds>("no_shot_seconds", 0, 120),
+		Lever<&AC::skipSeconds>("skip_seconds", 0, 600),
 		Lever<&AC::log>("log", 0, 1),
 	});
 	return table;
@@ -137,6 +140,24 @@ void CArtilleryController::Decide(CCircuitUnit* unit, control::ArtilleryState& s
 	const float range = unit->GetCircuitDef()->GetMaxRange();
 	const float rangeSq = range * range;
 	const bool popup = cfg->closeUnderFire > 0.f;
+	// Owner 2026-11-19 (Ascendancy, AI 11 Agitator): an aim that fires nothing
+	// (line of fire blocked by terrain or our own turret) held the gun for
+	// minutes, the forced order keeping the engine from any target it can hit.
+	// No shot for no_shot_seconds: release it and leave that target alone for
+	// skip_seconds. The shot frame is the EVENT_WEAPON_FIRED frame (any weapon).
+	s.skip.erase(std::remove_if(s.skip.begin(), s.skip.end(),
+		[frame](const std::pair<int, int>& k) { return k.second <= frame; }), s.skip.end());
+	if (s.target >= 0 && cfg->noShotSeconds > 0.f) {
+		const int lastShot = std::max(s.aimed, unit->GetFireFrame());
+		if (frame - lastShot > int(cfg->noShotSeconds * FRAMES_PER_SEC)) {
+			s.skip.emplace_back(s.target, frame + int(cfg->skipSeconds * FRAMES_PER_SEC));
+			Release(unit, s, "no shot fired: target skipped");
+			return;  // the engine targets until the next decision
+		}
+	}
+	const auto skipped = [&s](int id) {
+		return std::any_of(s.skip.begin(), s.skip.end(), [id](const std::pair<int, int>& k) { return k.first == id; });
+	};
 	scratch.clear(); scratchPos.clear(); scratchMobile.clear();
 	bool threatInReach = false, threatOutOfReach = false;
 	snapshot.Query({at.x, at.z}, std::max(range, popup ? range * 2.f : range), [&](const CCombatSnapshot::Entry& e) {
@@ -148,7 +169,10 @@ void CArtilleryController::Decide(CCircuitUnit* unit, control::ArtilleryState& s
 		const CCircuitDef* def = ai->GetCircuitDefSafe(e.defId);
 		if (def == nullptr) return;
 		const artillery::DefFacts facts = Facts(def);
-		if (facts.mobile && !(e.los || e.radar)) return;  // a remembered mobile position is stale
+		// A remembered mobile position is stale; a remembered structure is a ghost image,
+		// fired on only with ghost_fire (owner 2026-11-19: these guns never fire at ghosts).
+		if ((facts.mobile || cfg->ghostFire <= 0.f) && !(e.los || e.radar)) return;
+		if (!s.skip.empty() && skipped(e.id)) return;
 		const artillery::Contact c{e.id, artillery::Classify(facts, cfg->heavyCost), facts.range, distSq};
 		if (!artillery::InReach(c, range, cfg->heavyShare)) return;
 		scratch.push_back(c);
@@ -197,17 +221,22 @@ void CArtilleryController::Order(CCircuitUnit* unit, control::ArtilleryState& s,
 	if (targetId == s.target && frame < s.issued + int(cfg->reissueSeconds * FRAMES_PER_SEC)) return;
 	const int timeout = frame + int(cfg->orderSeconds * FRAMES_PER_SEC);
 	CEnemyInfo* enemy = ai->GetEnemyInfo(targetId);
-	// A structure by its location (ghosts included); a mobile unit by unit while seen.
-	if (mobile && enemy != nullptr && enemy->IsInRadarOrLOS()) {
+	// Any target in LOS or radar by unit (owner 2026-11-19: a ground order on a
+	// visible structure kept BAR's smart-trajectory helper from its high-arc
+	// fallback); only a ghost (ghost_fire) by its location.
+	(void)mobile;
+	if (enemy != nullptr && enemy->IsInRadarOrLOS()) {
 		TRY_UNIT(ai, unit, unit->GetUnit()->Attack(enemy->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);)
 	} else {
 		TRY_UNIT(ai, unit, unit->CmdAttackGround(pos, UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, timeout);)
 	}
 	if (targetId != s.target && cfg->log > 0.f) {
 		const CCircuitDef* def = enemy != nullptr ? enemy->GetCircuitDef() : nullptr;
-		ai->LOG("[Artillery] aim unit=%i target=%i def=%s kind=%s at=%.0f,%.0f preset=%s", unit->GetId(), targetId,
-			def != nullptr ? def->GetDef()->GetName() : "?", KindName(kind), pos.x, pos.z, PresetName(s.preset).c_str());
+		const char* seen = enemy == nullptr ? "?" : enemy->IsInLOS() ? "los" : enemy->IsInRadarOrLOS() ? "radar" : "ghost";
+		ai->LOG("[Artillery] aim unit=%i target=%i def=%s kind=%s at=%.0f,%.0f seen=%s preset=%s", unit->GetId(), targetId,
+			def != nullptr ? def->GetDef()->GetName() : "?", KindName(kind), pos.x, pos.z, seen, PresetName(s.preset).c_str());
 	}
+	if (targetId != s.target) s.aimed = frame;
 	s.target = targetId; s.kind = int(kind); s.issued = frame;
 }
 

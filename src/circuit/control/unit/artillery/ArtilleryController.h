@@ -14,6 +14,9 @@
 #include "control/kernel/ArtilleryTargeting.h"
 #include "AIFloat3.h"
 
+#include <utility>
+#include <vector>
+
 namespace circuit {
 
 class CCircuitAI;
@@ -38,6 +41,9 @@ struct ArtilleryConfig {
 	float closeUnderFire = 0.f;   // pop-up guns: drop a structure aim under fire it cannot answer
 	float closeSeconds = 6.f;     // ... and stay closed this long
 	float hitSeconds = 2.f;       // "under fire": hit within this many seconds
+	float ghostFire = 0.f;        // owner 2026-11-19: 0 never aims at a structure out of LOS and radar (a ghost image)
+	float noShotSeconds = 10.f;   // an aim with no shot fired this long is released to the engine (0: off)
+	float skipSeconds = 60.f;     // ... and that target is not aimed at again for this long
 	float log = 1.f;              // aim, release and close lines
 };
 
@@ -48,6 +54,8 @@ struct ArtilleryState : ControlledState {
 	int kind = 0;           // artillery::Kind of the aim
 	int issued = 0;         // frame of the last order
 	int closedUntil = 0;    // pop-up: no structure aim before this frame
+	int aimed = 0;          // frame the current target was first aimed at
+	std::vector<std::pair<int, int>> skip;  // (enemy id, until frame): aims released for no shot
 };
 }
 

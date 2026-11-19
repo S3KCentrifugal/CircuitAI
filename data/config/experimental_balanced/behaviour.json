@@ -77,7 +77,11 @@
 		"artillery_battery": {
 			"type": "artillery",
 			"aim_period": 1, "reissue_seconds": 15, "order_seconds": 60,
-			"heavy_cost": 600, "heavy_share": 0.5, "close_under_fire": 0, "log": 1
+			"heavy_cost": 600, "heavy_share": 0.5, "close_under_fire": 0, "log": 1,
+			// Owner 2026-11-19 (Ascendancy, AI 11 Agitator): never aim at a ghost image (structure out
+			// of LOS and radar); an aim with no shot fired for no_shot_seconds is released to the
+			// engine and that target skipped for skip_seconds. Visible targets are attacked as units.
+			"ghost_fire": 0, "no_shot_seconds": 10, "skip_seconds": 60
 		},
 		"artillery_popup": {"extends": "artillery_battery", "close_under_fire": 1, "close_seconds": 6, "hit_seconds": 2},
 		"artillery_fortified": {"extends": "artillery_battery"}
