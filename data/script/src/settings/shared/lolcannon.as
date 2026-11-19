@@ -58,6 +58,24 @@ namespace LolCannon {
     // and moved (another ring or another enemy start) once such porc covers it. 0 = off.
     float SitePorcMargin = 120.0f;
     float SitePorcMaxRange = 2000.0f;
+    // terrain blockers (owner 2026-11-19): the Ragnarok and the Calamity fire a low cannon arc
+    // (the Starfall's high arc rarely meets terrain and is not checked). A candidate site is
+    // tested against three aim points: the enemy start it is sited against and the two
+    // highest-rated roster targets in its range (best tier, then metal; seen or ghost enemy
+    // structures, the second at least AreaRadius from the first). Each arc is the engine's
+    // low-trajectory solution from the muzzle (the model's flare piece over the ground) with
+    // the weapon's projectile speed and gravity (aiBattle.CannonArcBlock); only its rising
+    // half, cannon to apex, is checked, every ArcStep elmos, and ground above the shell
+    // blocks it. The site needs ArcNeed of the aim points clear (fewer when fewer are known;
+    // an aim point out of reach for its height is left out of the vote). Results are cached
+    // per site and aim point (32 / 64 elmo cells) for ArcCacheSeconds. false = off.
+    bool ArcCheck = true;
+    int ArcNeed = 2;
+    float ArcStep = 48.0f;
+    float ArcMuzzleRagnarok = 133.0f;   // armvulc.s3o flare piece
+    float ArcMuzzleCalamity = 118.0f;   // corbuzz.s3o spindle (its six flares turn round it, 59..177)
+    int ArcCacheSeconds = 120;
+    int ArcTargetsKept = 128;           // roster targets ranked per site search
     // owner 2026-11-15 (TECH Calamity sited under scouted Bastions): the whole layout - the
     // cannon footprint's corners, every turret slot and every storage slot - is checked, every
     // second, and a hit moves the site in the same tick. A cannon frame already down is

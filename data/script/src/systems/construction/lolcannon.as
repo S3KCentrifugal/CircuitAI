@@ -1096,6 +1096,106 @@ namespace LolCannon {
         return false;
     }
 
+    // ---------------------------------------------------------------- terrain blockers (owner 2026-11-19)
+
+    // the muzzle over the ground for the low-arc cannons; < 0 for the Starfall (not checked)
+    float ArcMuzzle(CCircuitDef@ gun)
+    {
+        if (gun is null || !Global::LolCannon::ArcCheck) return -1.0f;
+        const string n = gun.GetName();
+        if (n == "armvulc") return Global::LolCannon::ArcMuzzleRagnarok;
+        if (n == "corbuzz") return Global::LolCannon::ArcMuzzleCalamity;
+        return -1.0f;
+    }
+
+    // seen and ghost enemy structures on the fire roster, best tier first, then dearest
+    // (the order CSuperTask ranks its areas by); rebuilt once per Plan, O(contacts x kept)
+    array<AIFloat3> arcTargets;
+    array<int> arcTier, arcDef;
+    array<float> arcMetal;
+    void RankArcTargets()
+    {
+        arcTargets.resize(0); arcTier.resize(0); arcDef.resize(0); arcMetal.resize(0);
+        BuildRoster();
+        const int keep = AiMax(2, Global::LolCannon::ArcTargetsKept);
+        const int nc = aiBattle.GetGroundContactCount(), ng = aiBattle.GetGhostCount();
+        for (int i = 0; i < nc + ng; ++i) {
+            const int defId = (i < nc) ? aiBattle.GetGroundContactDefId(i) : aiBattle.GetGhostDefId(i - nc);
+            if (defId <= 0 || defId >= int(tierByDef.length()) || tierByDef[defId] <= 0) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(defId);
+            if (d is null || d.IsMobile()) continue;
+            const AIFloat3 p = (i < nc) ? aiBattle.GetGroundContactPos(i) : aiBattle.GetGhostPos(i - nc);
+            if (p.x < 0.0f || p.z < 0.0f) continue;
+            const int t = tierByDef[defId];
+            const float m = d.costM;
+            if (int(arcTargets.length()) >= keep) {
+                const uint l = arcTargets.length() - 1;
+                if (arcTier[l] < t || (arcTier[l] == t && arcMetal[l] >= m)) continue;
+            }
+            uint at = arcTargets.length();
+            while (at > 0 && (arcTier[at - 1] > t || (arcTier[at - 1] == t && arcMetal[at - 1] < m))) --at;
+            arcTargets.insertAt(at, p); arcTier.insertAt(at, t); arcDef.insertAt(at, defId); arcMetal.insertAt(at, m);
+            if (int(arcTargets.length()) > keep) { arcTargets.removeLast(); arcTier.removeLast(); arcDef.removeLast(); arcMetal.removeLast(); }
+        }
+    }
+
+    // CannonArcBlock, cached per (32-elmo site cell, 64-elmo aim cell); the whole cache is
+    // dropped every ArcCacheSeconds (craters and new buildings change the ground slowly)
+    dictionary arcCache;
+    int arcCacheUntil = 0;
+    int arcCalls = 0, arcHits = 0;    // this search: arcs computed, arcs read from the cache
+    float ArcAt(CCircuitDef@ gun, const AIFloat3 &in from, const AIFloat3 &in to, float muzzle)
+    {
+        if (ai.frame >= arcCacheUntil) {
+            arcCache.deleteAll();
+            arcCacheUntil = ai.frame + AiMax(1, Global::LolCannon::ArcCacheSeconds) * SECOND;
+        }
+        const string key = gun.id + ":" + int(from.x / 32.0f) + "," + int(from.z / 32.0f) + ":" + int(to.x / 64.0f) + "," + int(to.z / 64.0f);
+        double v = 0.0;
+        if (arcCache.get(key, v)) { ++arcHits; return float(v); }
+        ++arcCalls;
+        const float r = aiBattle.CannonArcBlock(gun, from, to, muzzle, Global::LolCannon::ArcStep);
+        arcCache.set(key, double(r));
+        return r;
+    }
+
+    string ArcWord(float r)
+    {
+        if (r == 0.0f) return "clear";
+        if (r < 0.0f) return "out of reach";
+        return "blocked " + int(r) + " out";
+    }
+
+    // The 2-of-3 rule at candidate p: the enemy start and the top two roster targets in
+    // range. Aim points out of reach are left out; a site with none judged passes.
+    // At most 3 cached arcs; the target scan stops at the second target in range.
+    bool ArcOk(CCircuitDef@ gun, const AIFloat3 &in p, const AIFloat3 &in start, float range, string &out why)
+    {
+        why = "";
+        const float muzzle = ArcMuzzle(gun);
+        if (muzzle < 0.0f) return true;
+        int clear = 0, judged = 0;
+        float r = ArcAt(gun, p, start, muzzle);
+        if (r >= 0.0f) { ++judged; if (r == 0.0f) ++clear; }
+        why = "start " + ArcWord(r);
+        int found = 0;
+        AIFloat3 first;
+        const float ar = Global::LolCannon::AreaRadius;
+        for (uint i = 0; i < arcTargets.length() && found < 2; ++i) {
+            if (MapHelpers::SqDist(arcTargets[i], p) > range * range) continue;
+            if (found == 1 && MapHelpers::SqDist(arcTargets[i], first) < ar * ar) continue;
+            if (found == 0) first = arcTargets[i];
+            ++found;
+            r = ArcAt(gun, p, arcTargets[i], muzzle);
+            if (r >= 0.0f) { ++judged; if (r == 0.0f) ++clear; }
+            CCircuitDef@ d = ai.GetCircuitDef(arcDef[i]);
+            why += ", #" + found + " " + (d is null ? "?" : d.GetName()) + " tier " + arcTier[i] + " " + ArcWord(r);
+        }
+        const int need = AiMin(AiMax(1, Global::LolCannon::ArcNeed), judged);
+        why += " (" + clear + "/" + judged + " clear, need " + need + ")";
+        return clear >= need;
+    }
+
     bool Plan()
     {
         CCircuitDef@ gun = Gun();
@@ -1149,6 +1249,12 @@ namespace LolCannon {
             return false;
         }
         int scored = 0, tried = 0;
+        // owner 2026-11-19: terrain blockers on the low arc (Ragnarok, Calamity)
+        const bool arcOn = ArcMuzzle(gun) >= 0.0f;
+        if (arcOn) RankArcTargets();
+        arcCalls = 0; arcHits = 0;
+        int skipArc = 0;
+        string firstArc = "", siteArc = "";
         refusedGun = 0; shortTurrets = 0; bestTurrets = 0;
         bool found = false;
         skipResource = 0; skipLayout = 0; skipFailed = 0;
@@ -1165,6 +1271,15 @@ namespace LolCannon {
             const int porcAt = PorcOver(best[i]);
             if (porcAt >= 0) { if (skipPorc++ == 0) firstPorc = porcAt; continue; }
             if (aiTerrainMgr.IsZoneAlly(best[i])) continue;
+            if (arcOn) {
+                // before the footprint tests: terrain no clearing can fix keeps a candidate off the clear list too
+                string arcWhy;
+                if (!ArcOk(gun, best[i], starts[bestS[i]], range, arcWhy)) {
+                    if (skipArc++ == 0) firstArc = "(" + int(best[i].x) + ", " + int(best[i].z) + "): " + arcWhy;
+                    continue;
+                }
+                siteArc = arcWhy;
+            }
             const bool keepForClear = int(clr.length()) < clearKeep && !LolCannonClear::Failed(best[i]);
             const int layoutSkips = skipLayout;
             if (!GunGroundFree(gun, best[i], bestF[i])) {
@@ -1218,7 +1333,9 @@ namespace LolCannon {
                     + (layoutOn ? " (reserved)" : " (FRONT: cannon, turret block and storage strip held, orders unpinned)") + "; against the enemy spawn at (" + int(siteTarget.x) + ", "
                     + int(siteTarget.z) + "), " + int(sqrt(MapHelpers::SqDist(site, siteTarget))) + " away: " + targetWhy + backWhy
                     + (skipPorc > 0 ? "; " + skipPorc + " nearer candidate(s) under enemy porc (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "")
-                    + (skipBar > 0 ? "; " + skipBar + " nearer candidate(s) in an abandoned site's barred area" : ""), 1);
+                    + (skipBar > 0 ? "; " + skipBar + " nearer candidate(s) in an abandoned site's barred area" : "")
+                    + (arcOn ? "; arc " + siteArc + (skipArc > 0 ? "; " + skipArc + " nearer candidate(s) terrain-blocked (first " + firstArc + ")" : "")
+                        + " [" + arcCalls + " arcs, " + arcHits + " cached, " + arcTargets.length() + " roster targets]" : ""), 1);
         }
         if (!found && refusedGun > 0) {
             // one non-quiet try: native logs "RESERVE: refused <def> ...: <why>" (terrain, a blocked cell, the engine's ground test)
@@ -1237,6 +1354,8 @@ namespace LolCannon {
                 + Global::LolCannon::MinTurrets + "); skipped: " + skipResource + " on metal/geo spots, " + skipLayout
                 + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site, " + skipPorc + " under enemy porc, "
                 + skipBar + " in a barred area"
+                + (arcOn ? ", " + skipArc + " terrain-blocked" + (skipArc > 0 ? " (first " + firstArc + ")" : "")
+                    + " [" + arcCalls + " arcs, " + arcHits + " cached, " + arcTargets.length() + " roster targets]" : "")
                 + (clr.length() > 0 ? "; " + clr.length() + " blocked by structures kept for clearing"
                     + (LolCannonClear::Active() ? " (clearing " + LolCannonClear::At(LolCannonClear::site) + ")" : " (none clearable)") : "")
                 + (firstPorc >= 0 ? " (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "") + backWhy + "; retry in 30 s", 1);

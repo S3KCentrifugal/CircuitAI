@@ -320,6 +320,35 @@ bool CBattleAnalysis::LineOfFire(const AIFloat3& from, const AIFloat3& to, float
 	return true;
 }
 
+float CBattleAnalysis::CannonArcBlock(const CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& to,
+	float muzzle, float step) const
+{
+	const weapon_reach::Ballistics& b = MainBallistics(cdef);
+	if (b.kind != weapon_reach::Kind::CANNON || b.speed <= 0.f || b.gravity <= 0.f) return -2.f;
+	const float dx = to.x - from.x, dz = to.z - from.z;
+	const float dist = std::sqrt(dx * dx + dz * dz);
+	if (dist < 1.f) return 0.f;
+	// a cannon on or over water stands at the surface; the shell lands on the target's ground
+	const float y0 = std::max(0.f, Height(from)) + muzzle;
+	const float dy = std::max(0.f, Height(to)) - y0;
+	// per-frame units as the engine's CCannon::GetWantedDir: low root of
+	// g x^2 (1 + t^2) / (2 v^2) - x t + dy = 0
+	const float v2 = b.speed * b.speed, g = b.gravity;
+	const float disc = v2 * v2 - g * (g * dist * dist + 2.f * dy * v2);
+	if (disc < 0.f) return -1.f;
+	const float tanA = (v2 - std::sqrt(disc)) / (g * dist);
+	const float k = g * (1.f + tanA * tanA) / (2.f * v2);   // y(x) = y0 + x tanA - k x^2
+	// the apex: dy/dx = 0 at x = tanA / (2k); a shell fired downwards has no rising half
+	const float apex = (tanA > 0.f) ? std::min(dist, tanA / (2.f * k)) : 0.f;
+	const float s = std::max(8.f, step);
+	const float ux = dx / dist, uz = dz / dist;
+	for (float x = s; x <= apex; x += s) {
+		const float ground = Height(AIFloat3(from.x + ux * x, 0.f, from.z + uz * x));
+		if (ground > y0 + x * (tanA - k * x)) return x;
+	}
+	return 0.f;
+}
+
 // ---------------------------------------------------------------- routes
 
 // D-127: the engine's own test, per cell: the bot class (54 degrees, 20 deep)

@@ -82,6 +82,16 @@ public:
 	float ShotEnergy(const CCircuitDef* cdef) const;   // energy one shot (salvo) takes from storage
 	float ShotReload(const CCircuitDef* cdef) const;
 	bool LineOfFire(const springai::AIFloat3& from, const springai::AIFloat3& to, float muzzle) const;
+	// Owner 2026-11-19 (lolcannon terrain blockers): the main weapon's low cannon arc from a
+	// muzzle `muzzle` elmos over the ground at `from` to the ground at `to` (the engine's
+	// low-trajectory solution from the def's projectile speed and gravity, map gravity when
+	// it has none). Only the rising half (muzzle to apex, or the target if it comes first)
+	// is tested, every `step` elmos (>= 8, the heightmap's own square). Returns 0 clear,
+	// > 0 the 2-D distance from `from` of the first sample whose ground stands above the
+	// shell, -1 no low solution (out of reach for that height), -2 not a cannon.
+	// O(apex / step) heightmap reads, early exit on the first block.
+	float CannonArcBlock(const CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to,
+		float muzzle, float step) const;
 	float HeightAbove(const springai::AIFloat3& pos, float radius) const;  // height minus the ring's mean at radius
 
 	// --- routes and chokes

@@ -1799,6 +1799,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotEnergy(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotEnergy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ShotReload(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, ShotReload), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "bool LineOfFire(const AIFloat3& in, const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, LineOfFire), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "float CannonArcBlock(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in, float, float) const", asMETHOD(CBattleAnalysis, CannonArcBlock), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "void SetHeatHalfLife(float, float)", asMETHOD(CBattleAnalysis, SetHeatHalfLife), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "void ClearSources()", asMETHOD(CBattleAnalysis, ClearSources), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "void AddSource(const AIFloat3& in)", asMETHOD(CBattleAnalysis, AddSource), asCALL_THISCALL); ASSERT(r >= 0);
