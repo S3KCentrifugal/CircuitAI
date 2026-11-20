@@ -383,6 +383,21 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
         if(done && def) PlanGeoGuard(def,build->GetBuildPos());
         return;
     }
+    // Owner 2026-11-19: a block's own launcher order that finished marks the block's launcher standing, wherever
+    // the builder moved the site (headless v2: up to 530 elmos off the order site, so the area search missed it
+    // and the block ordered launcher after launcher).
+    for(auto& kv:tacticalBlocks) {
+        TacticalBlock& b=kv.second;
+        if(b.launcherTask!=task) continue;
+        b.launcherTask=nullptr;
+        if(done && b.launcher==1) {
+            b.launcher=2; b.launcherStood=true;
+            if(const auto* lb=dynamic_cast<IBuilderTask*>(task)) b.launcherSite=lb->GetBuildPos();
+            ai->LOG("[CommanderGroup] block_launcher standing def=%s at=%.0f,%.0f block=%i by=task_done",
+                kv.first>=0 && ai->GetCircuitDefSafe(kv.first)?ai->GetCircuitDefSafe(kv.first)->GetDef()->GetName():"?",
+                b.launcherSite.x,b.launcherSite.z,b.group);
+        }
+    }
     if(task==tacticalJob) {  // D-475: the tactical queue's slot is free again
         tacticalJob=nullptr;
         if(task==t1Job) t1Job=nullptr;  // D-495

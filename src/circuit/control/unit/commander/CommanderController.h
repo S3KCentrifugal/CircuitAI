@@ -637,6 +637,7 @@ private:
         float axisX=0,axisZ=1,across=0,along=0;
         int launcher=0,launcherTries=0; springai::AIFloat3 launcherSite{-1,0,-1};
         bool launcherStood=false; int abandonUntil=0;  // owner 2026-11-19: stood once / abandoned block cooldown
+        const IUnitTask* launcherTask=nullptr;  // the block's live launcher order; done=1 marks it standing
     };
     std::map<int,TacticalBlock> tacticalBlocks;
     int BlockArtilleryBuilt(const TacticalBlock& block,bool frames=false) const;
@@ -647,6 +648,9 @@ private:
     mutable int empStandFrame=-1,empGateLog=-100000; mutable bool empStand=false;
     bool BlockLauncherNear(const springai::AIFloat3& site,const CCircuitDef* def) const;
     CCircuitDef* BlockLauncherDef(CCircuitUnit* unit) const;
+    // Owner 2026-11-19: the def id of a reserved T2 artillery block near `pos` whose launcher is due
+    // (2 guns finished, none ordered or standing), or -1; asked before TacticalChoice so other gates can't skip it.
+    int DueBlockLauncher(const springai::AIFloat3& pos) const;
     IUnitTask* BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame,bool first=false);
     // D-495 (CommanderArtilleryT1.cpp): the T1 gun's plan, a justified target
     // and a site in its reach outside every known enemy weapon. Built from the

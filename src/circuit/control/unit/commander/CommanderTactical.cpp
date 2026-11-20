@@ -196,7 +196,7 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
         block.group=group; block.centre=centre;
         block.radius=.5f*std::sqrt(across*across+along*along)+size;
         block.axisX=axis.x; block.axisZ=axis.z; block.across=across; block.along=along;
-        block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherSite=AIFloat3(-1.f,0.f,-1.f);
+        block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherSite=AIFloat3(-1.f,0.f,-1.f); block.launcherTask=nullptr;
         ai->LOG("[CommanderGroup] tactical_block group=%i slots=%i def=%s at=%.0f,%.0f facing=%i",group,
             terrain->GetGroupCount(group,false),def->GetDef()->GetName(),centre.x,centre.z,facing);
         return true;
@@ -218,7 +218,11 @@ bool CCommanderController::TacticalSplit(CCircuitUnit* unit) const {
     // count fell under tactical_t2 and the half-built launcher was abandoned).
     const bool live=tacticalJob && !tacticalJob->IsDead();
     if(live && unit->GetTask()==tacticalJob && IsGroupMember(unit->GetId())) return true;
-    if(!IsGroupMember(unit->GetId()) || TacticalChoice(unit)==nullptr) return false;
+    if(!IsGroupMember(unit->GetId())) return false;
+    if(TacticalChoice(unit)==nullptr) {
+        auto* commander=GroupCommander();
+        if(!commander || !BlockLauncherDef(unit) || DueBlockLauncher(commander->GetPos(ai->GetLastFrame()))<0) return false;
+    }
     if(live && !tacticalJob->GetAssignees().empty()) return false;  // one constructor holds the split
     auto* build=dynamic_cast<IBuilderTask*>(unit->GetTask());
     return !(build && IsExpansionJob(build) && build->GetTarget());
@@ -237,6 +241,13 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         return nullptr;
     }
     if(!nearby || HealthRetreat(unit) || EnergyRetreat(unit)) return nullptr;
+    // Owner 2026-11-19: a block's due launcher first, whatever TacticalChoice would pick (headless v2: 5 blocks
+    // stayed at 2 guns for 9-20 min while the group never chose that gun type again).
+    if(BlockLauncherDef(unit)) {
+        const int due=DueBlockLauncher(anchor->GetPos(frame));
+        if(due>=0) if(CCircuitDef* heavy=ai->GetCircuitDefSafe(due))
+            if(auto* launcherTask=BlockLauncherWork(unit,anchor,heavy,tacticalBlocks[due],frame)) return launcherTask;
+    }
     CCircuitDef* def=TacticalChoice(unit);
     if(!def) return nullptr;
     auto* builder=ai->GetBuilderManager();
@@ -372,8 +383,19 @@ void CCommanderController::BlockAbandon(CCircuitDef* def,TacticalBlock& block,in
     ai->LOG("[CommanderGroup] block_abandoned def=%s block=%i guns=%i tries=%i team=%i: no launcher placed",
         def->GetDef()->GetName(),block.group,BlockArtilleryBuilt(block,true),block.launcherTries,ai->GetTeamId());
     ai->GetTerrainManager()->ReleaseGroup(block.group);
-    block.group=0; block.launcher=0; block.launcherTries=0; block.launcherStood=false;
+    block.group=0; block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherTask=nullptr;
     block.abandonUntil=frame+BLOCK_ABANDON_SECONDS*FRAMES_PER_SEC;
+}
+int CCommanderController::DueBlockLauncher(const AIFloat3& pos) const {
+    for(const auto& kv:tacticalBlocks) {
+        const TacticalBlock& b=kv.second;
+        if(b.group<=0 || b.launcher!=0) continue;
+        const CCircuitDef* d=ai->GetCircuitDefSafe(kv.first);
+        if(!d || !IsArtilleryDef(d) || IsArtilleryT1Def(d)) continue;
+        if(b.centre.SqDistance2D(pos)>SQUARE(cfg->group.radius+b.radius)) continue;
+        if(BlockArtilleryBuilt(b)>=2) return kv.first;
+    }
+    return -1;
 }
 bool CCommanderController::TeamEmpLauncherStanding() const {
     const int frame=ai->GetLastFrame();
@@ -458,7 +480,7 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
             int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC)));
         if(!task) continue;
         tacticalJob=task;
-        block.launcher=1; block.launcherSite=site; block.launcherTries=k;
+        block.launcher=1; block.launcherSite=site; block.launcherTries=k; block.launcherTask=task;
         ai->LOG("[CommanderGroup] block_launcher order def=%s at=%.0f,%.0f side=%s try=%i block=%i artillery=%s unit=%i team=%i",
             ldef->GetDef()->GetName(),site.x,site.z,d==2?"back":d==0?"left":d==1?"right":d==3?"back_left":"back_right",k,block.group,def->GetDef()->GetName(),
             unit->GetId(),ai->GetTeamId());
