@@ -621,9 +621,9 @@
 		"role": ["bomber", "air"]
 	},
 	"armliche": {
+		"retreat": 0.0,  // owner 2026-11-20: capital ships fight to the end (a plane retreat with no pad hovered in the enemy base)
 		"role": ["bomber", "air"],
-		"attribute": ["heavy"],
-		"retreat": 0.5
+		"attribute": ["heavy"]
 	},
 
 	// ships - armsy

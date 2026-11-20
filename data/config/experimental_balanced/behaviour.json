@@ -2106,6 +2106,7 @@
 				"power": 1.0
 			},
 			"armliche": {
+				"retreat": 0.0,  // owner 2026-11-20: capital ships fight to the end (a plane retreat with no pad hovered in the enemy base)
 				"role": ["bomber", "air"],
 				"lag_exempt": true,  // owner 2026-11-12: never throttled (LagLoad), like commanders
 				"attribute": ["siege"],
@@ -2720,6 +2721,7 @@
 				"power": 1.0
 			},
 			"corcrwh": {
+				"retreat": 0.0,  // owner 2026-11-20: capital ships fight to the end (a plane retreat with no pad hovered in the enemy base)
 				"target_min_cost": 300,
 				"role": ["heavy", "air"],
 				"attribute": ["anti_heavy"],
