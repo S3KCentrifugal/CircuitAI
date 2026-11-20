@@ -651,6 +651,7 @@ private:
     // Owner 2026-11-19: the def id of a reserved T2 artillery block near `pos` whose launcher is due
     // (2 guns finished, none ordered or standing), or -1; asked before TacticalChoice so other gates can't skip it.
     int DueBlockLauncher(const springai::AIFloat3& pos) const;
+    bool FrameInPorc(CCircuitUnit* frameUnit,int frame) const;  // owner 2026-11-20: frame in enemy porc reach
     IUnitTask* BlockLauncherWork(CCircuitUnit* unit,CCircuitUnit* anchor,CCircuitDef* def,TacticalBlock& block,int frame,bool first=false);
     // D-495 (CommanderArtilleryT1.cpp): the T1 gun's plan, a justified target
     // and a site in its reach outside every known enemy weapon. Built from the

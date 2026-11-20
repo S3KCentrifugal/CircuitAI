@@ -178,31 +178,62 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
     const float across=float(cols)*size,along=float(rows)*size;
     const float reach=unit->GetCircuitDef()->GetBuildDistance();
     const int minimum=std::max(1,int(std::ceil(cfg->group.tacticalMinFill*float(cols*rows))));
+    const float blockRadius=.5f*std::sqrt(across*across+along*along)+size;
+    // Owner 2026-11-20: no block within reach of known enemy porc, seen or ghost (the list CON SAFETY drops
+    // constructors by: EconomyManager::RefreshMexPorc, reach = weapon range + porc_margin). Played: a Persecutor
+    // slot inside an enemy Persecutor's reach was ordered and dropped by CON SAFETY 145 times in one game.
+    // Cost: EnemyPorcClearance is O(known enemy porc) over a list refreshed once a second; at most 15
+    // candidates plus one moved-back try per tactical_retry_seconds.
+    auto* economy=ai->GetEconomyManager();
     // Rejections by gate, for the log line when nothing fits.
-    int offMap=0,tooFar=0,area=0,unreachable=0,grid=0,fill=0;
-    for(int i=0;i<TACTICAL_BACK_ROWS*TACTICAL_SIDE_STEPS;++i) {
-        const float back=float(i/TACTICAL_SIDE_STEPS),across1=TACTICAL_SIDE[i%TACTICAL_SIDE_STEPS];
-        const auto c=TacticalP(center)-axis*(cfg->group.tacticalRear+along*(.5f+back))+side*(across*across1);
+    int offMap=0,tooFar=0,area=0,unreachable=0,grid=0,fill=0,porc=0;
+    bool porcSeen=false; commander::Point porcFirst{};
+    auto tryAt=[&](const commander::Point& c,float farLimit)->bool {
         AIFloat3 centre=TacticalF(c);
-        if(!OnMap(centre)) {++offMap;continue;}
+        if(!OnMap(centre)) {++offMap;return false;}
         centre.y=ai->GetMap()->GetElevationAt(centre.x,centre.z);
-        if(centre.SqDistance2D(center)>SQUARE(cfg->group.radius+along*TACTICAL_BACK_ROWS)) {++tooFar;continue;}
-        if(!terrain->CanReserveArea(centre,facing,across*.5f,along*.5f)) {++area;continue;}
-        if(!terrain->CanReachAtSafe(unit,centre,reach+across)) {++unreachable;continue;}
+        if(centre.SqDistance2D(center)>SQUARE(farLimit)) {++tooFar;return false;}
+        if(economy->EnemyPorcClearance(centre)<blockRadius) {
+            ++porc;
+            if(!porcSeen) { porcSeen=true; porcFirst=c; }
+            return false;
+        }
+        if(!terrain->CanReserveArea(centre,facing,across*.5f,along*.5f)) {++area;return false;}
+        if(!terrain->CanReachAtSafe(unit,centre,reach+across)) {++unreachable;return false;}
         const auto front=TacticalF(c+axis*(along*.5f));
         const int group=terrain->ReserveGrid(def,front,facing,cols,rows,0);
-        if(group<=0) {++grid;continue;}
-        if(terrain->GetGroupCount(group,false)<minimum) { terrain->ReleaseGroup(group); ++fill; continue; }
+        if(group<=0) {++grid;return false;}
+        if(terrain->GetGroupCount(group,false)<minimum) { terrain->ReleaseGroup(group); ++fill; return false; }
         block.group=group; block.centre=centre;
-        block.radius=.5f*std::sqrt(across*across+along*along)+size;
+        block.radius=blockRadius;
         block.axisX=axis.x; block.axisZ=axis.z; block.across=across; block.along=along;
         block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherSite=AIFloat3(-1.f,0.f,-1.f); block.launcherTask=nullptr;
         ai->LOG("[CommanderGroup] tactical_block group=%i slots=%i def=%s at=%.0f,%.0f facing=%i",group,
             terrain->GetGroupCount(group,false),def->GetDef()->GetName(),centre.x,centre.z,facing);
         return true;
+    };
+    const float farLimit=cfg->group.radius+along*TACTICAL_BACK_ROWS;
+    for(int i=0;i<TACTICAL_BACK_ROWS*TACTICAL_SIDE_STEPS;++i) {
+        const float back=float(i/TACTICAL_SIDE_STEPS),across1=TACTICAL_SIDE[i%TACTICAL_SIDE_STEPS];
+        const auto c=TacticalP(center)-axis*(cfg->group.tacticalRear+along*(.5f+back))+side*(across*across1);
+        if(tryAt(c,farLimit)) return true;
     }
-    ai->LOG("[CommanderGroup] tactical_block none def=%s near=%.0f,%.0f facing=%i off_map=%i far=%i area=%i reach=%i grid=%i fill=%i",
-        def->GetDef()->GetName(),center.x,center.z,facing,offMap,tooFar,area,unreachable,grid,fill);
+    // Owner 2026-11-20: every candidate in porc reach -> relocate backwards: the first one pushed straight out of
+    // the porc discs (away from the deepest porc) by the block's radius, once. It may lie past the usual rows;
+    // the block is released again if the commander stays out of group range of it.
+    if(porcSeen) {
+        AIFloat3 out;
+        if(economy->PorcEscapePoint(nullptr,TacticalF(porcFirst),blockRadius,out)) {
+            const commander::Point moved=TacticalP(out);
+            if(tryAt(moved,farLimit+2.f*blockRadius)) {
+                ai->LOG("[CommanderGroup] tactical_block moved_back def=%s from=%.0f,%.0f to=%.0f,%.0f porc=%i",
+                    def->GetDef()->GetName(),TacticalF(porcFirst).x,TacticalF(porcFirst).z,out.x,out.z,porc);
+                return true;
+            }
+        }
+    }
+    ai->LOG("[CommanderGroup] tactical_block none def=%s near=%.0f,%.0f facing=%i off_map=%i far=%i area=%i reach=%i grid=%i fill=%i porc=%i",
+        def->GetDef()->GetName(),center.x,center.z,facing,offMap,tooFar,area,unreachable,grid,fill,porc);
     return false;
 }
 // D-476 (the owner's rule): expansion jobs come first for every group
@@ -262,7 +293,7 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     if(block.group>0 && (t1Moved || block.centre.SqDistance2D(center)>SQUARE(cfg->group.radius+block.radius)
         || terrain->GetGroupCount(block.group,true)<=0)) {
         // An unfinished turret in the old block is finished first.
-        if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def)) {
+        if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def); frameUnit && !FrameInPorc(frameUnit,frame)) {
             auto* repair=builder->EnqueueRepairFor(frameUnit,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC),unit);
             if(repair && TacticalJobAllowed(unit,repair,anchor) && (unit->GetTask()==repair || repair->CanAssignTo(unit))) {
                 tacticalJob=repair;
@@ -303,7 +334,7 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         if(started>=2) {
             // Both first guns placed but not both finished, and no job on them: finish the frame.
             if(BlockArtilleryBuilt(block)<2) {
-                if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def)) {
+                if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def); frameUnit && !FrameInPorc(frameUnit,frame)) {
                     auto* repair=builder->EnqueueRepairFor(frameUnit,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC),unit);
                     if(repair && TacticalJobAllowed(unit,repair,anchor) && (unit->GetTask()==repair || repair->CanAssignTo(unit))) {
                         tacticalJob=repair;
@@ -325,6 +356,17 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
     }
     const int slot=terrain->NextSlotAny(block.group,unit->GetPos(frame));
     if(slot<0) return nullptr;
+    // Owner 2026-11-20: a slot inside known enemy porc reach (seen or ghost) gets no order: CON SAFETY would
+    // drop it on the way and the next call would order the same slot again. The block is released, so the next
+    // reservation (ReserveTacticalBlock) finds one further back, outside every porc's reach.
+    if(ai->GetEconomyManager()->EnemyPorcClearance(terrain->GetReservationPos(slot))<0.f) {
+        const auto at=terrain->GetReservationPos(slot);
+        ai->LOG("[CommanderGroup] tactical_block porc_release def=%s block=%i slot=%i at=%.0f,%.0f team=%i",
+            def->GetDef()->GetName(),block.group,slot,at.x,at.z,ai->GetTeamId());
+        terrain->ReleaseGroup(block.group);
+        block.group=0; block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherTask=nullptr;
+        return nullptr;
+    }
     // A builder task aborts at once, silently, when the walk to its site is not
     // safe at the builder's power (IBuilderTask::UpdatePath). Played (artillery-b19,
     // the owner's game on b18): a job per seat per second was made and dropped
@@ -385,6 +427,10 @@ void CCommanderController::BlockAbandon(CCircuitDef* def,TacticalBlock& block,in
     ai->GetTerrainManager()->ReleaseGroup(block.group);
     block.group=0; block.launcher=0; block.launcherTries=0; block.launcherStood=false; block.launcherTask=nullptr;
     block.abandonUntil=frame+BLOCK_ABANDON_SECONDS*FRAMES_PER_SEC;
+}
+// Owner 2026-11-20: an unfinished gun frame inside known enemy porc reach is not repaired (CON SAFETY drops it).
+bool CCommanderController::FrameInPorc(CCircuitUnit* frameUnit,int frame) const {
+    return ai->GetEconomyManager()->EnemyPorcClearance(frameUnit->GetPos(frame))<0.f;
 }
 int CCommanderController::DueBlockLauncher(const AIFloat3& pos) const {
     for(const auto& kv:tacticalBlocks) {
@@ -474,6 +520,7 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
         AIFloat3 site(block.centre.x+dirs[d][0]/len*off,0.f,block.centre.z+dirs[d][1]/len*off);
         if(!OnMap(site)) continue;
         site.y=ai->GetMap()->GetElevationAt(site.x,site.z);
+        if(ai->GetEconomyManager()->EnemyPorcClearance(site)<.5f*ls) continue;  // owner 2026-11-20: not in porc reach
         if(!terrain->CanBeBuiltAt(ldef,site) || !terrain->CanReachAtSafe(unit,site,unit->GetCircuitDef()->GetBuildDistance(),
             unit->GetCircuitDef()->GetPower())) continue;
         auto* task=builder->Enqueue(TaskB::Common(BT::DEFENCE,IBuilderTask::Priority::HIGH,ldef,site,0.f,true,
