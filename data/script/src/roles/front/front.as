@@ -1472,22 +1472,34 @@ namespace RoleFront {
         return support is null ? defaultTask : support;
     }
 
+    int g_frontPrimaryT2Asked = -100000;          // last frame the primary T2 constructor reached the fusion rule
+    const int FrontFusionWorkerWaitSeconds = 30;   // after that, another T2 constructor runs the rule
+
     IUnitTask@ Front_T2Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask, bool isEnergyFull, float metalIncome, float energyIncome, float metalCurrent, bool isEnergyLessThan90Percent) {
         // Normal fusion stays eligible until both FRONT AFUS income floors clear.
         // Native default energy selection observes the same availability gate.
 
         string unitSide = UnitHelpers::GetSideForUnitName(u.circuitDef.GetName());
 
-        // Freelance T2 constructors just do default tasks
-        if (u is Builder::freelanceT2BotConstructor || u is Builder::freelanceT2VehConstructor) {
+        const bool isPrimary = (u is Builder::primaryT2BotConstructor || u is Builder::primaryT2VehConstructor);
+        // Owner 2026-11-20: the primary may never come here (All That Smolders: AI 15's primary was its dedicated
+        // mex upgrader and the secondary sat in the commander group, so no fusion all game on a 10k metal bank).
+        // Once the primary has not asked for 30 s, any other T2 constructor that does ask runs the same rule.
+        if (isPrimary) g_frontPrimaryT2Asked = ai.frame;
+        const bool fusionWorker = isPrimary || ai.frame - g_frontPrimaryT2Asked > FrontFusionWorkerWaitSeconds * SECOND;
+        // Owner 2026-11-20: native re-asks a busy builder; a constructor already on a fusion stays on it
+        // (headless: answering with the default task swapped it off every second, and the next ask took the
+        // same unstaffed order again, 100+ takeovers per game, the fusion never finished)
+        if (!FrontEcoLadder::On() && Builder::IsOnFusion(u)) return u.task;
+        const bool freelance = (u is Builder::freelanceT2BotConstructor || u is Builder::freelanceT2VehConstructor);
+        // Freelance T2 constructors just do default tasks (unless standing in for the primary)
+        if (freelance && !fusionWorker) {
             return defaultTask;
         }
 
-        const bool isPrimary = (u is Builder::primaryT2BotConstructor || u is Builder::primaryT2VehConstructor);
-
         AIFloat3 anchor = Global::Map::StartPos;
 
-        if (isPrimary && !FrontEcoLadder::On()) {   // Front::EcoLadder owns the reactors when on
+        if (fusionWorker && !FrontEcoLadder::On()) {   // Front::EcoLadder owns the reactors when on
             // Fusion Reactor
             if (FrontEnergyMath::NormalAllowed(
                 /*mi*/ metalIncome,
@@ -1499,9 +1511,13 @@ namespace RoleFront {
                 /*advancedAllowed*/ FrontEnergy::AdvancedAllowed(metalIncome, energyIncome)
             )) {
                 IUnitTask@ tFus2 = Builder::EnqueueFUS(unitSide, anchor, SQUARE_SIZE * 32, SECOND * 300);
-                if (tFus2 !is null) return tFus2;
+                if (tFus2 !is null) {
+                    GenericHelpers::LogUtil("[FRONT][Fusion] ordered by " + u.circuitDef.GetName() + " " + u.id + (isPrimary ? " (primary)" : " (stand-in, primary away)")
+                        + " | M +" + int(metalIncome) + " E +" + int(energyIncome) + " bank " + int(aiEconomyMgr.energy.current) + "/" + int(aiEconomyMgr.energy.storage), 1);
+                    return tFus2;
+                }
                 // Owner 2026-11-19: a fusion already queued (native, build chain) that nobody builds blocked
-                // EnqueueFUS all game; the primary T2 constructor takes that order instead
+                // EnqueueFUS all game; the constructor running the rule takes that order instead
                 IUnitTask@ queuedFus = Builder::UnstaffedFusionTask(u);
                 if (queuedFus !is null) {
                     if (!(u.task is queuedFus)) GenericHelpers::LogUtil("[FRONT][Fusion] queued fusion had nobody on it: " + u.circuitDef.GetName() + " " + u.id + " takes it | M +" + int(metalIncome) + " E +" + int(energyIncome), 1);

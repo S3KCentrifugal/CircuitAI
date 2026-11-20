@@ -503,29 +503,29 @@ namespace Builder {
 	// (doc/angelscript-references.md), so these handles are safe to hold across
 	// callbacks; they are released in AiTaskRemoved.
 	IUnitTask@ FusionBuildTask = null;
-	// Owner 2026-11-19: every queued Fusion task (ours, native's, the build chain's), so a role rule that
-	// finds "a Fusion is already queued" can put its builder on that order when nobody is building it.
-	// (All That Glitters: a queued native fusion nobody staffed blocked EnqueueFUS for FRONTs all game)
-	array<IUnitTask@> queuedFusionTasks;
-	bool _IsFusionName(const string &in n)
+	// Owner 2026-11-19/20: a queued Fusion order nobody is building (native, build chain), for a role rule
+	// that finds "a Fusion is already queued". Asked from native each time (FindQueuedTask: live, unstaffed,
+	// assignable, reachable); no task handles are kept (a kept handle outlived its task and crashed the AI)
+	bool IsOnFusion(CCircuitUnit@ u)
 	{
+		if (u is null || u.task is null || u.task.IsDead()) return false;
+		IBuilderTask@ bt = cast<IBuilderTask>(u.task);
+		if (bt is null || bt.buildDef is null || Task::BuildType(bt.GetBuildType()) != Task::BuildType::ENERGY) return false;
 		array<string> f = UnitHelpers::GetAllFusionReactors();
+		const string n = bt.buildDef.GetName();
 		for (uint i = 0; i < f.length(); ++i) if (f[i] == n) return true;
 		return false;
 	}
 	IUnitTask@ UnstaffedFusionTask(CCircuitUnit@ u)
 	{
 		if (u is null || u.circuitDef is null) return null;
-		for (uint i = 0; i < queuedFusionTasks.length(); ++i) {
-			IUnitTask@ t = queuedFusionTasks[i];
-			if (t is null || t.IsDead()) continue;
-			if (u.task is t) return t;
-			IBuilderTask@ bt = cast<IBuilderTask>(t);
-			if (bt is null || bt.buildDef is null || !u.circuitDef.CanBuild(bt.buildDef)) continue;
-			array<CCircuitUnit@>@ on = t.GetUnits();
-			if (on !is null && on.length() > 0) continue;
-			return t;
-		}
+		IUnitTask@ t = aiBuilderMgr.FindQueuedTask(u, int(Task::BuildType::ENERGY));
+		if (t is null) return null;
+		IBuilderTask@ bt = cast<IBuilderTask>(t);
+		if (bt is null || bt.buildDef is null) return null;
+		array<string> f = UnitHelpers::GetAllFusionReactors();
+		const string n = bt.buildDef.GetName();
+		for (uint i = 0; i < f.length(); ++i) if (f[i] == n) return t;
 		return null;
 	}
 	IUnitTask@ AdvancedFusionBuildTask = null;
@@ -2242,7 +2242,6 @@ namespace Builder {
 			buildType = Task::BuildType(builderTask.GetBuildType());
 			hasBuildDef = (buildDefName.length() > 0);
 		}
-		if (hasBuildDef && _IsFusionName(buildDefName) && queuedFusionTasks.findByRef(task) < 0) queuedFusionTasks.insertLast(task);
 
 		// Centralize queued-flag setting here based on resolved metadata
 		if (hasBuildDef) {
@@ -2429,7 +2428,6 @@ namespace Builder {
 			bt = Task::BuildType(builderTask.GetBuildType());
 			have = (bname.length() > 0);
 		}
-		{ const int qi = queuedFusionTasks.findByRef(task); if (qi >= 0) queuedFusionTasks.removeAt(qi); }
 		GenericHelpers::LogUtil("[BUILDER] AiTaskRemoved: resolved def='" + bname + "' buildType=" + int(bt), 4);
 		// Clear per-builder current-task mapping for this task
 		ClearBuilderTaskByTask(task);
