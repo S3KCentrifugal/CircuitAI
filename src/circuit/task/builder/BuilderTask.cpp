@@ -57,6 +57,11 @@ namespace {
 thread_local int reevaluateSwapDepth = 0;
 constexpr int MAX_REEVALUATE_SWAP_DEPTH = 4;
 thread_local int reevaluateRefusedFrame = -1;
+// Owner 2026-11-20: long-range statics (heavy artillery, launchers) never get a site in known enemy porc reach;
+// a search with none left outside reach retries once from PORC_SITE_BACK_EXTRA elmos past the porc reach.
+constexpr float PORC_SITE_MIN_RANGE = 900.f;
+constexpr float PORC_SITE_BACK_EXTRA = 200.f;
+thread_local int porcSiteLogFrame = -1000000;  // PORC SITE log at most once per 10 s per thread
 }
 
 using namespace springai;
@@ -1359,10 +1364,23 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
     const auto exclusions=manager->GetCircuit()->GetCommanderController()->DefenceExclusions(builder,buildDef,pos,searchRadius,this);
     auto* control=manager->GetCircuit()->GetCommanderController();
     const auto coverage=control->GroupJammerCoverage(builder,buildDef,pos,searchRadius,this);
-	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder, &exclusions, &coverage, control](const AIFloat3& p) {
+	// Owner 2026-11-20 ("a ghost image of a persecutor should block all attempts, and it should be relocated
+	// backwards"): a static defence site inside the reach of known enemy porc (seen or ghost; the list CON
+	// SAFETY drops constructors by) is refused by the search itself, for every non-commander builder CON SAFETY
+	// guards and for every long-range static (heavy artillery, launchers). Played before: the search moved
+	// FRONT PorcCluster / Tactical sites up to ~340 elmos into reach, CON SAFETY dropped them and the scripts
+	// ordered them again. Cost: EnemyPorcClearance is O(known enemy porc) on a list refreshed once a second;
+	// the per-candidate check runs only when such porc lies within the search radius of the order.
+	CEconomyManager* economyMgr = manager->GetCircuit()->GetEconomyManager();
+	const bool porcSite = (buildType == BuildType::DEFENCE) && (buildDef != nullptr) && (economyMgr != nullptr)
+		&& !builder->GetCircuitDef()->IsRoleComm()
+		&& (economyMgr->IsPorcGuarded(builder) || (buildDef->GetMaxRange() >= PORC_SITE_MIN_RANGE))
+		&& (economyMgr->EnemyPorcClearance(pos) < searchRadius);
+	CTerrainManager::TerrainPredicate predicate = [this, terrainMgr, builder, &exclusions, &coverage, control, porcSite, economyMgr](const AIFloat3& p) {
 		return commander::DefenceSpaced({p.x,p.z},exclusions)
             && control->GroupBuildSiteAllowed(builder,buildDef,p)
             && coverage.Allows({p.x,p.z})
+            && (!porcSite || (economyMgr->EnemyPorcClearance(p) >= 0.f))
             && manager->GetCircuit()->GetBuilderManager()->IsBuildPositionAllowed(buildDef, p)
             && terrainMgr->CanReachAtSafe(builder, p, builder->GetCircuitDef()->GetBuildDistance());
 	};
@@ -1379,7 +1397,22 @@ void IBuilderTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, flo
 		return;
 	}
 	terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired);
-	const AIFloat3 bp = terrainMgr->FindBuildSite(buildDef, pos, searchRadius, facing, predicate);
+	AIFloat3 bp = terrainMgr->FindBuildSite(buildDef, pos, searchRadius, facing, predicate);
+	// Owner 2026-11-20: nothing outside porc reach near the order -> one more search from the order's place
+	// pushed straight back out of the porc discs (away from the deepest one). Unpinned searches only: a pinned
+	// slot is the caller's site, and the commander group relocates its own blocks.
+	if (porcSite && !geom::is_valid(bp) && (pinnedReservation < 0)) {
+		AIFloat3 back;
+		if (economyMgr->PorcEscapePoint(nullptr, pos, PORC_SITE_BACK_EXTRA, back)) {
+			terrainMgr->BeginReservedSearch(pinnedReservation, pinRequired);
+			bp = terrainMgr->FindBuildSite(buildDef, back, searchRadius, facing, predicate);
+			const int lf = manager->GetCircuit()->GetLastFrame();
+			if (lf - porcSiteLogFrame >= FRAMES_PER_SEC * 10) { porcSiteLogFrame = lf;
+			manager->GetCircuit()->LOG("PORC SITE: %s %s moved back from (%.0f,%.0f) to (%.0f,%.0f): %s",
+				builder->GetCircuitDef()->GetDef()->GetName(), buildDef->GetDef()->GetName(), pos.x, pos.z,
+				back.x, back.z, geom::is_valid(bp) ? "site found" : "no site"); }
+		}
+	}
 	TakeReservation(terrainMgr);
 	pinFailed = pinRequired && (reservationId < 0);
 	SetBuildPos(bp);

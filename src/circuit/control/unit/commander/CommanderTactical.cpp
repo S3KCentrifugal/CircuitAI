@@ -224,11 +224,21 @@ bool CCommanderController::ReserveTacticalBlock(CCircuitUnit* unit,CCircuitUnit*
     if(porcSeen) {
         AIFloat3 out;
         if(economy->PorcEscapePoint(nullptr,TacticalF(porcFirst),blockRadius,out)) {
-            const commander::Point moved=TacticalP(out);
-            if(tryAt(moved,farLimit+2.f*blockRadius)) {
-                ai->LOG("[CommanderGroup] tactical_block moved_back def=%s from=%.0f,%.0f to=%.0f,%.0f porc=%i",
-                    def->GetDef()->GetName(),TacticalF(porcFirst).x,TacticalF(porcFirst).z,out.x,out.z,porc);
-                return true;
+            // Headless 11-20: the escape point itself mostly failed CanReserveArea (own structures), so step
+            // further back along the escape direction (0..3 block lengths) with the block centred or one block
+            // width to either side: at most 12 more tries per tactical_retry_seconds.
+            commander::Point dir=commander::Normal(TacticalP(out)-porcFirst);
+            if(commander::Length(dir)<.1f) dir=axis*-1.f;
+            const commander::Point across2{-dir.z,dir.x};
+            const float sides[3]={0.f,-1.f,1.f};
+            for(int k=0;k<4;++k) for(float s:sides) {
+                const commander::Point moved=TacticalP(out)+dir*(along*float(k))+across2*(across*s);
+                if(tryAt(moved,farLimit+2.f*blockRadius+along*float(k))) {
+                    const auto to=TacticalF(moved);
+                    ai->LOG("[CommanderGroup] tactical_block moved_back def=%s from=%.0f,%.0f to=%.0f,%.0f step=%i porc=%i",
+                        def->GetDef()->GetName(),TacticalF(porcFirst).x,TacticalF(porcFirst).z,to.x,to.z,k,porc);
+                    return true;
+                }
             }
         }
     }
