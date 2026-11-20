@@ -270,9 +270,11 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame)) return launcherTask;
         if(block.launcher==1) return nullptr;
     }
-    // Owner 2026-11-19 (Scylla, AI 15 kept filling Persecutor blocks with no Catalyst up): a block gets no new
-    // gun unless this team has a finished EMP launcher (armemp, cortron, legperdition) standing. With none, the
-    // block's own launcher is ordered first (no two-gun wait); one that stood and has died is ordered again.
+    // Owner 2026-11-19 (Scylla, AI 15 kept filling Persecutor blocks with no Catalyst up), reworked the same
+    // evening (a Paralyzer/Catalyst stood alone at the block edge with no guns): while this team has no
+    // finished EMP launcher (armemp, cortron, legperdition) standing, a block gets two guns first, its own
+    // launcher once those two are finished (BlockLauncherWork above), and no further gun until a launcher
+    // stands. A block launcher that stood and has died is ordered again.
     // A block whose launcher could not be placed after BLOCK_LAUNCHER_TRIES sites is abandoned (BlockAbandon):
     // no more guns there, even with a launcher standing elsewhere.
     if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && block.launcher==2 && !block.launcherStood) {
@@ -280,19 +282,35 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         return nullptr;
     }
     if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && !TeamEmpLauncherStanding()) {
-        if(block.launcher==2 && block.launcherStood && !(tacticalJob && !tacticalJob->IsDead())) {
+        if(block.launcher==2 && block.launcherStood) {
             block.launcher=0; block.launcherStood=false; ++block.launcherTries;
             ai->LOG("[CommanderGroup] block_launcher lost block=%i tries=%i",block.group,block.launcherTries);
+            if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame)) return launcherTask;
+            if(block.launcher==2 && !block.launcherStood) { BlockAbandon(def,block,frame); return nullptr; }
         }
-        if(block.launcher<2)
-            if(auto* launcherTask=BlockLauncherWork(unit,anchor,def,block,frame,true)) return launcherTask;
-        if(block.launcher==2 && !block.launcherStood) { BlockAbandon(def,block,frame); return nullptr; }
-        if(frame>=empGateLog+30*FRAMES_PER_SEC) {
-            empGateLog=frame;
-            ai->LOG("[CommanderGroup] block_gun held def=%s block=%i guns=%i launcher=%i tries=%i: no finished EMP launcher standing team=%i",
-                def->GetDef()->GetName(),block.group,BlockArtilleryBuilt(block,true),block.launcher,block.launcherTries,ai->GetTeamId());
+        const int started=BlockArtilleryBuilt(block,true);
+        if(started>=2) {
+            // Both first guns placed but not both finished, and no job on them: finish the frame.
+            if(BlockArtilleryBuilt(block)<2) {
+                if(auto* frameUnit=builder->FindUnfinishedNear(block.centre,block.radius,def)) {
+                    auto* repair=builder->EnqueueRepairFor(frameUnit,int(cfg->group.tacticalOrderSeconds*FRAMES_PER_SEC),unit);
+                    if(repair && TacticalJobAllowed(unit,repair,anchor) && (unit->GetTask()==repair || repair->CanAssignTo(unit))) {
+                        tacticalJob=repair;
+                        ai->LOG("[CommanderGroup] job_start queue=tactical def=%s repair=%i team=%i",def->GetDef()->GetName(),
+                            frameUnit->GetId(),ai->GetTeamId());
+                        return repair;
+                    }
+                    if(repair) builder->DiscardUnusedTask(repair);
+                }
+            }
+            if(frame>=empGateLog+30*FRAMES_PER_SEC) {
+                empGateLog=frame;
+                ai->LOG("[CommanderGroup] block_gun held def=%s block=%i guns=%i launcher=%i tries=%i: no finished EMP launcher standing team=%i",
+                    def->GetDef()->GetName(),block.group,started,block.launcher,block.launcherTries,ai->GetTeamId());
+            }
+            return nullptr;
         }
-        return nullptr;
+        // fewer than two guns placed: falls through to one of the block's first two guns
     }
     const int slot=terrain->NextSlotAny(block.group,unit->GetPos(frame));
     if(slot<0) return nullptr;
