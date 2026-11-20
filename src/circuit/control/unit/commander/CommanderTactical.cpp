@@ -361,7 +361,7 @@ bool CCommanderController::BlockLauncherNear(const AIFloat3& site,const CCircuit
     auto* clb=ai->GetCallback();
     const int team=ai->GetTeamId();
     bool found=false;
-    auto& units=clb->GetFriendlyUnitsIn(site,64.f);
+    auto& units=clb->GetFriendlyUnitsIn(site,128.f);  // 64 missed launchers the engine placed a step off the site
     for(springai::Unit* u:units) {
         if(u && !found && u->GetTeam()==team && def && !u->IsBeingBuilt() && clb->Unit_GetDefId(u->GetUnitId())==def->GetId()) found=true;  // finished only (owner 2026-11-19)
         delete u;

@@ -46,7 +46,18 @@ bool CCommanderController::ArtilleryCrowded(const CCircuitDef* def) const {
     const int frame=ai->GetLastFrame();
     AIFloat3 at=anchor->GetPos(frame);
     const auto block=tacticalBlocks.find(def->GetId());
-    if(block!=tacticalBlocks.end() && block->second.group>0) at=block->second.centre;
+    if(block!=tacticalBlocks.end() && block->second.group>0) {
+        const TacticalBlock& b=block->second;
+        at=b.centre;
+        // Owner 2026-11-19 (heavy block order: 2 guns, then the block's launcher, then the rest): a T2 block
+        // whose launcher is due (2 guns finished, none ordered or standing yet) or ordered is never crowded,
+        // so the group comes back for the launcher; and once the block's own launcher stands, the block fills
+        // its remaining slots past artillery_local_max. Headless 11-19: 8 of 15 blocks stopped at 2 guns.
+        if(!IsArtilleryT1Def(def)) {
+            if(b.launcher==2 && b.launcherStood) return false;
+            if(b.launcher==1 || (b.launcher==0 && BlockArtilleryBuilt(b)>=2)) return false;
+        }
+    }
     int ours=census->CountNear(at,artilleryLocalRadius);
     if(tacticalJob && !tacticalJob->IsDead()) if(auto* build=dynamic_cast<IBuilderTask*>(tacticalJob);
         build && IsArtilleryDef(build->GetBuildDef())) ++ours;
