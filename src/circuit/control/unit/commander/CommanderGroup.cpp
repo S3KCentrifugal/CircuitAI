@@ -285,6 +285,11 @@ bool CCommanderController::GroupMayBuild(CCircuitUnit* unit,CCircuitDef* def,con
         && def==static_cast<IBuilderTask*>(junoJob)->GetBuildDef();
     if((!juno && !GroupBuildSiteAllowed(unit,def,site)) || HealthRetreat(unit) || EnergyRetreat(unit)) return false;
     if(KeepOutBlocks(unit,site)) return false;
+    // Owner 2026-11-20 (All That Glitters, AI 15 legacv 21400): the vehicle
+    // porc check (IBuilderTask::DropIfPorc) drops any job inside scouted porc
+    // reach, so the group must not hand one out or re-adopt it. +inf for
+    // commanders, bots and other unguarded units: no change for them.
+    if(ai->GetEconomyManager()->EnemyPorcClearance(unit,site)<0.f) return false;
     if(juno || !IsGroupMember(unit->GetId())) return true;
     auto* anchor=GroupCommander();
     return anchor && def && commander::GroupJobInRange(site.SqDistance2D(anchor->GetPos(ai->GetLastFrame())),
@@ -473,21 +478,30 @@ IUnitTask* CCommanderController::GroupBuild(CCircuitUnit* unit,CCircuitDef* def,
     // Trace only: the first failing site gate per candidate cell, so a
     // planner `placement` skip names its cause. No cost without the variable.
     static const bool traceSites=std::getenv("CIRCUIT_COMMANDER_TRACE")!=nullptr;
-    std::array<int,6> rejected{};
+    std::array<int,7> rejected{};
+    // Owner 2026-11-20 (All That Glitters, AI 15 legacv 21400): a porc-guarded
+    // vehicle drops any job inside scouted porc reach (IBuilderTask::DropIfPorc),
+    // so a site there made the group re-order the same jammer every second
+    // (~520 fallback patrols in 5 min). The gate is the same clearance the drop
+    // uses. Cost: guarded vehicles only, O(cached porc list) per candidate cell
+    // (the list refreshes once a second); +inf at once for everyone else.
+    CEconomyManager* const economy=ai->GetEconomyManager();
+    const bool porcGuarded=economy->IsConPorcGuarded(unit);
     CTerrainManager::TerrainPredicate admit=[&](const AIFloat3& p) {
         int gate=0;
         const bool ok=(++gate,coverage.Allows({p.x,p.z}))
             && (++gate,GroupBuildSiteAllowed(unit,def,p)) && (++gate,GroupLaneWorkAllowed(unit,def,p))
             && (++gate,p.SqDistance2D(center)<=SQUARE(cfg->group.radius))
             && (++gate,ai->GetThreatMap()->GetThreatAt(unit,p)<=cfg->front.threat)
+            && (++gate,!porcGuarded || economy->EnemyPorcClearance(unit,p)>=0.f)
             && (++gate,ai->GetTerrainManager()->CanReachAtSafe2(unit,p,unit->GetCircuitDef()->GetBuildDistance()));
         if(!ok && traceSites) ++rejected[gate-1];
         return ok;
     };
     const auto traceReject=[&](const char* why) -> IUnitTask* {
         if(traceSites && defenseSlot>=0)
-            ai->LOG("[CommanderGroup] site_reject unit=%i def=%s why=%s coverage=%i site=%i lane=%i radius=%i threat=%i reach=%i",
-                unit->GetId(),def->GetDef()->GetName(),why,rejected[0],rejected[1],rejected[2],rejected[3],rejected[4],rejected[5]);
+            ai->LOG("[CommanderGroup] site_reject unit=%i def=%s why=%s coverage=%i site=%i lane=%i radius=%i threat=%i porc=%i reach=%i",
+                unit->GetId(),def->GetDef()->GetName(),why,rejected[0],rejected[1],rejected[2],rejected[3],rejected[4],rejected[5],rejected[6]);
         return nullptr;
     };
     AIFloat3 at=-RgtVector;
