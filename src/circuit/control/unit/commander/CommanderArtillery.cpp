@@ -54,7 +54,7 @@ bool CCommanderController::ArtilleryCrowded(const CCircuitDef* def) const {
         // so the group comes back for the launcher; and once the block's own launcher stands, the block fills
         // its remaining slots past artillery_local_max. Headless 11-19: 8 of 15 blocks stopped at 2 guns.
         if(!IsArtilleryT1Def(def)) {
-            if(b.launcher==2 && b.launcherStood) return false;
+            if(BlockLauncherStanding(b)) return false;  // owner 2026-11-20: a launcher standing at this block
             if(b.launcher==1 || (b.launcher==0 && BlockArtilleryBuilt(b)>=2)) return false;
         }
     }

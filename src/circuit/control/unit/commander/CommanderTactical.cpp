@@ -64,6 +64,7 @@ constexpr float TACTICAL_LANE_AHEAD=256.f;
 constexpr int BLOCK_LAUNCHER_TRIES=20;
 constexpr float BLOCK_LAUNCHER_STEP=64.f;
 constexpr int BLOCK_ABANDON_SECONDS=120;
+constexpr float BLOCK_LAUNCHER_NEAR=600.f;  // owner 2026-11-20: a launcher this near the block centre opens it
 commander::Point TacticalP(const AIFloat3& p) { return {p.x,p.z}; }
 AIFloat3 TacticalF(commander::Point p) { return {p.x,0.f,p.z}; }
 }
@@ -333,7 +334,9 @@ IUnitTask* CCommanderController::GroupTacticalWork(CCircuitUnit* unit,CCircuitUn
         BlockAbandon(def,block,frame);
         return nullptr;
     }
-    if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && !TeamEmpLauncherStanding()) {
+    // Owner 2026-11-20 (AI 10 built Persecutors 3-6 in a block whose only Catalyst stood 1,000 elmos away):
+    // the launcher that opens a block must stand at that block (BlockLauncherStanding), not anywhere on the team.
+    if(IsArtilleryDef(def) && !IsArtilleryT1Def(def) && !BlockLauncherStanding(block)) {
         if(block.launcher==2 && block.launcherStood) {
             block.launcher=0; block.launcherStood=false; ++block.launcherTries;
             ai->LOG("[CommanderGroup] block_launcher lost block=%i tries=%i",block.group,block.launcherTries);
@@ -453,6 +456,36 @@ int CCommanderController::DueBlockLauncher(const AIFloat3& pos) const {
     }
     return -1;
 }
+// Owner 2026-11-20: a finished EMP launcher (armemp, cortron, legperdition) of this team within
+// BLOCK_LAUNCHER_NEAR of the block's centre, or the block's own launcher (marked standing when its task finished,
+// wherever the builder moved it) still standing at its site. Cost: one or two friendly-unit radius queries per
+// block per frame (cached on the block for the frame).
+bool CCommanderController::BlockLauncherStanding(const TacticalBlock& block) const {
+    if(block.group<=0) return false;
+    const int frame=ai->GetLastFrame();
+    if(block.standFrame==frame) return block.standValue;
+    static const char* names[3]={"armemp","cortron","legperdition"};
+    int ids[3]={-1,-1,-1};
+    for(int i=0;i<3;++i) if(CCircuitDef* d=ai->GetCircuitDef(names[i])) ids[i]=d->GetId();
+    auto* clb=ai->GetCallback();
+    const int team=ai->GetTeamId();
+    auto launcherNear=[&](const AIFloat3& at,float radius) {
+        bool found=false;
+        auto& units=clb->GetFriendlyUnitsIn(at,radius);
+        for(springai::Unit* u:units) {
+            if(u && !found && u->GetTeam()==team && !u->IsBeingBuilt()) {
+                const int id=clb->Unit_GetDefId(u->GetUnitId());
+                found=(id==ids[0] || id==ids[1] || id==ids[2]);
+            }
+            delete u;
+        }
+        return found;
+    };
+    bool standing=launcherNear(block.centre,BLOCK_LAUNCHER_NEAR);
+    if(!standing && block.launcherStood && OnMap(block.launcherSite)) standing=launcherNear(block.launcherSite,128.f);
+    block.standFrame=frame; block.standValue=standing;
+    return standing;
+}
 bool CCommanderController::TeamEmpLauncherStanding() const {
     const int frame=ai->GetLastFrame();
     if(frame==empStandFrame) return empStand;
@@ -501,15 +534,13 @@ IUnitTask* CCommanderController::BlockLauncherWork(CCircuitUnit* unit,CCircuitUn
     }
     if(!first && BlockArtilleryBuilt(block)<2) return nullptr;
     if(!ldef) {
-        // A launcher of this team standing elsewhere (the unit cap makes none buildable) covers the block.
-        // With none standing, this builder (a seat that cannot make the launcher, or the cap) only waits:
-        // another group constructor may build it (headless 11-19: two blocks were abandoned at once here).
-        const bool covered=TeamEmpLauncherStanding();
-        if(covered) { block.launcher=2; block.launcherStood=true; }
+        // Owner 2026-11-20: this builder cannot make the launcher (no build option, or the unit cap). The block
+        // is never counted as covered by a launcher elsewhere: its guns hold at 2 until a group constructor
+        // that can build the launcher takes it (DueBlockLauncher asks only such constructors).
         if(frame>=empGateLog+30*FRAMES_PER_SEC) {
             empGateLog=frame;
-            ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i covered=%i unit=%s",block.group,int(covered),
-                unit->GetCircuitDef()->GetDef()->GetName());
+            ai->LOG("[CommanderGroup] block_launcher none_buildable block=%i def=%s guns=%i unit=%s: guns held at 2 for a launcher builder",
+                block.group,def->GetDef()->GetName(),BlockArtilleryBuilt(block),unit->GetCircuitDef()->GetDef()->GetName());
         }
         return nullptr;
     }

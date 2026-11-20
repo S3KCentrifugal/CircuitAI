@@ -637,6 +637,7 @@ private:
         float axisX=0,axisZ=1,across=0,along=0;
         int launcher=0,launcherTries=0; springai::AIFloat3 launcherSite{-1,0,-1};
         bool launcherStood=false; int abandonUntil=0;  // owner 2026-11-19: stood once / abandoned block cooldown
+        mutable int standFrame=-1; mutable bool standValue=false;  // BlockLauncherStanding, cached per frame
         const IUnitTask* launcherTask=nullptr;  // the block's live launcher order; done=1 marks it standing
     };
     std::map<int,TacticalBlock> tacticalBlocks;
@@ -644,6 +645,7 @@ private:
     // Owner 2026-11-19: no block gun unless this team has a finished EMP launcher
     // (armemp, cortron, legperdition) standing anywhere; answer cached per frame.
     bool TeamEmpLauncherStanding() const;
+    bool BlockLauncherStanding(const TacticalBlock& block) const;  // owner 2026-11-20: launcher at this block
     void BlockAbandon(CCircuitDef* def,TacticalBlock& block,int frame);
     mutable int empStandFrame=-1,empGateLog=-100000; mutable bool empStand=false;
     bool BlockLauncherNear(const springai::AIFloat3& site,const CCircuitDef* def) const;
