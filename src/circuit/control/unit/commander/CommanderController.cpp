@@ -132,6 +132,9 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Group<&GC::radius>("commander_group_radius",128,2000),
         Group<&GC::maintenance>("commander_group_maintenance",0,1),
         Group<&GC::lineReviewSeconds>("commander_group_line_review_seconds",1,60),
+        Group<&GC::rebaseGap>("commander_group_rebase_gap",0,4000),
+        Group<&GC::rebaseBehind>("commander_group_rebase_behind",0,2000),
+        Group<&GC::rebaseSeconds>("commander_group_rebase_seconds",0,120),
         Group<&GC::projectHoldSeconds>("commander_group_project_hold_seconds",0,120),
         Group<&GC::tacticalT2>("commander_group_tactical_t2",0,3),
         Group<&GC::tacticalMetal>("commander_group_tactical_metal",0,1000000),
@@ -223,6 +226,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::radius>("front_radius",100,1000),Front<&FC::threat>("front_threat",0,50),
         Front<&FC::repairCombat>("front_repair_combat",0,1),
         Front<&FC::solarIncome>("front_solar_income",0,10000),Front<&FC::solarStorage>("front_solar_storage",0,1),
+        Front<&FC::solarMaxIncome>("front_solar_max_income",0,1000000),
         Front<&FC::solarRadius>("front_solar_radius",32,600),Front<&FC::solarDef>("front_solar_def",-1,100000),
         Front<&FC::solarFusionStop>("front_solar_fusion_stop",0,1),Front<&FC::solarReclaim>("front_solar_reclaim",0,1),
         Front<&FC::solarReclaimRadius>("front_solar_reclaim_radius",0,10000),
@@ -251,6 +255,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Fall<&BC::search>("fallback_search",300,10000),Fall<&BC::holdSeconds>("fallback_hold_seconds",0,30),
         Fall<&BC::porcRange>("fallback_porc_range",200,5000),
         // D-299 work ladder
+        Work<&WC::stationaryAssist>("stationary_assist",0,1),
         Work<&WC::radius>("work_radius",0,3000),Work<&WC::clearance>("work_clearance",0,2000),
         Work<&WC::repairHealth>("repair_health",.5f,1),Work<&WC::reclaimStorage>("reclaim_storage",.1f,1),
         Work<&WC::reclaimEnergy>("reclaim_energy",0,100000),
@@ -870,7 +875,10 @@ void CCommanderController::Update() {
         // Fixed three-frame active/idle observation cadence independent of the
         // total action population. Immediate own-shot/move-failure invalidation.
         if(frame>=s.fundingUntil || !ai->GetEnemyInfo(s.fundingTarget)) s.fundingBudget=0;
-        if(frame>=s.next) { s.next=frame+3; Tick(unit,s,frame); }
+        if(frame>=s.next) {
+            s.next=frame+3; Tick(unit,s,frame);
+            if(ai->GetTeamUnit(id)==unit) StationaryAssist(unit,s,frame);
+        }
         reserve+=std::max(s.budget,s.fundingBudget);
     }
 }

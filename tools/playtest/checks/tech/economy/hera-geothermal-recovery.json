@@ -1,0 +1,49 @@
+{
+  "_doc": "Hera Planum nuke opening: completed geothermal must satisfy the same bootstrap credit at chain and silo admission, followed by normal economy recovery.",
+  "stop_minute": 40,
+  "expect": [
+    {
+      "key": "nuke opening",
+      "pattern": "\\[TECH\\]\\[Chain\\] objective nuke",
+      "scope": "tech",
+      "by_minute": 1
+    },
+    {
+      "key": "geothermal substitution",
+      "pattern": "\\[GeoBufferProbe\\] physical_shortfall_covered",
+      "scope": "any",
+      "by_minute": 25
+    },
+    {
+      "key": "silo handoff",
+      "pattern": "\\[TECH\\]\\[NukeRush\\] silo complete; normal economy resumes",
+      "scope": "tech",
+      "by_minute": 35,
+      "after_key": "geothermal substitution"
+    },
+    {
+      "key": "advanced economy",
+      "pattern": "\\[Playtest\\] finished corafus team 0",
+      "scope": "any",
+      "by_minute": 40,
+      "after_key": "silo handoff"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "tech"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

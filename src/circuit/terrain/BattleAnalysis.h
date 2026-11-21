@@ -222,6 +222,7 @@ public:
     springai::AIFloat3 CorridorPoint(int corridor,float progress) const;
     bool SetFrontLane(const std::vector<springai::AIFloat3>& points,float halfWidth);
     float GetFrontLaneLength() const {return frontLanePath.Length();}
+    unsigned GetFrontLaneRevision() const {return frontLaneRevision;}
     float GetFrontLaneWidth() const {return frontLaneWidth;}
     float GetFrontLaneProgress(const springai::AIFloat3& p) const {return frontLanePath.Project({p.x,p.y,p.z}).progress;}
     float GetFrontLaneDistance(const springai::AIFloat3& p) const;
@@ -479,6 +480,7 @@ private:
 	std::vector<springai::AIFloat3> allyEnds, enemyEnds;
 	std::vector<SLane> lanes;
     lane::Path frontLanePath;
+    unsigned frontLaneRevision=0;
     lane::Front laneFront;
     std::vector<int> frontCombatBin; // heat-grid cell -> nearest lane bin; route-owned
     int laneFrontFrame=-1;

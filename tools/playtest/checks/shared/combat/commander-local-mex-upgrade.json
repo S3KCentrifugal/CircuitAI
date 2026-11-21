@@ -1,0 +1,40 @@
+{
+  "stop_minute": 4,
+  "expect": [
+    {
+      "key": "local upgrade offered",
+      "pattern": "\\[LocalMexUpgrade\\] worker=\\d+ target=\\d+",
+      "scope": "any",
+      "by_minute": 3
+    },
+    {
+      "key": "upgrade finished",
+      "pattern": "finished id=\\d+ team=0 unit=armmoho",
+      "scope": "any",
+      "by_minute": 4,
+      "after_key": "local upgrade offered"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

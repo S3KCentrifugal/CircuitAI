@@ -15,6 +15,13 @@
 #include "spring/SpringUnit.h"
 #include "task/common/WaitTask.h"
 #include "task/builder/RepairTask.h"
+#include "control/core/LeaseTask.h"
+#include "unit/action/TravelAction.h"
+#include "spring/SpringCallback.h"
+#include "spring/CustomCommand.h"
+#include "Sim/Units/CommandAI/Command.h"
+#include "AISCommands.h"
+#include <array>
 #include "CircuitAI.h"
 #include "util/Utils.h"
 #include "Log.h"
@@ -32,6 +39,85 @@ constexpr int ASSIST_BREAK_WAIT_SECONDS=2;
 constexpr int ASSIST_LOW_INVARIANT_SECONDS=5;
 // D-490: INV-263 is logged at most once per this many seconds per commander.
 constexpr int ASSIST_LOW_LOG_SECONDS=60;
+}
+
+// Supplement a stationary owner's empty/WAIT queue without changing its task,
+// retreat latch or station. One local O(K) query per second at most; no unit
+// census, task allocation or retained engine wrappers. An active command wins,
+// including our own repair, so no per-tick order churn. Engine repair-with-area
+// bounds the target before movement, as in CBRepairTask::UpdateStationary.
+void CCommanderController::StationaryAssist(CCircuitUnit* unit,State& s,int frame) {
+    if(cfg->work.stationaryAssist<=0 || frame<s.work.stationaryAssistNext) return;
+    s.work.stationaryAssistNext=frame+FRAMES_PER_SEC;
+    auto* current=unit->GetTask();
+    if(!current || current->IsDead() || current->IsExternalControlled() || current->IsEnemyReclaim()
+        || unit->IsMorphing() || unit->GetUnit()->IsParalyzed() || unit->GetUnit()->IsBeingBuilt()
+        || unit->GetUnit()->GetRulesParamFloat("circuit_comm_transported",0)>0 || s.pending>=0) return;
+    bool holding=current->GetType()==IUnitTask::Type::IDLE;
+    if(auto* wait=dynamic_cast<IWaitTask*>(current)) holding=wait->IsStationary();
+    if(current->GetType()==IUnitTask::Type::RETREAT) {
+        const auto* travel=unit->GetTravelAct();
+        const bool jammed=Jammed(unit);
+        holding=jammed || (travel && travel->IsFinished());
+        springai::AIFloat3 station;
+        if(holding && !jammed && RetreatStation(unit,station))
+            holding=unit->GetPos(frame).SqDistance2D(station)<=64.f*64.f;
+    }
+    if(auto* lease=dynamic_cast<CLeaseTask*>(current))
+        holding=lease->GetController()==this && s.mode==Mode::FALLBACK
+            && unit->GetPos(frame).SqDistance2D(s.fallback.goal)<=64.f*64.f;
+    if(!holding || !unit->GetCircuitDef()->IsAbleToRepair()) { s.work.stationaryAssistOwner=nullptr; return; }
+    auto* api=ai->GetUnitAPI();
+    const int queued=api->GetCMDQueueSize(unit->GetId());
+    if(s.work.stationaryAssistOwner==current && queued>0 && api->GetCMD(unit->GetId())==CMD_REPAIR
+        && unit->GetPos(frame).SqDistance2D(s.work.stationaryAssistPosition)>64.f) {
+        ai->LOG("[INVARIANT] INV-274 stationary commander assistance moved unit=%i",unit->GetId());
+        s.work.stationaryAssistOwner=nullptr;
+    }
+    if(queued<0 || queued>1 || (queued==1 && api->GetCMD(unit->GetId())!=CMD_WAIT)) return;
+    const auto here=unit->GetPos(frame);
+    // Target centres are already tested in 3D against build reach. Keep only
+    // a numerical margin, so valid work near the edge is not silently ignored.
+    const float reach=unit->GetCircuitDef()->GetBuildDistance()-1.f;
+    if(reach<=100.f) return;
+    int best=-1;
+    float bestDistance=reach*reach;
+    workIds=ai->GetCallback()->GetFriendlyUnitIdsIn(here,reach,false);
+    for(int id:workIds) {
+        if(id==unit->GetId()) continue;
+        auto* target=ai->GetFriendlyUnit(id);
+        if(!target || !target->GetCircuitDef() || ai->GetBuilderManager()->IsReclaimUnit(target)) continue;
+        auto* body=target->GetUnit();
+        if(body->GetHealth()<=0 || (!body->IsBeingBuilt() && body->GetHealth()>=body->GetMaxHealth())) continue;
+        const float distance=here.SqDistance(target->GetPos(frame));
+        if(distance<bestDistance || (distance==bestDistance && (best<0 || id<best))) {
+            best=id;bestDistance=distance;
+        }
+    }
+    // BAR temporarily marks fresh nanoframes neutral. The friendly callback
+    // omits them; keep this second query local and admit allied frames only.
+    const auto& neutrals=ai->GetCallback()->GetNeutralUnitsIn(here,reach,false);
+    for(auto* target:neutrals) {
+        if(target->GetAllyTeam()!=ai->GetAllyTeamId() || !target->IsBeingBuilt() || target->GetHealth()<=0) continue;
+        const int id=target->GetUnitId();
+        auto* ally=ai->GetFriendlyUnit(id);
+        if(ally && ai->GetBuilderManager()->IsReclaimUnit(ally)) continue;
+        const float distance=here.SqDistance(target->GetPos());
+        if(distance<bestDistance || (distance==bestDistance && (best<0 || id<best))) {
+            best=id;bestDistance=distance;
+        }
+    }
+    utils::free(neutrals);
+    if(best<0) return;
+    s.work.stationaryAssistOwner=current;
+    s.work.stationaryAssistPosition=here;
+    std::array<float,5> params={float(best),here.x,here.y,here.z,reach-100.f};
+    TRY_UNIT(ai,unit,
+        unit->RemoveWait();
+        SendCustomCommand(ai->GetSkirmishAIId(),unit->GetId(),CMD_REPAIR,params,0,frame+30*FRAMES_PER_SEC);
+        unit->GetUnit()->Wait(UNIT_COMMAND_OPTION_SHIFT_KEY);
+    )
+    ai->LOG("[CommanderAssist] unit=%i target=%i holding=1 task=%i",unit->GetId(),best,int(current->GetType()));
 }
 
 /*

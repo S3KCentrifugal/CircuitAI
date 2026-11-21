@@ -14,13 +14,16 @@ namespace FrontLayout {
     const array<float> ExtensionAhead={256.f,512.f,768.f,1024.f};
     const array<float> ExtensionAcross={0.f,256.f,-256.f};
 
-    // The point FRONT factories face: the lane 1024 elmos out once it is
-    // published, else the nearest enemy start. Setup's legacy lane position
-    // is an expansion anchor, not the combat lane direction.
+    // Advance from the candidate, not a fixed point near home: extension
+    // sites can pass that point and would otherwise face back toward it.
+    AIFloat3 ForwardGoalAt(const AIFloat3& in site) {
+        const float length=aiBattle.GetFrontLaneLength();
+        if(length<=0.f) return Lanes::NearestEnemyStart(site);
+        return aiBattle.GetFrontLanePoint(AiMin(length,aiBattle.GetFrontLaneProgress(site)
+            +Global::RoleSettings::Front::FactoryFacingAdvance));
+    }
     AIFloat3 ForwardGoal() {
-        return aiBattle.GetFrontLaneLength()>0.f
-            ? aiBattle.GetFrontLanePoint(AiMin(1024.f,aiBattle.GetFrontLaneLength()))
-            : Lanes::NearestEnemyStart(Global::Map::StartPos);
+        return ForwardGoalAt(Global::Map::StartPos);
     }
     int ForwardFacing() {
         return LayoutHelpers::FacingToward(Global::Map::StartPos,ForwardGoal());
@@ -94,7 +97,7 @@ namespace FrontLayout {
             const float ahead=ExtensionAhead[i/ExtensionAcross.length()],across=ExtensionAcross[i%ExtensionAcross.length()];
             const AIFloat3 site(seed.x+ux*ahead-uz*across,0.f,seed.z+uz*ahead+ux*across);
             if(site.x<0.f || site.z<0.f || site.x>=float(AiTerrainWidth()) || site.z>=float(AiTerrainHeight())) continue;
-            facing=LayoutHelpers::FacingToward(site,goal);
+            facing=LayoutHelpers::FacingToward(site,ForwardGoalAt(site));
             for(int rows=Global::RoleSettings::Front::FactorySupportRows;rows>=1;--rows) {
                 const int slot=aiTerrainMgr.PlanFactoryCluster(key,def,nano,site,facing,t2?3:2,rows);
                 if(slot<0) continue;

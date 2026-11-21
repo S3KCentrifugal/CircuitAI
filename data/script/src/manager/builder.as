@@ -2080,6 +2080,16 @@ namespace Builder {
             // seat or not (front_gantry_nanos.as); none left: null and it goes on below as usual
             IUnitTask@ caretaker=FrontGantryNanos::Work(u);
             if(caretaker !is null) return caretaker;
+            // Delivery at the first mex is useful only if later providers do
+            // not immediately send the economy constructor to a distant vent.
+            // Keep combat-group seats and external/retreat ownership intact.
+            if (u.circuitDef !is null && !u.circuitDef.IsAbleToFly()
+                && UnitHelpers::GetConstructorTier(u.circuitDef) == 2 && !CommanderGroup::Owns(u.id)
+                && (u.task is null || (!u.task.IsExternalControlled() && !u.task.IsEnemyReclaim()
+                    && u.task.GetType() != int(Task::Type::PLAYER) && u.task.GetType() != int(Task::Type::RETREAT)))) {
+                IUnitTask@ upgrade = aiEconomyMgr.EnqueueLocalMexUpgrade(u, Global::RoleSettings::Front::LocalMexUpgradeRadius);
+                if (upgrade !is null) return upgrade;
+            }
             IUnitTask@ support=FrontFactorySupport::Assist(u,false);
             if(support !is null) return support;
             FrontEnergy::Update(); // before any group/base/default provider can enqueue energy

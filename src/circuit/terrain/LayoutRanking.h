@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <limits>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -137,6 +138,27 @@ inline bool Overlaps(const CellRect& a, const CellRect& b)
 {
 	return (a.x1 < b.x2) && (b.x1 < a.x2) && (a.z1 < b.z2) && (b.z1 < a.z2);
 }
+
+// Preserve each support block's interior even when terrain/temporary occupancy
+// left holes in its slot grid. Distinct zones must not bridge open service space.
+class SupportInteriors {
+public:
+	void Include(int zone, CellRect footprint) {
+		auto [it, added] = blocks.try_emplace(zone, footprint);
+		if (added) return;
+		auto& bounds = it->second;
+		bounds.x1 = std::min(bounds.x1, footprint.x1);
+		bounds.z1 = std::min(bounds.z1, footprint.z1);
+		bounds.x2 = std::max(bounds.x2, footprint.x2);
+		bounds.z2 = std::max(bounds.z2, footprint.z2);
+	}
+	bool OverlapsInterior(CellRect footprint) const {
+		for (const auto& entry : blocks) if (Overlaps(footprint, entry.second)) return true;
+		return false;
+	}
+private:
+	std::map<int, CellRect> blocks;
+};
 
 // D-099: `inner` lies wholly inside `outer`
 inline bool Inside(const CellRect& inner, const CellRect& outer)

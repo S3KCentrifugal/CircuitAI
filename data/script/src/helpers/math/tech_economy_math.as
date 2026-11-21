@@ -1,5 +1,10 @@
 // Pure economy decisions shared by TECH policy and its actual-VM tests.
 namespace TechEconomyMath {
+    // Completed local geothermal substitutes for bootstrap generators in both
+    // chain progress and final project admission. Partial equivalents round down.
+    int EnergyEquivalentCount(int completed,float geothermal,float output) {
+        return completed + (output>0.f && geothermal>0.f ? int(geothermal/output) : 0);
+    }
     bool FundedGrowthReactor(float metalBank,float metalReserve,float metalCost,
             float energyBank,float energyStorage,float energyIncome,float energyCost,
             float seconds,bool stalled) {

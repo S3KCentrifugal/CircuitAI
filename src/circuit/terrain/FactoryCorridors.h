@@ -48,6 +48,7 @@ public:
 
 	void SetPolicy(bool enabled, bool ownLane);
 	void SetExemptDef(int def);
+	void SetRequiredDef(int def, float laneFraction);
 	void SetOptions(const SOptions& options);
 	void SetLane(int team, const std::vector<springai::AIFloat3>& points);
 	// D-460 (KI-744): this AI's lane road, reserved past goalStart along
@@ -57,7 +58,7 @@ public:
 	// planning: a reservation preview, which may proceed before a lane exists.
 	bool Ensure(CCircuitDef* def, const springai::AIFloat3& pos, int facing, bool planning = false);
 	bool Blocked(const int2& a, const int2& b) const { return coverage.OverlapsOther(-1, {a.x, a.y, b.x, b.y}); }
-	bool IsEnabled() const { return enabled; }
+	bool IsEnabled() const { return enabled || requiredDef >= 0; }
 
 	// Lifecycle events from the terrain manager; never polled.
 	void ObserveFactory(int unitId, CCircuitDef* def, const springai::AIFloat3& pos, int facing, bool isT1);
@@ -120,6 +121,8 @@ private:
 	SOptions options;
 	bool enabled = false, ownLane = false;
 	int exemptDef = -1;
+	int requiredDef = -1;
+	float requiredLaneFraction = 0.5f;
 	int enabledFrame = -1;        // C1: lane wait counts from the frame corridors were enabled
 	bool unroutedLogged = false;
 	int nextId = 1;

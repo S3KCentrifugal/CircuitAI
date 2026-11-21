@@ -1,6 +1,7 @@
 // Factory districts, clusters and the builder travel preview (D-440..D-445,
 // D-452, D-454). Split from TerrainManager.cpp (A3); same class, same state.
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "terrain/FactoryDistrictGeometry.h"
 #include "terrain/BuildTravelBudget.h"
 #include "terrain/TerrainCorridor.h"
@@ -76,8 +77,27 @@ void CTerrainManager::SetFactoryFacingGoal(const AIFloat3& goal)
 	SavePlacementPolicy();
 }
 
+void CTerrainManager::SetFactoryFacingAdvance(float value)
+{
+    factoryFacingAdvance = std::isfinite(value) ? std::clamp(value, 0.f, 8192.f) : 0.f;
+    layoutInts[kFacingAdvanceKey] = int(factoryFacingAdvance);
+}
+
+AIFloat3 CTerrainManager::GetFactoryFacingGoalAt(const AIFloat3& site) const
+{
+    const auto* battle = circuit->GetBattle();
+    if (factoryFacingGoal.x < 0.f || factoryFacingAdvance <= 0.f || !battle
+        || battle->GetFrontLaneLength() <= 0.f) return factoryFacingGoal;
+    // Placement only: project this candidate along the lane, then look ahead.
+    // Never reuse the fixed home waypoint after an extension has passed it.
+    return battle->GetFrontLanePoint(std::min(battle->GetFrontLaneLength(),
+        battle->GetFrontLaneProgress(site) + factoryFacingAdvance));
+}
+
 void CTerrainManager::SavePlacementPolicy()
 {
+	layoutInts[kFacingAdvanceKey] = int(factoryFacingAdvance);
+	layoutInts[kProtectSupportRowsKey] = protectSupportRows ? 1 : 0;
 	layoutInts[kFactoryActivateKey] = factoryReservationOnActivate ? 1 : 0;
 	layoutInts[kFactoryFlushKey] = factoryFlushPacking ? 1 : 0;
 	layoutInts[kFactoryDirectKey] = factoryDirectSite ? 1 : 0;
@@ -87,6 +107,8 @@ void CTerrainManager::SavePlacementPolicy()
 
 void CTerrainManager::LoadPlacementPolicy()
 {
+	factoryFacingAdvance = float(std::max(0, GetLayoutInt(kFacingAdvanceKey, 0)));
+	protectSupportRows = GetLayoutInt(kProtectSupportRowsKey, 0) != 0;
 	// Older saves wrote a slot-search travel budget and one combined
 	// "required" flag.
 	const bool legacyRequired = GetLayoutInt(kLegacyFactoryRequiredKey, 1) != 0;

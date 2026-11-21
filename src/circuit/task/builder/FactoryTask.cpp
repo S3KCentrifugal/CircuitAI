@@ -178,8 +178,15 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
         // For the script-opted-in opening yard, test its exit inside the
         // candidate predicate. Rejecting only the first returned footprint
         // used to switch facing even when a later forward site was usable.
-        CTerrainManager::TerrainPredicate sitePredicate = [this, map, testSize, &predicate, &rejectedAccess, &rejectedExit](const AIFloat3& p) {
+        CTerrainManager::TerrainPredicate sitePredicate = [this, map, terrainMgr, testSize, &predicate, &rejectedAccess, &rejectedExit](const AIFloat3& p) {
             if (!predicate(p)) { ++rejectedAccess; return false; }
+            const auto goal = terrainMgr->GetFactoryFacingGoalAt(p);
+            if (!pinRequired && goal.x >= 0.f) {
+                int allowed[3];
+                const int count = base_layout::FacingsToward(p.x,p.z,goal.x,goal.z,
+                    terrainMgr->GetTerrainWidth()*0.5f,terrainMgr->GetTerrainHeight()*0.5f,allowed);
+                if (std::find(allowed,allowed+count,facing)==allowed+count) return false;
+            }
             if (preferredFacing < 0 || pinRequired) return true;
             AIFloat3 mouth = p;
             switch (facing) {
@@ -233,7 +240,7 @@ void CBFactoryTask::FindBuildSite(CCircuitUnit* builder, const AIFloat3& pos, fl
 	// D-460 (KI-743): with a facing goal (FRONT, TACTICAL) a factory faces
 	// toward it or sideways, never away: the native order below tried the
 	// opposite facing second and built a T2 plant facing the map edge.
-	const AIFloat3& goal = terrainMgr->GetFactoryFacingGoal();
+	const AIFloat3 goal = terrainMgr->GetFactoryFacingGoalAt(pos);
 	int aimed[3] = {-1, -1, -1};
 	const int aimedCount = (goal.x >= 0.f)
 		? base_layout::FacingsToward(pos.x, pos.z, goal.x, goal.z,

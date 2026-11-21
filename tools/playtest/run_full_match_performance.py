@@ -35,6 +35,7 @@ def main():
     p.add_argument('--data',type=Path,help='Matching pinned data tree; defaults to current repository data')
     # D-298: default to the lobby's last game; a pinned archive dies on the next BAR update.
     p.add_argument('--game',default=None)
+    p.add_argument('--engine',default='recoil_2026.07.04')
     p.add_argument('--profile',default='experimental_balanced')
     p.add_argument('--profiles',help='Comma-separated per-team profiles for compatibility coverage; excluded from cost comparisons')
     p.add_argument('--mode',choices=['fast','visual','performance'],default='performance')
@@ -130,7 +131,7 @@ def main():
     if a.shots and a.mode=='visual' and not a.headless:shots=a.shots
     cli=[sys.executable,str(playtest.HERE/'playtest.py')]
     cmd=cli+['stage','--dir',str(d),'--dll',str(a.dll),'--map',name,*extra,
-       *(['--game',a.game] if a.game else []),'--engine','recoil_2026.07.04',
+       *(['--game',a.game] if a.game else []),'--engine',a.engine,
        '--roles','all','--role',role,'--side','armada','--bonus','0',
        '--ai-option','profile='+a.profile,'--ai-option','random_seed=220001',
        '--modoption','deathmode=com','--minutes',str(a.minutes),'--speed',str(a.speed),'--speed-plan',plan,'--mode',a.mode,
@@ -236,7 +237,7 @@ def main():
                                   CIRCUIT_VERIFY_EMPTY_PACK='1',CIRCUIT_VERIFY_PACK_CANDIDATES='1',CIRCUIT_VERIFY_SEA_STATIC_INDEX='1')
     playtest.validate_checks(d/'full-match-checks.json')
     try:
-        subprocess.run(cli+['launch','--dir',str(d),'--engine','recoil_2026.07.04']+(['--headless'] if a.headless else []),env=env,check=True)
+        subprocess.run(cli+['launch','--dir',str(d),'--engine',a.engine]+(['--headless'] if a.headless else []),env=env,check=True)
         return subprocess.run(cli+['watch','--dir',str(d),'--role',role,'--checks',str(d/'full-match-checks.json'),
             '--play-decided','--minutes',str(a.minutes+1),'--wall-minutes','180']+(['--keep-going'] if a.keep_going else [])).returncode
     finally:
