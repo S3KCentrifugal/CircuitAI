@@ -225,10 +225,32 @@ void CRangedEngagement::Hold(CCircuitUnit* unit,bool unsafe)
         issuing=false;
     }
 }
+// Owner 2026-11-21 (Daedalus arena, radar mode): a still, never-identified ground
+// radar dot may be porc that outranges us. With unknown_static_reach set, a move
+// may not end within that reach of one and nearer it than it began (leaving is
+// allowed). The dot list is rebuilt once per frame, O(contacts), only for such hulls.
+bool CRangedEngagement::UnknownStaticBlocks(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    if(!(p.unknownStaticReach>0.f)) return false;
+    const int frame=ai->GetLastFrame();
+    if(frame!=unknownStillFrame) {
+        unknownStillFrame=frame; unknownStill.clear();
+        for(const auto& c:world.Contacts()) {
+            if(c.def || c.airDot || c.seenDef || c.pos.y< -20.f) continue;
+            if(c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>p.spamDotSpeed*p.spamDotSpeed) continue;
+            unknownStill.push_back(c.pos);
+        }
+    }
+    const float r2=p.unknownStaticReach*p.unknownStaticReach;
+    for(const auto& u:unknownStill) { const float db=u.SqDistance2D(to); if(db<r2 && db<u.SqDistance2D(from)) return true; }
+    return false;
+}
 bool CRangedEngagement::SafeMove(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,float margin,bool escape)
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
     ExactStaticScope exact(world,p);
+    if(UnknownStaticBlocks(unit,from,to)) return false;
     return p.coordinated && p.engagementSeconds>0.f ? world.CohortSafe(unit,from,to,margin,escape)
         :world.Safe(from,to,margin,escape,p.pressStatic,GhostRange(p));
 }
@@ -396,26 +418,9 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         // point inside coverage, and a whole-leg test then halted the march at
         // the gantry. Walk each leg in 64-elmo samples and keep the last safe
         // one, so the march always reaches the coverage edge.
-        // Owner 2026-11-21: still unidentified ground dots (possible porc) within unknown_static_reach block the march.
-        std::vector<AIFloat3> unknownStatic;
-        if(p.unknownStaticReach>0.f) {
-            const float look=p.unknownStaticReach+std::sqrt(current.SqDistance2D(marchGoal));
-            for(const auto& c:world.Contacts()) {
-                if(c.def || c.airDot || c.seenDef || c.pos.y< -20.f) continue;
-                if(c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>p.spamDotSpeed*p.spamDotSpeed) continue;
-                if(current.SqDistance2D(c.pos)<=look*look) unknownStatic.push_back(c.pos);
-            }
-        }
-        const auto unknownBlocks=[&](const AIFloat3& a,const AIFloat3& b) {
-            const float r2=p.unknownStaticReach*p.unknownStaticReach;
-            // blocked when the leg ends inside that reach and nearer the dot than it began
-            for(const auto& u:unknownStatic) { const float db=u.SqDistance2D(b); if(db<r2 && db<u.SqDistance2D(a)) return true; }
-            return false;
-        };
         const auto safeAt=[&](const AIFloat3& a,const AIFloat3& b) {
             return SafeMove(unit,a,b,StaticMargin(p),true)
-                && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0
-                && !unknownBlocks(a,b);
+                && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0;
         };
         std::string why;   // trace only (2026-11-21 Daedalus idle): which check cut the leg
         for(const auto& q:points) {
@@ -431,7 +436,7 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
                     world.DangerSign(q,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p)),steps);
                 why=buf;
                 why+=world.ExplainLeg(from,q,StaticMargin(p),p.pressStatic,GhostRange(p),StaticDanger(p));
-                if(unknownBlocks(from,q)) why+=" [unknown still dot within "+std::to_string(int(p.unknownStaticReach))+"]";
+                if(UnknownStaticBlocks(unit,from,q)) why+=" [unknown still dot within "+std::to_string(int(p.unknownStaticReach))+"]";
             }
             AIFloat3 last=from; bool any=false;
             for(int i=1;i<steps;++i) {
@@ -1515,6 +1520,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             point.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(point.x,point.z);
             if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),point)) { ++terrainRejected; continue; }
             if(!world.FreeSlot(id,point,spacing)) { ++slotRejected; continue; }
+            if(UnknownStaticBlocks(unit,pos,point)) { ++coverageRejected; continue; }   // owner 2026-11-21
             if(!world.Safe(pos,point,StaticMargin(policy),true,policy.pressStatic,GhostRange(policy))
                 || world.DangerSign(point,policy.safetyMargin,policy.pressStatic,GhostRange(policy),StaticDanger(policy))>0.f) {
                 if(report && k==0) {
@@ -1563,6 +1569,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             if (point.SqDistance2D(c.pos) >= pos.SqDistance2D(c.pos)
                 || !world.FreeSlot(id, point, spacing) || world.DangerSign(point, policy.safetyMargin, policy.pressStatic, GhostRange(policy), StaticDanger(policy)) > 0.f
                 || !world.Safe(pos, point, StaticMargin(policy), true, policy.pressStatic, GhostRange(policy))
+                || UnknownStaticBlocks(unit, pos, point)
                 || !ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(), point)) continue;
             const float score = pos.SqDistance2D(point);
             if (score < chosenScore) { chosenScore = score; chosen = point; found = true; }
