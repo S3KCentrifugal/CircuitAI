@@ -130,6 +130,24 @@ def prepare(args):
                 repair+='\n if (ai.teamId==0 && u.circuitDef.GetName()=="armack") { IBuilderTask@ own=cast<IBuilderTask>(u.task); if(own !is null && !own.IsDead()) return own; return aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::ENERGY,Task::Priority::HIGH,ai.GetCircuitDef("armfus"),AIFloat3(4000,0,4136),0.f,true,120*SECOND)); } // real constructor supplies a nanoframe near the edge of commander reach\n'
         if name=='builder' and case.get('solar_ceiling_fixture'):
             repair+='\n if(ai.teamId==0 && ai.frame<40*SECOND) return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); // let supplied high-income stall settle before commander policy\n'
+        if name=='builder' and case.get('placement_fixture')=='nano-refill':
+            repair+='''
+        if(ai.teamId==0 && u.circuitDef.GetName()=="armck" && ai.frame>=65*SECOND) {
+            IBuilderTask@ own=cast<IBuilderTask>(u.task);
+            if(own !is null && !own.IsDead()) return own;
+            CCircuitDef@ nano=ai.GetCircuitDef("armnanotc");
+            aiTerrainMgr.RestoreSpineSupport("fixture.spine",nano,8,30*SECOND);
+            const int group=aiTerrainMgr.GetLayoutInt("fixture.spine.support",0);
+            const int slot=aiTerrainMgr.NextRefilledSupportSlot(u,nano,group,8);
+            AiLog("[RefillFixture] worker slot="+slot+" can_build="+u.circuitDef.CanBuild(nano)+" group="+group);
+            if(slot>=0) {
+                IUnitTask@ job=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,Task::Priority::HIGH,nano,
+                    aiTerrainMgr.GetReservationPos(slot),0,true,120*SECOND));
+                if(job !is null && AiPinReservation(job,slot)) return job;
+                if(job !is null) aiBuilderMgr.AbortTask(job);
+            }
+        }
+'''
         if name=='builder' and case.get('placement_fixture'):
             worker='armacv' if case['placement_fixture']=='factory-facing' else 'armack'
             repair+='\n if(ai.teamId==0 && u.circuitDef.GetName()=="'+worker+'" && _PlacementTask !is null && !_PlacementTask.IsDead()) return _PlacementTask; // declared placement fixture\n'
@@ -230,7 +248,7 @@ def prepare(args):
 '''
         if case.get('placement_fixture'):
             kind=case['placement_fixture']
-            if kind not in ('nano-interior','factory-facing','gantry-corridor'):
+            if kind not in ('nano-interior','nano-refill','factory-facing','gantry-corridor'):
                 raise ValueError('Unknown placement fixture')
             if kind in ('factory-facing','gantry-corridor'):
                 fixture_path=staged/'script/src/systems/construction/front_layout.as'
@@ -239,7 +257,26 @@ def prepare(args):
                 fixture_path.write_text(fixture_source[:fixture_start]+'\n if(ai.teamId==0) return; // supplied far-site test of native ordinary placement\n'+fixture_source[fixture_start:])
             declarations+='bool _PlacementReady=false; IUnitTask@ _PlacementTask;\n'
             events+='\n if(ai.teamId==0 && ai.frame>=20*SECOND && !_PlacementReady) { _PlacementReady=true; aiTerrainMgr.SetLayoutEnabled(true);\n'
-            if kind=='nano-interior':
+            if kind=='nano-refill':
+                declarations+='int _RefillOpening=-1; int _RefillGroup=0; bool _RefillReleased=false; bool _RefillComplete=false;\n'
+                events+='''
+ CCircuitDef@ nano=ai.GetCircuitDef("armnanotc"), lab=ai.GetCircuitDef("armlab");
+ aiBuilderMgr.experimentalBuild = true; // TECH retains construction ownership inside reserved cells
+ aiTerrainMgr.SetFactoryCorridorPolicy(false,false); // TECH's ordinary opening-lab policy
+ _RefillOpening=aiTerrainMgr.ReserveBuilding(lab,AIFloat3(2016,0,3824),2,0);
+ const int zone=aiTerrainMgr.ReserveZone(AIFloat3(2000,0,3504),0,512,512,false);
+ _RefillGroup=aiTerrainMgr.LayBand(zone,nano,AIFloat3(1856,0,3504),3,4,6,0,false,true,false,0);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.zone",zone);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.support",_RefillGroup);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.x",2000); aiTerrainMgr.SetLayoutInt("fixture.spine.z",3504);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.facing",3); aiTerrainMgr.SetLayoutInt("fixture.spine.columns",4);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.rows",6); aiTerrainMgr.SetLayoutInt("fixture.spine.opening_slot",_RefillOpening);
+ const int restored=aiTerrainMgr.RestoreSpineSupport("fixture.spine",nano,32,300*SECOND);
+ if(_RefillOpening<0 || aiTerrainMgr.GetGroupCount(_RefillGroup,false)!=12 || restored!=0)
+   AiLog("[RangedArena] ERROR active exit was not preserved slots="+aiTerrainMgr.GetGroupCount(_RefillGroup,false)+" restored="+restored);
+ else AiLog("[RefillFixture] active exit preserved missing=12");
+'''
+            elif kind=='nano-interior':
                 events+='''
  CCircuitDef@ nano=ai.GetCircuitDef("armnanotc"), utility=ai.GetCircuitDef("armtarg");
  aiTerrainMgr.SetProtectSupportRows(true);
@@ -280,6 +317,23 @@ def prepare(args):
  if(berth<0 || _PlacementTask is null || !AiPinReservation(_PlacementTask,berth)) AiLog("[RangedArena] ERROR gantry berth failed");
 '''
             events+='\n } // declared placement fixture\n'
+            if kind=='nano-refill':
+                events+='''
+ if(ai.teamId==0 && _PlacementReady && ai.frame>=60*SECOND && !_RefillReleased) {
+   _RefillReleased=true; aiTerrainMgr.ReleaseReservation(_RefillOpening);
+   const int restored=aiTerrainMgr.RestoreSpineSupport("fixture.spine",ai.GetCircuitDef("armnanotc"),8,30*SECOND);
+   if(restored!=8) AiLog("[RangedArena] ERROR opening removal did not wake bounded refill");
+   else AiLog("[RefillFixture] opening removed restored=8");
+ }
+ if(ai.teamId==0 && _RefillReleased && !_RefillComplete) {
+   CCircuitDef@ nano=ai.GetCircuitDef("armnanotc");
+   if(nano.count-aiBuilderMgr.GetUnfinishedCount(nano)>=12) {
+     _RefillComplete=true;
+     if(aiTerrainMgr.GetGroupCount(_RefillGroup,false)!=24) AiLog("[RangedArena] ERROR duplicate or missing support intent");
+     else AiLog("[RefillFixture] filled=12 total_slots=24");
+   }
+ }
+'''
             if kind=='gantry-corridor':
                 declarations+='bool _CorridorPeerChecked=false;\n'
                 events+='''

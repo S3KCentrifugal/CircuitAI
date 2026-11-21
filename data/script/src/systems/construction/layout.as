@@ -1545,6 +1545,7 @@ namespace Layout {
     // or a box slot? The planner asks before it names a turret.
     bool CanPlaceTurret()
     {
+        RefreshSpineSupport();
         if (CompactEco::Active()) return true; // admission only; placement checks reach and capacity
         if (fallback && aiTerrainMgr.IsLayoutEnabled()) return true;   // D-121: cramped ground: CrampedNanoTask decides how many
         if (!HasComplex()) return false;
@@ -2594,6 +2595,7 @@ namespace Layout {
 
     IUnitTask@ AdmitNanoTask(CCircuitUnit@ unit, Task::Priority priority, int parallelBudget, int preferredSlot = -1)
     {
+        RefreshSpineSupport();
         const bool crampedLayout = fallback && aiTerrainMgr.IsLayoutEnabled();
         if ((!HasComplex() && !crampedLayout) || unit is null || unit.circuitDef is null || nano is null) return null;
         if (!unit.circuitDef.CanBuild(nano)) return null;
@@ -2626,6 +2628,9 @@ namespace Layout {
         }
         if (CompactEco::Active()) return CompactEco::NanoTask(unit, priority);
         if (crampedLayout) return CrampedNanoTask(unit, priority);
+        // Fill recovered interior intent before extending into overflow groups.
+        const int refill = forceForwardSlot ? -1 : aiTerrainMgr.NextRefilledSupportSlot(unit,nano,nanoGroup,8);
+        if (refill >= 0) return EnqueueNanoSlot(unit,priority,refill);
         for (uint index = 0; !forceForwardSlot && index < overflowSupportGroups.length(); ++index) {
             const int slot = aiTerrainMgr.NextSupportSlot(unit,nano,overflowSupportGroups[index],unit.GetPos(ai.frame),8);
             if (slot < 0) continue;
@@ -2687,6 +2692,13 @@ namespace Layout {
         if (!AiPinReservation(task,id)) {aiBuilderMgr.AbortTask(task);return null;}
         EconomyCluster::NanoAdmitted(id);
         return task;
+    }
+
+    void RefreshSpineSupport()
+    {
+        if (HasSpine() && nano !is null)
+            aiTerrainMgr.RestoreSpineSupport(SPINE,nano,Global::RoleSettings::Tech::LayoutSupportRefillBudget,
+                Global::RoleSettings::Tech::LayoutSupportRefillSeconds * SECOND);
     }
 
     int PreferredLandSupportSlot(CCircuitUnit@ unit)

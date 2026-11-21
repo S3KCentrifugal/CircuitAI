@@ -493,6 +493,16 @@ namespace TechRules {
             return aiBuilderMgr.Enqueue(TaskB::Repair(Task::Priority::HIGH, c.building, 60 * SECOND));
         return null;
     }
+    IUnitTask@ DoRefillTurret(Ctx@ c)
+    {
+        Layout::RefreshSpineSupport();
+        CCircuitDef@ nano = Layout::nano;
+        if (!Layout::HasSpine() || nano is null || !c.d.CanBuild(nano)
+            || aiEconomyMgr.metal.current < nano.costM) return null;
+        const int slot = aiTerrainMgr.NextRefilledSupportSlot(c.u,nano,Layout::nanoGroup,8);
+        return slot < 0 ? null : Layout::NanoTask(c.u,Task::Priority::HIGH,-1,slot);
+    }
+
     IUnitTask@ DoTurret(Ctx@ c)
     {
         string why;
@@ -628,6 +638,7 @@ namespace TechRules {
         table.insertLast(Rule("energy.assist",     MOBILE,       W3(@Draining, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "stalling and one is going up within EcoAssistRadius: assist it"));
         table.insertLast(Rule("lab.t2",            CONSTRUCTORS, W2(@OpeningDone, @NoAfusYetOrAgain), @DoT2Lab,        "the advanced lab the moment +18 metal / 250 energy clear (PickT2Lab); again once the economy is online and none stands (D-102)"));
         table.insertLast(Rule("energy.convert",    MOBILE,       W3(@ConverterWanted, @NotStalling, @NotMetalFull), @DoConverter,    "energy floating, a surplus of twice a converter's draw, or energy income past EcoEnergyRatioHigh x metal: a converter"));
+        table.insertLast(Rule("turret.refill", MOBILE, W3(@IntoT2, @NotStalling, @NoDearOrderPending), @DoRefillTurret, "restore affordable missing spine nanos before growing build power"));
         table.insertLast(Rule("turret.build",      MOBILE,       W0(), @DoTurret,       "static build power under EcoBuildPowerPerMetal x metal, or metal floating: a turret on its slot; else assist the one going up"));
         table.insertLast(Rule("energy.short",      MOBILE,       W3(@EnergyShort, @EnergyIdle, @EnergyForMe), @DoEnergy,       "below the energy target and nothing going up: cheapest energy per E/s"));
         table.insertLast(Rule("energy.assist2",    MOBILE,       W3(@EnergyShort, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "below target and one is going up within EcoAssistRadius: assist it"));

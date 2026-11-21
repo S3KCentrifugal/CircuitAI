@@ -1,0 +1,30 @@
+{
+  "stop_minute": 5,
+  "expect": [
+    {
+      "key": "active exit",
+      "pattern": "active exit preserved missing=12",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "bounded wake",
+      "pattern": "opening removed restored=8",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "filled grid",
+      "pattern": "filled=12 total_slots=24",
+      "scope": "any",
+      "by_minute": 5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[INVARIANT\\]|\\[RangedArena\\].*ERROR|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

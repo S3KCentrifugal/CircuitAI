@@ -260,6 +260,8 @@ public:
         CCircuitDef* converter, const springai::AIFloat3& origin, int facing,
         int maximumRows, int serviceDepth, int candidateLimit, float searchRadius, float neighbourClearance, int reactorLimit,
         const std::vector<springai::AIFloat3>& preferences, float preferenceRadius);
+    int RestoreSpineSupport(const std::string& name, const CCircuitDef* nano, int budget, int retryFrames);
+    int NextRefilledSupportSlot(CCircuitUnit* builder, const CCircuitDef* def, int group, int budget);
 	// D-343 (SEA): as ReserveZone, but a rectangle touching a teammate's
 	// reservation is shrunk until it touches none instead of being refused.
 	// The zone never covers allied ground (INV-088).
@@ -673,6 +675,7 @@ private:
     // All definitions, ordered by reservation ID, including group zero.
     std::map<int, std::set<int>> groupSlots;
     std::map<int, SlotCandidates> lostSlots;
+    std::map<int, SlotCandidates> refilledSlots; // group -> recovered intent, derived from persisted slot markers
     void ClearLostReservation(int id);
     void IndexReservation(int id);
     void EraseReservation(int id);
