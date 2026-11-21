@@ -11,6 +11,22 @@ struct Plan {
     Rect bounds;
     int columns = 0, rows = 0, facing = 0;
 };
+// The complete support intent survives clipping: reconstruct it from named
+// spine metadata, including saves made before deferred-slot recovery existed.
+inline std::vector<Slot> SupportGrid(Point origin, int facing, Footprint nano, int columns, int rows) {
+    std::vector<Slot> result;
+    if (!IsFacingValid(facing) || columns < 2 || columns > 8 || rows < 2 || rows > 24
+        || columns % 2 || rows % 2 || nano.x <= 0 || nano.z <= 0) return result;
+    result.reserve(columns * rows);
+    for (int row = 0; row < rows; ++row) for (int col = 0; col < columns; ++col) {
+        Slot slot;
+        slot.centre = Offset(origin, facing, rows * nano.z - (2 * row + 1) * nano.z,
+            -columns * nano.x + (2 * col + 1) * nano.x);
+        slot.footprint = nano; slot.facing = facing; slot.order = int(result.size());
+        result.push_back(slot);
+    }
+    return result;
+}
 // Pure startup ranking: capacity always wins; neighbour space breaks capacity
 // ties before travel. Exact ties retain the caller's deterministic order.
 struct CandidateRank {
