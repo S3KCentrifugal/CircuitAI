@@ -313,6 +313,8 @@ void CBuilderManager::InitHandlers()
 	rezPorcMargin = root["economy"].get("rez_porc_margin", 64.f).asFloat();
 	rezWallRadius = root["economy"].get("rez_wall_radius", 1500.f).asFloat();
 	commanderReclaimWalls = root["economy"].get("commander_reclaim_walls", true).asBool();
+	rezMapMetal = root["economy"].get("rez_map_metal", true).asBool();
+	rezMapMetalMin = std::max(1.f, root["economy"].get("rez_map_metal_min", 1.f).asFloat());
 	{
 		const Json::Value& walls = root["economy"]["rez_reclaim_walls"];
 		std::vector<std::string> names;
@@ -2815,6 +2817,12 @@ IBuilderTask* CBuilderManager::MakeBuilderTask(CCircuitUnit* unit, const CQueryC
 	// among all of them by threat-aware path cost.
 	if (unit->GetCircuitDef()->IsAbleToResurrect()) {
 		FindEnemyWallReclaim(unit);
+		// Owner 2026-11-20: the nearest safe wreck or map metal (rock) is offered
+		// the same way, as a HIGH task, every time a rez bot looks for work.
+		// Before, the offer came only from the end of MakeEconomyTasks (cut off
+		// by any mex/energy task first) and from the idle fallback below, which
+		// runs only while metal is in excess - so early rez bots got none.
+		economyMgr->UpdateReclaimTasks(pos, unit, true);
 	}
 
 	// FIXME: MakeEconomyTasks doesn't check CanAssignTo() and may create task irrelevant for unit
@@ -2921,6 +2929,14 @@ IBuilderTask* CBuilderManager::MakeBuilderTask(CCircuitUnit* unit, const CQueryC
 
 	if (task == nullptr) {
 		if ((unit->GetTask() != idleTask) || isNotReady) {
+			// Owner 2026-11-20: an idle rez bot with nothing near looks map-wide
+			// for a safe wreck or map metal even while metal is not in excess.
+			if ((unit->GetTask() == idleTask) && cdef->IsAbleToResurrect()) {
+				IBuilderTask* wide = economyMgr->UpdateReclaimTasks(pos, unit, false);
+				if ((wide != nullptr) && wide->CanAssignTo(unit)) {
+					return wide;
+				}
+			}
 			return nullptr;  // current task is in danger or unreachable
 		}
 		task = CreateBuilderTask(pos, unit);

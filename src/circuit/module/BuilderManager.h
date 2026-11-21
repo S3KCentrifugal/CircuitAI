@@ -402,8 +402,16 @@ public:
     bool IsReclaimWallDef(const CCircuitDef* def) const {
         return commanderReclaimWalls && (def != nullptr) && (rezWallDefs.count(const_cast<CCircuitDef*>(def)) != 0);
     }
+    // Owner 2026-11-20: rez bots also reclaim map metal (rocks, heaps: any
+    // reclaimable metal feature that cannot be resurrected) on threat-free
+    // ground, ranked like wrecks. JSON economy rez_map_metal (default true),
+    // rez_map_metal_min (least metal per feature, default 1).
+    bool IsRezMapMetal() const { return rezMapMetal; }
+    float GetRezMapMetalMin() const { return rezMapMetalMin; }
 private:
     bool commanderReclaimWalls = true;
+    bool rezMapMetal = true;
+    float rezMapMetalMin = 1.f;
     float rezPorcRange = 1000.f;
     float rezPorcMargin = 64.f;
     float rezWallRadius = 1500.f;

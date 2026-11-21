@@ -18,6 +18,8 @@
 #include "resource/EnergyGrid.h"
 #include "task/builder/FactoryTask.h"
 #include "task/builder/MexTask.h"
+#include "task/builder/ReclaimTask.h"
+#include "map/ThreatMap.h"
 #include "terrain/TerrainManager.h"
 #include "CircuitAI.h"
 #include "util/GameAttribute.h"
@@ -1838,9 +1840,18 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 	float minSqDist = std::numeric_limits<float>::max();
 	const bool porcGuarded = IsPorcGuarded(unit);
 	const AIFloat3 unitPos = unit->GetPos(circuit->GetLastFrame());
+	// Map metal for a rez bot: switched on, and only while metal has room.
+	const bool rezMapMetal = isResurrect && builderMgr->IsRezMapMetal() && !IsMetalFull();
+	const float rezMapMetalMin = builderMgr->GetRezMapMetalMin();
+	CThreatMap* threatMap = circuit->GetThreatMap();
+	threatMap->SetThreatType(unit);
+	bool bestMapMetal = false;
 	for (Feature* feature : features) {
 		AIFloat3 featPos = feature->GetPosition();
 		CTerrainManager::CorrectPosition(featPos);  // Impulsed flying feature
+		if (position.SqDistance2D(featPos) >= minSqDist) {
+			continue;  // only a nearer feature can win: skip the reach and def checks
+		}
 		if (!terrainMgr->CanReachAtSafe2(unit, featPos, unit->GetCircuitDef()->GetBuildDistance())) {
 			continue;
 		}
@@ -1851,11 +1862,29 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 			continue;
 		}
 		FeatureDef* featDef;
+		bool isMapMetal = false;
 		if (isResurrect) {
 			if (!clb->Feature_IsResurrectable(feature->GetFeatureId())) {
-				continue;
+				// Owner 2026-11-20: a rez bot used to skip every feature it could not
+				// resurrect, so rocks were never its job and an early rez bot with
+				// no wreck near guarded a factory. Map metal now ranks with wrecks
+				// (nearest wins), only on ground the threat map shows free.
+				if (!rezMapMetal) {
+					continue;
+				}
+				featDef = feature->GetDef();
+				if (!featDef->IsReclaimable()) {
+					delete featDef;
+					continue;
+				}
+				if (threatMap->GetThreatAt(featPos) > THREAT_MIN) {
+					delete featDef;
+					continue;
+				}
+				isMapMetal = true;
+			} else {
+				featDef = feature->GetDef();
 			}
-			featDef = feature->GetDef();
 		} else {
 			featDef = feature->GetDef();
 			if (!featDef->IsReclaimable()) {
@@ -1865,7 +1894,7 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 		}
 		float reclaimValue = featDef->GetContainedResource(metalRes)/* * feature->GetReclaimLeft()*/;
 		delete featDef;
-		if (reclaimValue < 1.0f) {
+		if (reclaimValue < (isMapMetal ? rezMapMetalMin : 1.0f)) {
 			continue;
 		}
 		float sqDist = position.SqDistance2D(featPos);
@@ -1873,6 +1902,7 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 			pos = featPos;
 			cost = reclaimValue;
 			minSqDist = sqDist;
+			bestMapMetal = isMapMetal;
 		}
 	}
 	utils::free_clear(features);
@@ -1884,7 +1914,20 @@ IBuilderTask* CEconomyManager::UpdateReclaimTasks(const AIFloat3& position, CCir
 			return task;
 		}
 		task = builderMgr->GetResurrectTask(pos, 8.0f/*unit->GetCircuitDef()->GetBuildDistance()*/);
-		if (isResurrect) {
+		if (bestMapMetal) {
+			// Rock (or heap): a HIGH reclaim like a wreck task, rez bots only, so
+			// constructors are not pulled off their build plan to chase rocks.
+			if (task == nullptr) {
+				task = builderMgr->Enqueue(TaskB::Reclaim(IBuilderTask::Priority::HIGH, pos, cost, FRAMES_PER_SEC * 300, 8.0f));
+				if (task != nullptr) {
+					static_cast<CBReclaimTask*>(task)->SetRezOnly(true);
+					circuit->LOG("REZ: %s(%i) map metal %.0f at (%.0f, %.0f)",
+							unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), cost, pos.x, pos.z);
+				}
+			} else {
+				task = nullptr;
+			}
+		} else if (isResurrect) {
 			if (task == nullptr) {
 				task = builderMgr->Enqueue(TaskB::Resurrect(IBuilderTask::Priority::HIGH, pos, cost, FRAMES_PER_SEC * 300,
 										   8.0f/*unit->GetCircuitDef()->GetBuildDistance()*/));

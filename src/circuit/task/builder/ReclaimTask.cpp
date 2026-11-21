@@ -56,8 +56,8 @@ bool CBReclaimTask::CanAssignTo(CCircuitUnit* unit) const
 	if (!IReclaimTask::CanAssignTo(unit)) {
 		return false;
 	}
-	if ((enemyWallId >= 0) && !unit->GetCircuitDef()->IsAbleToResurrect()) {
-		return false;  // enemy walls are a rez bot job
+	if (((enemyWallId >= 0) || rezOnly) && !unit->GetCircuitDef()->IsAbleToResurrect()) {
+		return false;  // enemy walls and map metal (owner 2026-11-20) are rez bot jobs
 	}
 	CCircuitAI* circuit = manager->GetCircuit();
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -180,6 +180,9 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 			if (EnemyInKeepout(circuit, unit, pos, enemy->GetPos())) {
 				continue;  // owner 2026-11-15: rez bots, no target inside a keep-out
 			}
+			if (rezOnly && (circuit->GetThreatMap()->GetThreatAt(enemy->GetPos()) > THREAT_MIN)) {
+				continue;  // owner 2026-11-20: a rez bot on map metal stays on threat-free ground
+			}
 			CCircuitDef* edef = enemy->GetCircuitDef();
 			if ((edef == nullptr) || (edef->IsReclaimable()
 				&& (!edef->IsAttacker() || unit->GetCircuitDef()->IsAttrVampire())
@@ -198,6 +201,7 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 			CTerrainManager* terrainMgr = circuit->GetTerrainManager();
 			CEconomyManager* economyMgr = circuit->GetEconomyManager();
 			const bool porcGuarded = economyMgr->IsPorcGuarded(unit);  // owner 2026-11-04; rez bots 2026-11-15
+			const bool isRezBot = unit->GetCircuitDef()->IsAbleToResurrect();
 			circuit->GetThreatMap()->SetThreatType(unit);
 			float minSqDist = std::numeric_limits<float>::max();
 			Resource* metalRes = circuit->GetEconomyManager()->GetMetalRes();
@@ -211,6 +215,13 @@ bool CBReclaimTask::Reevaluate(CCircuitUnit* unit)
 					|| economyMgr->IsPorcPathBlocked(unit, pos, featPos)))
 				{
 					continue;  // a wreck in porc reach is no target for a construction vehicle or rez bot
+				}
+				// Owner 2026-11-20: a rez bot on map metal moves on to more map
+				// metal on threat-free ground; wrecks stay resurrect jobs.
+				if (isRezBot && ((circuit->GetThreatMap()->GetThreatAt(featPos) > THREAT_MIN)
+					|| circuit->GetCallback()->Feature_IsResurrectable(feature->GetFeatureId())))
+				{
+					continue;
 				}
 				FeatureDef* featDef = feature->GetDef();
 				if (!featDef->IsReclaimable()) {

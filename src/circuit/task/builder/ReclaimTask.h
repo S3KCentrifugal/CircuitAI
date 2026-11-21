@@ -30,12 +30,15 @@ public:
 	// Enemy wall (dragon's teeth) target for rez bots; -1 = positional/feature.
 	void SetEnemyWall(int id) { enemyWallId = id; }
 	int GetEnemyWallId() const { return enemyWallId; }
+	// Owner 2026-11-20: map metal (rocks) offered to rez bots stays a rez bot job.
+	void SetRezOnly(bool value) { rezOnly = value; }
 
 private:
 	virtual bool Execute(CCircuitUnit* unit) override;
 	virtual bool Reevaluate(CCircuitUnit* unit) override;
 
 	int enemyWallId = -1;
+	bool rezOnly = false;
 
 	virtual bool Load(std::istream& is) override;
 };
