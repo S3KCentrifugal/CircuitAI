@@ -411,6 +411,11 @@ struct CommanderFrontConfig {
     // construction through a re-evaluation; assistBreakEnergy is the bank share
     // under which (or stalling) an assisting commander breaks off (0: off).
     float solarStall=0,keepOwnBuild=0,assistBreakEnergy=0;
+    // Owner 2026-11-20: once a fusion of ours is finished the commander orders no
+    // front solar (solarFusionStop) and reclaims the front solars it ordered
+    // (solarReclaim) within solarReclaimRadius of the commander; others are
+    // queued as plain reclaim jobs for any builder.
+    float solarFusionStop=1,solarReclaim=1,solarReclaimRadius=1200;
     float assistCloseSeconds=0;  // D-493: assist offers stay closed this long after a break
     float mexSeconds=0,stallSeconds=10,detourSeconds=0; // 0: no detour backoff
     float mexAA=-1,mexLos=0,radarSpacing=500;
@@ -703,6 +708,22 @@ private:
     static constexpr int FRONT_GEO_FAILS=2;
     struct FrontGeoSite { springai::AIFloat3 pos; int fails=0; };
     mutable std::vector<FrontGeoSite> frontGeoSites;
+    // Owner 2026-11-20: sites of the front solars WORK_SOLAR ordered, and the
+    // reclaim jobs for them after a fusion stands (task cleared in TaskFinished).
+    static constexpr int FRONT_SOLAR_SITES_MAX=64,FRONT_SOLAR_RECLAIMS_MAX=4;
+    struct FrontSolarSite { springai::AIFloat3 pos; int defId=-1; };
+    std::vector<FrontSolarSite> frontSolarSites;
+    struct FrontSolarReclaimJob { int target=-1; IBuilderTask* task=nullptr; };
+    std::vector<FrontSolarReclaimJob> frontSolarReclaims;
+    static constexpr int FRONT_SOLAR_RETRY_SECONDS=20;
+    std::vector<std::pair<int,int>> frontSolarRetry;  // solar unit id, frame its next order may come
+    static constexpr int FRONT_SOLAR_COMMANDER_TRIES=3,FRONT_SOLAR_MAX_TRIES=6;
+    std::vector<std::pair<int,int>> frontSolarTries;  // solar unit id, reclaim orders made
+    int frontSolarFusionCheck=-1000000,frontSolarScanNext=0,frontSolarLogNext=0;
+    bool frontSolarFusion=false;
+    bool FrontSolarFusionStands(int frame);
+    void NoteFrontSolarSite(const springai::AIFloat3& pos,int defId);
+    IUnitTask* FrontSolarReclaim(CCircuitUnit* unit,int frame);
     std::vector<int> geoDefs,geoGuardDefs,geoGuardFrontDefs,geoGuardSideDefs;
     // D-481: one plan per guarded geo; each item (front light lasers, then the
     // two side flak) has its own task, so builders work items in parallel.

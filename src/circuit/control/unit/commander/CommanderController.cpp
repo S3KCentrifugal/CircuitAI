@@ -224,6 +224,8 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Front<&FC::repairCombat>("front_repair_combat",0,1),
         Front<&FC::solarIncome>("front_solar_income",0,10000),Front<&FC::solarStorage>("front_solar_storage",0,1),
         Front<&FC::solarRadius>("front_solar_radius",32,600),Front<&FC::solarDef>("front_solar_def",-1,100000),
+        Front<&FC::solarFusionStop>("front_solar_fusion_stop",0,1),Front<&FC::solarReclaim>("front_solar_reclaim",0,1),
+        Front<&FC::solarReclaimRadius>("front_solar_reclaim_radius",0,10000),
         Front<&FC::solarStall>("front_solar_stall",0,1),Front<&FC::keepOwnBuild>("front_keep_own_build",0,1),
         Front<&FC::assistBreakEnergy>("front_assist_break_energy",0,1),
         Front<&FC::assistCloseSeconds>("front_assist_close_seconds",0,120),

@@ -346,6 +346,7 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
     for(auto& entry:states) { entry.value->work.Retire(task); entry.value->work.RetireOrigin(task); }  // D-493
+    for(auto& job:frontSolarReclaims) if(job.task==task) job.task=nullptr;  // owner 2026-11-20 front solar reclaim
     if(task==junoJob) {
         junoJob=nullptr;
         ai->LOG("[CommanderGroup] juno_probe_end team=%i done=%i",ai->GetTeamId(),int(done));

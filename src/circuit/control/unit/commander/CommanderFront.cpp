@@ -17,6 +17,9 @@
 #include "util/Utils.h"
 #include "Log.h"
 
+#include <algorithm>
+#include <limits>
+
 namespace circuit {
 using springai::AIFloat3;
 using BT=IBuilderTask::BuildType;
@@ -234,6 +237,21 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         auto* current=unit->GetTask();
         if(!current || current->IsExternalControlled() || current->IsEnemyReclaim()
             || current->GetType()==IUnitTask::Type::PLAYER || current->GetType()==IUnitTask::Type::RETREAT) return nullptr;
+        // Owner 2026-11-20: once a fusion of ours is finished no front solar is
+        // ordered or continued; the commander reclaims the front solars instead.
+        if(cfg->front.solarFusionStop>0 && FrontSolarFusionStands(ai->GetLastFrame())) {
+            if(state.work.kind==WORK_SOLAR && current==state.work.task && !current->IsDead()) {
+                auto* build=dynamic_cast<IBuilderTask*>(current);
+                if(build && build->GetBuildType()==BT::RECLAIM) return current;
+            }
+            if(state.work.kind==WORK_REPAIR_COMBAT && current==state.work.task && !current->IsDead()) return current;
+            if(cfg->front.solarReclaim<=0 || (cfg->front.keepOwnBuild>0 && IsOwnConstruction(unit,current))) return nullptr;
+            auto* reclaim=FrontSolarReclaim(unit,ai->GetLastFrame());
+            if(!reclaim) return nullptr;
+            state.work.task=reclaim;state.work.kind=WORK_SOLAR;state.work.reach=0;
+            state.work.NoteOrigin(reclaim,commander::TaskOrigin::Solar);
+            return reclaim;
+        }
         if((state.work.kind==WORK_SOLAR || state.work.kind==WORK_REPAIR_COMBAT)
             && current==state.work.task && !current->IsDead()) return current;
         // D-490: the commander's own construction (a mex, a turret) is finished first.
@@ -279,6 +297,7 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         }
         if(!task) { state.front.solarNext=frame+3*FRAMES_PER_SEC;return nullptr; }
         state.work.task=task;state.work.kind=WORK_SOLAR;state.work.reach=0;
+        NoteFrontSolarSite(task->GetPosition(),def->GetId());
         state.work.NoteOrigin(task,commander::TaskOrigin::Solar);  // D-493
         ai->LOG("[CommanderWork] unit=%i work=22 solar=%s income=%.1f storage=%.3f",unit->GetId(),def->GetDef()->GetName(),
             eco->GetAvgEnergyIncome(),eco->GetEnergyCur()/eco->GetEnergyStore());
@@ -470,5 +489,153 @@ bool CCommanderController::PushHome(CCircuitUnit* unit,State& s,int frame) {
     s.front.pushHome=true; s.route.clear();
     ai->LOG("[CommanderFront] unit=%i home reason=%s frame=%i riot_metal=%.0f",unit->GetId(),reason,frame,riot);
     return true;
+}
+// Owner 2026-11-20: once the AI has a finished fusion, the commander orders no
+// more solars at the front and reclaims the front solars it ordered. Any of our
+// finished fusions counts (land, naval or advanced; never the decoy fusion).
+// Latched: once one has stood the rung stays closed for the rest of the game,
+// even if that fusion dies (headless 2026-11-20: a lost fusion reopened it at
+// 1,400 E/s income). Checked at most once a second until it latches.
+bool CCommanderController::FrontSolarFusionStands(int frame) {
+    if(frontSolarFusion || frame-frontSolarFusionCheck<FRAMES_PER_SEC) return frontSolarFusion;
+    frontSolarFusionCheck=frame;
+    static const char* const fusions[]={"armfus","corfus","legfus","armckfus","armuwfus","coruwfus",
+        "leganavalfusion","armafus","corafus","legafus"};
+    auto* builder=ai->GetBuilderManager();
+    bool stands=false;
+    for(const char* name:fusions) {
+        CCircuitDef* def=ai->GetCircuitDef(name);
+        if(!def) continue;
+        const int unfinished=builder?builder->GetUnfinishedCount(def):0;
+        if(def->GetCount()-unfinished>0) { stands=true;break; }
+    }
+    if(stands!=frontSolarFusion)
+        ai->LOG("[CommanderWork] front_solar fusion=%i sites=%i",int(stands),int(frontSolarSites.size()));
+    frontSolarFusion=stands;
+    return stands;
+}
+
+void CCommanderController::NoteFrontSolarSite(const AIFloat3& pos,int defId) {
+    if(defId<0 || !OnMap(pos)) return;
+    for(auto& site:frontSolarSites) if(site.pos.SqDistance2D(pos)<SQUARE(32.f)) { site.defId=defId;return; }
+    if(int(frontSolarSites.size())>=FRONT_SOLAR_SITES_MAX) frontSolarSites.erase(frontSolarSites.begin());
+    frontSolarSites.push_back({pos,defId});
+}
+
+// The commander takes the nearest front solar within front_solar_reclaim_radius
+// that is reachable and under front_threat. Solars out of its radius get a plain
+// reclaim job any builder may take (at most FRONT_SOLAR_RECLAIMS_MAX at once,
+// under no threat). A site with no solar of ours left is forgotten. One
+// friendly-unit query per remembered site, at most every two seconds.
+IUnitTask* CCommanderController::FrontSolarReclaim(CCircuitUnit* unit,int frame) {
+    if(!unit || !unit->GetCircuitDef() || !unit->GetCircuitDef()->IsAbleToReclaim()) return nullptr;
+    auto* builder=ai->GetBuilderManager();
+    auto* callback=ai->GetCallback();
+    auto* threat=ai->GetThreatMap();
+    auto* terrain=ai->GetTerrainManager();
+    if(!builder || !callback || !threat || !terrain) return nullptr;
+    // Jobs whose task has ended were cleared by TaskFinished; drop dead targets too.
+    frontSolarReclaims.erase(std::remove_if(frontSolarReclaims.begin(),frontSolarReclaims.end(),
+        [&](const FrontSolarReclaimJob& j){return !j.task || j.task->IsDead() || !ai->GetTeamUnit(j.target);}),
+        frontSolarReclaims.end());
+    const auto pos=unit->GetPos(frame);
+    const float reach=unit->GetCircuitDef()->GetBuildDistance();
+    const float radius=cfg->front.solarReclaimRadius;
+    // The commander's choice first: an open job for a solar in its radius.
+    IUnitTask* mine=nullptr; float best=std::numeric_limits<float>::max();
+    for(auto& job:frontSolarReclaims) {
+        CCircuitUnit* target=ai->GetTeamUnit(job.target);
+        if(!target || !job.task || job.task->IsDead()) continue;
+        const auto at=target->GetPos(frame);
+        const float sq=at.SqDistance2D(pos);
+        if(sq>SQUARE(radius) || sq>=best || threat->GetThreatAt(unit,at)>cfg->front.threat
+            || !job.task->CanAssignTo(unit) || !terrain->CanReachAtSafe2(unit,at,reach)) continue;
+        mine=job.task; best=sq;
+    }
+    if(mine) return mine;
+    if(frame<frontSolarScanNext || frontSolarSites.empty()) return nullptr;
+    frontSolarScanNext=frame+2*FRAMES_PER_SEC;
+    const auto queued=[&](CCircuitUnit* u) {
+        for(auto& job:frontSolarReclaims) if(job.target==u->GetId()) return true;
+        for(auto* task:builder->GetTasks(BT::RECLAIM))
+            if(task && !task->IsDead() && task->GetTarget()==u) return true;
+        return false;
+    };
+    // An unfinished frame a live energy job is still building is left to it.
+    const auto building=[&](CCircuitUnit* u) {
+        if(u->IsFinished()) return false;
+        for(auto* task:builder->GetTasks(BT::ENERGY))
+            if(task && !task->IsDead() && task->GetTarget()==u && !task->GetAssignees().empty()) return true;
+        return false;
+    };
+    CCircuitUnit* chosen=nullptr; best=std::numeric_limits<float>::max();
+    std::vector<CCircuitUnit*> farTargets;
+    // Neighbouring sites can see the same solar: each one is weighed once.
+    std::vector<int> seen;
+    // A solar ordered within FRONT_SOLAR_RETRY_SECONDS waits (an order that
+    // ended unfinished is not re-made every scan).
+    frontSolarRetry.erase(std::remove_if(frontSolarRetry.begin(),frontSolarRetry.end(),
+        [&](const std::pair<int,int>& r){return r.second<=frame;}),frontSolarRetry.end());
+    const auto waiting=[&](int id) {
+        for(const auto& r:frontSolarRetry) if(r.first==id) return true;
+        return false;
+    };
+    // Orders made per solar: after FRONT_SOLAR_COMMANDER_TRIES the commander
+    // leaves it to other builders; after FRONT_SOLAR_MAX_TRIES it is left standing.
+    const auto tries=[&](int id) {
+        for(const auto& t:frontSolarTries) if(t.first==id) return t.second;
+        return 0;
+    };
+    for(auto it=frontSolarSites.begin();it!=frontSolarSites.end();) {
+        bool found=false;
+        for(int id:callback->GetFriendlyUnitIdsIn(it->pos,48.f,false)) {
+            CCircuitUnit* u=ai->GetTeamUnit(id);
+            if(!u || u==unit || !u->GetCircuitDef() || u->GetCircuitDef()->GetId()!=it->defId) continue;
+            found=true;
+            if(std::find(seen.begin(),seen.end(),id)!=seen.end()) continue;
+            seen.push_back(id);
+            const int tried=tries(id);
+            if(tried>=FRONT_SOLAR_MAX_TRIES || waiting(id) || building(u) || queued(u)) continue;
+            const auto at=u->GetPos(frame);
+            if(!OnMap(at)) continue;
+            const float sq=at.SqDistance2D(pos);
+            const bool commanderCan=tried<FRONT_SOLAR_COMMANDER_TRIES && sq<=SQUARE(radius) && threat->GetThreatAt(unit,at)<=cfg->front.threat
+                && terrain->CanReachAtSafe2(unit,at,reach);
+            if(commanderCan) { if(sq<best) { chosen=u; best=sq; } }
+            else if(threat->GetThreatAt(at)<=0.f) farTargets.push_back(u);
+        }
+        // A live energy job at the site keeps it remembered (its solar may still come).
+        if(!found) {
+            bool pending=false;
+            for(auto* task:builder->GetTasks(BT::ENERGY))
+                if(task && !task->IsDead() && task->GetPosition().SqDistance2D(it->pos)<SQUARE(32.f)) { pending=true;break; }
+            if(!pending) { it=frontSolarSites.erase(it);continue; }
+        }
+        ++it;
+    }
+    const auto order=[&](CCircuitUnit* target)->IBuilderTask* {
+        if(!target || !target->GetCircuitDef() || !target->GetCircuitDef()->GetDef()) return nullptr;
+        auto* task=builder->Enqueue(TaskB::Reclaim(IBuilderTask::Priority::NORMAL,target,120*FRAMES_PER_SEC));
+        if(!task) return nullptr;
+        frontSolarReclaims.push_back({target->GetId(),task});
+        frontSolarRetry.emplace_back(target->GetId(),frame+FRONT_SOLAR_RETRY_SECONDS*FRAMES_PER_SEC);
+        bool counted=false;
+        for(auto& t:frontSolarTries) if(t.first==target->GetId()) { ++t.second;counted=true;break; }
+        if(!counted) {
+            if(frontSolarTries.size()>=size_t(4*FRONT_SOLAR_SITES_MAX)) frontSolarTries.erase(frontSolarTries.begin());
+            frontSolarTries.emplace_back(target->GetId(),1);
+        }
+        const auto at=target->GetPos(frame);
+        ai->LOG("[CommanderWork] unit=%i front_solar_reclaim %s id=%i x=%.0f z=%.0f by=%s",unit->GetId(),
+            target->GetCircuitDef()->GetDef()->GetName(),target->GetId(),at.x,at.z,target==chosen?"commander":"any_builder");
+        return task;
+    };
+    IBuilderTask* own=chosen?order(chosen):nullptr;
+    for(auto* u:farTargets) {
+        if(int(frontSolarReclaims.size())>=FRONT_SOLAR_RECLAIMS_MAX) break;
+        order(u);
+    }
+    if(own && !own->CanAssignTo(unit)) own=nullptr;
+    return own;
 }
 }
