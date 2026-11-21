@@ -4831,6 +4831,17 @@ bool CTerrainManager::IsExitClear(CCircuitDef* cdef, const AIFloat3& pos, int fa
 			if (!blockingMap.IsInBounds(x, z) || (blockingMap.IsStruct(x, z) && !blockingMap.IsReserved(x, z))) {
 				return false;
 			}
+			// Owner, 2026-11-20 (Swirly Rock: TECH AI 8's gantry sited at 0:25 with an
+			// ally's mex spot 100 elmos in front; the ally's T2 mex there walled in a
+			// Sol and an Astraeus): a metal or geo spot in the exit counts as a standing
+			// extractor, like unbuildable terrain, built on or not. The spot mark is the
+			// permanent 2*BLOCK_VAL blocker count Init seeds (IsResourceSite), so a
+			// struct mark that a later DelStruct wiped cannot hide a standing mex either.
+			// Same test the factory corridors use (FactoryCorridors.cpp, D-460). O(1)
+			// per cell; no metal map has spot marks.
+			if (blockingMap.IsResourceSite(x, z)) {
+				return false;
+			}
 		}
 	}
 	// planned slots (any group) whose footprint overlaps the exit
