@@ -1195,11 +1195,15 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         withdrawalUntil=0;
     }
     int best=-1,bestWeapon=-1; float bestScore=-1.f,bestDamage=0.f;
+    // trace only (2026-11-21 Daedalus idle): why ground contacts within max range were not picked
+    int skSpam=0,skLos=0,skKind=0,skReach=0,skTraj=0,skFriend=0,skDamage=0,inReach=0;
+    const auto inMax=[&](const CRangedWorld::Contact& c){ return report && !(c.def && c.def->IsAbleToFly()) && !c.airDot && pos.SqDistance2D(c.pos)<=SQUARE(maxRange+c.radius); };
     for(int i:nearby) {
         const auto& c=contacts[i];
-        if(Spam(policy,c)) continue; // owner 2026-10-19: never a priority target
-        if(!c.los && !policy.allowRadar) continue;
-        if((c.mobile && !policy.allowMobile)||(!c.mobile && !policy.allowStatic)) continue;
+        const bool counted=inMax(c); if(counted) ++inReach;
+        if(Spam(policy,c)) { if(counted) ++skSpam; continue; } // owner 2026-10-19: never a priority target
+        if(!c.los && !policy.allowRadar) { if(counted) ++skLos; continue; }
+        if((c.mobile && !policy.allowMobile)||(!c.mobile && !policy.allowStatic)) { if(counted) ++skKind; continue; }
         // D-294 (owner correction): artillery and radar are a pairing, so a
         // blind shot at a slow or stationary dot stays valid. Identified avoided
         // categories are excluded here; an unidentified dot too fast for the
@@ -1209,17 +1213,18 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             const auto& w=caps.weapons[wi];
             if((c.def && !(w.category&c.def->GetCategory())) || c.pos.y< -20.f) continue;
             const float range=world.Range(w,pos,c.pos);
-            if(pos.SqDistance2D(c.pos)>range*range || !world.Trajectory(w,pos,c.pos)) continue;
+            if(pos.SqDistance2D(c.pos)>range*range) { if(inMax(c)) ++skReach; continue; }
+            if(!world.Trajectory(w,pos,c.pos)) { if(inMax(c)) ++skTraj; continue; }
             // Destroying energy storage can kill nearby allies even when our
             // own weapon is precise. Keep clear of its loaded death blast and
             // withhold the shot until the exposed cohort can leave it.
             if(c.explosionRadius>0.f && pos.SqDistance2D(c.pos)<std::pow(c.explosionRadius+caps.radius,2.f)) continue;
-            if(world.FriendlySplash(id,c.pos,std::max(w.splash,c.explosionRadius))) continue;
-            if(world.FriendlyLine(w,id,pos,c.pos)) continue;
+            if(world.FriendlySplash(id,c.pos,std::max(w.splash,c.explosionRadius))) { if(inMax(c)) ++skFriend; continue; }
+            if(world.FriendlyLine(w,id,pos,c.pos)) { if(inMax(c)) ++skFriend; continue; }
             const int armor=c.armor;
             const float damage=policy.mode==RangedPolicy::Mode::CARRIER?c.health:
                 (armor>=0 && size_t(armor)<w.damage.size()?w.damage[armor]*w.alphaScale:0.f);
-            if(damage<=0.f) continue;
+            if(damage<=0.f) { if(inMax(c)) ++skDamage; continue; }
             // A legal unidentified radar dot is a low-priority blind shot,
             // never an invented heavy identity, HP estimate or threat source.
             float value=c.def ? ranged::UsefulScore(c.cost,c.health,damage,world.Reserved(c.id,id),policy.mode==RangedPolicy::Mode::PRECISION,
@@ -1296,6 +1301,9 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     }
     // A priority target still fires on HOLD, so spam in reach always holds:
     // an unreachable priority target would otherwise hand the volley to spam.
+    if(report) ai->LOG("RANGEDTRACE: pick unit=%d at=%.0f,%.0f best=%d def=%s spamIn=%d otherIn=%d closing=%d moving=%d marching=%d inReach=%d skip spam=%d los=%d kind=%d reach=%d traj=%d friend=%d damage=%d",
+        id,pos.x,pos.z,best>=0?contacts[best].id:-1,best>=0&&contacts[best].def?contacts[best].def->GetDef()->GetName():"-",int(spamInRange),int(otherInRange),
+        closing?closing->id:-1,int(moving),int(marching),inReach,skSpam,skLos,skKind,skReach,skTraj,skFriend,skDamage);
     if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && (best>=0 || otherInRange || droneTarget>=0));
     if(best<0 && droneTarget>=0) {
         const auto& c=contacts[droneTarget];
