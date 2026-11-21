@@ -1304,7 +1304,15 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if(report) ai->LOG("RANGEDTRACE: pick unit=%d at=%.0f,%.0f best=%d def=%s spamIn=%d otherIn=%d closing=%d moving=%d marching=%d inReach=%d skip spam=%d los=%d kind=%d reach=%d traj=%d friend=%d damage=%d",
         id,pos.x,pos.z,best>=0?contacts[best].id:-1,best>=0&&contacts[best].def?contacts[best].def->GetDef()->GetName():"-",int(spamInRange),int(otherInRange),
         closing?closing->id:-1,int(moving),int(marching),inReach,skSpam,skLos,skKind,skReach,skTraj,skFriend,skDamage);
-    if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && (best>=0 || otherInRange || droneTarget>=0));
+    // Owner 2026-11-21: spam_fire_idle_seconds. Busy = a target, a drone target, a
+    // closing threat, a withdrawal, a move or a march. Only spam in reach for that
+    // long while idle: open fire and let engine autofire take it.
+    if(best>=0 || droneTarget>=0 || closing || frame<withdrawalUntil || moving || marching || query || !spamInRange) spamIdleSince=frame;
+    const bool spamIdleFire=policy.spamFireIdleSeconds>0.f && spamInRange && !otherInRange
+        && frame-spamIdleSince>=int(policy.spamFireIdleSeconds*FRAMES_PER_SEC);
+    if(spamIdleFire && !spamIdleLogged) { ai->LOG("RANGED: spam idle fire unit=%d after=%.0fs",id,policy.spamFireIdleSeconds); spamIdleLogged=true; }
+    if(!spamIdleFire) spamIdleLogged=false;
+    if(policy.fireAtWill) UpdateFireState(unit,spamIdleFire || (!spamInRange && (best>=0 || otherInRange || droneTarget>=0)));
     if(best<0 && droneTarget>=0) {
         const auto& c=contacts[droneTarget];
         if(report) ai->LOG("RANGED: drone target unit=%d target=%d dist=%.0f spam=%d",id,c.id,std::sqrt(pos.SqDistance2D(c.pos)),int(spamInRange));
@@ -1379,6 +1387,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // a firing band around an apparently harmless unknown target.
         if(!c.def && !policy.advanceUnknownRadar) { ++unknownObjectives; return; }
         if((c.def && c.def->IsAbleToFly()) || (c.mobile?!policy.allowMobile:!policy.allowStatic)) return;
+        // Owner 2026-11-21 (Swirly Rock Daedalus idle): spam is never our target, so it is
+        // never the objective either. A Peewee as nearest objective parked the hull on a
+        // firing site round it (already in reach: stand), fire held, for minutes.
+        if(policy.fireAtWill && Spam(policy,c)) return;
         // D-294: never approach an identified avoided contact. Unidentified
         // dots stay approachable (advance_unknown_radar owns that): approach
         // is the only way to identify them; the blind SHOT is what is refused.
@@ -1426,6 +1438,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         const auto& c=contacts[i];
         if (policy.holdFireline && !c.los) continue;
         if(!c.def && !policy.advanceUnknownRadar) { ++unknownObjectives; continue; }
+        if(policy.fireAtWill && Spam(policy,c)) continue;   // owner 2026-11-21: spam is never an objective
         if((c.mobile?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
         const float distance=pos.SqDistance2D(c.pos);

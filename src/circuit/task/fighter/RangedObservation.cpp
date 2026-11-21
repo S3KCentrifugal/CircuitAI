@@ -4,6 +4,9 @@
 #include "unit/ally/AllyTeam.h"
 #include "unit/enemy/EnemyUnit.h"
 #include "unit/enemy/EnemyManager.h"
+#include "map/MapManager.h"
+#include "UnitDef.h"
+#include <unordered_map>
 #include "spring/SpringCallback.h"
 #include "spring/SpringMap.h"
 #include "spring/SpringUnit.h"
@@ -215,6 +218,24 @@ void CRangedObservation::BuildContacts(CCircuitAI* ai, std::vector<Contact>& out
 void CRangedObservation::BuildGhosts(CCircuitAI* ai)
 {
 	ghosts.clear(); ghostHazards.Clear(); largestGhostHazard=0.f;
+	// Owner 2026-11-21 (Swirly Rock Daedalus idle): a structure cannot move, so a
+	// ghost whose spot lies inside our radar coverage with no blip there is gone
+	// (killed out of LOS: artillery, nuke, lolcannon). It stood ~1,300 from AI 13's
+	// gantry and halted every march leg there for minutes. Kept when the spot is
+	// within a known enemy jammer's radius + 128 (a jammed live tower) or the
+	// definition is stealthy. Jammer radius per def is read once and cached.
+	static std::unordered_map<int,float> jamRadius;
+	std::vector<std::pair<AIFloat3,float>> jammers;
+	for (const auto& [jid,je]:ai->GetEnemyManager()->GetEnemyUnits()) {
+		if (!je) continue;
+		CCircuitDef* jd=je->GetCircuitDef();
+		if (!jd || (je->GetData().losStatus & (SEnemyData::DEAD|SEnemyData::DYING))) continue;
+		auto it=jamRadius.find(jd->GetId());
+		if (it==jamRadius.end()) it=jamRadius.emplace(jd->GetId(),float(jd->GetDef()->GetJammerRadius())).first;
+		if (it->second>0.f && std::isfinite(je->GetPos().x)) jammers.emplace_back(je->GetPos(),it->second);
+	}
+	CMapManager* mapMgr=ai->GetMapManager();
+	int staleRadar=0;
 	for (const auto& [id,e]:ai->GetEnemyManager()->GetEnemyUnits()) {
 		if (!e || e->IsInRadarOrLOS()) continue;
 		const auto& g=e->GetData();
@@ -223,6 +244,10 @@ void CRangedObservation::BuildGhosts(CCircuitAI* ai)
 			|| (g.losStatus & (SEnemyData::DEAD|SEnemyData::DYING|SEnemyData::NEUTRAL|SEnemyData::HIDDEN))
 			|| (e->IsIgnore() && !gd->IsIgnore()) || e->IsBeingBuilt()
 			|| !std::isfinite(e->GetPos().x) || !std::isfinite(e->GetPos().z)) continue;
+		if (mapMgr!=nullptr && !gd->IsStealth() && mapMgr->IsInRadar(e->GetPos())
+			&& std::none_of(jammers.begin(),jammers.end(),[&](const auto& j){ return j.first.SqDistance2D(e->GetPos())<SQUARE(j.second+128.f); })) {
+			++staleRadar; continue;
+		}
 		Contact c; c.id=id; c.def=gd; c.pos=e->GetPos(); c.ghost=true;
 		c.health=std::max(1.f,e->GetHealth()); c.radius=e->GetRadius(); c.cost=e->GetCost();
 		c.armed=true; c.groundRange=gd->GetMaxRange(CCircuitDef::RangeType::LAND);
@@ -235,6 +260,12 @@ void CRangedObservation::BuildGhosts(CCircuitAI* ai)
 		largestGhostHazard=std::max(largestGhostHazard,c.hazardRadius);
 		ghostHazards.Add(P(c.pos),int(ghosts.size()));
 		ghosts.push_back(c);
+	}
+	static const bool trace=std::getenv("CIRCUIT_RANGED_TRACE")!=nullptr;
+	static int lastStaleLog=-100000;
+	if (trace && staleRadar>0 && ai->GetLastFrame()>=lastStaleLog+300) {
+		lastStaleLog=ai->GetLastFrame();
+		ai->LOG("RANGEDTRACE: ghosts kept=%u dropped_in_radar=%d jammers=%u",unsigned(ghosts.size()),staleRadar,unsigned(jammers.size()));
 	}
 }
 

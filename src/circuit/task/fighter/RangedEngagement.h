@@ -89,6 +89,7 @@ private:
     bool assistInvariantLogged=false;
     std::vector<springai::AIFloat3> path;
     bool marching=false; int marchRetryFrame=0;
+    int spamIdleSince=0; bool spamIdleLogged=false;   // owner 2026-11-21: spam_fire_idle_seconds
     springai::AIFloat3 marchGoal;
 };
 }
