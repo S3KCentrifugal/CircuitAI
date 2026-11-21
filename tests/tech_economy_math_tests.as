@@ -186,3 +186,13 @@ void test_growth_reactor_breaks_full_bank_deadlock_only_when_funded() {
     Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,0,6000,250000,90,false));
     Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,6000,250000,0,false));
 }
+
+void test_air_lab_income_or_full_bank_and_committed_work() {
+    Check(!TechEconomyMath::AirLabFunded(79.99f,999,1000,80,false));
+    Check(TechEconomyMath::AirLabFunded(80,0,1000,80,false));
+    Check(TechEconomyMath::AirLabFunded(0,1000,1000,80,false));
+    Check(!TechEconomyMath::AirLabFunded(0,999,1000,80,false));
+    Check(TechEconomyMath::AirLabFunded(0,0,1000,80,true));
+    Check(!TechEconomyMath::AirLabFunded(0,0,0,80,false));
+    Check(!TechEconomyMath::AirLabFunded(79,1000,2000,80,false));
+}

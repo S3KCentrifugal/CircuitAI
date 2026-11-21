@@ -1,0 +1,18 @@
+{
+  "stop_minute": 1,
+  "expect": [
+    {
+      "key": "policy",
+      "pattern": "\\[AirLabPolicy\\] PASS plans=5 bank=pass income=pass committed=pass",
+      "scope": "any",
+      "by_minute": 1
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[INVARIANT\\]|\\[RangedArena\\].*ERROR|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

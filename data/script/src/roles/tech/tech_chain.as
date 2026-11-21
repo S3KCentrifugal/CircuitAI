@@ -72,6 +72,17 @@ namespace TechChain
     array<int> staleHave;      // ... at this count
 
     bool Active() { return active && !done; }
+    bool AirLabFunded(float threshold) {
+        CCircuitDef@ lab = ai.GetCircuitDef(DefFor("aap"));
+        if (lab is null) return false;
+        // Existing units and funded offers are scalar checks. Only an unfunded
+        // offer scans Q active factory tasks to retain a committed order after
+        // spending. No army query, cache, extra polling or commands (air-lab-policy).
+        if (TechEconomyMath::AirLabFunded(Economy::GetMinMetalIncomeLast10s(),
+            aiEconomyMgr.metal.current, lab.costM, threshold, lab.count > 0)) return true;
+        return aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) > 0;
+    }
+
     // D-489: the active chain holds a step with this key that is not yet met
     // or skipped. O(steps), a dozen; called once per economy update.
     bool WantsStep(const string &in key)
@@ -307,7 +318,7 @@ namespace TechChain
         if (!Active()) return false;
         for (uint i = 0; i < steps.length(); ++i) {
             Step@ s = steps[i];
-            if (s.key == "income" || (i < skipped.length() && skipped[i])) continue;
+            if (s.key == "income" || s.key == "airfunding" || (i < skipped.length() && skipped[i])) continue;
             if (NukeRush() && s.key == "lab" && TechBuild::WasIntoT2()) continue;
             if (NukeRush() && s.key == "alab" && nukeLabReleased) continue;
             if (NukeRush() && s.key == "mstor" && nukeStorageReleased) continue;
@@ -1051,8 +1062,9 @@ namespace TechChain
                 unmet = true;
                 return TechGantry::EarlyWork(u);
             }
-            if (s.key == "income") {
-                if (Economy::GetMinMetalIncomeLast10s() >= float(s.target)) continue;
+            if (s.key == "income" || s.key == "airfunding") {
+                if (s.key == "airfunding" ? AirLabFunded(float(s.target))
+                    : Economy::GetMinMetalIncomeLast10s() >= float(s.target)) continue;
                 unmet = true;
                 return Ladder(u, int(i), s);
             }
@@ -1308,7 +1320,8 @@ namespace TechChain
     {
         if (!Active()) return false;
         for (uint i = 0; i < steps.length(); ++i)
-            if (steps[i].key == "income" && Economy::GetMinMetalIncomeLast10s() < float(steps[i].target)) return true;
+            if ((steps[i].key == "income" && Economy::GetMinMetalIncomeLast10s() < float(steps[i].target))
+                || (steps[i].key == "airfunding" && !AirLabFunded(float(steps[i].target)))) return true;
         return false;
     }
 }
