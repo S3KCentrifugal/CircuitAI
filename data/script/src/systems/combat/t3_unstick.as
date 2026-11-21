@@ -148,6 +148,15 @@ namespace T3Unstick {
         h.blockerUnits.deleteAll();
     }
 
+    // Owner 2026-11-21: within `radius` of the factory that made it (false when that factory is gone)
+    bool NearProducer(CCircuitUnit@ u, const AIFloat3 &in pos, float radius)
+    {
+        if (u.GetProducerId() < 0) return false;
+        CCircuitUnit@ producer = ai.GetTeamUnit(u.GetProducerId());
+        if (!ai.IsOwnedUnit(producer)) return false;
+        return producer.GetPos(ai.frame).SqDistance2D(pos) <= radius * radius;
+    }
+
     bool IsT3(CCircuitUnit@ u)
     {
         if (!ai.IsOwnedUnit(u)) return false;
@@ -276,7 +285,10 @@ namespace T3Unstick {
             CCircuitUnit@ b = ai.GetTeamUnit(own[i]);
             if (!ai.IsOwnedUnit(b)) continue;
             if (b.circuitDef.IsMobile()) {
+                // Owner 2026-11-21 (Swirly Rock Daedalus): never push a ranged-controller hull: the
+                // 500-elmo step toward the enemy walked waiting Daedalus into Annihilator reach.
                 if (b !is u && int(movers.length()) < Global::T3Unstick::ClearMobilesMax && Clears(b)
+                    && !b.circuitDef.IsAttrAny(Unit::Attr::RANGED.mask)
                     && b.GetPos(ai.frame).SqDistance2D(pos) <= clearSq) movers.insertLast(b);
                 continue;
             }
@@ -459,6 +471,9 @@ namespace T3Unstick {
             if (!h.signalled) {
                 const bool fighting = u.task !is null && u.task.GetType() == Task::Type::FIGHTER;
                 if (!fighting) { h.anchorFrame = ai.frame; continue; }
+                // Owner 2026-11-21: a ranged-controller hull stands still on purpose (coverage edge,
+                // firing site); it is stuck only while penned near its own factory.
+                if (u.circuitDef.IsAttrAny(Unit::Attr::RANGED.mask) && !NearProducer(u, pos, 400.0f)) { h.anchorFrame = ai.frame; continue; }
                 if (ai.frame - h.anchorFrame < int(Global::T3Unstick::StuckSeconds) * SECOND) continue;
             }
             StartRound(h, u, pos);
