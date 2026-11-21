@@ -1,0 +1,86 @@
+{
+  "name": "commander-solar-ceiling",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      3000,
+      3000
+    ],
+    [
+      6000,
+      6500
+    ]
+  ],
+  "camera": [
+    3000,
+    3000,
+    1800
+  ],
+  "photos": [],
+  "groups": [
+    {
+      "unit": "armfus",
+      "team": 0,
+      "count": 2,
+      "position": [
+        2400,
+        2600
+      ],
+      "spacing": 240,
+      "columns": 2,
+      "after_seconds": 12
+    },
+    {
+      "unit": "armveil",
+      "team": 0,
+      "count": 20,
+      "position": [
+        2200,
+        3400
+      ],
+      "spacing": 120,
+      "columns": 5,
+      "after_seconds": 14
+    },
+    {
+      "unit": "armlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3300,
+        3000
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "corlab",
+      "team": 1,
+      "count": 1,
+      "position": [
+        6000,
+        6200
+      ],
+      "after_seconds": 12
+    }
+  ],
+  "commander_observation": true,
+  "commander_front_work": true,
+  "commander_initial": true,
+  "start_energy": 10000,
+  "start_energy_storage": 10000,
+  "start_metal": 10000,
+  "checks": "commander-solar-ceiling",
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "description": "A high-income stalled economy cannot make the commander start regular solars.",
+  "storage_scenario": "comm-solar-ceiling",
+  "solar_ceiling_fixture": true
+}

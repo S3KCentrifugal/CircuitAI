@@ -1,3 +1,11 @@
+void test_nuke_buffer_counts_completed_geothermal_consistently() {
+    Check(TechEconomyMath::EnergyEquivalentCount(21,300.f,9.f)>=24);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,0.f,9.f)==21);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,26.f,9.f)==23);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,27.f,9.f)==24);
+    Check(TechEconomyMath::EnergyEquivalentCount(24,0.f,20.f)==24);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,300.f,0.f)==21);
+}
 void test_full_metal_releases_reactor_even_with_full_energy_and_pending_conversion() {
     Check(EcoPlanner::DecideConversion(true,true,1,2,true,true,true,true,false) == EcoPlanner::METAL_FULL);
 }

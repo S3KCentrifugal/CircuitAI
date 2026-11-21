@@ -534,6 +534,7 @@ bool CBattleAnalysis::SetFrontLane(const std::vector<AIFloat3>& points,float hal
     // collinear vertices. Vertex-only seeding cuts holes in long straight lanes.
     frontLaneDistance=lane::CorridorDistances(path,gw,gh,cellSize);
     frontLanePath.Set(std::move(path));
+    ++frontLaneRevision;
     laneFront.Reset(frontLanePath.Length());
     laneFrontFrame=-1;
     frontLaneWidth=std::clamp(halfWidth,64.f,2048.f);

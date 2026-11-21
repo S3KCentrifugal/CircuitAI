@@ -235,6 +235,7 @@ public:
 	// The mechanism lives in CFactoryCorridors (D-451); these forward to it.
 	void SetFactoryCorridorPolicy(bool enabled, bool ownLane) { factoryCorridors.SetPolicy(enabled, ownLane); }
 	void SetFactoryCorridorExempt(int def) { factoryCorridors.SetExemptDef(def); }
+	void SetFactoryCorridorRequired(int def, float laneFraction) { factoryCorridors.SetRequiredDef(def, laneFraction); }
 	void SetFactoryCorridorOptions(int liveProbes, int backgroundProbes, int visits,
 			float goalStart, float goalEnd, float laneWaitSeconds) {
 		factoryCorridors.SetOptions({liveProbes, backgroundProbes, visits, goalStart, goalEnd, laneWaitSeconds});
@@ -330,6 +331,10 @@ public:
 	void SetFactoryReservationOnActivate(bool value) { SetLayoutPolicy(kFactoryActivateKey, factoryReservationOnActivate, value); }
 	// Flush packing: a factory stands flush against the construction turrets.
 	void SetFactoryFlushPacking(bool value) { SetLayoutPolicy(kFactoryFlushKey, factoryFlushPacking, value); }
+	void SetProtectSupportRows(bool value) {
+		if (protectSupportRows != value) ++packingRevision;
+		SetLayoutPolicy(kProtectSupportRowsKey, protectSupportRows, value);
+	}
 	// Direct site: an explicit request position is used as-is when buildable.
 	void SetFactoryDirectSite(bool value) { SetLayoutPolicy(kFactoryDirectKey, factoryDirectSite, value); }
 	bool IsFactoryReservationOnActivate() const { return factoryReservationOnActivate; }
@@ -339,6 +344,8 @@ public:
 	// lane, or the nearest enemy start before the lane exists). An invalid
 	// point (x < 0) leaves the native facing search unchanged for other roles.
 	void SetFactoryFacingGoal(const springai::AIFloat3& goal);
+	void SetFactoryFacingAdvance(float value);
+	springai::AIFloat3 GetFactoryFacingGoalAt(const springai::AIFloat3& site) const;
 	const springai::AIFloat3& GetFactoryFacingGoal() const { return factoryFacingGoal; }
 	// D-460: serve a planned slot for this def with its own facing, before a
 	// facing-filtered search can pass it over. Sets the reserved id/facing.
@@ -521,8 +528,12 @@ private:
 	bool FactoryExitUsable(const base_layout::FactoryCluster& cluster, CCircuitDef* factory);
 	static constexpr const char* kFactoryActivateKey = "policy.layout.factory_activate";
 	static constexpr const char* kFactoryFlushKey = "policy.layout.factory_flush";
+	static constexpr const char* kProtectSupportRowsKey = "policy.layout.protect_support_rows";
+	bool protectSupportRows = false;
 	static constexpr const char* kFactoryDirectKey = "policy.layout.factory_direct";
 	static constexpr const char* kFacingGoalXKey = "policy.layout.facing_goal_x";
+	static constexpr const char* kFacingAdvanceKey = "policy.layout.facing_advance";
+	float factoryFacingAdvance = 0.f;
 	static constexpr const char* kFacingGoalZKey = "policy.layout.facing_goal_z";
 	springai::AIFloat3 factoryFacingGoal{-1.f, 0.f, -1.f};  // x < 0: none
 	std::vector<std::uint8_t> resourceKeepOut;  // blocking cells, 1 = keep roads off

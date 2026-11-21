@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--out',required=True,type=Path)
     parser.add_argument('--cases',help='Comma-separated case names; default all commander correctness cases')
     parser.add_argument('--profile',default='experimental_balanced')
+    parser.add_argument('--engine',default='recoil_2026.07.04')
     parser.add_argument('--mode',choices=['fast','visual'],default='fast')
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--stop-on-failure',action='store_true',help='Focused iteration; final regression normally collects all cases')
@@ -70,7 +71,7 @@ def main():
             'profile':args.profile,'mode':args.mode,'results':[]}
     for index,(name,minutes) in enumerate(selected):
         command=[sys.executable,str(HERE/'ranged_arena.py'),'--case',name,'--dll',str(args.dll),
-            '--data',str(args.data),'--profile',args.profile,'--minutes',str(minutes),'--mode',args.mode]
+            '--data',str(args.data),'--profile',args.profile,'--minutes',str(minutes),'--mode',args.mode,'--engine',args.engine]
         if args.headless:command.append('--headless')
         print(f'[{index+1}/{len(selected)}] {name}',flush=True)
         row=run_record(command,args.out.with_name(args.out.stem+'-'+name+'.txt'))

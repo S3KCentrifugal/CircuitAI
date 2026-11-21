@@ -4,6 +4,7 @@
 #include "resource/MetalManager.h"
 #include "setup/SetupManager.h"
 #include "spring/SpringMap.h"
+#include "spring/SpringCallback.h"
 #include "task/builder/MexTask.h"
 #include "task/builder/MexUpTask.h"
 #include "terrain/TerrainManager.h"
@@ -248,6 +249,45 @@ IBuilderTask* CEconomyManager::EnqueueFieldMex(CCircuitUnit* builder, const AIFl
             circuit->GetTeamId(), available, outside, occupied, territory, footprint, unreachable, center.x, center.z);
     }
     return nullptr; // bounded search pending; never a declaration of map exhaustion
+}
+
+IBuilderTask* CEconomyManager::EnqueueLocalMexUpgrade(CCircuitUnit* builder, float radius)
+{
+    if (!builder || radius <= 0 || !std::isfinite(radius)) return nullptr;
+    auto* current = dynamic_cast<IBuilderTask*>(builder->GetTask());
+    // Keep the claim and reclaim/build sequence through native re-evaluation.
+    if (current && !current->IsDead() && current->GetBuildType() == IBuilderTask::BuildType::MEXUP)
+        return current;
+    if (IsEnergyStalling() || GetAvgMetalIncome() <= 10.f) return nullptr;
+    const auto here = builder->GetPos(circuit->GetLastFrame());
+    // O(K log K) over a local friendly query, on task asks only. Keep IDs,
+    // not wrappers, across enqueue callbacks; native upgrade admission owns
+    // reachability, availability and the spot/field claim on both map types.
+    std::vector<std::pair<float, int>> candidates;
+    for (int id : circuit->GetCallback()->GetFriendlyUnitIdsIn(here, radius, false)) {
+        auto* target = circuit->GetTeamUnit(id);
+        if (!target || !target->IsFinished() || target->GetCircuitDef()->GetExtractsM() <= 0) continue;
+        candidates.emplace_back(here.SqDistance2D(target->GetPos(circuit->GetLastFrame())), id);
+    }
+    std::sort(candidates.begin(), candidates.end());
+    for (const auto& candidate : candidates) {
+          // Admission uses the canonical spot centre, which can differ from
+          // the extractor's position at the edge of the local search disc.
+          if (!metalMap) {
+              auto* target = circuit->GetTeamUnit(candidate.second);
+              if (!target) continue;
+              const int spot = circuit->GetMetalManager()->FindNearestSpot(target->GetPos(circuit->GetLastFrame()));
+              if (spot < 0 || circuit->GetMetalManager()->GetSpots()[spot].position.SqDistance2D(here) > radius*radius) continue;
+          }
+        if (auto* task = EnqueueMexUpgrade(builder, circuit->GetTeamUnit(candidate.second))) {
+            if (task->GetBuildType() != IBuilderTask::BuildType::MEXUP
+                || task->GetPosition().SqDistance2D(here) > radius*radius)
+                circuit->LOG("[INVARIANT] INV-270 local mex upgrade escaped its admission radius worker=%i",builder->GetId());
+            circuit->LOG("[LocalMexUpgrade] worker=%i target=%i distance=%.0f",builder->GetId(),candidate.second,std::sqrt(candidate.first));
+            return task;
+        }
+    }
+    return nullptr;
 }
 
 IBuilderTask* CEconomyManager::EnqueueMexUpgrade(CCircuitUnit* builder, CCircuitUnit* target)

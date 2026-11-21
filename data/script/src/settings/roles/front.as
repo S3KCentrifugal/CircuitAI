@@ -4,6 +4,10 @@
 namespace Global {
 namespace RoleSettings {
 namespace Front {
+            // Economy T2 constructors upgrade nearby owned mexes before geo,
+            // factory support or generic work. Zero disables this priority.
+            float LocalMexUpgradeRadius = 1200.f;
+            float FactoryFacingAdvance = 1024.f;
             bool FactoryLayoutsEnabled = true;
             int FactorySupportRows = 4; // reserved growth, not an instruction to build all turrets
             // D-486: fill mode. While metal floats (10 s minimum income at least

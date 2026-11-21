@@ -573,6 +573,7 @@ namespace Tech {
             int LayoutBoxMaxExtra = 4;               // D-072: boxes grown behind the first when it is full (each with its own turret rows)
             int LayoutBoxShelfCells = 12;            // building depth between turret rows: 192 elmos, inside a turret's 400 reach
             int LayoutBoxNanoRows = 4;               // D-081: four turret rows per cluster (a MapConfig may override)
+            bool LayoutProtectSupportRows = true;   // Keep utility/economy packing out of holes inside nano blocks.
             bool LayoutTurretBlock = true;           // D-081: the rows touch (a solid block filled across every row), the shelf for other structures behind it; off = a shelf between rows
             int LayoutBoxMinRows = 3;                // D-081: a cluster with fewer rows than this is not planned (INV-012)
             int LayoutForwardGapCells = 8;           // D-081: clear cells between the main cluster's front and the forward cluster

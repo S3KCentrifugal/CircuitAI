@@ -1,0 +1,36 @@
+{
+  "stop_minute": 3,
+  "expect": [
+    {
+      "key": "real building frame",
+      "pattern": "placement_frame unit=armshltx",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "connected route",
+      "pattern": "\\[FactoryCorridor\\] def=armshltx",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "allied exclusion",
+      "pattern": "ally respects gantry corridor",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "largest T3 traversal",
+      "pattern": "gantry_t3_arrived",
+      "scope": "any",
+      "by_minute": 3
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[INVARIANT\\]|\\[RangedArena\\].*ERROR|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

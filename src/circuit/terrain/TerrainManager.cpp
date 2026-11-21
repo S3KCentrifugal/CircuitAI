@@ -4325,8 +4325,19 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandida
 	// planned slot counts as PLANNED_SLOT_PENALTY elmos further than it is.
 	constexpr float PLANNED_SLOT_PENALTY = 256.f;
 	std::vector<std::pair<AIFloat3, bool>> nanos;  // slot position, served (consumed)
+	// Each zone is a separate block: do not bridge the space between campuses.
+	// On packing asks only, O(N log Z) for N support slots in Z zones, then
+	// O(Z) per candidate. Derive from live slots so loss/load/group release need
+	// no additional cache lifetime. Consumed slots still define the formation.
+	layout_rank::SupportInteriors supportInteriors;
 	float reach = maxReach;
     auto addNano = [&](const SReservation& r) {
+		if (protectSupportRows && r.def != cdef) {
+			int2 a, b;
+			if (ReservationCells(r.def, r.pos, r.facing, a, b)) {
+				supportInteriors.Include(r.zone, {a.x, a.y, b.x, b.y});
+			}
+		}
 		nanos.emplace_back(r.pos, r.consumed);
 		if ((maxReach <= 0.f) && (r.def != nullptr)) {
             // Mixed land/naval support groups use the conservative shared reach.
@@ -4421,6 +4432,8 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandida
 					continue;
 				}
 				nearSq = layout_rank::TurretDistanceSq(builtSq, plannedSq, PLANNED_SLOT_PENALTY);  // D-083 via D-094
+				const layout_rank::CellRect footprint{cx, cz, cx + dx, cz + dz};
+				if (supportInteriors.OverlapsInterior(footprint)) continue;
 				if (!IsSlotFree(int2(cx, cz), int2(cx + dx, cz + dz), zone, -1)) {
 					continue;
 				}
@@ -5012,6 +5025,22 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 		}
 		const int id = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
 		if (id >= 0) {
+			if (protectSupportRows) {
+				// Audit the admitted, snapped footprint against live group slots.
+				// Once per successful placement, not for every candidate/callback.
+				layout_rank::SupportInteriors interiors;
+				const auto members=groupSlots.find(nanoGroup);
+				if (members!=groupSlots.end()) for (int slot : members->second) {
+					const auto& support=reservations.at(slot);
+					int2 a,b;
+					if (support.def!=cdef && ReservationCells(support.def,support.pos,support.facing,a,b))
+						interiors.Include(support.zone,{a.x,a.y,b.x,b.y});
+				}
+				int2 a,b;
+				if (ReservationCells(cdef,reservations.at(id).pos,facing,a,b)
+					&& interiors.OverlapsInterior({a.x,a.y,b.x,b.y}))
+					circuit->LOG("[INVARIANT] INV-271 utility packing interrupted a support block slot=%i",id);
+			}
 			circuit->LOG("RESERVE: packed %s at (%.0f, %.0f) facing %i in zone %i, %.0f from a turret (id %i, group %i, %i candidates)",
 					cdef->GetDef()->GetName(), pos.x, pos.z, facing, zone, std::sqrt(c.nanoSq), id, group, int(candidates.size()));
 			return id;

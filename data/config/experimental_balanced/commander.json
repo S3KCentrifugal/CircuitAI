@@ -62,6 +62,10 @@
         "commander_group_radius": 600,
         "commander_group_maintenance": 1,
         "commander_group_line_review_seconds": 5,
+        // D-522: let accepted projects finish, then catch up to a held front.
+        "commander_group_rebase_gap": 600,
+        "commander_group_rebase_behind": 300,
+        "commander_group_rebase_seconds": 10,
         "commander_group_project_hold_seconds": 30,
         // D-475: the tactical queue. With two T2 constructors in the group, more
         // than tactical_metal metal stored and energy above tactical_energy of
@@ -195,6 +199,8 @@
 		"advance_roles": "FRONT,TACTICAL",
 		"front_repair_combat": 1,
 		"front_solar_income": 400, "front_solar_storage": 0.2, "front_solar_radius": 300,
+		// Hard ceiling, including stalls; an already started solar still finishes.
+		"front_solar_max_income": 1000,
 		// D-490 (owner): the commander finishes its own construction (never swapped for
 		// another build task), and breaks off assisting another builder for energy or a
 		// mex while the bank is under this share of storage or energy stalls.

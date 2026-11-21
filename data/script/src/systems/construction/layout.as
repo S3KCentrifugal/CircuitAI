@@ -370,6 +370,7 @@ namespace Layout {
 
     bool Enable(bool on)
     {
+        aiTerrainMgr.SetProtectSupportRows(on && Global::RoleSettings::Tech::LayoutProtectSupportRows);
         const bool enabled = aiTerrainMgr.SetLayoutEnabled(on);
         GenericHelpers::LogUtil("[Layout] " + (enabled ? "on" : "off") + " for this AI"
             + (on && !enabled ? " (JSON gate is closed)" : ""), 1);

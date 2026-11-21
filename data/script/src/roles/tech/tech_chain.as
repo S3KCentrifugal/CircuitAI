@@ -708,12 +708,19 @@ namespace TechChain
         }
     }
 
+    int EnergyStanding(CCircuitDef@ d)
+    {
+        if (d is null) return 0;
+        const float output = d.GetName() == DefFor("wind") ? WindExpected() : aiEconomyMgr.GetEnergyMake(d);
+        return TechEconomyMath::EnergyEquivalentCount(d.count - aiBuilderMgr.GetUnfinishedCount(d),
+            LocalGeothermal::Output(), output);
+    }
+
     int Standing(const Step@ s, CCircuitDef@ d)
     {
         int have = d.count - aiBuilderMgr.GetUnfinishedCount(d);
         if (s.key == "wind" || s.key == "solar" || s.key == "advsolar") {
-            const float output = s.key == "wind" ? WindExpected() : aiEconomyMgr.GetEnergyMake(d);
-            if (output > 0.0f) have += int(LocalGeothermal::Output() / output);
+            have = EnergyStanding(d);
         }
         if (s.key == "mex") {
             CCircuitDef@ m = ai.GetCircuitDef(DefFor("moho"));
@@ -754,8 +761,11 @@ namespace TechChain
             // T2 workers skip T1 energy steps; enforce the completed production
             // buffer at admission too, rather than counting planned generators.
             CCircuitDef@ buffer = ai.GetCircuitDef(nukeEnergyDef);
-            if (buffer is null || buffer.count - aiBuilderMgr.GetUnfinishedCount(buffer) < nukeSiloEnergyCount) {
-                ProjectBlocked("energy-buffer",d,buffer is null ? 0 : buffer.count-aiBuilderMgr.GetUnfinishedCount(buffer),nukeSiloEnergyCount);
+            // D-523: the chain already credits completed local geothermal.
+            // Counting turbines alone here deadlocked Hera at 21/24 forever.
+            const int energyStanding = EnergyStanding(buffer);
+            if (buffer is null || energyStanding < nukeSiloEnergyCount) {
+                ProjectBlocked("energy-buffer",d,energyStanding,nukeSiloEnergyCount);
                 return null;
             }
         }
