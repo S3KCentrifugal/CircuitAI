@@ -83,6 +83,19 @@ void CFactoryCorridors::SetPolicy(bool enabledIn, bool ownLaneIn)
 	}
 }
 
+void CFactoryCorridors::SetRequiredDef(int def, float laneFraction)
+{
+	const int next = terrain.layoutConfigured ? def : -1;
+	const float fraction = std::isfinite(laneFraction) ? std::clamp(laneFraction, 0.f, 1.f) : 0.5f;
+	if (next == requiredDef && fraction == requiredLaneFraction) return;
+	const int previous = requiredDef;
+	requiredDef = next;
+	requiredLaneFraction = fraction;
+	for (auto& [id, route] : routes) if (route.def == previous || route.def == requiredDef) Invalidate(route);
+	SaveOptions();
+	QueueRefresh();
+}
+
 void CFactoryCorridors::SetExemptDef(int def)
 {
 	// Once a non-T1 factory stands the T1 lab is kept, so it is routed too.
@@ -332,7 +345,8 @@ bool CFactoryCorridors::Ensure(CCircuitDef* def, const AIFloat3& position, int f
 bool CFactoryCorridors::EnsureImpl(CCircuitDef* def, const AIFloat3& position, int facing, bool planning, bool background)
 {
 	CCircuitAI* circuit = terrain.circuit;
-	if (!enabled || !def || def->IsMobile() || def->GetId() == exemptDef
+	const bool required = def && def->GetId() == requiredDef;
+	if ((!enabled && !required) || !def || def->IsMobile() || (!required && def->GetId() == exemptDef)
 		|| !circuit->GetFactoryManager()->GetFactoryDef(def)) return true;
 	const auto& facts = terrain.FactoryMovementFacts(def);
 	if (facts.empty()) return true;  // aircraft-only and ship-only factories keep their exits
@@ -358,6 +372,7 @@ bool CFactoryCorridors::EnsureImpl(CCircuitDef* def, const AIFloat3& position, i
 	if (failure != failed.end() && failure->retry > frame) return false;
 	if (!HasLane()) {
 		if (planning) return true;  // pending layout is allowed, actual construction waits
+		if (required) return false; // a required factory must never build unrouted
 		// C1: no lane at all after the wait: build unrouted rather than hold
 		// the factory. QueueRefresh adds a route once a lane is published.
 		const int wait = int(options.laneWaitSeconds * FRAMES_PER_SEC);
@@ -408,12 +423,21 @@ bool CFactoryCorridors::EnsureImpl(CCircuitDef* def, const AIFloat3& position, i
 	// connection goals: a base route never travels down the front.
 	for (const auto& [laneTeam, points] : lanes) {
 		if (ownLane && laneTeam != team) continue;
+		float goalStart = options.goalStart, goalEnd = options.goalEnd;
+		if (required) {
+			float total = 0.f;
+			for (std::size_t i=1; i<points.size(); ++i) total += std::sqrt(points[i].SqDistance2D(points[i-1]));
+			// The whole admitted route has this factory's maximum product width,
+			// including the segment beyond the narrower FRONT home connector.
+			goalStart = total * requiredLaneFraction;
+			goalEnd = std::min(total, goalStart + kGoalSampleElmos);
+		}
 		float walked = 0.f;
-		for (std::size_t i = 1; i < points.size() && walked < options.goalEnd; ++i) {
+		for (std::size_t i = 1; i < points.size() && walked < goalEnd; ++i) {
 			const auto delta = points[i] - points[i - 1];
 			const float length = std::sqrt(delta.SqLength2D());
-			const float usable = std::min(length, options.goalEnd - walked);
-			if (length > 0.f) for (float t = std::max(0.f, options.goalStart - walked); t <= usable; t += kGoalSampleElmos) {
+			const float usable = std::min(length, goalEnd - walked);
+			if (length > 0.f) for (float t = std::max(0.f, goalStart - walked); t <= usable; t += kGoalSampleElmos) {
 				const auto p = points[i - 1] + delta * (t / length);
 				const int x = (int(p.x / kCellElmos) - x0) / kRouteStep, z = (int(p.z / kCellElmos) - z0) / kRouteStep;
 				if (p.x < x0 * kCellElmos || p.z < z0 * kCellElmos || x < 0 || z < 0 || x >= gw || z >= gh) continue;
@@ -478,6 +502,25 @@ bool CFactoryCorridors::EnsureImpl(CCircuitDef* def, const AIFloat3& position, i
 
 void CFactoryCorridors::ObserveFactory(int unitId, CCircuitDef* def, const AIFloat3& pos, int facing, bool isT1)
 {
+	// Audit this AI's construction, not a supplied, transferred or reloaded
+	// factory whose placement it did not choose. Lifecycle-only O(queued factories).
+	const auto& pending=terrain.circuit->GetBuilderManager()->GetTasks(IBuilderTask::BuildType::FACTORY);
+	const bool ownPlacement=std::any_of(pending.begin(),pending.end(),[&](const auto* task) {
+		return !task->IsDead() && task->GetBuildDef()==def && SameSite(task->GetBuildPos(),pos);
+	});
+	if (ownPlacement && terrain.factoryFacingAdvance>0.f) {
+		const auto goal=terrain.GetFactoryFacingGoalAt(pos);
+		const float dx=goal.x-pos.x, dz=goal.z-pos.z;
+		const float dot=facing==0?dz:(facing==1?dx:(facing==2?-dz:-dx));
+		if (goal.x>=0.f && dot < -0.05f*std::sqrt(dx*dx+dz*dz))
+			terrain.circuit->LOG("[INVARIANT] INV-272 FRONT factory faces away from its forward lane unit=%i",unitId);
+	}
+	if (ownPlacement && def->GetId()==requiredDef) {
+		bool connected=false;
+		for (const auto& [id, route] : routes)
+			if (route.def==requiredDef && route.lane>=0 && !route.rectangles.empty() && SameSite(route.pos,pos)) { connected=true; break; }
+		if (!connected) terrain.circuit->LOG("[INVARIANT] INV-273 required factory has no protected front corridor unit=%i",unitId);
+	}
 	factories[unitId] = {def->GetId(), facing, pos};
 	if (!isT1) {
 		exemptDef = -1;
@@ -533,6 +576,8 @@ void CFactoryCorridors::SaveOptions()
 	ints[Key("enabled")] = enabled;
 	ints[Key("own")] = ownLane;
 	ints[Key("exempt")] = exemptDef;
+	ints[Key("required")] = requiredDef;
+	ints[Key("requiredFractionMs")] = int(requiredLaneFraction * kMillis);
 	ints[Key("enabledFrame")] = enabledFrame;
 }
 
@@ -616,6 +661,8 @@ void CFactoryCorridors::Load()
 	loaded.laneWaitSeconds = float(terrain.GetLayoutInt(Key("laneWaitMs"), int(loaded.laneWaitSeconds * kMillis))) / kMillis;
 	// Read every saved policy key before SetOptions, which re-saves them all.
 	enabled = terrain.GetLayoutInt(Key("enabled"), 0) != 0 && terrain.layoutConfigured;
+	requiredDef = terrain.layoutConfigured ? terrain.GetLayoutInt(Key("required"), -1) : -1;
+	requiredLaneFraction = std::clamp(float(terrain.GetLayoutInt(Key("requiredFractionMs"), 500)) / kMillis, 0.f, 1.f);
 	ownLane = terrain.GetLayoutInt(Key("own"), 0) != 0;
 	exemptDef = terrain.GetLayoutInt(Key("promoted"), 0) ? -1 : terrain.GetLayoutInt(Key("exempt"), -1);
 	enabledFrame = terrain.GetLayoutInt(Key("enabledFrame"), enabled ? terrain.circuit->GetLastFrame() : -1);
@@ -694,7 +741,7 @@ void CFactoryCorridors::QueueRefresh()
 	// Release destroys the scheduler before the factory/builder managers.
 	// Do not inspect those managers or reconstruct work during that teardown.
 	CCircuitAI* circuit = terrain.circuit;
-	if (!circuit->GetScheduler() || !enabled || !HasLane()) return;
+	if (!circuit->GetScheduler() || (!enabled && requiredDef < 0) || !HasLane()) return;
 	// Event-driven O(unconnected routes + factory slots + standing factories).
 	// B2: connected roads need no refresh; capture values, since Ensure may
 	// prune route records while the queue drains.

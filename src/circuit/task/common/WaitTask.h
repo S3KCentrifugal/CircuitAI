@@ -29,6 +29,7 @@ public:
 	// Configure before assignment. Clear the predecessor's queue and use engine
 	// WAIT so an idle mobile cannot generate an automatic chase command.
 	void SetStationary(bool value) { isStationary = value; if (value) isStop = true; }
+	bool IsStationary() const { return isStationary; }
 
 protected:
 	bool isStop;

@@ -3294,6 +3294,7 @@ void CTerrainManager::IndexReservation(int id)
     ++packingRevision; // invalidate exact empty-geometry reuse on mutation
     const auto& r = reservations.at(id);
     groupSlots[r.group].insert(id);
+    if (GetLayoutInt("native.refill." + std::to_string(id), 0)) refilledSlots[r.group].ids.insert(id);
     // Persist in the existing named-int section: no binary layout change.
     // Load reads that section before indexing slots; the index itself is derived.
     if (GetLayoutInt("native.lost." + std::to_string(id), 0) != 0)
@@ -3312,6 +3313,12 @@ void CTerrainManager::EraseReservation(int id)
     auto found = reservations.find(id);
     if (found == reservations.end()) return;
     const auto& r = found->second;
+    layoutInts.erase("native.refill." + std::to_string(id));
+    auto refill = refilledSlots.find(r.group);
+    if (refill != refilledSlots.end()) {
+        refill->second.ids.erase(id);
+        if (refill->second.ids.empty()) refilledSlots.erase(refill);
+    }
     ClearLostReservation(id);
     auto group = groupSlots.find(r.group);
     if (group != groupSlots.end()) {
@@ -3418,9 +3425,28 @@ int CTerrainManager::ReserveCoastalSupport(CCircuitUnit* builder, const CCircuit
     return -1;
 }
 
+int CTerrainManager::NextRefilledSupportSlot(CCircuitUnit* builder, const CCircuitDef* def, int group, int budget)
+{
+    if (!builder || !def || !builder->GetCircuitDef()->CanBuild(def) || group <= 0) return -1;
+    auto refill = refilledSlots.find(group);
+    if (refill != refilledSlots.end()) {
+        auto& bucket = refill->second;
+        const int id = reservation_candidates::Next(bucket.ids, bucket.after, std::clamp(budget,1,32), [&](int candidate) {
+            const auto& r = reservations.at(candidate);
+            return r.def == def && !r.consumed && !r.claimed && r.serveFails < kDeadSlotFails
+                && IsReservationBuildable(candidate)
+                && CanReachAtSafe(builder,r.pos,builder->GetCircuitDef()->GetBuildDistance());
+        });
+        if (id >= 0) return id;
+    }
+    return -1;
+}
+
 int CTerrainManager::NextSupportSlot(CCircuitUnit* builder, const CCircuitDef* def, int group, const AIFloat3& seed, int budget)
 {
     if (!builder || !def || !builder->GetCircuitDef()->CanBuild(def) || group <= 0) return -1;
+    const int refill = NextRefilledSupportSlot(builder,def,group,budget);
+    if (refill >= 0) return refill;
     const int preferred = NextSlotConnected(group,seed);
     const auto it = reservations.find(preferred);
     if (it != reservations.end() && it->second.def == def && IsReservationBuildable(preferred)
@@ -3591,6 +3617,64 @@ void CTerrainManager::SetLayoutPriority(int priority)
     priority = std::clamp(priority, 0, 2);
     layoutInts["native.priority"] = priority;
     circuit->GetAllyTeam()->GetLayoutReservations().SetPriority(circuit->GetTeamId(), priority);
+}
+
+int CTerrainManager::RestoreSpineSupport(const std::string& name, const CCircuitDef* definition, int budget, int retryFrames)
+{
+    if (!layoutEnabled || !definition || budget <= 0 || retryFrames <= 0) return 0;
+    const int zone = GetLayoutInt(name + ".zone", 0), group = GetLayoutInt(name + ".support", 0);
+    if (zones.find(zone) == zones.end() || group <= 0) return 0;
+    const int frame = circuit->GetLastFrame();
+    const int opening = GetReservationState(GetLayoutInt(name + ".opening_slot", -1));
+    const std::string key = name + ".refill";
+    // Cheap asks read scalars only. Opening removal wakes the bounded survey
+    // immediately; other temporary blockers are retried at the script cadence.
+    const bool changed = opening != GetLayoutInt(key + ".opening", -2);
+    if (!changed && frame < GetLayoutInt(key + ".next", 0)) return 0;
+    SetLayoutInt(key + ".opening", opening);
+    SetLayoutInt(key + ".next", frame + retryFrames);
+    auto* nano = const_cast<CCircuitDef*>(definition);
+    const int facing = GetLayoutInt(name + ".facing", -1);
+    const auto grid = economy_spine::SupportGrid({GetLayoutInt(name + ".x", -8) / 8,
+        GetLayoutInt(name + ".z", -8) / 8}, facing,
+        {nano->GetDef()->GetXSize()/2,nano->GetDef()->GetZSize()/2},
+        GetLayoutInt(name + ".columns", 0),GetLayoutInt(name + ".rows", 0));
+    if (grid.empty()) return 0;
+    // O(N log N + G log N) bookkeeping, N existing group slots, G<=192.
+    // At most B<=32 missing footprints probe the engine per retry. Only when
+    // a hole exists, one existing exit snapshot scans R reservations/U owned
+    // units. Reuse it for the batch. Named grid/cursor/markers survive load.
+    std::set<std::pair<int,int>> occupied;
+    const auto members = groupSlots.find(group);
+    if (members != groupSlots.end()) for (int id : members->second) {
+        const auto& r = reservations.at(id);
+        if (r.def == nano) occupied.emplace(int(std::lround(r.pos.x)),int(std::lround(r.pos.z)));
+    }
+    std::vector<layout_rank::CellRect> exits;
+    bool exitsRead = false;
+    int cursor = std::max(0,GetLayoutInt(key + ".cursor", 0)) % int(grid.size());
+    int restored = 0, probes = 0;
+    const auto& bounds = zones.at(zone);
+    for (size_t visited = 0; visited < grid.size() && probes < std::min(budget,32); ++visited) {
+        const auto& slot = grid[cursor]; cursor = (cursor + 1) % int(grid.size());
+        AIFloat3 pos(slot.centre.x2*8.f,0.f,slot.centre.z2*8.f);
+        pos = Pos2BuildPos(nano,pos,facing);
+        if (occupied.count({int(std::lround(pos.x)),int(std::lround(pos.z))})) continue;
+        ++probes;
+        if (!exitsRead) { exits = FactoryExitLanes(); exitsRead = true; }
+        int2 a,b;
+        if (!ReservationCells(nano,pos,facing,a,b) || a.x<bounds.c1.x || a.y<bounds.c1.y
+            || b.x>bounds.c2.x || b.y>bounds.c2.y || !IsSlotFree(a,b,zone,-1)
+            || layout_rank::OverlapsAny({a.x,a.y,b.x,b.y},exits) || !IsEngineBuildable(nano,pos,facing)) continue;
+        const int id = ReserveBuildingEx(nano,pos,facing,0,group,false,true,false,zone,true,true);
+        if (id < 0) continue;
+        SetLayoutInt("native.refill." + std::to_string(id),1);
+        refilledSlots[group].ids.insert(id);
+        ++restored;
+    }
+    SetLayoutInt(key + ".cursor",cursor);
+    if (restored) circuit->LOG("[Layout][Spine] restored=%i group=%i deferred support slots",restored,group);
+    return restored;
 }
 
 bool CTerrainManager::PlanEconomySpine(const std::string& name, CCircuitDef* nano,
@@ -4325,8 +4409,19 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandida
 	// planned slot counts as PLANNED_SLOT_PENALTY elmos further than it is.
 	constexpr float PLANNED_SLOT_PENALTY = 256.f;
 	std::vector<std::pair<AIFloat3, bool>> nanos;  // slot position, served (consumed)
+	// Each zone is a separate block: do not bridge the space between campuses.
+	// On packing asks only, O(N log Z) for N support slots in Z zones, then
+	// O(Z) per candidate. Derive from live slots so loss/load/group release need
+	// no additional cache lifetime. Consumed slots still define the formation.
+	layout_rank::SupportInteriors supportInteriors;
 	float reach = maxReach;
     auto addNano = [&](const SReservation& r) {
+		if (protectSupportRows && r.def != cdef) {
+			int2 a, b;
+			if (ReservationCells(r.def, r.pos, r.facing, a, b)) {
+				supportInteriors.Include(r.zone, {a.x, a.y, b.x, b.y});
+			}
+		}
 		nanos.emplace_back(r.pos, r.consumed);
 		if ((maxReach <= 0.f) && (r.def != nullptr)) {
             // Mixed land/naval support groups use the conservative shared reach.
@@ -4421,6 +4516,8 @@ std::vector<CTerrainManager::SPackCandidate> CTerrainManager::ComputePackCandida
 					continue;
 				}
 				nearSq = layout_rank::TurretDistanceSq(builtSq, plannedSq, PLANNED_SLOT_PENALTY);  // D-083 via D-094
+				const layout_rank::CellRect footprint{cx, cz, cx + dx, cz + dz};
+				if (supportInteriors.OverlapsInterior(footprint)) continue;
 				if (!IsSlotFree(int2(cx, cz), int2(cx + dx, cz + dz), zone, -1)) {
 					continue;
 				}
@@ -5012,6 +5109,22 @@ int CTerrainManager::PackNearGroup(int zone, CCircuitDef* cdef, int nanoGroup, i
 		}
 		const int id = ReserveBuildingEx(cdef, pos, facing, 0, group, true, true, false, zone, true);
 		if (id >= 0) {
+			if (protectSupportRows) {
+				// Audit the admitted, snapped footprint against live group slots.
+				// Once per successful placement, not for every candidate/callback.
+				layout_rank::SupportInteriors interiors;
+				const auto members=groupSlots.find(nanoGroup);
+				if (members!=groupSlots.end()) for (int slot : members->second) {
+					const auto& support=reservations.at(slot);
+					int2 a,b;
+					if (support.def!=cdef && ReservationCells(support.def,support.pos,support.facing,a,b))
+						interiors.Include(support.zone,{a.x,a.y,b.x,b.y});
+				}
+				int2 a,b;
+				if (ReservationCells(cdef,reservations.at(id).pos,facing,a,b)
+					&& interiors.OverlapsInterior({a.x,a.y,b.x,b.y}))
+					circuit->LOG("[INVARIANT] INV-271 utility packing interrupted a support block slot=%i",id);
+			}
 			circuit->LOG("RESERVE: packed %s at (%.0f, %.0f) facing %i in zone %i, %.0f from a turret (id %i, group %i, %i candidates)",
 					cdef->GetDef()->GetName(), pos.x, pos.z, facing, zone, std::sqrt(c.nanoSq), id, group, int(candidates.size()));
 			return id;
@@ -5287,6 +5400,7 @@ void CTerrainManager::LoadLayout(std::istream& is)
     groupSlots.clear();
     activeLayoutZones.clear();
     lostSlots.clear();
+    refilledSlots.clear();
 	localReservations.Clear();
 	uint32_t groupNameCount = 0;
 	utils::binary_read(is, groupNameCount);

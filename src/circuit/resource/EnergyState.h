@@ -3,7 +3,7 @@
 // assist break and emergency solar, TECH's surplus seats). Each caller keeps
 // its own threshold; the computation is shared so they cannot drift apart.
 // Engine free; CEconomyManager::GetEnergyState fills it. Tests:
-// tests/energy_state_test.cpp.
+// tests/commander_task_origin_test.cpp.
 
 namespace circuit::economy {
 
@@ -25,6 +25,16 @@ inline float BankShare(const EnergyState& s)
 inline bool EnergyLow(const EnergyState& s, float share)
 {
 	return s.stalling || (share > 0.f && s.storage > 0.f && s.current < s.storage * share);
+}
+
+// New emergency solar offers only. Existing construction keeps its owner.
+// A positive hard ceiling takes precedence over the stall exception.
+inline bool EmergencySolarAllowed(const EnergyState& s, float triggerIncome,
+        float hardIncome, bool allowStall, float storageShare)
+{
+	return triggerIncome > 0.f && (hardIncome <= 0.f || s.income < hardIncome)
+		&& (s.income < triggerIncome || (allowStall && s.stalling))
+		&& s.storage > 0.f && EnergyLow(s, storageShare);
 }
 
 } // namespace circuit::economy

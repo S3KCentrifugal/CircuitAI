@@ -1,0 +1,18 @@
+{
+  "stop_minute": 2,
+  "expect": [
+    {
+      "key": "real building frame",
+      "pattern": "placement_frame unit=armavp",
+      "scope": "any",
+      "by_minute": 2
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[INVARIANT\\]|\\[RangedArena\\].*ERROR|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

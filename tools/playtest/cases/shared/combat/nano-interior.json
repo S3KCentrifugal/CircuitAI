@@ -1,0 +1,70 @@
+{
+  "name": "nano-interior",
+  "unit": "armcom",
+  "side": "armada",
+  "role": "FRONT",
+  "description": "Pinpointer placement preserves a four-row support band with deliberately missing interior slots.",
+  "commander_overrides": {
+    "front_distance": 0,
+    "front_push_ahead": 600,
+    "front_push_screen": 0,
+    "front_persistent": 1
+  },
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      2000
+    ],
+    [
+      6000,
+      2000
+    ],
+    [
+      6000,
+      5000
+    ]
+  ],
+  "camera": [
+    2000,
+    3504,
+    1800
+  ],
+  "photos": [
+    90
+  ],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "hold_friendly": true,
+  "groups": [
+    {
+      "unit": "armack",
+      "team": 0,
+      "count": 1,
+      "position": [
+        2200,
+        3504
+      ],
+      "after_seconds": 12
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "nano-interior",
+  "commander_front_work": false,
+  "commander_initial": true,
+  "start_metal": 100000,
+  "coverage_probe": false,
+  "start_energy": 1000000,
+  "repair_observation": false,
+  "storage_scenario": "nano-interior",
+  "placement_fixture": "nano-interior",
+  "ally_spots": "1,2",
+  "enemy_team": 2
+}

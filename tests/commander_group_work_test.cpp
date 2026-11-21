@@ -8,6 +8,21 @@
 #include <array>
 using namespace circuit::commander;
 int main() {
+    FrontRebase rebase;
+    assert(!FrontRebaseAhead(1000,-1,1600,600,300)); // no fresh held evidence
+    assert(!FrontRebaseAhead(1000,1899,1600,600,300));
+    assert(!FrontRebaseAhead(1000,2500,1299,600,300)); // safety holds here
+    assert(FrontRebaseAhead(1000,1900,1300,600,300));
+    assert(!FrontRebaseAhead(1000,2500,1600,0,300)); // policy disabled
+    assert(!rebase.Observe(true,30,300));
+    assert(!rebase.Observe(true,329,300));
+    assert(rebase.Observe(true,330,300));
+    assert(!rebase.Observe(false,331,300)); // combat/stale/retreat resets
+    assert(!rebase.Observe(true,400,300));
+    assert(!rebase.Observe(true,699,300));
+    assert(rebase.Observe(true,700,300));
+    rebase={}; // lane replacement / different commander
+    assert(!rebase.Observe(true,701,300));
     assert(!ShouldStartDeployment(250.f*250.f,250));
     assert(ShouldStartDeployment(251.f*251.f,250));
     assert(!ShouldStartDeployment(std::numeric_limits<float>::infinity(),250));

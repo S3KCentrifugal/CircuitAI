@@ -211,6 +211,7 @@ def main():
     ap.add_argument('--units', default=','.join(u for u, _ in T3))
     ap.add_argument('--lines', default='l')
     ap.add_argument('--speed', type=int, default=20)
+    ap.add_argument('--engine', default='recoil_2026.07.04')
     ap.add_argument('--mode',choices=['fast','visual','performance'],default='fast')
     ap.add_argument('--minutes', type=int, default=5)
     ap.add_argument('--headless', action='store_true')
@@ -245,7 +246,7 @@ def main():
                 case['modoptions'] = {'scavunitsforplayers': 1}  # load Scavenger unit defs
             (CASES / f'{name}.json').write_text(json.dumps(case, indent=2) + '\n', newline='\n')
             command = [sys.executable, str(HERE / 'ranged_arena.py'), '--case', name, '--dll', args.dll,
-                       '--data', args.data, '--minutes', str(args.minutes), '--speed', str(args.speed),'--mode',args.mode]
+                       '--data', args.data, '--minutes', str(args.minutes), '--speed', str(args.speed),'--mode',args.mode,'--engine',args.engine]
             if args.headless:
                 command.append('--headless')
             diagnostic=out.parent/(out.stem+'-'+name+'-runner.txt')

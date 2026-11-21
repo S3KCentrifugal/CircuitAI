@@ -120,6 +120,11 @@ namespace LayoutHelpers {
     {
         const AiRole role = Global::AISettings::Role;
         aiTerrainMgr.SetFactoryCorridorPolicy(CorridorsForRole(role), role == AiRole::FRONT);
+        CCircuitDef@ requiredGantry = role == AiRole::TECH
+            && aiSetupMgr.ConfigBool("factory_corridors/tech_gantry", true)
+            ? ai.GetCircuitDef(UnitHelpers::GetLandGantryForSide(Global::AISettings::Side)) : null;
+        aiTerrainMgr.SetFactoryCorridorRequired(requiredGantry is null ? -1 : requiredGantry.id,
+            aiSetupMgr.ConfigFloat("factory_corridors/tech_front_fraction", 0.5f));
         aiTerrainMgr.SetFactoryCorridorExempt(-1);
         aiTerrainMgr.SetFactoryCorridorOptions(
             aiSetupMgr.ConfigInt("factory_corridors/probes", 4),
@@ -147,6 +152,7 @@ namespace LayoutHelpers {
         // (CoverageLanes::Claim); x < 0 leaves the native search unchanged.
         aiTerrainMgr.SetFactoryFacingGoal(legacyPlacement ? AIFloat3(-1.f,0.f,-1.f)
             : Lanes::NearestEnemyStart(Global::Map::StartPos));
+        aiTerrainMgr.SetFactoryFacingAdvance(frontDistrict ? Global::RoleSettings::Front::FactoryFacingAdvance : 0.f);
         if (!tacticalDistrict) aiTerrainMgr.ReleaseUnusedLayout(TacticalLayout::ROOT);
         if (!frontDistrict) FrontLayout::Release();
         aiTerrainMgr.SetLayoutPriority(Global::AISettings::Role == AiRole::TECH ? 2

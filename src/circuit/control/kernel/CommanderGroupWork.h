@@ -3,6 +3,20 @@
 
 namespace circuit::commander {
 enum class ConstructionPhase { URGENT, NANO, SENSORS, DEFENSE };
+// Admission state only, never task ownership. A changed lane/anchor or a lost
+// safe-front observation starts a new stability window (commander_group_work_test).
+struct FrontRebase {
+    int since=-1;
+    bool ready=false;
+    bool Observe(bool ahead,int frame,int stableFrames) {
+        if(!ahead) { since=-1;ready=false;return false; }
+        if(since<0 || frame<since) since=frame;
+        return ready=frame-since>=stableFrames;
+    }
+};
+inline bool FrontRebaseAhead(float own,float held,float safe,float gap,float behind) {
+    return gap>0 && held>=0 && held-behind-own>=gap && safe-own>=gap*.5f;
+}
 // A support anchor is shared controller state, but its radius owns only the
 // enrolled workers. No scan/allocation: membership is supplied by the caller.
 inline bool SupportBoundaryApplies(bool frontDuty, bool hasAnchor, bool member) {

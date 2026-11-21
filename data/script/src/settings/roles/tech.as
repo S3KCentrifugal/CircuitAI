@@ -573,6 +573,9 @@ namespace Tech {
             int LayoutBoxMaxExtra = 4;               // D-072: boxes grown behind the first when it is full (each with its own turret rows)
             int LayoutBoxShelfCells = 12;            // building depth between turret rows: 192 elmos, inside a turret's 400 reach
             int LayoutBoxNanoRows = 4;               // D-081: four turret rows per cluster (a MapConfig may override)
+            bool LayoutProtectSupportRows = true;   // Keep utility/economy packing out of holes inside nano blocks.
+            int LayoutSupportRefillBudget = 8;       // Missing footprints revalidated per retry; zero disables recovery.
+            int LayoutSupportRefillSeconds = 30;     // Slow retry, with immediate wake on opening-lab state changes.
             bool LayoutTurretBlock = true;           // D-081: the rows touch (a solid block filled across every row), the shelf for other structures behind it; off = a shelf between rows
             int LayoutBoxMinRows = 3;                // D-081: a cluster with fewer rows than this is not planned (INV-012)
             int LayoutForwardGapCells = 8;           // D-081: clear cells between the main cluster's front and the forward cluster
@@ -745,6 +748,7 @@ namespace Tech {
 
             // T2 Aircraft Plant thresholds (TECH role)
             // Mirrors AIR role defaults; scoped to TECH so roles don't cross-reference
+            float EconomyNukeAirLabMetalIncome = 80.0f; // first T2 air lab: income OR its full metal cost in storage
             float RequiredMetalIncomeForT2AircraftPlant = 100.0f;   // owner, 2026-11-07 (D-489): was 200
             float RequiredEnergyIncomeForT2AircraftPlant = 2000.0f;
 

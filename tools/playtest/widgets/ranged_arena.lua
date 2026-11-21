@@ -259,6 +259,14 @@ function widget:UnitCreated(id,def,team,builder)
         tracked[id]={team=team,def=def};log("spawn id="..id.." team="..team.." unit="..UnitDefs[def].name.." x="..math.floor(pending.x).." z="..math.floor(pending.z));pending=nil
     elseif builder and (tracked[builder] or (cfg.builders and team==0)) then
         tracked[id]={team=team,def=def,child=true,parent=builder};log("child id="..id.." parent="..builder.." unit="..UnitDefs[def].name)
+        if cfg.placement_fixture and team==0 then
+            local facing=Spring.GetUnitBuildFacing(id)
+            local x,_,z=Spring.GetUnitPosition(id)
+            log("placement_frame unit="..UnitDefs[def].name.." facing="..tostring(facing).." x="..math.floor(x).." z="..math.floor(z))
+            if cfg.placement_fixture=="factory-facing" and UnitDefs[def].name=="armavp" and (facing~=0 or z<3500) then
+                log("ERROR factory faced behind forward site")
+            end
+        end
     end
 end
 function widget:UnitDestroyed(id,def,team,attacker,attackerDef,attackerTeam)
@@ -321,6 +329,17 @@ function widget:UnitFinished(id,def,team)
     end
 end
 function widget:GameFrame(f)
+    if cfg.placement_fixture=="gantry-corridor" and not cfg.gantryTransitSeen and f%30==0 then
+        for id,u in pairs(tracked) do
+            if u.team==0 and UnitDefs[u.def].name=="armthor" then
+                local x,_,z=Spring.GetUnitPosition(id)
+                if x and math.abs(x-4000)<150 and z>=3952 then
+                    cfg.gantryTransitSeen=true
+                    log("gantry_t3_arrived unit="..id)
+                end
+            end
+        end
+    end
     if cfg.expansion_mex_observation and f%90==0 then
         local sx,sz=cfg.starts[1][1],cfg.starts[1][2]
         local done=0
@@ -512,6 +531,22 @@ function widget:GameFrame(f)
         Spring.SelectUnitArray(ids,false);Spring.SendCommands("destroy");Spring.SelectUnitArray({},false)
         log("fixture_units_removed unit="..cfg.remove_unit_name.." count="..#ids)
     end
+    -- Declared fixture: damage a noncombat ally, then let only the held
+    -- commander provide repair. Synced health must be observed before PASS.
+    if cfg.stationary_assist_fixture and not cfg.stationary_assist_fixture.construction and f%3==0 and f>=25*30 then
+        local spec=cfg.stationary_assist_fixture
+        for id,u in pairs(tracked) do
+            if u.team==0 and UnitDefs[u.def].name==spec.target_unit then
+                local hp,maxhp=Spring.GetUnitHealth(id)
+                if not spec.sent then
+                    spec.sent=true
+                    Spring.SendLuaRulesMsg("$dev$:sethealth "..id..":40")
+                elseif not spec.applied and hp and maxhp and hp/maxhp<.5 then
+                    spec.applied=true;log("stationary_assist_damage_applied target="..id)
+                end
+            end
+        end
+    end
     -- Read-only repair evidence: health gain while command 40 holds a fixed
     -- builder position. Fixture only, never enabled by production AI data.
     if cfg.repair_observation and f%3==0 then
@@ -524,10 +559,12 @@ function widget:GameFrame(f)
                 if c and c.id==40 and c.params and #c.params==5 and cfg.repair_observation then
                     local x,_,z=Spring.GetUnitPosition(id)
                     local hp=Spring.GetUnitHealth(c.params[1])
+                    local _,_,_,_,progress=Spring.GetUnitHealth(c.params[1])
                     if prior and prior.target==c.params[1] then
                         if (x-prior.x)^2+(z-prior.z)^2>64 then log("ERROR stationary_repair_moved unit="..id) end
                         if hp and hp>prior.hp+20+(f-prior.frame)/3 and not prior.healed then
                             prior.healed=true;log("stationary_repair_healed unit="..id.." target="..prior.target)
+                            if progress and progress<1 then log("stationary_construction_assisted unit="..id.." target="..prior.target) end
                         end
                     elseif hp then cfg.repair_samples[id]={x=x,z=z,hp=hp,frame=f,target=c.params[1]} end
                 else cfg.repair_samples[id]=nil end

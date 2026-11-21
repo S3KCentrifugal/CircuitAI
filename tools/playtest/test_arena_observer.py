@@ -4,6 +4,21 @@ from test_lane_ui_memory import ROOT, LuaRuntime
 
 
 class ArenaObserverTests(unittest.TestCase):
+    def test_factory_facing_requires_forward_orientation_at_forward_site(self):
+        for facing,z,failed in ((0,3912,False),(2,3912,True),(0,2112,True)):
+            with self.subTest(facing=facing,z=z):
+                lua=self.observer()
+                lua.execute('''
+                    cfg.placement_fixture="factory-facing"
+                    UnitDefs[3]={name="armavp"}
+                ''')
+                lua.execute('Spring.GetUnitBuildFacing=function() return '+str(facing)+' end; '
+                            'Spring.GetUnitPosition=function() return 4000,0,'+str(z)+' end; '
+                            'widget:UnitCreated(3,3,0,1)')
+                lines=list(lua.globals().lines.values())
+                self.assertTrue(any('placement_frame unit=armavp' in s for s in lines))
+                self.assertEqual(any('ERROR factory faced' in s for s in lines),failed)
+
     def test_decoy_health_threshold_and_visibility_are_observed(self):
         lua=self.observer()
         lua.execute('''

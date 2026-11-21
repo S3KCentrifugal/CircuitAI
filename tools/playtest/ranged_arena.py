@@ -63,7 +63,7 @@ def prepare(args):
     stage = command + ['stage','--dir',str(directory),'--dll',str(args.dll),'--data',str(args.data),
         '--map',case['map'],'--map-file',str(starts),'--role',role,'--roles','all','--ally-spots',case.get('ally_spots','1'),
         '--side',case.get('side','armada'),
-        '--engine','recoil_2026.07.04','--speed',str(args.speed),'--mode',getattr(args,'mode','fast'),'--minutes',str(args.minutes),
+        '--engine',getattr(args,'engine','recoil_2026.07.04'),'--speed',str(args.speed),'--mode',getattr(args,'mode','fast'),'--minutes',str(args.minutes),
         '--shots','','--width','1280','--height','720','--lean-render','--bonus','0',
         '--ai-option','profile='+args.profile,'--ai-option','random_seed='+str(args.seed),
         '--modoption','deathmode=neverend','--modoption','startenergy='+str(case.get('start_energy',1000000)),
@@ -124,6 +124,33 @@ def prepare(args):
             repair += '\n if (ai.teamId==0 && !u.circuitDef.IsMobile()) return aiBuilderMgr.DefaultMakeTask(u);'
         if name=='builder' and case.get('commander_repair_only'):
             repair+='\n if (ai.teamId==0 && u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)) { aiBuilderMgr.SetCommanderCombatOption("front_ready",1.f); IUnitTask@ repair=aiBuilderMgr.CommanderFrontWork(u,21,null,0.f); if(repair !is null) return repair; return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); } // stationary repair isolation fixture\n'
+        if name=='builder' and case.get('stationary_assist_fixture'):
+            repair+='\n if (ai.teamId==0 && u.circuitDef.IsRoleAny(Unit::Role::COMM.mask)) { aiBuilderMgr.SetCommanderCombatOption("front_ready",1.f); return aiBuilderMgr.CommanderFrontWork(u,15,null,30.f); } // held-owner assist fixture\n'
+            if case['stationary_assist_fixture'].get('construction'):
+                repair+='\n if (ai.teamId==0 && u.circuitDef.GetName()=="armack") { IBuilderTask@ own=cast<IBuilderTask>(u.task); if(own !is null && !own.IsDead()) return own; return aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::ENERGY,Task::Priority::HIGH,ai.GetCircuitDef("armfus"),AIFloat3(4000,0,4136),0.f,true,120*SECOND)); } // real constructor supplies a nanoframe near the edge of commander reach\n'
+        if name=='builder' and case.get('solar_ceiling_fixture'):
+            repair+='\n if(ai.teamId==0 && ai.frame<40*SECOND) return aiBuilderMgr.CommanderFrontWork(u,15,null,1.f); // let supplied high-income stall settle before commander policy\n'
+        if name=='builder' and case.get('placement_fixture')=='nano-refill':
+            repair+='''
+        if(ai.teamId==0 && u.circuitDef.GetName()=="armck" && ai.frame>=65*SECOND) {
+            IBuilderTask@ own=cast<IBuilderTask>(u.task);
+            if(own !is null && !own.IsDead()) return own;
+            CCircuitDef@ nano=ai.GetCircuitDef("armnanotc");
+            aiTerrainMgr.RestoreSpineSupport("fixture.spine",nano,8,30*SECOND);
+            const int group=aiTerrainMgr.GetLayoutInt("fixture.spine.support",0);
+            const int slot=aiTerrainMgr.NextRefilledSupportSlot(u,nano,group,8);
+            AiLog("[RefillFixture] worker slot="+slot+" can_build="+u.circuitDef.CanBuild(nano)+" group="+group);
+            if(slot>=0) {
+                IUnitTask@ job=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::NANO,Task::Priority::HIGH,nano,
+                    aiTerrainMgr.GetReservationPos(slot),0,true,120*SECOND));
+                if(job !is null && AiPinReservation(job,slot)) return job;
+                if(job !is null) aiBuilderMgr.AbortTask(job);
+            }
+        }
+'''
+        if name=='builder' and case.get('placement_fixture'):
+            worker='armacv' if case['placement_fixture']=='factory-facing' else 'armack'
+            repair+='\n if(ai.teamId==0 && u.circuitDef.GetName()=="'+worker+'" && _PlacementTask !is null && !_PlacementTask.IsDead()) return _PlacementTask; // declared placement fixture\n'
         path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
     # KI-785: with every builder and factory frozen no first factory can
     # appear, so D-494's first-factory check (INV-267) cannot judge the arena.
@@ -148,6 +175,14 @@ def prepare(args):
             array<AIFloat3> points={'''+point+'''};
             route.SetTraversal(true,48,false); route.SetRoute(points); return route;
         } // enemy fixture only
+'''
+    if case.get('placement_fixture')=='gantry-corridor':
+        override += '''
+        if(ai.teamId==0 && u.circuitDef.GetName()=="armthor") {
+            CRouteTask@ route=cast<CRouteTask>(aiMilitaryMgr.Enqueue(TaskF::Route()));
+            array<AIFloat3> points={AIFloat3(4000,0,4000)};
+            route.SetTraversal(false,48,false); route.SetRoute(points); return route;
+        } // largest-footprint gantry product physically traverses the protected connector
 '''
     if case.get('hold_friendly'):
         override += '''
@@ -211,6 +246,161 @@ def prepare(args):
             source=source[:start]+'\n if ('+scope+') CommanderCombat::Override("'+key+'",'+repr(float(value))+'f); // per-AI override fixture\n'+source[start:]
         declarations=''
         events=''
+        if case.get('solar_ceiling_fixture'):
+            declarations+='bool _SolarCeilingObserved=false;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=40*SECOND && !_SolarCeilingObserved
+    && aiEconomyMgr.energy.income>=1000.f && aiEconomyMgr.isEnergyStalling) {
+   _SolarCeilingObserved=true; AiLog("[SolarCeilingFixture] high income stall observed");
+ }
+'''
+        if case.get('air_lab_policy_fixture'):
+            declarations+='bool _AirLabPolicyChecked=false;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=20*SECOND && !_AirLabPolicyChecked) {
+   _AirLabPolicyChecked=true;
+   const AiRole savedRole=Global::AISettings::Role;
+   const bool savedHeavy=Global::RoleSettings::Tech::HeavyRushEnabled;
+   const string savedPlan=TechPlan::plan; const int savedPhase=TechPlan::phase;
+   Global::AISettings::Role=AiRole::TECH; Global::RoleSettings::Tech::HeavyRushEnabled=false;
+   array<string> plans={"eco","nuke","spamrush","lrpc","t3rush"};
+   bool ok=true;
+   for(uint k=0;k<plans.length();++k) {
+     TechPlan::plan=plans[k]; TechPlan::phase=0;
+     array<TechChain::Step@>@ steps=TechPlan::NextPhase(plans[k]=="nuke" ? "nuke" : "afus");
+     int ap=-1,aap=-1,funding=-1,early=-1; string sequence="";
+     for(uint i=0;i<steps.length();++i) {
+       sequence+=(i>0 ? "," : "")+steps[i].key;
+       if(steps[i].key=="ap") ap=int(i);
+       if(steps[i].key=="aap") aap=int(i);
+       if(steps[i].key=="airfunding") {funding=int(i);ok=ok && steps[i].target==80;}
+       if(steps[i].key=="earlygantry") early=int(i);
+     }
+     if(k<2) ok=ok && ap>=0 && funding==ap+1 && aap==funding+1;
+     else ok=ok && funding<0 && ap>=0 && aap>ap;
+     if(k==1) ok=ok && steps[steps.length()-1].key=="income" && steps[steps.length()-1].target==200;
+     if(k==4 && TechGantry::EarlyEnabled()) ok=ok && early>ap && aap>early;
+     AiLog("[AirLabPolicy] "+plans[k]+" sequence="+sequence);
+   }
+   const string savedEndgame=Global::RoleSettings::Tech::EndgamePlan;
+   Global::RoleSettings::Tech::EndgamePlan="nuke"; TechPlan::plan="nuke"; TechPlan::phase=0;
+   array<TechChain::Step@>@ beforeSilo=TechPlan::NextPhase("afus");
+   ok=ok && beforeSilo.length()==1 && beforeSilo[0].key=="silo";
+   array<TechChain::Step@>@ afterSilo=TechPlan::NextPhase("nuke");
+   ok=ok && afterSilo.length()==5 && afterSilo[0].key=="ap"
+      && afterSilo[1].key=="airfunding" && afterSilo[2].key=="aap" && afterSilo[3].target==200;
+   Global::RoleSettings::Tech::EndgamePlan=savedEndgame;
+   CCircuitDef@ lab=ai.GetCircuitDef(TechChain::DefFor("aap"));
+   ok=ok && lab !is null && aiEconomyMgr.metal.current>=lab.costM
+       && Economy::GetMinMetalIncomeLast10s()<80 && TechChain::AirLabFunded(80);
+   ok=ok && TechEconomyMath::AirLabFunded(80,0,lab.costM,80,false)
+       && !TechEconomyMath::AirLabFunded(79,lab.costM-1,lab.costM,80,false)
+       && TechEconomyMath::AirLabFunded(0,0,lab.costM,80,true);
+   TechPlan::plan=savedPlan; TechPlan::phase=savedPhase;
+   Global::AISettings::Role=savedRole; Global::RoleSettings::Tech::HeavyRushEnabled=savedHeavy;
+   AiLog(ok ? "[AirLabPolicy] PASS plans=5 bank=pass income=pass committed=pass" : "[RangedArena] ERROR air lab policy");
+ }
+'''
+        if case.get('placement_fixture'):
+            kind=case['placement_fixture']
+            if kind not in ('nano-interior','nano-refill','factory-facing','gantry-corridor'):
+                raise ValueError('Unknown placement fixture')
+            if kind in ('factory-facing','gantry-corridor'):
+                fixture_path=staged/'script/src/systems/construction/front_layout.as'
+                fixture_source=fixture_path.read_text()
+                fixture_start=fixture_source.index('{',fixture_source.index('void Prepare(IUnitTask@ task)'))+1
+                fixture_path.write_text(fixture_source[:fixture_start]+'\n if(ai.teamId==0) return; // supplied far-site test of native ordinary placement\n'+fixture_source[fixture_start:])
+            declarations+='bool _PlacementReady=false; IUnitTask@ _PlacementTask;\n'
+            events+='\n if(ai.teamId==0 && ai.frame>=20*SECOND && !_PlacementReady) { _PlacementReady=true; aiTerrainMgr.SetLayoutEnabled(true);\n'
+            if kind=='nano-refill':
+                declarations+='int _RefillOpening=-1; int _RefillGroup=0; bool _RefillReleased=false; bool _RefillComplete=false;\n'
+                events+='''
+ CCircuitDef@ nano=ai.GetCircuitDef("armnanotc"), lab=ai.GetCircuitDef("armlab");
+ aiBuilderMgr.experimentalBuild = true; // TECH retains construction ownership inside reserved cells
+ aiTerrainMgr.SetFactoryCorridorPolicy(false,false); // TECH's ordinary opening-lab policy
+ _RefillOpening=aiTerrainMgr.ReserveBuilding(lab,AIFloat3(2016,0,3824),2,0);
+ const int zone=aiTerrainMgr.ReserveZone(AIFloat3(2000,0,3504),0,512,512,false);
+ _RefillGroup=aiTerrainMgr.LayBand(zone,nano,AIFloat3(1856,0,3504),3,4,6,0,false,true,false,0);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.zone",zone);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.support",_RefillGroup);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.x",2000); aiTerrainMgr.SetLayoutInt("fixture.spine.z",3504);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.facing",3); aiTerrainMgr.SetLayoutInt("fixture.spine.columns",4);
+ aiTerrainMgr.SetLayoutInt("fixture.spine.rows",6); aiTerrainMgr.SetLayoutInt("fixture.spine.opening_slot",_RefillOpening);
+ const int restored=aiTerrainMgr.RestoreSpineSupport("fixture.spine",nano,32,300*SECOND);
+ if(_RefillOpening<0 || aiTerrainMgr.GetGroupCount(_RefillGroup,false)!=12 || restored!=0)
+   AiLog("[RangedArena] ERROR active exit was not preserved slots="+aiTerrainMgr.GetGroupCount(_RefillGroup,false)+" restored="+restored);
+ else AiLog("[RefillFixture] active exit preserved missing=12");
+'''
+            elif kind=='nano-interior':
+                events+='''
+ CCircuitDef@ nano=ai.GetCircuitDef("armnanotc"), utility=ai.GetCircuitDef("armtarg");
+ aiTerrainMgr.SetProtectSupportRows(true);
+ const int zone=aiTerrainMgr.ReserveZone(AIFloat3(2000,0,3504),0,512,512,false);
+ const int group=aiTerrainMgr.LayBand(zone,nano,AIFloat3(2000,0,3600),0,12,4,0,false,true,false,0);
+ for(int i=0;i<6;++i) { const int hole=aiTerrainMgr.NextSlotAny(group,AIFloat3(2000,0,3504)); if(hole>=0) aiTerrainMgr.ReleaseReservation(hole); }
+ const int slot=aiTerrainMgr.PackNearGroup(zone,utility,group,0,AIFloat3(2000,0,3504),0,0,0);
+ if(slot<0) AiLog("[RangedArena] ERROR utility had no perimeter placement");
+ else {
+   const AIFloat3 p=aiTerrainMgr.GetReservationPos(slot);
+   if(p.x>1688 && p.x<2312 && p.z>3384 && p.z<3624) AiLog("[RangedArena] ERROR utility interrupted nano interior");
+   else AiLog("[PlacementFixture] nano interior protected");
+   @_PlacementTask=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::STORE,Task::Priority::HIGH,utility,p,0,true,180*SECOND));
+   if(_PlacementTask is null || !AiPinReservation(_PlacementTask,slot)) AiLog("[RangedArena] ERROR utility pin failed");
+ }
+'''
+            else:
+                events+='''
+ CoverageLanes::Load(); CoverageLanes::enabled=false; CoverageLanes::Clear();
+ array<AIFloat3> lane={AIFloat3(4000,0,2000),AIFloat3(4000,0,6000)};
+ aiBattle.SetFrontLane(lane,384);
+'''
+                if kind=='factory-facing':
+                    events+='''
+ aiTerrainMgr.SetFactoryFacingGoal(AIFloat3(4000,0,3024));
+ aiTerrainMgr.SetFactoryFacingAdvance(1024);
+ @_PlacementTask=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::FACTORY,Task::Priority::HIGH,ai.GetCircuitDef("armavp"),AIFloat3(4000,0,4000),256,true,180*SECOND));
+ AiPreferFactoryFacing(_PlacementTask,0);
+'''
+                else:
+                    events+='''
+ CCircuitDef@ gantry=ai.GetCircuitDef("armshltx");
+ aiTerrainMgr.SetFactoryCorridorPolicy(false,false);
+ aiTerrainMgr.SetFactoryCorridorRequired(gantry.id,0.5f);
+ aiTerrainMgr.SetFactoryLane(1,lane);
+ const int berth=aiTerrainMgr.ReserveBuilding(gantry,AIFloat3(4000,0,3008),0,0);
+ @_PlacementTask=aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::FACTORY,Task::Priority::HIGH,gantry,AIFloat3(4000,0,3000),256,true,180*SECOND));
+ if(berth<0 || _PlacementTask is null || !AiPinReservation(_PlacementTask,berth)) AiLog("[RangedArena] ERROR gantry berth failed");
+'''
+            events+='\n } // declared placement fixture\n'
+            if kind=='nano-refill':
+                events+='''
+ if(ai.teamId==0 && _PlacementReady && ai.frame>=60*SECOND && !_RefillReleased) {
+   _RefillReleased=true; aiTerrainMgr.ReleaseReservation(_RefillOpening);
+   const int restored=aiTerrainMgr.RestoreSpineSupport("fixture.spine",ai.GetCircuitDef("armnanotc"),8,30*SECOND);
+   if(restored!=8) AiLog("[RangedArena] ERROR opening removal did not wake bounded refill");
+   else AiLog("[RefillFixture] opening removed restored=8");
+ }
+ if(ai.teamId==0 && _RefillReleased && !_RefillComplete) {
+   CCircuitDef@ nano=ai.GetCircuitDef("armnanotc");
+   if(nano.count-aiBuilderMgr.GetUnfinishedCount(nano)>=12) {
+     _RefillComplete=true;
+     if(aiTerrainMgr.GetGroupCount(_RefillGroup,false)!=24) AiLog("[RangedArena] ERROR duplicate or missing support intent");
+     else AiLog("[RefillFixture] filled=12 total_slots=24");
+   }
+ }
+'''
+            if kind=='gantry-corridor':
+                declarations+='bool _CorridorPeerChecked=false;\n'
+                events+='''
+ if(ai.teamId==1 && ai.frame>=80*SECOND && !_CorridorPeerChecked) {
+   _CorridorPeerChecked=true;
+   aiTerrainMgr.SetLayoutEnabled(true);
+   CCircuitDef@ blocker=ai.GetCircuitDef("armestor");
+   const bool road=aiTerrainMgr.CanReserveBuilding(blocker,AIFloat3(4000,0,3600),0);
+   const bool outside=aiTerrainMgr.CanReserveBuilding(blocker,AIFloat3(4500,0,3600),0);
+   AiLog(!road && outside ? "[PlacementFixture] ally respects gantry corridor" : "[RangedArena] ERROR allied corridor exclusion failed");
+ }
+'''
         if case.get('defense_overrides'):
             declarations+='bool _DefenseFixture=false;\n'
             events+='\n if(ai.teamId==0 && ai.frame>=10*SECOND && !_DefenseFixture) {\n DefensePlanner::Load();\n'+defense_fixture_policy(case['defense_overrides'])+'\n _DefenseFixture=true; GenericHelpers::LogUtil("[DefenseFixture] applied",1);\n }\n'
@@ -378,6 +568,14 @@ def prepare(args):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
     if case.get('commander_repair_only'):
         pins['overrides'] += ['team 0 commander offers stationary repair then stationary hold; normal combat controller remains active']
+    if case.get('stationary_assist_fixture'):
+        pins['overrides'] += ['team 0 commander retains stationary wait ownership; declared repair/construction target supplied']
+    if case.get('solar_ceiling_fixture'):
+        pins['overrides'] += ['commander held for first 40 seconds while supplied fusion/jammer economy settles; then real FRONT policy']
+    if case.get('placement_fixture'):
+        pins['overrides'] += ['declared placement fixture: '+case['placement_fixture']+'; supplied reservation/lane and assigned worker']
+        if case['placement_fixture'] in ('factory-facing','gantry-corridor'):
+            pins['overrides'] += ['team 0 FrontLayout.Prepare bypassed to exercise ordinary far-site placement']
     if case.get('commander_front_work'):
         pins['overrides'] += [('all commanders' if case.get('coverage_probe') else 'team 0 commanders')
                              +' use real FRONT builder policy; other builders frozen']
@@ -401,6 +599,7 @@ def main():
     parser.add_argument('--variant',choices=['baseline','siege','ranged'],default='ranged')
     parser.add_argument('--profile',default='experimental_balanced')
     parser.add_argument('--game',default=None,help='game archive name (default: the last lobby script\'s, via playtest.py)')
+    parser.add_argument('--engine',default='recoil_2026.07.04',help='Installed engine directory used for this run')
     parser.add_argument('--seed',type=int,default=2071)
     parser.add_argument('--minutes',type=int,default=4)
     parser.add_argument('--speed',type=int,default=20)
@@ -414,7 +613,7 @@ def main():
     parser.add_argument('--opponent-data',type=Path,default=None)
     args=parser.parse_args();directory,command=prepare(args)
     if args.stage_only: return 0
-    launch=command+['launch','--dir',str(directory),'--engine','recoil_2026.07.04']
+    launch=command+['launch','--dir',str(directory),'--engine',args.engine]
     if args.headless: launch+=['--headless']
     # Validate before spawning; cleanup must also run if the watcher cannot start.
     case=json.loads((directory/'ranged-arena.json').read_text())

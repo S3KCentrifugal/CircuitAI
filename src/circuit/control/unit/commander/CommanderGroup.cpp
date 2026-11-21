@@ -789,6 +789,47 @@ IUnitTask* CCommanderController::GroupSeatMexWork(CCircuitUnit* unit,CCircuitUni
     }
     return nullptr;
 }
+bool CCommanderController::GroupRebaseNeeded(CCircuitUnit* anchor,int frame) {
+    auto* battle=ai->GetBattle();
+    auto* state=states.Find(anchor->GetId());
+    const unsigned revision=battle->GetFrontLaneRevision();
+    if(groupRebaseAnchor!=anchor->GetId() || groupRebaseLane!=revision) {
+        groupRebase={};groupRebaseNext=0;
+        groupRebaseAnchor=anchor->GetId();groupRebaseLane=revision;
+    }
+    if(cfg->group.rebaseGap<=0 || !role.frontDuty || !role.advance || !Handles(anchor)
+        || control::SuspensionOf(anchor,frame)!=control::Suspension::NONE
+        || anchor->GetTask()->GetType()==IUnitTask::Type::RETREAT
+        || (state && (FallbackActive(*state,frame) || (frame<state->work.lineUntil && !state->work.lineDone)))
+        || HealthRetreat(anchor) || EnergyRetreat(anchor)) {
+        groupRebase.Observe(false,frame,0);groupRebaseNext=0;return false;
+    }
+    // New local combat must reopen emergency construction immediately, even
+    // between strategic reviews. This reads the existing bounded lane bins.
+    if(groupRebase.ready && GroupNearCombat(anchor)) {
+        groupRebase.Observe(false,frame,0);groupRebaseNext=0;return false;
+    }
+    if(frame<groupRebaseNext) return groupRebase.ready;
+    groupRebaseNext=frame+int(cfg->group.lineReviewSeconds*FRAMES_PER_SEC);
+    // Reuse the lane's shared, freshness-checked evidence, not another army
+    // census. Once per group/review: O(B+P), B<=128 bins and P lane segments,
+    // plus the existing once/second FrontPosition safety/reachability checks.
+    // Runtime state belongs to this controller and expires on lane/anchor loss.
+    const float held=battle->GetLaneHeldProgress();
+    const float own=battle->GetFrontLaneProgress(anchor->GetPos(frame));
+    const auto goal=state?FrontPosition(anchor,*state,frame):AIFloat3(-1,0,-1);
+    const bool ahead=OnMap(goal) && !GroupNearCombat(anchor)
+        && commander::FrontRebaseAhead(own,held,battle->GetFrontLaneProgress(goal),
+            cfg->group.rebaseGap,cfg->group.rebaseBehind);
+    const bool was=groupRebase.ready;
+    const bool ready=groupRebase.Observe(ahead,frame,int(cfg->group.rebaseSeconds*FRAMES_PER_SEC));
+    // Time spent deliberately advancing is not time waiting for a builder
+    // seat. Re-evaluate the offer at the new anchor before starting that clock.
+    if(ready && !was) { defenseSeatWaitSince=-1;defenseDecisionNext=0; }
+    if(ready!=was) ai->LOG("[CommanderGroup] front_rebase=%i unit=%i own=%.0f held=%.0f",int(ready),anchor->GetId(),own,held);
+    return ready;
+}
+
 IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     if(!unit || !role.frontDuty || (!IsGroupMember(unit->GetId()) && !Handles(unit)) || !unit->IsFinished()) return nullptr;
     auto* current=unit->GetTask();
@@ -824,6 +865,12 @@ IUnitTask* CCommanderController::GroupWork(CCircuitUnit* unit) {
     // Retention is checked before the worker proximity gate. A constructor
     // travelling to its reserved site must not bounce back into follow.
     if(builder && IsExpansionJob(current) && GroupProjectAllowed(unit,current)) return current;
+    // D-522: accepted construction drains normally. Do not replenish a rear
+    // defense/nano/sensor queue indefinitely after the lane has been retaken.
+    // Local combat clears this gate; ordinary deployment owns the advance and
+    // still applies retreat, threat, exposure and route checks to every move.
+    if(builder && GroupRebaseNeeded(anchor,frame))
+        return IsGroupMember(unit->GetId())?GroupFollow(unit,anchor):nullptr;
     // D-476: one expansion job per constructor, up to commander_group_expansion_jobs;
     // with the queue full a constructor helps a job with room (the legacy
     // single job when the cap is 1: join first, start only when none exists).
@@ -872,6 +919,8 @@ void CCommanderController::UpdateCommanderGroup() {
     groupNext=frame+FRAMES_PER_SEC;
     auto* anchor=GroupCommander();
     const int anchorId=anchor?anchor->GetId():-1;
+    if(anchor) GroupRebaseNeeded(anchor,frame);
+    else {groupRebase={};groupRebaseNext=0;groupRebaseAnchor=-1;}
     // Only shields can use the remote-plasma lane exception. Refresh its
     // safety evidence while constructing, not only when proposing idle work.
     if(anchor && defenseSettings.enabled>0) for(const auto& job:expansionJobs) {

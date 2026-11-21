@@ -219,8 +219,8 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         // D-493: the shared energy state; D-490: front_solar_stall also offers it
         // while energy stalls above front_solar_income.
         const economy::EnergyState energy=eco->GetEnergyState();
-        const bool incomeLow=energy.income<cfg->front.solarIncome || (cfg->front.solarStall>0 && energy.stalling);
-        if(!incomeLow || energy.storage<=0 || !economy::EnergyLow(energy,cfg->front.solarStorage)) return nullptr;
+        if(!economy::EmergencySolarAllowed(energy,cfg->front.solarIncome,
+            cfg->front.solarMaxIncome,cfg->front.solarStall>0,cfg->front.solarStorage)) return nullptr;
         // Priority-two repairs retain precedence over emergency economy. Only
         // ask the existing bounded repair selector when a solar is eligible;
         // ordinary deployment does not gain another friendly-unit query.
@@ -257,6 +257,8 @@ IUnitTask* CCommanderController::FrontWork(CCircuitUnit* unit,int kind,CCircuitD
         if(!task) { state.front.solarNext=frame+3*FRAMES_PER_SEC;return nullptr; }
         state.work.task=task;state.work.kind=WORK_SOLAR;
         state.work.NoteOrigin(task,commander::TaskOrigin::Solar);  // D-493
+        if(cfg->front.solarMaxIncome>0 && energy.income>=cfg->front.solarMaxIncome)
+            ai->LOG("[INVARIANT] INV-275 new commander solar offered above hard income ceiling unit=%i",unit->GetId());
         ai->LOG("[CommanderWork] unit=%i work=22 solar=%s income=%.1f storage=%.3f",unit->GetId(),def->GetDef()->GetName(),
             eco->GetAvgEnergyIncome(),eco->GetEnergyCur()/eco->GetEnergyStore());
         return task;

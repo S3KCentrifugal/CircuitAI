@@ -125,6 +125,9 @@ struct CommanderFrontState {
     bool territoryPending=false;
 };
 struct CommanderWorkState : commander::WorkIdentity<IUnitTask> {
+    int stationaryAssistNext=0; // transient polling deadline, no target ownership
+    IUnitTask* stationaryAssistOwner=nullptr; // identity only, never dereferenced
+    springai::AIFloat3 stationaryAssistPosition;
     // D-299 work ladder. lineUntil keeps the last fallback line's turret
     // quota open after the fallback ends; task is the last ladder task
     // (address compared only, never dereferenced) that Deploy must not
@@ -241,6 +244,7 @@ struct CommanderGroupConfig {
     float sensorDefenseBand=3; // weapons at/above this band precede sensor work
     float combatDistance=1000,combatMemory=30,radius=600;
     float maintenance=1,lineReviewSeconds=5,projectHoldSeconds=30;
+    float rebaseGap=0,rebaseBehind=300,rebaseSeconds=10;
     // D-475 tactical queue: launchers in a reserved block, once the group has
     // tacticalT2 T2 members (0: off), more than tacticalMetal stored metal and
     // energy above tacticalEnergy of storage without a stall.
@@ -298,6 +302,7 @@ struct CommanderFrontConfig {
     float distance=1600,standoff=650,radius=500,threat=3;
     float repairCombat=0;
     float solarIncome=0,solarStorage=.2f,solarRadius=300,solarDef=-1;
+    float solarMaxIncome=0; // hard ceiling for new solar offers; 0 disables the ceiling
     // D-490: solarStall>0 also offers the emergency solar while energy stalls
     // above solarIncome; keepOwnBuild>0 keeps the commander on its own
     // construction through a re-evaluation; assistBreakEnergy is the bank share
@@ -352,6 +357,7 @@ struct CommanderFallbackConfig {
     float goalHoldSeconds=0; // 0: the fallback goal may change every replan
 };
 struct CommanderWorkConfig {
+    float stationaryAssist=1; // assist/repair in reach while the current owner holds
     // D-299 FRONT work ladder. radius 0 = the commander's own LOS.
     float radius=0,clearance=400,repairHealth=.98f,reclaimStorage=.95f,reclaimMetal=1;
     float reclaimEnergy=25,reclaimEnergyStorage=.9f,reclaimEnergyPerMetal=60,reclaimRetry=3;
@@ -580,6 +586,10 @@ private:
     bool groupNanoDue=false;
     unsigned groupNanoOwed=0;
     int groupNext=0,groupAnchorId=-1,groupMaintenanceNext=0,groupUpgradeNext=0;
+    commander::FrontRebase groupRebase;
+    int groupRebaseNext=0,groupRebaseAnchor=-1;
+    unsigned groupRebaseLane=0;
+    bool GroupRebaseNeeded(CCircuitUnit* anchor,int frame);
     bool GroupCanBuild(CCircuitDef* def,CCircuitUnit* anchor) const;
     bool GroupCanFund(CCircuitDef* def) const;
     std::array<defense::Rule,defense::MAX_RULES> defenseRules;
@@ -768,6 +778,7 @@ private:
         const springai::AIFloat3* coveragePoint=nullptr);
 
     IUnitTask* RepairWork(CCircuitUnit* unit,const State& state,bool defence,float radius,int frame,bool stationary=false);
+    void StationaryAssist(CCircuitUnit* unit,State& state,int frame);
     IUnitTask* ReclaimWork(CCircuitUnit* unit,State& state,float radius,int frame);
     IUnitTask* LineWork(CCircuitUnit* unit,State& state,CCircuitDef* buildDef,int frame);
     IUnitTask* RadarWork(CCircuitUnit* unit,State& state,CCircuitDef* buildDef,int frame);

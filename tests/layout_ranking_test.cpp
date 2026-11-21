@@ -356,6 +356,22 @@ void TestHullPathClear()
 
 int main()
 {
+	{
+		SupportInteriors blocks;
+		Check(!blocks.OverlapsInterior({0,0,3,3}), "empty support group does not exclude packing");
+		// Four rows around a missing interior patch: the utility fits the hole,
+		// but must not turn a temporarily missing nano into a permanent break.
+		for (int row=0; row<4; ++row) for (int col=0; col<12; ++col) {
+			if (row>0 && row<3 && col>4 && col<8) continue;
+			blocks.Include(1,{col*3,row*3,col*3+3,row*3+3});
+		}
+		Check(blocks.OverlapsInterior({15,3,21,9}), "pinpointer cannot occupy interior hole");
+		Check(!blocks.OverlapsInterior({36,3,42,9}), "flush perimeter utility remains legal");
+		Check(blocks.OverlapsInterior({35,3,41,9}), "one-cell intrusion is rejected");
+		blocks.Include(2,{60,0,72,12});
+		Check(!blocks.OverlapsInterior({42,3,48,9}), "separate campuses do not exclude intervening service space");
+		Check(blocks.OverlapsInterior({63,3,66,6}), "secondary campus stays protected");
+	}
     for (int requested=0;requested<4;++requested) for (int actual=0;actual<4;++actual) {
         Check(MatchesFacingPass(actual,requested)==(actual==requested),
             "opening facing pass tests and serves the same exit orientation");

@@ -55,6 +55,24 @@ static void EnergyLowIsOneRule()
 	Check(circuit::economy::BankShare(s) == 0.f, "empty bank share");
 }
 
+static void SolarHardCeilingWinsOverStall()
+{
+	using circuit::economy::EmergencySolarAllowed;
+	EnergyState s; s.storage=1000; s.current=0; s.income=399;
+	Check(EmergencySolarAllowed(s,400,1000,true,.2f), "low-income emergency solar remains eligible");
+	s.income=400;
+	Check(!EmergencySolarAllowed(s,400,1000,true,.2f), "normal trigger is exclusive");
+	s.stalling=true; s.income=999;
+	Check(EmergencySolarAllowed(s,400,1000,true,.2f), "stall exception works below hard ceiling");
+	s.income=1000;
+	Check(!EmergencySolarAllowed(s,400,1000,true,.2f), "stall cannot bypass exact ceiling");
+	s.income=5000;
+	Check(!EmergencySolarAllowed(s,400,1000,true,.2f), "stall cannot bypass ceiling at high income");
+	Check(EmergencySolarAllowed(s,400,0,true,.2f), "zero ceiling preserves prior policy");
+	s.income=399; s.stalling=false; s.current=500;
+	Check(!EmergencySolarAllowed(s,400,1000,true,.2f), "healthy bank still suppresses solar");
+}
+
 int main()
 {
 	OwnOriginsFinishTheirBuild();
@@ -62,6 +80,7 @@ int main()
 	UnknownFallsBackToSoleWorker();
 	RepairsAndGuardsAreAssists();
 	EnergyLowIsOneRule();
+	SolarHardCeilingWinsOverStall();
 	if (failures > 0) { std::printf("commander_task_origin_test: %d failure(s)\n", failures); return 1; }
 	std::printf("commander_task_origin_test: OK\n");
 	return 0;

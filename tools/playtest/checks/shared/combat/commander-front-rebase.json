@@ -1,0 +1,71 @@
+{
+  "stop_minute": 6,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "rules",
+      "pattern": "\\[DefenseFixture\\] applied",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "rear defense",
+      "pattern": "\\[CommanderGroup\\] unit=\\d+ build=armllt nano=0 x=\\d+ z=4[0-5]\\d\\d",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "rebase",
+      "pattern": "\\[CommanderGroup\\] front_rebase=1 unit=(?P<unit>\\d+)",
+      "scope": "any",
+      "by_minute": 4,
+      "after_minute": 2
+    },
+    {
+      "key": "advance",
+      "pattern": "\\[CoverageProbe\\] advanced_in_lane team=0(?:\\D|$)",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "rebase"
+    },
+    {
+      "key": "forward defense",
+      "pattern": "\\[CommanderGroup\\] unit=\\d+ build=armllt nano=0 x=\\d+ z=(?:4[7-9]\\d\\d|5\\d{3})",
+      "scope": "any",
+      "by_minute": 6,
+      "after_key": "advance"
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "rule rejected",
+      "pattern": "\\[DefenseFixture\\] ERROR",
+      "scope": "any"
+    }
+  ]
+}

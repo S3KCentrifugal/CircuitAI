@@ -273,6 +273,10 @@ static IUnitTask* EnqueueMexUpgrade(CEconomyManager* mgr, CCircuitUnit* builder,
 {
     return mgr->EnqueueMexUpgrade(builder,target);
 }
+static IUnitTask* EnqueueLocalMexUpgrade(CEconomyManager* mgr, CCircuitUnit* builder, float radius)
+{
+    return mgr->EnqueueLocalMexUpgrade(builder, radius);
+}
 
 CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 		: IModuleScript(scr, mgr)
@@ -304,6 +308,7 @@ CEconomyScript::CEconomyScript(CScriptManager* scr, CEconomyManager* mgr)
 	r = engine->RegisterObjectMethod("CEconomyManager", "float GetFieldYield(const CCircuitDef@, const AIFloat3& in)", asMETHOD(CEconomyManager, GetFieldYield), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueFieldUpgrade(CCircuitUnit@, const AIFloat3& in, float)", asFUNCTION(CEconomyManager_EnqueueFieldUpgrade), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueMexUpgrade(CCircuitUnit@, CCircuitUnit@)", asFUNCTION(EnqueueMexUpgrade), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CEconomyManager", "IUnitTask@+ EnqueueLocalMexUpgrade(CCircuitUnit@, float)", asFUNCTION(EnqueueLocalMexUpgrade), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "const SResourceInfo metal", asOFFSET(CEconomyManager, metal)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "const SResourceInfo energy", asOFFSET(CEconomyManager, energy)); ASSERT(r >= 0);
 	r = engine->RegisterObjectProperty("CEconomyManager", "bool isMetalEmpty", asOFFSET(CEconomyManager, isMetalEmpty)); ASSERT(r >= 0);

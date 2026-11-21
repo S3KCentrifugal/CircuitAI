@@ -1507,6 +1507,8 @@ void CInitScript::RegisterMgr()
     r = engine->RegisterObjectMethod("CTerrainManager", "bool IsAlliedSpaceFree(const CCircuitDef@, const AIFloat3& in, int facing) const", asMETHOD(CTerrainManager, IsAlliedSpaceFree), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveCoastalSupport(CCircuitUnit@, const CCircuitDef@, int zone, int group, const AIFloat3& in anchor, float radius, int budget, int maximum)", asMETHOD(CTerrainManager, ReserveCoastalSupport), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "int NextSupportSlot(CCircuitUnit@, const CCircuitDef@, int group, const AIFloat3& in seed, int budget)", asMETHOD(CTerrainManager, NextSupportSlot), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int RestoreSpineSupport(const string& in, const CCircuitDef@, int budget, int retryFrames)", asMETHOD(CTerrainManager, RestoreSpineSupport), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int NextRefilledSupportSlot(CCircuitUnit@, const CCircuitDef@, int group, int budget)", asMETHOD(CTerrainManager, NextRefilledSupportSlot), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "int PackReachable(CCircuitUnit@, const CCircuitDef@, int zone, int supportGroup, int facing, const AIFloat3& in seed, int budget)", asMETHOD(CTerrainManager, PackReachable), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetGroupActivationState(int) const", asMETHOD(CTerrainManager, GetGroupActivationState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetGroupZone(int) const", asMETHOD(CTerrainManager, GetGroupZone), asCALL_THISCALL); ASSERT(r >= 0);
@@ -1533,6 +1535,7 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetBuildSiteReservations(bool)", asMETHOD(CTerrainManager, SetBuildSiteReservations), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorPolicy(bool, bool)", asMETHOD(CTerrainManager, SetFactoryCorridorPolicy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorExempt(int)", asMETHOD(CTerrainManager, SetFactoryCorridorExempt), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorRequired(int, float)", asMETHOD(CTerrainManager, SetFactoryCorridorRequired), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryCorridorOptions(int, int, int, float, float, float)", asMETHOD(CTerrainManager, SetFactoryCorridorOptions), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryLane(int, const array<AIFloat3>@)", asFUNCTION(CTerrainManager_SetFactoryLane), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryLaneRoad(const array<AIFloat3>@, const CCircuitDef@)", asFUNCTION(CTerrainManager_SetFactoryLaneRoad), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
@@ -1540,6 +1543,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool SetLayoutEnabled(bool)", asMETHOD(CTerrainManager, SetLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryReservationOnActivate(bool)", asMETHOD(CTerrainManager, SetFactoryReservationOnActivate), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryFlushPacking(bool)", asMETHOD(CTerrainManager, SetFactoryFlushPacking), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetProtectSupportRows(bool)", asMETHOD(CTerrainManager, SetProtectSupportRows), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryFacingAdvance(float)", asMETHOD(CTerrainManager, SetFactoryFacingAdvance), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void SetFactoryDirectSite(bool)", asMETHOD(CTerrainManager, SetFactoryDirectSite), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutEnabled() const", asMETHOD(CTerrainManager, IsLayoutEnabled), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "bool IsLayoutConfigured() const", asMETHOD(CTerrainManager, IsLayoutConfigured), asCALL_THISCALL); ASSERT(r >= 0);

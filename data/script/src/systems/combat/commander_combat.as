@@ -59,6 +59,9 @@ namespace CommanderCombat {
             Option("commander_group_combat_distance",1000.f);
             Option("commander_group_combat_memory",30.f);
             Option("commander_group_radius",600.f);
+            Option("commander_group_rebase_gap",0.f);
+            Option("commander_group_rebase_behind",300.f);
+            Option("commander_group_rebase_seconds",10.f);
             Option("enabled",Global::Commander::Enabled?1.f:0.f);
             Option("advance",front?1.f:0.f);
             aiBuilderMgr.SetCommanderCombatOption("front_duty",(role==int(AiRole::FRONT) && front)?1.f:0.f);
@@ -239,6 +242,7 @@ namespace CommanderCombat {
             Option("front_recovery",Global::Commander::FrontRecovery?1.f:0.f);
             Option("front_repair_combat",0.f);
             Option("front_solar_income",0.f);
+            Option("front_solar_max_income",0.f);
             Option("front_solar_storage",.2f);
             Option("front_solar_radius",300.f);
             Option("artillery_local_max",0.f);        // D-492: the group holds artillery back past this many near its commander (0: off)

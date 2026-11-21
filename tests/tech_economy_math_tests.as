@@ -1,3 +1,11 @@
+void test_nuke_buffer_counts_completed_geothermal_consistently() {
+    Check(TechEconomyMath::EnergyEquivalentCount(21,300.f,9.f)>=24);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,0.f,9.f)==21);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,26.f,9.f)==23);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,27.f,9.f)==24);
+    Check(TechEconomyMath::EnergyEquivalentCount(24,0.f,20.f)==24);
+    Check(TechEconomyMath::EnergyEquivalentCount(21,300.f,0.f)==21);
+}
 void test_full_metal_releases_reactor_even_with_full_energy_and_pending_conversion() {
     Check(EcoPlanner::DecideConversion(true,true,1,2,true,true,true,true,false) == EcoPlanner::METAL_FULL);
 }
@@ -177,4 +185,14 @@ void test_growth_reactor_breaks_full_bank_deadlock_only_when_funded() {
     Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,6000,250000,90,true));
     Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,0,6000,250000,90,false));
     Check(!TechEconomyMath::FundedGrowthReactor(12000,500,9700,18000,20000,6000,250000,0,false));
+}
+
+void test_air_lab_income_or_full_bank_and_committed_work() {
+    Check(!TechEconomyMath::AirLabFunded(79.99f,999,1000,80,false));
+    Check(TechEconomyMath::AirLabFunded(80,0,1000,80,false));
+    Check(TechEconomyMath::AirLabFunded(0,1000,1000,80,false));
+    Check(!TechEconomyMath::AirLabFunded(0,999,1000,80,false));
+    Check(TechEconomyMath::AirLabFunded(0,0,1000,80,true));
+    Check(!TechEconomyMath::AirLabFunded(0,0,0,80,false));
+    Check(!TechEconomyMath::AirLabFunded(79,1000,2000,80,false));
 }

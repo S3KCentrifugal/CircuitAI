@@ -89,6 +89,25 @@ int main() {
         check(!RetainBuildable(plan,allowed,{1024,1024},400,21));
         check(plan.sites.empty()); // no orphan economy slots after support loss
     }
+    // Reconstruct the original support intent exactly after clipping or load.
+    for (int facing=0; facing<4; ++facing) {
+        auto full=Generate({274,1172},facing,{3,3},{6,6},{4,4},4,24,3,true,14,400);
+        auto grid=SupportGrid({274,1172},facing,{3,3},4,24);
+        check(grid.size()==96);
+        for (size_t i=0;i<grid.size();++i) {
+            check(full.sites[i].family==SUPPORT);
+            check(grid[i].centre.x2==full.sites[i].slot.centre.x2 && grid[i].centre.z2==full.sites[i].slot.centre.z2);
+        }
+    }
+    check(SupportGrid({0,0},-1,{3,3},4,24).empty());
+    check(SupportGrid({0,0},0,{3,3},4,1000).empty());
+    // Reported opening lab (2016,9696), facing north: 96-wide footprint,
+    // 320-long exit plus 32 lateral margin. Its temporary exit clips 12 sites.
+    int deferred=0;
+    const Rect openingExit{121,583,131,603};
+    for (const auto& slot : SupportGrid({274,1172},3,{3,3},4,24))
+        deferred += Intersects(RectFromCentre(slot.centre,slot.footprint,slot.facing),openingExit);
+    check(deferred==12);
     std::cout<<checks<<" economy spine checks; "<<failures<<" failures\n";
     return failures!=0;
 }
