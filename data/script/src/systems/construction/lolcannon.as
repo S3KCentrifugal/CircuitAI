@@ -2379,6 +2379,32 @@ namespace LolCannon {
             + gantries.length() + " gantries)", 1);
     }
 
+    // Shields (owner 2026-11-20): the shield count, downrank, chain and dwell levers (settings/shared/lolcannon.as Shield*).
+    void ShieldControl(CCircuitUnit@ u, CSuperTask@ st)
+    {
+        const string name = u.circuitDef.GetName();
+        const bool star = (name == "legstarfall");
+        const bool cal = (name == "corbuzz");
+        const float muzzle = star ? Global::LolCannon::StarfallMuzzle : (cal ? Global::LolCannon::CalamityMuzzle : Global::LolCannon::RagnarokMuzzle);
+        st.SetTierShields(Global::LolCannon::ShieldMax, Global::LolCannon::ShieldTierPenalty, Global::LolCannon::ShieldDwellAreas, muzzle, star);
+        st.SetTierChain(Global::LolCannon::ShieldChain);
+        if (Global::LolCannon::ShieldMax <= 0) return;
+        // seconds become frames for Ragnarok and Calamity; Starfall volleys stay shots
+        const float unit = star ? 1.0f : float(SECOND);
+        const float afusBase = star ? Global::LolCannon::StarfallAfusBase : (cal ? Global::LolCannon::CalamityAfusBase : Global::LolCannon::RagnarokAfusBase);
+        const float afusPer = star ? Global::LolCannon::StarfallAfusPerShield : (cal ? Global::LolCannon::CalamityAfusPerShield : Global::LolCannon::RagnarokAfusPerShield);
+        const float otherBase = star ? Global::LolCannon::StarfallOtherBase : (cal ? Global::LolCannon::CalamityOtherBase : Global::LolCannon::RagnarokOtherBase);
+        const float otherPer = star ? Global::LolCannon::StarfallOtherPerShield : (cal ? Global::LolCannon::CalamityOtherPerShield : Global::LolCannon::RagnarokOtherPerShield);
+        const array<string> afus = UnitHelpers::GetAllAdvancedFusionReactors();
+        for (uint i = 0; i < tierByDef.length(); ++i) {
+            if (tierByDef[i] <= 0) continue;
+            CCircuitDef@ d = ai.GetCircuitDef(int(i));
+            if (d is null) continue;
+            const bool isAfus = afus.find(d.GetName()) >= 0;
+            st.SetTierDwell(d, (isAfus ? afusBase : otherBase) * unit, (isAfus ? afusPer : otherPer) * unit);
+        }
+    }
+
     // Military AiMakeTask: a lolcannon's CSuperTask orders roster targets; the unit fires at will otherwise.
     void FireControl(CCircuitUnit@ u, IUnitTask@ t)
     {
@@ -2397,6 +2423,7 @@ namespace LolCannon {
         st.SetTierBlastWatch(Global::LolCannon::BlastMinRadius, Global::LolCannon::BlastDropElmos,
             Global::LolCannon::BlastMinPoints, Global::LolCannon::BlastTierPenalty);
         st.SetTierBlastDepth(Global::LolCannon::BlastDepthScale, Global::LolCannon::BlastDropShare);
+        ShieldControl(u, st);
         u.SetFireState(Global::LolCannon::FireState);   // owner 2026-10-26: fire at will; the tiered orders pick the target when one is in range
         GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " fires at " + st.GetTierCount()
             + " roster defs, best tier first; fire state " + Global::LolCannon::FireState, 1);

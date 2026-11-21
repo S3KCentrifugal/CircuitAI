@@ -195,6 +195,40 @@ namespace LolCannon {
     int GunAreaSeconds = 30;        // owner 2026-10-28: 30 (was 20); the Starfall keeps StarfallShotsPerArea
     int StarfallAreas = 3;
     int StarfallShotsPerArea = 2;
+    // shields (owner 2026-11-20; CSuperTask::SetTierShields, TierTargeting.h ArcSpheres):
+    // every enemy block shield known (seen, radar or a remembered image) is a sphere
+    // of its radius (Keeper/Overseer/Soteria 550) at its position; a roster target
+    // counts the spheres its shell's arc enters (the low arc for Ragnarok and
+    // Calamity, the high one for the Starfall, from the muzzle). Behind ShieldMax or
+    // more it falls ShieldTierPenalty tiers (below every live tier, above likely
+    // killed). The top ShieldDwellAreas areas dwell by their aim's shields (the
+    // lines below). ShieldChain: a downranked target that a lesser-protected roster
+    // target's death blasts would kill makes that one worth its tier (blasts are not
+    // stopped by shields). ShieldMax 0: off.
+    int ShieldMax = 7;
+    int ShieldTierPenalty = 7;
+    int ShieldDwellAreas = 3;
+    bool ShieldChain = true;
+    // muzzle heights over the gun's ground (s3o: armvulc flare 133, corbuzz spindle 118)
+    float RagnarokMuzzle = 133.0f;
+    float CalamityMuzzle = 118.0f;
+    float StarfallMuzzle = 120.0f;
+    // dwell lines: base + perShield x shields; seconds for Ragnarok and Calamity,
+    // volleys for the Starfall; "Afus" for advanced fusions, "Other" for every other
+    // roster def. Measured headless (tools/playtest/run_lolcannon_shield.py, BAR\lolshield-runs):
+    // the time in which 90% of trials killed the target, at full energy.
+    float RagnarokAfusBase = 40.0f;
+    float RagnarokAfusPerShield = 16.0f;
+    float RagnarokOtherBase = 40.0f;
+    float RagnarokOtherPerShield = 16.0f;
+    float CalamityAfusBase = 40.0f;
+    float CalamityAfusPerShield = 16.0f;
+    float CalamityOtherBase = 40.0f;
+    float CalamityOtherPerShield = 16.0f;
+    float StarfallAfusBase = 2.0f;
+    float StarfallAfusPerShield = 1.0f;
+    float StarfallOtherBase = 2.0f;
+    float StarfallOtherPerShield = 1.0f;
     // scouting (owner 2026-10-27): at the first strike, then every ReScoutSeconds at
     // the gun's highest-rated area, AIR (TECH with no AIR on the map) flies this
     // package, spread over ReconSpread round the area and on to the far map edge

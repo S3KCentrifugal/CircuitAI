@@ -264,4 +264,100 @@ inline bool Advance(Rotation& r, int areas, int frame, int dwellFrames, int dwel
 	return moved;
 }
 
+/*
+ * Shields (owner 2026-11-20). BAR's block shields (Keeper armgate, Overseer
+ * corgate, Soteria legdeflector: radius 550, 6175 power, 130 regen; the
+ * floating and T3 ones larger) stop every plasma shell that crosses into the
+ * sphere while it is up (unit_shield_behaviour.lua: the shell's shield damage
+ * goes to the sphere it hit, the shell is gone). The sphere is centred on the
+ * shield weapon's emit point; for these buildings that is the unit's base
+ * position (headless arena 2026-11-20: weapon vector dy 0, absorbed shells
+ * ended on that sphere within 60 elmos). A shell coming from outside every
+ * sphere must pass through each sphere its path enters before it lands, so a
+ * target is protected by every live shield whose sphere the shot's arc enters:
+ * the ones round the target (they contain it) and any the arc dips through on
+ * the way down (a low Ragnarok or Calamity arc, about 17 degrees at 4800 elmos;
+ * the Starfall's 72 degree high arc rarely). Death blasts are not projectiles
+ * and are not stopped (the gadget negates only damage with an attacker).
+ */
+struct Sphere {
+	float x, y, z, r;
+};
+
+// Shields whose sphere holds the point (the target's middle).
+inline int CoveringSpheres(float px, float py, float pz, const std::vector<Sphere>& s)
+{
+	int n = 0;
+	for (const Sphere& c : s) {
+		const float dx = px - c.x, dy = py - c.y, dz = pz - c.z;
+		if (dx * dx + dy * dy + dz * dz < c.r * c.r) ++n;
+	}
+	return n;
+}
+
+/*
+ * Shields a cannon shell's ballistic arc enters on its way from the muzzle
+ * (m) to the target's middle (t): the engine's CCannon::GetWantedDir arc in
+ * per-frame units, y(x) = y0 + x tanA - k x^2 with k = g (1 + tanA^2) / 2v^2,
+ * the low root (Ragnarok, Calamity) or the high one (Starfall). Only spheres
+ * within r of the line from muzzle to target in plan are sampled, every `step`
+ * elmos: O(near spheres x dist / step), about 150 samples a sphere at 4800
+ * elmos and step 32. -1 when the target is beyond the arc's reach.
+ */
+inline int ArcSpheres(float mx, float my, float mz, float tx, float ty, float tz,
+	float speed, float gravity, bool high, float step, const std::vector<Sphere>& s)
+{
+	const float dx = tx - mx, dz = tz - mz;
+	const float dist = std::sqrt(dx * dx + dz * dz);
+	if ((speed <= 0.f) || (gravity <= 0.f)) return CoveringSpheres(tx, ty, tz, s);
+	if (dist < 1.f) return CoveringSpheres(tx, ty, tz, s);
+	const float dy = ty - my;
+	const float v2 = speed * speed, g = gravity;
+	const float disc = v2 * v2 - g * (g * dist * dist + 2.f * dy * v2);
+	if (disc < 0.f) return -1;
+	const float tanA = (high ? (v2 + std::sqrt(disc)) : (v2 - std::sqrt(disc))) / (g * dist);
+	const float k = g * (1.f + tanA * tanA) / (2.f * v2);
+	const float ux = dx / dist, uz = dz / dist;
+	const float st = std::max(8.f, step);
+	int n = 0;
+	for (const Sphere& c : s) {
+		// plan distance from the sphere's centre to the line of fire
+		const float cx = c.x - mx, cz = c.z - mz;
+		const float along = cx * ux + cz * uz;
+		const float across = std::abs(-cx * uz + cz * ux);
+		if ((across >= c.r) || (along < -c.r) || (along > dist + c.r)) continue;
+		const float h = std::sqrt(std::max(0.f, c.r * c.r - across * across));   // the chord's half length in plan
+		const float x0 = std::max(0.f, along - h), x1 = std::min(dist, along + h);
+		bool in = false;
+		for (float x = x0; (x <= x1) && !in; x += st) {
+			const float px = mx + ux * x, pz = mz + uz * x;
+			const float py = my + x * (tanA - k * x);
+			const float ex = px - c.x, ey = py - c.y, ez = pz - c.z;
+			in = (ex * ex + ey * ey + ez * ez < c.r * c.r);
+		}
+		if (!in) {   // the last sample: the target point itself
+			const float ex = tx - c.x, ey = ty - c.y, ez = tz - c.z;
+			in = (ex * ex + ey * ey + ez * ez < c.r * c.r);
+		}
+		if (in) ++n;
+	}
+	return n;
+}
+
+/*
+ * The dwell on one area (owner 2026-11-20): `base` for an unshielded target
+ * plus `perShield` for each shield its shot passes; frames for Ragnarok and
+ * Calamity, shots (volleys) for the Starfall. Measured so that 90% of arena
+ * trials kill the target in that time (tools/playtest/run_lolcannon_shield.py).
+ */
+struct Dwell {
+	float base = 0.f, perShield = 0.f;
+};
+
+inline int DwellFor(const Dwell& d, int shields, int fallback)
+{
+	if ((d.base <= 0.f) && (d.perShield <= 0.f)) return fallback;
+	return std::max(1, int(std::lround(d.base + d.perShield * float(std::max(0, shields)))));
+}
+
 } // namespace circuit::tier

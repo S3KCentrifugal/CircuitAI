@@ -2051,6 +2051,10 @@ void CInitScript::RegisterCSuperTask(asIScriptEngine* engine)
 	// Likely killed (owner 2026-11-12): big death blasts read from the ground at roster structures out of sight
 	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierBlastWatch(float, float, int, int)", asMETHOD(CSuperTask, SetTierBlastWatch), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierBlastDepth(float, float)", asMETHOD(CSuperTask, SetTierBlastDepth), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierShields(int, int, int, float, bool)", asMETHOD(CSuperTask, SetTierShields), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierDwell(const CCircuitDef@, float, float)", asMETHOD(CSuperTask, SetTierDwell), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierChain(bool)", asMETHOD(CSuperTask, SetTierChain), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaShields(int) const", asMETHOD(CSuperTask, GetTierAreaShields), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierBlastSerial() const", asMETHOD(CSuperTask, GetTierBlastSerial), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "AIFloat3 GetTierBlastPos() const", asMETHOD(CSuperTask, GetTierBlastPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierLikelyKilledCount() const", asMETHOD(CSuperTask, GetTierLikelyKilledCount), asCALL_THISCALL); ASSERT(r >= 0);

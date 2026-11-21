@@ -1633,7 +1633,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 		targetFrame = frame - tierRetargetFrames;  // the target is gone: the next one now
 	}
 	if ((tierAreaMax > 1) && (tierDwellShots <= 0) && !tierAreas.empty()
-		&& (frame - tierRotation.since >= tierDwellFrames))
+		&& (frame - tierRotation.since >= ((tierCurDwellFrames > 0) ? tierCurDwellFrames : tierDwellFrames)))
 	{
 		targetFrame = frame - tierRetargetFrames;  // the dwell is up: the next area now
 	}
@@ -1643,6 +1643,8 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	targetFrame = frame;
 
 	const bool byArea = (tierAreaMax > 1);
+	const bool shieldsOn = (tierShieldMax > 0) || !tierDwellByDef.empty() || tierChain;
+	const bool collect = byArea || shieldsOn;
 	std::vector<tier::Candidate> candidates;
 	std::vector<const SEnemyData*> candidateDatas;
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -1666,10 +1668,14 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 			}
 			const bool likelyKilled = IsMarked(e);
 			const int tierOf = it->second + (likelyKilled ? std::max(0, tierBlastPenalty) : 0);
-			if (!byArea && (bestData != nullptr) && (tierOf > best.tier)) {
+			if (!collect && (bestData != nullptr) && (tierOf > best.tier)) {
 				continue;
 			}
 			if (((canTargetCat & e.cdef->GetCategory()) == 0) || (e.cdef->IsMobile() && !e.IsInRadarOrLOS())) {
+				if ((it->second == 1) && tierSkipLogged.insert(e.id).second) {
+					circuit->LOG("TIER: team=%i %s(%i): skips %s(%i): category %s", circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(),
+							e.cdef->GetDef()->GetName(), e.id, ((canTargetCat & e.cdef->GetCategory()) == 0) ? "not targetable" : "mobile out of sight");
+				}
 				continue;
 			}
 			const float sqDist = position.SqDistance2D(e.pos);
@@ -1681,7 +1687,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 				c = tier::Downranked(c, tierBlastPenalty);
 				tierDeadNow.insert(e.id);
 			}
-			if (byArea) {
+			if (collect) {
 				candidates.push_back(c);
 				candidateDatas.push_back(&e);
 				continue;
@@ -1692,11 +1698,21 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 			}
 		}
 	}
+	if (shieldsOn) {
+		ShieldScan(unit, candidates, candidateDatas);
+	}
 	if (byArea) {
 		const int pick = PickTierArea(unit, candidates);
 		if (pick >= 0) {
 			best = candidates[pick];
 			bestData = candidateDatas[pick];
+		}
+	} else if (collect) {
+		for (size_t i = 0; i < candidates.size(); ++i) {
+			if (tier::Better(candidates[i], (bestData == nullptr) ? nullptr : &best, tierTargetId)) {
+				best = candidates[i];
+				bestData = candidateDatas[i];
+			}
 		}
 	}
 
@@ -1760,6 +1776,189 @@ void CSuperTask::SetTierBlastDepth(float refDepth, float share)
 	tierBlastRefDepth = refDepth;
 	tierBlastShare = std::max(0.f, share);
 	tierRingRadius.clear();
+}
+
+void CSuperTask::SetTierShields(int maxShields, int penalty, int dwellAreas, float muzzle, bool high)
+{
+	tierShieldMax = std::max(0, maxShields);
+	tierShieldPenalty = std::max(0, penalty);
+	tierShieldAreas = std::max(0, dwellAreas);
+	tierShieldMuzzle = std::max(0.f, muzzle);
+	tierShieldHigh = high;
+}
+
+void CSuperTask::SetTierDwell(const CCircuitDef* edef, float base, float perShield)
+{
+	if (edef == nullptr) return;
+	if ((base <= 0.f) && (perShield <= 0.f)) tierDwellByDef.erase(edef->GetId());
+	else tierDwellByDef[edef->GetId()] = tier::Dwell{std::max(0.f, base), std::max(0.f, perShield)};
+}
+
+int CSuperTask::AreaDwell(int index, bool shots) const
+{
+	const int fallback = shots ? tierDwellShots : tierDwellFrames;
+	if (!ValidArea(index) || (index >= tierShieldAreas)) return fallback;
+	const auto def = tierAimDef.find(tierAreaTargets[index]);
+	if (def == tierAimDef.end()) return fallback;
+	const auto d = tierDwellByDef.find(def->second);
+	if (d == tierDwellByDef.end()) return fallback;
+	return tier::DwellFor(d->second, tierAreaShields[index], fallback);
+}
+
+/*
+ * Shields and chains on one roster scan (owner 2026-11-20). Every enemy
+ * shield structure known within range plus its radius (and a mobile one in
+ * radar or LOS) becomes a sphere at its position (TierTargeting.h Sphere).
+ * Each candidate counts the spheres its shot's arc enters (ArcSpheres): behind
+ * tierShieldMax or more it falls tierShieldPenalty tiers, adds no metal to its
+ * area, and its shield count sets the dwell of the area it aims (AreaDwell).
+ * Chains: a downranked candidate that a lesser-protected candidate's death
+ * blasts would kill (its blast and every blast after: ChainFrom, the nuke
+ * ChainKill rule; blasts are not stopped by shields) hands that one its tier.
+ * Cost per scan (every tierRetargetFrames, one or two cannons an AI): enemies
+ * once for the spheres, candidates x near spheres x ~150 arc samples, and for
+ * chains downranked x candidates x a chain over at most 48 near structures.
+ */
+void CSuperTask::ShieldScan(CCircuitUnit* unit, std::vector<tier::Candidate>& cands, const std::vector<const SEnemyData*>& datas)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	tierShieldsOf.clear();
+	tierAimDef.clear();
+	for (size_t i = 0; i < cands.size(); ++i) tierAimDef[cands[i].id] = datas[i]->cdef->GetId();
+	if ((tierShieldMax <= 0) && !tierChain && tierDwellByDef.empty()) return;
+
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	const float maxRange = cdef->GetMaxRange();
+	tierSpheres.clear();
+	const auto* enemies = circuit->GetEnemyManager();
+	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
+		for (const SEnemyData& e : *pool) {
+			if (e.IsFake() || e.IsDead() || e.IsDying() || (e.cdef == nullptr)) continue;
+			const float r = e.cdef->GetShieldRadius();
+			if (r < 100.f) continue;   // a commander's own small shield and the like: not a block shield
+			if (e.cdef->IsMobile() && !e.IsInRadarOrLOS()) continue;
+			if (e.IsInLOS() && e.isBeingBuilt) continue;
+			if (position.SqDistance2D(e.pos) > SQUARE(maxRange + r)) continue;
+			// an image a big death blast likely killed (it leaves no wreck to clear it) shields nothing
+			if (!e.IsInRadarOrLOS() && IsMarked(e)) continue;
+			tierSpheres.push_back(tier::Sphere{e.pos.x, circuit->GetMap()->GetElevationAt(e.pos.x, e.pos.z), e.pos.z, r});
+		}
+	}
+
+	float speed = 0.f, gravity = 0.f;
+	if (CBattleAnalysis* battle = circuit->GetBattle()) {
+		const weapon_reach::Ballistics& b = battle->MainBallistics(cdef);
+		if (b.kind == weapon_reach::Kind::CANNON) {
+			speed = b.speed;
+			gravity = b.gravity;
+		}
+	}
+	const float mx = position.x, mz = position.z;
+	const float my = std::max(0.f, circuit->GetMap()->GetElevationAt(mx, mz)) + tierShieldMuzzle;
+	constexpr float TARGET_MID = 24.f;   // the shell aims at the target's middle, about this over its ground
+	constexpr float ARC_STEP = 32.f;
+	std::vector<int> baseTier(cands.size(), 0);
+	std::vector<bool> protectedHi(cands.size(), false);
+	bool anyProtected = false;
+	for (size_t i = 0; i < cands.size(); ++i) {
+		const SEnemyData& e = *datas[i];
+		int n = 0;
+		if (!tierSpheres.empty()) {
+			const float ty = circuit->GetMap()->GetElevationAt(e.pos.x, e.pos.z) + TARGET_MID;
+			n = tier::ArcSpheres(mx, my, mz, e.pos.x, ty, e.pos.z, speed, gravity, tierShieldHigh, ARC_STEP, tierSpheres);
+			if (n < 0) n = tier::CoveringSpheres(e.pos.x, ty, e.pos.z, tierSpheres);
+		}
+		tierShieldsOf[cands[i].id] = n;
+		baseTier[i] = cands[i].tier;
+		const bool down = (tierShieldMax > 0) && (n >= tierShieldMax);
+		if (down) {
+			cands[i].tier += tierShieldPenalty;
+			cands[i].cost = 0.f;
+			protectedHi[i] = anyProtected = true;
+		}
+		// one line per target and shield count (a count changes when shields are built or die)
+		const auto logged = tierShieldLogged.find(cands[i].id);
+		if ((n > 0) && ((logged == tierShieldLogged.end()) || (logged->second != n))) {
+			tierShieldLogged[cands[i].id] = n;
+			circuit->LOG("TIER: team=%i %s(%i): %s(%i) at (%i,%i) behind %i shield(s) of %i known%s",
+					circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
+					int(e.pos.x), int(e.pos.z), n, int(tierSpheres.size()), down ? std::format(": tier {} -> {}", baseTier[i], cands[i].tier).c_str() : "");
+		}
+	}
+	if (!tierChain || !anyProtected) return;
+
+	// Chains: X (downranked) through Y (not), by Y's death blast and the blasts after it.
+	std::vector<SChainUnit> chainUnits;
+	std::vector<size_t> nearIdx;
+	for (size_t x = 0; x < cands.size(); ++x) {
+		if (!protectedHi[x]) continue;
+		const SEnemyData& ex = *datas[x];
+		const float reachX = DeathBlastOf(ex.cdef).volume * 2.f;
+		for (size_t y = 0; y < cands.size(); ++y) {
+			if (protectedHi[y] || (cands[y].tier <= baseTier[x])) continue;
+			const SEnemyData& ey = *datas[y];
+			const SDeathBlast by = DeathBlastOf(ey.cdef);
+			if ((by.damage <= 0.f) || (ey.pos.SqDistance2D(ex.pos) > SQUARE(by.radius + reachX + 600.f))) continue;
+			// the roster structures round Y that its chain could pass through
+			chainUnits.clear();
+			nearIdx.clear();
+			for (size_t j = 0; (j < cands.size()) && (chainUnits.size() < 48); ++j) {
+				const SEnemyData& ej = *datas[j];
+				if (ej.cdef->IsMobile() || (ej.pos.SqDistance2D(ey.pos) > SQUARE(1500.f))) continue;
+				const float hp = (ej.IsInLOS() && (ej.health > 0.f)) ? ej.health : ej.cdef->GetHealth();
+				nearIdx.push_back(j);
+				chainUnits.push_back({ej.pos, cands[j].cost, hp, ej.cdef, FacingOf(ej.id, DeathBlastOf(ej.cdef))});
+			}
+			unsigned seed = 0, target = 0;
+			bool haveSeed = false, haveTarget = false;
+			for (unsigned k = 0; k < nearIdx.size(); ++k) {
+				if (nearIdx[k] == y) { seed = k; haveSeed = true; }
+				if (nearIdx[k] == x) { target = k; haveTarget = true; }
+			}
+			if (!haveSeed || !haveTarget) continue;
+			const std::vector<bool> dead = ChainFrom(seed, chainUnits);
+			if (!dead[target]) continue;
+			circuit->LOG("TIER: team=%i %s(%i): %s(%i) behind %i shields dies in the chain from %s(%i) (%i shields): tier %i -> %i",
+					circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), ex.cdef->GetDef()->GetName(), ex.id,
+					tierShieldsOf[ex.id], ey.cdef->GetDef()->GetName(), ey.id, tierShieldsOf[ey.id], cands[y].tier, baseTier[x]);
+			cands[y].tier = baseTier[x];
+			cands[y].cost += ex.cost;
+		}
+	}
+}
+
+// The chain from one unit's death (its blast, then every blast after): ChainKill
+// with the first death given, not shot. O(n^2) for n units.
+std::vector<bool> CSuperTask::ChainFrom(unsigned seed, const std::vector<SChainUnit>& units)
+{
+	const float volumeFactor = manager->GetCircuit()->GetMilitaryManager()->GetNuclearInfo().volumeFactor;
+	const unsigned n = units.size();
+	std::vector<float> hp(n);
+	std::vector<SDeathBlast> blasts(n);
+	for (unsigned k = 0; k < n; ++k) {
+		blasts[k] = DeathBlastOf(units[k].cdef);
+		hp[k] = units[k].health;
+	}
+	std::vector<bool> dead(n, false);
+	if (seed >= n) return dead;
+	hp[seed] = 0.f;
+	std::vector<unsigned> frontier{seed};
+	while (!frontier.empty()) {
+		std::vector<unsigned> next;
+		for (unsigned k : frontier) {
+			if (dead[k]) continue;
+			dead[k] = true;
+			const SDeathBlast& b = blasts[k];
+			if (b.damage <= 0.f) continue;
+			for (unsigned j = 0; j < n; ++j) {
+				if (dead[j] || (hp[j] <= 0.f)) continue;
+				hp[j] -= AreaDamage(b.damage, b.radius, b.edge, SurfaceDistance(blasts[j], volumeFactor, units[j].pos, units[j].facing, units[k].pos));
+				if (hp[j] <= 0.f) next.push_back(j);
+			}
+		}
+		frontier.swap(next);
+	}
+	return dead;
 }
 
 void CSuperTask::SampleRing(tier::GroundRing& r) const
@@ -1994,7 +2193,12 @@ int CSuperTask::PickTierArea(CCircuitUnit* unit, const std::vector<tier::Candida
 		}
 	}
 	tierAreaTargets.clear();
-	for (const tier::Area& a : tierAreas) tierAreaTargets.push_back(candidates[a.aim].id);
+	tierAreaShields.clear();
+	for (const tier::Area& a : tierAreas) {
+		tierAreaTargets.push_back(candidates[a.aim].id);
+		const auto sh = tierShieldsOf.find(candidates[a.aim].id);
+		tierAreaShields.push_back((sh != tierShieldsOf.end()) ? sh->second : 0);
+	}
 	tierSeenNow.clear();
 	for (const tier::Candidate& c : candidates) tierSeenNow.insert(c.id);
 	// "Seen" spans TIER_SEEN_FRAMES (a3: commanders flickering in and out of
@@ -2020,22 +2224,30 @@ int CSuperTask::PickTierArea(CCircuitUnit* unit, const std::vector<tier::Candida
 	if (tier::TopChanged(oldTop, top, oldTopStill, topSeenBefore)) {
 		tier::Restart(tierRotation, frame);
 		why = "the top area changed";
-	} else if (tier::Advance(tierRotation, int(tierAreas.size()), frame, tierDwellFrames, tierDwellShots)) {
+	} else if (tier::Advance(tierRotation, int(tierAreas.size()), frame,
+		AreaDwell(tierRotation.index, false), (tierDwellShots > 0) ? AreaDwell(tierRotation.index, true) : 0))
+	{
 		why = (tierRotation.index == 0) ? "back to the top" : "next area";
 	}
 	tierRotation.topId = top;
 	if (tierAreas.empty()) {
+		tierCurDwellFrames = tierCurDwellShots = 0;
 		return -1;
 	}
+	tierCurDwellFrames = AreaDwell(tierRotation.index, false);
+	tierCurDwellShots = (tierDwellShots > 0) ? AreaDwell(tierRotation.index, true) : 0;
 	if ((why != nullptr) || (oldIndex != tierRotation.index)) {
 		std::string ranking;
 		for (size_t i = 0; i < tierAreas.size(); ++i) {
 			const tier::Area& a = tierAreas[i];
-			ranking += std::format("{}#{} t{} {:.0f}m ({},{})", i ? "; " : "", i + 1, a.tier, a.metal, int(a.x), int(a.z));
+			ranking += std::format("{}#{} t{} {:.0f}m s{} ({},{})", i ? "; " : "", i + 1, a.tier, a.metal,
+				tierAreaShields[i], int(a.x), int(a.z));
 		}
-		circuit->LOG("TIER: team=%i frame=%i %s(%i): area %i of %i (%s): %s",
+		circuit->LOG("TIER: team=%i frame=%i %s(%i): area %i of %i (%s), dwell %i %s: %s",
 				circuit->GetTeamId(), frame, unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
-				tierRotation.index + 1, int(tierAreas.size()), (why != nullptr) ? why : "fewer areas", ranking.c_str());
+				tierRotation.index + 1, int(tierAreas.size()), (why != nullptr) ? why : "fewer areas",
+				(tierDwellShots > 0) ? tierCurDwellShots : tierCurDwellFrames / FRAMES_PER_SEC,
+				(tierDwellShots > 0) ? "shots" : "s", ranking.c_str());
 	}
 	return tierAreas[tierRotation.index].aim;
 }
@@ -2064,7 +2276,7 @@ void CSuperTask::CountTierShot(CCircuitUnit* unit, int frame)
 	}
 	if (frame - tierShotFrame < tierShotGap) return;
 	tierShotFrame = frame;
-	if (++tierRotation.shots >= tierDwellShots) {
+	if (++tierRotation.shots >= ((tierCurDwellShots > 0) ? tierCurDwellShots : tierDwellShots)) {
 		targetFrame = frame - tierRetargetFrames;  // the next area at the next update
 	}
 }

@@ -77,6 +77,21 @@ public:
 	int GetTierBlastSerial() const { return tierBlastSerial; }
 	springai::AIFloat3 GetTierBlastPos() const { return tierBlastPos; }
 	int GetTierLikelyKilledCount() const { return int(tierDeadNow.size()); }  // in range at the last scan
+	// Shields (owner 2026-11-20, TierTargeting.h ArcSpheres): every enemy shield
+	// known (seen, in radar or a remembered image) is a sphere; a roster target
+	// counts the live spheres its shot's arc enters (from the muzzle, muzzle
+	// elmos over the gun's ground; the high arc for the Starfall). maxShields > 0:
+	// a target behind that many or more falls `penalty` tiers. dwellAreas: the
+	// top areas whose dwell follows SetTierDwell. maxShields <= 0: off.
+	void SetTierShields(int maxShields, int penalty, int dwellAreas, float muzzle, bool high);
+	// The dwell on an area aimed at this def: base + perShield x its shields, in
+	// frames (Ragnarok, Calamity) or shots (Starfall: SetTierRotation dwellShots > 0).
+	void SetTierDwell(const CCircuitDef* edef, float base, float perShield);
+	// Chain (owner 2026-11-20): a target the shields downranked is worth firing
+	// at through a lesser-protected roster target whose death blasts reach it
+	// (the nuke ChainKill rule): that target takes the protected one's tier.
+	void SetTierChain(bool on) { tierChain = on; }
+	int GetTierAreaShields(int i) const { return ValidArea(i) ? tierAreaShields[i] : -1; }
 
 private:
 	void ExecuteAttack(CCircuitUnit* unit);
@@ -140,6 +155,7 @@ private:
 	static float SurfaceDistance(const SDeathBlast& b, float volumeFactor, const springai::AIFloat3& unitPos, int facing, const springai::AIFloat3& p);
 	int FacingOf(ICoreUnit::Id id, const SDeathBlast& b);
 	float ChainKill(const CWeaponDef* wd, float radius, const springai::AIFloat3& aim, const std::vector<SChainUnit>& units);
+	std::vector<bool> ChainFrom(unsigned seed, const std::vector<SChainUnit>& units);
 	std::unordered_map<const CCircuitDef*, SDeathBlast> deathBlasts;
 	std::unordered_map<ICoreUnit::Id, int> facings;  // enemy building facing, read once in LOS (buildings never turn)
 	// Known enemy interceptors (position, squared coverage + margin), and how many hold pos.
@@ -246,6 +262,25 @@ private:
 	int tierBlastPenalty = 10;
 	int tierBlastSerial = 0;
 	springai::AIFloat3 tierBlastPos = springai::AIFloat3(-1.f, 0.f, -1.f);
+	// Shields: see SetTierShields.
+	int tierShieldMax = 0;            // off until the script sets it
+	int tierShieldPenalty = 7;
+	int tierShieldAreas = 3;
+	float tierShieldMuzzle = 120.f;
+	bool tierShieldHigh = false;
+	bool tierChain = false;
+	std::unordered_map<int, tier::Dwell> tierDwellByDef;   // def id -> dwell line
+	std::vector<tier::Sphere> tierSpheres;                 // this scan's shields (reused)
+	std::unordered_map<int, int> tierShieldsOf;            // candidate id -> shields its shot passes, this scan
+	std::vector<int> tierAreaShields;                      // each area's aim's shields
+	std::unordered_map<int, int> tierAimDef;               // candidate id -> def id, this scan
+	std::unordered_map<int, int> tierShieldLogged;         // candidate id -> the shield count last logged
+	std::unordered_set<int> tierSkipLogged;                // tier-1 enemies logged as not targetable
+	int tierCurDwellFrames = 0;       // the dwell of the area under fire now
+	int tierCurDwellShots = 0;
+	int AreaDwell(int index, bool shots) const;            // the dwell of area `index` (frames or shots)
+	// Shields and chains on this scan's candidates: tiers raised, chain tiers lowered.
+	void ShieldScan(CCircuitUnit* unit, std::vector<tier::Candidate>& cands, const std::vector<const SEnemyData*>& datas);
 	int tierShotFrame = -1000000;     // the last shot counted
 	int tierShotGap = -1;             // frames between two shots of the main weapon's salvos; -1 not yet known
 	// Debug strikes
