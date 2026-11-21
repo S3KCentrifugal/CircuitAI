@@ -141,6 +141,10 @@ struct RangedPolicy {
     // threat) for this many seconds opens fire, so engine autofire takes the
     // spam instead of standing on HOLD forever. 0 = off (spam always held).
     float spamFireIdleSeconds = 0.f;
+    // Owner 2026-11-21 (Daedalus arena, radar mode): a never-identified ground
+    // radar dot that is not moving may be porc that outranges us. March legs
+    // (and their samples) never come within this distance of one. 0 = off.
+    float unknownStaticReach = 0.f;
     // Owner 2026-10-28: permanent fire at will. The controller opens fire when
     // it takes the unit and never sets hold fire (no poke, cohort-hold or spam
     // gating); priority targets still steer the guns. Overrides fireAtWill.

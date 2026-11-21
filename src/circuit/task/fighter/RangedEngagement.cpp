@@ -396,9 +396,26 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         // point inside coverage, and a whole-leg test then halted the march at
         // the gantry. Walk each leg in 64-elmo samples and keep the last safe
         // one, so the march always reaches the coverage edge.
+        // Owner 2026-11-21: still unidentified ground dots (possible porc) within unknown_static_reach block the march.
+        std::vector<AIFloat3> unknownStatic;
+        if(p.unknownStaticReach>0.f) {
+            const float look=p.unknownStaticReach+std::sqrt(current.SqDistance2D(marchGoal));
+            for(const auto& c:world.Contacts()) {
+                if(c.def || c.airDot || c.seenDef || c.pos.y< -20.f) continue;
+                if(c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>p.spamDotSpeed*p.spamDotSpeed) continue;
+                if(current.SqDistance2D(c.pos)<=look*look) unknownStatic.push_back(c.pos);
+            }
+        }
+        const auto unknownBlocks=[&](const AIFloat3& a,const AIFloat3& b) {
+            const float r2=p.unknownStaticReach*p.unknownStaticReach;
+            // blocked when the leg ends inside that reach and nearer the dot than it began
+            for(const auto& u:unknownStatic) { const float db=u.SqDistance2D(b); if(db<r2 && db<u.SqDistance2D(a)) return true; }
+            return false;
+        };
         const auto safeAt=[&](const AIFloat3& a,const AIFloat3& b) {
             return SafeMove(unit,a,b,StaticMargin(p),true)
-                && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0;
+                && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0
+                && !unknownBlocks(a,b);
         };
         std::string why;   // trace only (2026-11-21 Daedalus idle): which check cut the leg
         for(const auto& q:points) {
@@ -414,6 +431,7 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
                     world.DangerSign(q,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p)),steps);
                 why=buf;
                 why+=world.ExplainLeg(from,q,StaticMargin(p),p.pressStatic,GhostRange(p),StaticDanger(p));
+                if(unknownBlocks(from,q)) why+=" [unknown still dot within "+std::to_string(int(p.unknownStaticReach))+"]";
             }
             AIFloat3 last=from; bool any=false;
             for(int i=1;i<steps;++i) {
