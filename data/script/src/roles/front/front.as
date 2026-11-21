@@ -1474,6 +1474,9 @@ namespace RoleFront {
 
     int g_frontPrimaryT2Asked = -100000;          // last frame the primary T2 constructor reached the fusion rule
     const int FrontFusionWorkerWaitSeconds = 30;   // after that, another T2 constructor runs the rule
+    int g_frontFusionTookId = -1;                  // last builder put on a queued fusion, and when
+    int g_frontFusionTookFrame = -100000;
+    dictionary g_frontFusionRest;                  // builder id -> frame its takeover rest ends
 
     IUnitTask@ Front_T2Constructor_AiMakeTask(CCircuitUnit@ u, IUnitTask@ defaultTask, bool isEnergyFull, float metalIncome, float energyIncome, float metalCurrent, bool isEnergyLessThan90Percent) {
         // Normal fusion stays eligible until both FRONT AFUS income floors clear.
@@ -1518,9 +1521,21 @@ namespace RoleFront {
                 }
                 // Owner 2026-11-19: a fusion already queued (native, build chain) that nobody builds blocked
                 // EnqueueFUS all game; the constructor running the rule takes that order instead
-                IUnitTask@ queuedFus = Builder::UnstaffedFusionTask(u);
+                // Owner 2026-11-20: a takeover that does not hold (the builder is back asking within 10 s, off the
+                // fusion: dropped by porc reach, an unreachable site, another program) rests that builder 60 s
+                // (headless: one legack re-took the same order 21 times in a minute)
+                int64 restUntil = -1;
+                const string uk = "" + u.id;
+                if (g_frontFusionRest.exists(uk)) g_frontFusionRest.get(uk, restUntil);
+                IUnitTask@ queuedFus = (ai.frame < restUntil) ? null : Builder::UnstaffedFusionTask(u);
                 if (queuedFus !is null) {
-                    if (!(u.task is queuedFus)) GenericHelpers::LogUtil("[FRONT][Fusion] queued fusion had nobody on it: " + u.circuitDef.GetName() + " " + u.id + " takes it | M +" + int(metalIncome) + " E +" + int(energyIncome), 1);
+                    if (g_frontFusionTookId == u.id && ai.frame - g_frontFusionTookFrame < 10 * SECOND) {
+                        g_frontFusionRest.set(uk, int64(ai.frame + 60 * SECOND));
+                        GenericHelpers::LogUtil("[FRONT][Fusion] " + u.circuitDef.GetName() + " " + u.id + " did not stay on the queued fusion; rests 60 s", 1);
+                        return defaultTask;
+                    }
+                    g_frontFusionTookId = u.id; g_frontFusionTookFrame = ai.frame;
+                    GenericHelpers::LogUtil("[FRONT][Fusion] queued fusion had nobody on it: " + u.circuitDef.GetName() + " " + u.id + " takes it | M +" + int(metalIncome) + " E +" + int(energyIncome), 1);
                     return queuedFus;
                 }
             }
