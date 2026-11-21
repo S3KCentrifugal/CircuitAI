@@ -8,6 +8,7 @@
 #include "AIFloat3.h"
 #include <algorithm>
 #include <map>
+#include <string>
 #include <deque>
 #include <memory>
 #include <unordered_map>
@@ -78,6 +79,10 @@ public:
     // contacts and ghosts use staticMargin, mobiles keep margin.
     float Danger(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f, float staticMargin=-1.f) const;
     int DangerSign(const springai::AIFloat3& pos, float margin, float press=0.f, float ghostRange=0.f, float staticMargin=-1.f) const;
+    // Trace only (CIRCUIT_RANGED_TRACE, 2026-11-21 Daedalus idle): which contacts make a march leg
+    // unsafe. Linear scan; never called outside trace logging.
+    std::string ExplainLeg(const springai::AIFloat3& from, const springai::AIFloat3& to, float margin, float press,
+        float ghostRange, float staticMargin) const;
     const std::vector<Contact>& Ghosts() const { return ghosts; }
     // Ghost porc (indices into Ghosts()) whose hazard (+margin) reaches pos.
     void NearbyGhosts(const springai::AIFloat3& pos, float margin, float ghostRange, float press, std::vector<int>& result) const;

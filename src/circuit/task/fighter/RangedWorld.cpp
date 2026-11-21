@@ -1,4 +1,5 @@
 #include "task/fighter/RangedWorld.h"
+#include <cstdio>
 #include "util/WeaponReach.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
@@ -419,6 +420,36 @@ float CRangedWorld::Danger(const AIFloat3& pos,float margin,float press,float gh
         if(pos.SqDistance2D(c.pos)<std::pow(hazard+fixedMargin,2.f)) danger+=c.cost;
     });
     return danger;
+}
+std::string CRangedWorld::ExplainLeg(const AIFloat3& from,const AIFloat3& to,float margin,float press,float ghostRange,float staticMargin) const
+{
+    // Trace only: segment test as Safe (statics + ghosts, non-escaping) and point test as DangerSign at 'to'.
+    std::string out; int n=0;
+    const float fixedMargin=staticMargin<0.f?margin:staticMargin;
+    const auto add=[&](const Contact& c,const char* why,float hz,float m,float dist) {
+        if(n>=4) return; ++n;
+        char buf[200];
+        snprintf(buf,sizeof(buf)," [%s %s id=%d %s%s hz=%.0f m=%.0f dist=%.0f at=%.0f,%.0f]",why,
+            c.def?c.def->GetDef()->GetName():"dot",c.id,c.ghost?"ghost":(c.mobile?"mobile":"static"),c.los?"":" nolos",hz,m,dist,c.pos.x,c.pos.z);
+        out+=buf;
+    };
+    const auto scan=[&](const std::vector<Contact>& list,bool ghostList) {
+        for(const auto& c:list) {
+            if(ghostList && c.groundRange>ghostRange) continue;
+            const float hz=Hz(c,press); if(!(hz>0.f)) continue;
+            if(!c.mobile || c.ghost) {
+                const float r=hz+margin;
+                const float d2=ranged::SegmentDistanceSq(P(c.pos),P(from),P(to));
+                if(d2<r*r) add(c,"leg",hz,margin,std::sqrt(d2));
+            }
+            const float m=(c.mobile && !c.ghost)?margin:fixedMargin;
+            const float pd2=to.SqDistance2D(c.pos);
+            if(c.cost>0.f && pd2<std::pow(hz+m,2.f)) add(c,"point",hz,m,std::sqrt(pd2));
+        }
+    };
+    scan(contacts,false);
+    if(ghostRange>0.f) scan(ghosts,true);
+    return out.empty()?std::string(" [none]"):out;
 }
 int CRangedWorld::DangerSign(const AIFloat3& pos,float margin,float press,float ghostRange,float staticMargin) const
 {

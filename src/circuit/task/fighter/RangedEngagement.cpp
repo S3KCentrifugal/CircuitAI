@@ -23,6 +23,8 @@
 #include <cmath>
 #include <limits>
 #include <cstdlib>
+#include <cstdio>
+#include <string>
 #include <map>
 
 namespace circuit {
@@ -398,18 +400,31 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
             return SafeMove(unit,a,b,StaticMargin(p),true)
                 && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0;
         };
+        std::string why;   // trace only (2026-11-21 Daedalus idle): which check cut the leg
         for(const auto& q:points) {
             if(from.SqDistance2D(q)<16.f) continue;
             if(safeAt(from,q)) { legal.push_back(q); from=q; continue; }
             cut=true;
             const float length=std::sqrt(from.SqDistance2D(q));
             const int steps=std::max(1,int(length/64.f));
+            if(trace) {
+                char buf[200];
+                snprintf(buf,sizeof(buf)," leg=%u len=%.0f to=%.0f,%.0f safeMove=%d danger=%d steps=%d",unsigned(legal.size()),length,q.x,q.z,
+                    int(SafeMove(unit,from,q,StaticMargin(p),true)),
+                    world.DangerSign(q,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p)),steps);
+                why=buf;
+                why+=world.ExplainLeg(from,q,StaticMargin(p),p.pressStatic,GhostRange(p),StaticDanger(p));
+            }
             AIFloat3 last=from; bool any=false;
             for(int i=1;i<steps;++i) {
                 AIFloat3 sample=from+(q-from)*(float(i)/steps);
                 CTerrainManager::CorrectPosition(sample);
                 sample.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(sample.x,sample.z);
-                if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),sample) || !safeAt(last,sample)) break;
+                if(!ai->GetTerrainManager()->CanMoveToPos(unit->GetArea(),sample)) { if(trace) why+=" sample"+std::to_string(i)+"=terrain"; break; }
+                if(!safeAt(last,sample)) {
+                    if(trace) why+=" sample"+std::to_string(i)+"=unsafe"+world.ExplainLeg(last,sample,StaticMargin(p),p.pressStatic,GhostRange(p),StaticDanger(p));
+                    break;
+                }
                 last=sample; any=true;
             }
             if(any) legal.push_back(last);
@@ -422,6 +437,7 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
             else TimingFront(unit,"halt");
             if(trace || !points.empty()) ai->LOG("RANGED: march halt unit=%d points=%u legal=%u cut=%d goal=%.0f,%.0f",
                 id,unsigned(points.size()),unsigned(legal.size()),int(cut),marchGoal.x,marchGoal.z);
+            if(trace) ai->LOG("RANGEDTRACE: halt unit=%d at=%.0f,%.0f%s",id,current.x,current.z,why.c_str());
             return;
         }
         const int cap=p.maxWaypoints;
