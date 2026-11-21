@@ -844,6 +844,12 @@ namespace RoleTech
 				/*metalIncomePerPlant*/ Global::RoleSettings::Tech::RequiredMetalIncomeForT2AircraftPlant,
 				/*energyIncomePerPlant*/ Global::RoleSettings::Tech::RequiredEnergyIncomeForT2AircraftPlant);
 
+            // The first Economy/Nuke T2 air lab uses its own OR gate; the normal
+            // income/energy cap still controls other plans and additional labs.
+            if ((TechPlan::plan == "eco" || TechPlan::plan == "nuke")
+                && TechChain::AirLabFunded(Global::RoleSettings::Tech::EconomyNukeAirLabMetalIncome))
+                allowedT2Air = AiMax(allowedT2Air, 1);
+
 			// D-489 (owner, 2026-11-07): the T1 aircraft lab follows the first
 			// advanced fusion, or an aircraft-lab step the chain has reached
 			// (the nuke plan's, after its silo). This block runs after

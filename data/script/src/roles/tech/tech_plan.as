@@ -98,12 +98,21 @@ namespace TechPlan {
             ? Global::RoleSettings::Tech::GantryScaleFirstMetal : Global::RoleSettings::Tech::GantryScaleBaseMetal);
         if (plan == "nuke") {
             if (phase == 1) {
-                if (objective != "nuke" && !TechHeavyRush::SiloReady()) s.insertLast(TechChain::Step("silo", TechChain::DefFor("silo"), 1));
-                else s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1)); // D-229: no aircraft-factory spending before the rush silo
-                s.insertLast(TechChain::Step("income", "", gate200));
+                if (objective != "nuke" && !TechHeavyRush::SiloReady()) {
+                    // No later air step here: a T1 worker cannot build the silo
+                    // and Next would otherwise skip ahead to that air step.
+                    s.insertLast(TechChain::Step("silo", TechChain::DefFor("silo"), 1));
+                } else {
+                    s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));
+                    s.insertLast(TechChain::Step("airfunding", "", int(Global::RoleSettings::Tech::EconomyNukeAirLabMetalIncome)));
+                    s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
+                    s.insertLast(TechChain::Step("income", "", gate200));
+                }
             } else if (phase == 2) {
-                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));   // D-103: only an air constructor builds the advanced aircraft plant
+                s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));
+                s.insertLast(TechChain::Step("airfunding", "", int(Global::RoleSettings::Tech::EconomyNukeAirLabMetalIncome)));
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
+                s.insertLast(TechChain::Step("income", "", gate200));
                 s.insertLast(TechChain::Step("income", "", gate500));
             }
         } else if (plan == "spamrush") {
@@ -151,9 +160,9 @@ namespace TechPlan {
             if (phase == 1) {
                 // D-489 (owner, 2026-11-07): the eco plan had no aircraft lab at all.
                 // The T1 aircraft lab follows the first advanced fusion; the T2 aircraft
-                // lab waits for its income (RequiredMetalIncomeForT2AircraftPlant).
+                // lab waits for 80 metal/sec OR its full metal cost in storage.
                 s.insertLast(TechChain::Step("ap", TechChain::DefFor("ap"), 1));
-                s.insertLast(TechChain::Step("income", "", int(Global::RoleSettings::Tech::RequiredMetalIncomeForT2AircraftPlant)));
+                s.insertLast(TechChain::Step("airfunding", "", int(Global::RoleSettings::Tech::EconomyNukeAirLabMetalIncome)));
                 s.insertLast(TechChain::Step("aap", TechChain::DefFor("aap"), 1));
             }
         }

@@ -853,6 +853,7 @@ namespace Tech {
 
             // T2 Aircraft Plant thresholds (TECH role)
             // Mirrors AIR role defaults; scoped to TECH so roles don't cross-reference
+            float EconomyNukeAirLabMetalIncome = 80.0f; // first T2 air lab: income OR its full metal cost in storage
             float RequiredMetalIncomeForT2AircraftPlant = 100.0f;   // owner, 2026-11-07 (D-489): was 200
             float RequiredEnergyIncomeForT2AircraftPlant = 2000.0f;
 

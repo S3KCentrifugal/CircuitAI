@@ -246,6 +246,53 @@ def prepare(args):
    _SolarCeilingObserved=true; AiLog("[SolarCeilingFixture] high income stall observed");
  }
 '''
+        if case.get('air_lab_policy_fixture'):
+            declarations+='bool _AirLabPolicyChecked=false;\n'
+            events+='''
+ if(ai.teamId==0 && ai.frame>=20*SECOND && !_AirLabPolicyChecked) {
+   _AirLabPolicyChecked=true;
+   const AiRole savedRole=Global::AISettings::Role;
+   const bool savedHeavy=Global::RoleSettings::Tech::HeavyRushEnabled;
+   const string savedPlan=TechPlan::plan; const int savedPhase=TechPlan::phase;
+   Global::AISettings::Role=AiRole::TECH; Global::RoleSettings::Tech::HeavyRushEnabled=false;
+   array<string> plans={"eco","nuke","spamrush","lrpc","t3rush"};
+   bool ok=true;
+   for(uint k=0;k<plans.length();++k) {
+     TechPlan::plan=plans[k]; TechPlan::phase=0;
+     array<TechChain::Step@>@ steps=TechPlan::NextPhase(plans[k]=="nuke" ? "nuke" : "afus");
+     int ap=-1,aap=-1,funding=-1,early=-1; string sequence="";
+     for(uint i=0;i<steps.length();++i) {
+       sequence+=(i>0 ? "," : "")+steps[i].key;
+       if(steps[i].key=="ap") ap=int(i);
+       if(steps[i].key=="aap") aap=int(i);
+       if(steps[i].key=="airfunding") {funding=int(i);ok=ok && steps[i].target==80;}
+       if(steps[i].key=="earlygantry") early=int(i);
+     }
+     if(k<2) ok=ok && ap>=0 && funding==ap+1 && aap==funding+1;
+     else ok=ok && funding<0 && ap>=0 && aap>ap;
+     if(k==1) ok=ok && steps[steps.length()-1].key=="income" && steps[steps.length()-1].target==200;
+     if(k==4 && TechGantry::EarlyEnabled()) ok=ok && early>ap && aap>early;
+     AiLog("[AirLabPolicy] "+plans[k]+" sequence="+sequence);
+   }
+   const string savedEndgame=Global::RoleSettings::Tech::EndgamePlan;
+   Global::RoleSettings::Tech::EndgamePlan="nuke"; TechPlan::plan="nuke"; TechPlan::phase=0;
+   array<TechChain::Step@>@ beforeSilo=TechPlan::NextPhase("afus");
+   ok=ok && beforeSilo.length()==1 && beforeSilo[0].key=="silo";
+   array<TechChain::Step@>@ afterSilo=TechPlan::NextPhase("nuke");
+   ok=ok && afterSilo.length()==5 && afterSilo[0].key=="ap"
+      && afterSilo[1].key=="airfunding" && afterSilo[2].key=="aap" && afterSilo[3].target==200;
+   Global::RoleSettings::Tech::EndgamePlan=savedEndgame;
+   CCircuitDef@ lab=ai.GetCircuitDef(TechChain::DefFor("aap"));
+   ok=ok && lab !is null && aiEconomyMgr.metal.current>=lab.costM
+       && Economy::GetMinMetalIncomeLast10s()<80 && TechChain::AirLabFunded(80);
+   ok=ok && TechEconomyMath::AirLabFunded(80,0,lab.costM,80,false)
+       && !TechEconomyMath::AirLabFunded(79,lab.costM-1,lab.costM,80,false)
+       && TechEconomyMath::AirLabFunded(0,0,lab.costM,80,true);
+   TechPlan::plan=savedPlan; TechPlan::phase=savedPhase;
+   Global::AISettings::Role=savedRole; Global::RoleSettings::Tech::HeavyRushEnabled=savedHeavy;
+   AiLog(ok ? "[AirLabPolicy] PASS plans=5 bank=pass income=pass committed=pass" : "[RangedArena] ERROR air lab policy");
+ }
+'''
         if case.get('placement_fixture'):
             kind=case['placement_fixture']
             if kind not in ('nano-interior','nano-refill','factory-facing','gantry-corridor'):
