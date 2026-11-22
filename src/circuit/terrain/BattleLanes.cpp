@@ -646,6 +646,33 @@ float CBattleAnalysis::AssessLaneAdvance(float from,float goal,bool* stale) {
     return laneFront.Limit(from,goal,laneFrontMargin,laneFrontRatio,circuit->GetLastFrame(),90);
 }
 
+// Local query over the ally-owned publication: O(touched cells + local contacts),
+// no per-reader world census/allocation. Script owns radius, memory and reaction.
+// -2 means stale publication, -1 means no identified land contact.
+int CBattleAnalysis::LocalGroundContact(const AIFloat3& from, float radius, float memorySeconds, AIFloat3& position) {
+    position = AIFloat3(-1.f, 0.f, -1.f);
+    if (!std::isfinite(radius) || radius <= 0.f || !std::isfinite(memorySeconds)
+        || !std::isfinite(from.x) || !std::isfinite(from.z)) return -1;
+    const int frame = circuit->GetLastFrame();
+    auto& snapshot = circuit->GetAllyTeam()->GetCombatSnapshot();
+    snapshot.Want(frame);
+    if (snapshot.Frame() < 0 || frame - snapshot.Frame() > 60) return -2;
+    const int memory = int(std::clamp(memorySeconds, 0.f, 120.f) * FRAMES_PER_SEC);
+    float nearest = radius * radius;
+    int selected = -1;
+    snapshot.Query({from.x, from.z}, radius, [&](const CCombatSnapshot::Entry& e) {
+        if (!e.los && !e.radar && frame - e.lastObserved > memory) return;
+        const auto* def = circuit->GetCircuitDefSafe(e.defId);
+        if (def == nullptr || def->IsAbleToFly()) return;
+        const AIFloat3 pos(e.pos.x, e.elevation, e.pos.z);
+        if (Height(pos) < 0.f) return; // land footholds, not submerged/naval contacts
+        const float distance = from.SqDistance2D(pos);
+        if (distance > nearest || (distance == nearest && selected >= 0 && e.id >= selected)) return;
+        nearest = distance; selected = e.id; position = pos;
+    });
+    return selected;
+}
+
 bool CBattleAnalysis::KnownEnemyNear(const AIFloat3& from,float radius,float memorySeconds) {
     if(!std::isfinite(radius) || radius<=0 || !std::isfinite(memorySeconds)) return false;
     const int frame=circuit->GetLastFrame();

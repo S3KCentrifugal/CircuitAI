@@ -30,6 +30,7 @@
 #include "tech_heavy_rush.as"
 #include "../../systems/production/tech_air_foundry.as"
 #include "tech_transport.as"
+#include "../../systems/combat/tech_base_response.as"
 
 namespace RoleTech
 {
@@ -591,6 +592,7 @@ namespace RoleTech
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_MainUpdate", 4);
 		Tech_UpdateNukeFirstStrike();
+        TechBaseResponse::Tick();
         NukeRecon::Tick();   // TECH's first silo calls the allied AIR nuke scout wave
 	}
 
@@ -611,8 +613,10 @@ namespace RoleTech
 	// to the closest allies (Team::Donation::OnCombatBotBuilt, D-041).
 	void Tech_MilitaryAiUnitAdded(CCircuitUnit @unit, Unit::UseAs usage)
 	{
+        const bool defender = TechBaseResponse::OnFinished(unit);
         NukeRecon::Finished(unit);
-		Invariants::OnUnitAdded(unit);   // D-076: INV-001
+		Invariants::OnUnitAdded(unit);   // includes retirement audit for emergency products
+        if (defender) return;
         if (FrontlineEngineering::IsFiendProduct(unit)) return; // local combat support, not factory donation quota
         if (TechHeavyRush::OnFinished(unit)) return;
         // D-158: keep the amphibious wave together; constructor donations are separate.
@@ -1611,6 +1615,7 @@ namespace RoleTech
 	void Tech_FactoryAiUnitRemoved(CCircuitUnit @unit, Unit::UseAs usage)
 	{
 		GenericHelpers::LogUtil("[TECH] Enter Tech_FactoryAiUnitRemoved", 4);
+        TechBaseResponse::Removed(unit);
 		Lifecycle::Forget(unit);   // D-076
 		// Lab tracking is now centralized in Factory::AiUnitRemoved
 	}

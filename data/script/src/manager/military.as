@@ -133,6 +133,8 @@ namespace Military {
 			return st;
 		}
 
+        IUnitTask@ home = TechBaseResponse::TaskFor(u);
+        if (home !is null) return home;
 		IUnitTask@ t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
 		if (t !is null) return t;
 		@t = TechHeavyRush::MilitaryTask(u);
@@ -194,6 +196,7 @@ namespace Military {
 
 	void AiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
 	{
+        TechBaseResponse::Removed(unit);
         CommanderGroup::OnRemoved(unit);
         TechHeavyRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
@@ -210,6 +213,7 @@ namespace Military {
 
 	void AiLoad(IStream& istream)
 	{
+        TechBaseResponse::Reset();
         AmphibiousOps::Reset(); // ephemeral routes are rebuilt through Military::AiMakeTask
         AmphibiousOps::lastTick = -100000; // a loaded frame may precede the last live update
         FrontOpener::Load(); // retire ephemeral opener task ownership after reload

@@ -1,0 +1,109 @@
+{
+  "name": "tech-base-response-cortex",
+  "unit": "corcom",
+  "side": "cortex",
+  "role": "TECH",
+  "enemy_role": "FRONT",
+  "description": "Low-income TECH responds only to a nearby land incursion with both bot tiers, then resumes constructors.",
+  "map": "Comet Catcher Remake 1.8",
+  "map_key": "comet",
+  "starts": [
+    [
+      4000,
+      2000
+    ],
+    [
+      7000,
+      5000
+    ]
+  ],
+  "camera": [
+    4000,
+    3000,
+    1800
+  ],
+  "photos": [],
+  "production": true,
+  "commander_observation": true,
+  "commander_initial": true,
+  "hold_friendly": false,
+  "enemy_team": 1,
+  "hold_teams": [
+    1
+  ],
+  "commander_front_work": false,
+  "coverage_probe": false,
+  "start_metal": 100000,
+  "start_energy": 1000000,
+  "tech_base_response_fixture": true,
+  "groups": [
+    {
+      "unit": "corlab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        3840,
+        2100
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "coralab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4200,
+        2100
+      ],
+      "after_seconds": 70
+    },
+    {
+      "unit": "armrad",
+      "team": 0,
+      "count": 1,
+      "position": [
+        4000,
+        1500
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "armfus",
+      "team": 1,
+      "count": 1,
+      "position": [
+        5504,
+        2000
+      ],
+      "after_seconds": 20
+    },
+    {
+      "unit": "armpeep",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4000,
+        1800
+      ],
+      "after_seconds": 35
+    },
+    {
+      "unit": "armfus",
+      "team": 1,
+      "count": 1,
+      "position": [
+        4000,
+        1120
+      ],
+      "after_seconds": 60
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "tech-base-response-cortex",
+  "storage_scenario": "base-response-cortex"
+}

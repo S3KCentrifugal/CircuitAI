@@ -17,6 +17,15 @@ namespace circuit {
 
 using namespace springai;
 
+// Per-task admission lever; ordinary Enqueue retains economy-driven priority.
+static IUnitTask* CFactoryManager_EnqueuePriority(CFactoryManager* manager,
+        const TaskS::SRecruitTask& request, bool preservePriority)
+{
+    CRecruitTask* task = manager->Enqueue(request);
+    task->SetPreservePriority(preservePriority);
+    return task;
+}
+
 // count already contains frames; count only orders without a frame here.
 static int CFactoryManager_GetPendingRecruitCount(const CFactoryManager* manager, const CCircuitDef* def)
 {
@@ -56,6 +65,7 @@ CFactoryScript::CFactoryScript(CScriptManager* scr, CFactoryManager* mgr)
 	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ MakeFactoryTask(CCircuitUnit@, bool keepActive, bool keepQueued = false)", asMETHOD(CFactoryManager, MakeFactoryTask), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ GetPendingFactoryTask(CCircuitUnit@) const", asMETHOD(CFactoryManager, GetPendingFactoryTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "void AbortTask(IUnitTask@)", asMETHODPR(CFactoryManager, AbortTask, (IUnitTask*), void), asCALL_THISCALL); ASSERT(r >= 0);  // D-076: a retiring factory drops its task
+    r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ Enqueue(const SRecruitTask& in, bool)", asFUNCTION(CFactoryManager_EnqueuePriority), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ Enqueue(const SRecruitTask& in)", asMETHODPR(CFactoryManager, Enqueue, (const TaskS::SRecruitTask&), CRecruitTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ Enqueue(const SServSTask& in)", asMETHODPR(CFactoryManager, Enqueue, (const TaskS::SServSTask&), IUnitTask*), asCALL_THISCALL); ASSERT(r >= 0);
 //	r = engine->RegisterObjectMethod("CFactoryManager", "IUnitTask@+ EnqueueRetreat()", asMETHOD(CFactoryManager, EnqueueRetreat), asCALL_THISCALL); ASSERT(r >= 0);

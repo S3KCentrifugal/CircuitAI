@@ -483,6 +483,9 @@ namespace Tech {
             int ConverterParallel = 3;                      // D-079: converters queued at once while energy floats (one at a time otherwise); the pull-inflated surplus is replaced by half the income while floating
             float ChainEnergyFloatSeconds = 15.0f;          // D-079: the energy bank at EcoConvertEnergyPercent of storage for this long = energy floats: no energy structure is ordered, converters first (the pull is inflated by the build in progress, so the bank is read, not the pull)
             float InvariantFloatOrderSeconds = 90.0f;        // D-079: INV-009 - an energy frame appearing after the bank has been full this long was ordered while floating
+            float BaseResponseRadius = 1200.0f; // land intrusions around the economy core, zero disables
+            float BaseResponseMemorySeconds = 15.0f; // bounded last-observed enemy contact memory
+            float BaseResponseClearSeconds = 5.0f; // clear-area confirmation before economy resumes
             float PowerAheadSeconds = 15.0f;                // D-075: the metal bank at InvariantFloatPercent of storage for this long, or risen by PowerAheadRise over it = income above spending
             float PowerAheadRise = 30.0f;                   // D-075: ... the rise over PowerAheadSeconds that counts as the bank rising
             float ExpCombatMetalIncome = 200.0f;            // D-068: under this 10 s metal income TECH's labs make no combat unit (rush bots stay capped, no scout/fast-bot batches); 0 = never
