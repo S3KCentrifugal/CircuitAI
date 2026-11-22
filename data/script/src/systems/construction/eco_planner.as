@@ -552,12 +552,12 @@ namespace EcoPlanner {
     string PickEnergy(const State@ s, string &out why, const string &in reason)
     {
         array<Option@>@ opts = EnergyOptions(s); // this owned list is filtered below
-        // D-429: mex-first is a preference, not an energy-starvation loop.
+        // D-527: energy pressure alone must not divert scarce metal from base mexes.
         // Affordable reactor relief is shared with the chain and INV-021;
         // AIR and the dedicated nuke recipe retain their own prerequisites.
         const bool energyShort = s.ePull > s.eIncome || s.eIncome < TargetEnergy(s.mIncome);
         const bool mohos = s.air ? !AirEconomy::MexesReady()
-            : TechEconomyMath::MexesBlockReactor(TechChain::MohosPending(), TechChain::NukeRush(), energyShort,
+            : TechEconomyMath::MexesBlockReactor(TechChain::MohosPending(), TechChain::NukeRush(), energyShort, TechBuild::ReactorMetalSurplus(),
                 s.mIncome, Global::RoleSettings::Tech::MinimumMetalIncomeForFUS,
                 s.eIncome, Global::RoleSettings::Tech::EcoFusionEnergyIncome);
         const string rsn = mohos ? (reason + "; mex upgrades pending, no fusion") : reason;

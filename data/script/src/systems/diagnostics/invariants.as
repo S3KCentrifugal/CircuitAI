@@ -110,10 +110,10 @@ namespace Invariants {
             const float mi = Economy::GetMinMetalIncomeLast10s();
             const float ei = Economy::GetMinEnergyIncomeLast10s();
             if (TechEconomyMath::MexesBlockReactor(true, false,
-                aiEconomyMgr.energy.pull > ei || ei < EcoPlanner::TargetEnergy(mi), mi,
+                aiEconomyMgr.energy.pull > ei || ei < EcoPlanner::TargetEnergy(mi), TechBuild::ReactorMetalSurplus(), mi,
                 Global::RoleSettings::Tech::MinimumMetalIncomeForFUS, ei,
                 Global::RoleSettings::Tech::EcoFusionEnergyIncome))
-                Violation("INV-021", "fusion", "fusion admitted before mex upgrades without affordable energy relief");
+                Violation("INV-021", "fusion", "fusion admitted before mex upgrades without sustained metal surplus for energy relief");
         }
         const bool energy = name == UnitHelpers::GetWindNameForSide(side)
             || name == UnitHelpers::GetSolarNameForSide(side) || name == UnitHelpers::GetAdvSolarNameForSide(side)

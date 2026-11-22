@@ -50,9 +50,15 @@ namespace TechEconomyMath {
     bool CapacityNeeded(float target, float standing, float arriving, bool draining) {
         return !draining && target > 0 && standing + arriving < target;
     }
-    bool MexesBlockReactor(bool pending, bool dedicatedRush, bool energyShort,
+    // D-527: require a complete observation window; startup samples cannot prove surplus.
+    bool SustainedMetalSurplus(bool full, uint samples, uint requiredSamples,
+        float first, float current, float minimumRise) {
+        return full || (requiredSamples >= 2 && samples >= requiredSamples
+            && minimumRise > 0.f && current - first >= minimumRise);
+    }
+    bool MexesBlockReactor(bool pending, bool dedicatedRush, bool energyShort, bool metalSurplus,
         float metalIncome, float minimumMetal, float energyIncome, float minimumEnergy) {
-        return pending && (dedicatedRush || !energyShort
+        return pending && (dedicatedRush || !energyShort || !metalSurplus
             || metalIncome < minimumMetal || energyIncome < minimumEnergy);
     }
     bool FusionSuperseded(bool afusComplete, bool dedicatedRush, int fusionPending) {

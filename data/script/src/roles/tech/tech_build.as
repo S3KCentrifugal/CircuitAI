@@ -175,6 +175,14 @@ namespace TechBuild {
     bool MetalFullLong() { return metalFullSince >= 0 && ai.frame - metalFullSince >= int(Global::RoleSettings::Tech::PowerAheadSeconds) * SECOND; }
     bool MetalRising() { return metalBank.length() >= 2 && metalBank[metalBank.length() - 1] - metalBank[0] >= Global::RoleSettings::Tech::PowerAheadRise; }
     bool MetalAhead() { return MetalFullLong() || MetalRising(); }
+    // D-527: reuse the once-a-second bank history, with no new scans, samples or orders.
+    // Constant-time admission; unlike MetalRising, require the complete configured window.
+    bool ReactorMetalSurplus() {
+        return TechEconomyMath::SustainedMetalSurplus(MetalFullLong(), metalBank.length(),
+            uint(Global::RoleSettings::Tech::PowerAheadSeconds) + 1,
+            metalBank.length() > 0 ? metalBank[0] : 0.f, aiEconomyMgr.metal.current,
+            Global::RoleSettings::Tech::PowerAheadRise);
+    }
     string MetalAheadWhy()
     {
         if (MetalFullLong()) return "bank full for " + int((ai.frame - metalFullSince) / SECOND) + " s";
