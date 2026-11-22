@@ -132,6 +132,8 @@ namespace Factory {
 		// constructor donations/recovery and spam. Checking only in the TECH
 		// delegate allowed these earlier providers to restart a retired lab.
 		if (Lifecycle::IsRetiring(u)) return null;
+        IUnitTask@ home = TechBaseResponse::Produce(u);
+        if (home !is null) return home;
 		GantryFallback::Arm(u);   // owner, 2026-10-26: T3 gantries repeat and rally to their edge lane
         if(Global::AISettings::Role==AiRole::TECH && FrontlineEngineering::active
             && EngineeringReplacements::BaseEmergency()) return RoleTech::Tech_FactoryAiMakeTask(u);

@@ -151,7 +151,21 @@ def prepare(args):
         if name=='builder' and case.get('placement_fixture'):
             worker='armacv' if case['placement_fixture']=='factory-facing' else 'armack'
             repair+='\n if(ai.teamId==0 && u.circuitDef.GetName()=="'+worker+'" && _PlacementTask !is null && !_PlacementTask.IsDead()) return _PlacementTask; // declared placement fixture\n'
+        if name=='factory' and case.get('tech_base_response_fixture'):
+            repair+='\n if(ai.teamId==0 && !_BaseResponseActive && ai.frame<90*SECOND) return aiFactoryMgr.Enqueue(TaskS::Wait(false,SECOND)); // allow nearby intrusion before economy products\n'
         path.write_text(source[:start]+repair+'\n if ('+condition+') return '+manager+'.Enqueue('+wait+'); // supplied arena only\n'+source[start:])
+    # KI-785: with every builder and factory frozen no first factory can
+    # appear, so D-494's first-factory check (INV-267) cannot judge the arena.
+    # Only that check is skipped; every other invariant stays forbidden.
+    first_factory_skipped = not (case.get('builders') or case.get('commander_front_work') or case.get('production'))
+    if case.get('tech_base_response_fixture'):
+        path=staged/'script/src/systems/construction/front_layout.as'
+        source=path.read_text(); start=source.index('{',source.index('void CheckFirstFactory()'))+1
+        path.write_text(source[:start]+'\n if(ai.teamId!=0) return; // enemy builders are frozen in this supplied fixture\n'+source[start:])
+    if first_factory_skipped:
+        path = staged/'script/src/systems/construction/front_layout.as'
+        source = path.read_text(); start = source.index('{', source.index('void CheckFirstFactory()'))+1
+        path.write_text(source[:start]+'\n if (ai.frame>=0) return; // supplied arena: builders and factories frozen (KI-785)\n'+source[start:])
     path = staged/'script/src/manager/military.as'
     source = path.read_text(); start = source.index('{',source.index('IUnitTask@ AiMakeTask(CCircuitUnit@ u)'))+1
     # Normal combat cases leave friendly commands to the AI. Production-only
@@ -244,6 +258,51 @@ def prepare(args):
  if(ai.teamId==0 && ai.frame>=40*SECOND && !_SolarCeilingObserved
     && aiEconomyMgr.energy.income>=1000.f && aiEconomyMgr.isEnergyStalling) {
    _SolarCeilingObserved=true; AiLog("[SolarCeilingFixture] high income stall observed");
+ }
+'''
+        if case.get('tech_base_response_fixture'):
+            events+='\n if(ai.teamId==0) Global::AISettings::Side='+json.dumps(case.get('side','armada'))+';\n'
+            declarations+='bool _BaseResponseReady=false,_BaseResponseActive=false,_BaseResponseClear=false,_BaseResponseResumed=false; int _BaseResponseT1=0,_BaseResponseT2=0;\n'
+            events+='''
+ if(ai.teamId==0) {
+   if(!_BaseResponseReady) {
+     _BaseResponseReady=true;
+     RoleTech::Register(); @Global::profileController.RoleCfg=RoleConfigs::Get(AiRole::TECH);
+     Global::Map::StartPos=AIFloat3(4000,0,2000);
+     Global::RoleSettings::Tech::BaseResponseRadius=1200.f;
+     Global::RoleSettings::Tech::HeavyRushEnabled=false;
+     array<string> names={"armpw","corak","leggob","armfast","corpyro","legstr"};
+     for(uint i=0;i<names.length();++i) { CCircuitDef@ d=ai.GetCircuitDef(names[i]); if(d !is null) d.maxThisUnit=0; }
+   }
+   TechBaseResponse::Tick();
+   if(ai.frame>=30*SECOND && ai.frame<55*SECOND && TechBaseResponse::active)
+     AiLog("[RangedArena] ERROR response to distant/air-only contact");
+   if(ai.frame>=60*SECOND && TechBaseResponse::active) {
+     _BaseResponseActive=true;
+     const string side=Global::AISettings::Side;
+     CCircuitDef@ light=ai.GetCircuitDef(side=="armada" ? "armpw" : side=="cortex" ? "corak" : "leggob");
+     array<string> fast=UnitHelpers::GetFastT2Bots(side);
+     CCircuitDef@ heavy=ai.GetCircuitDef(fast[0]);
+     _BaseResponseT1=AiMax(_BaseResponseT1,light.count-aiBuilderMgr.GetUnfinishedCount(light));
+     _BaseResponseT2=AiMax(_BaseResponseT2,heavy.count-aiBuilderMgr.GetUnfinishedCount(heavy));
+   }
+   if(_BaseResponseActive && !TechBaseResponse::active && !_BaseResponseClear) {
+     _BaseResponseClear=true;
+     const string side=Global::AISettings::Side;
+     const string light=side=="armada" ? "armpw" : side=="cortex" ? "corak" : "leggob";
+     array<string> fast=UnitHelpers::GetFastT2Bots(side);
+     CCircuitDef@ t1=ai.GetCircuitDef(light),t2=ai.GetCircuitDef(fast[0]);
+     AiLog(_BaseResponseT1>=2 && _BaseResponseT2>=1 ? "[BaseResponseFixture] PASS both tiers defended and cleared" : "[RangedArena] ERROR missing defender tier");
+   }
+   if(_BaseResponseClear && !_BaseResponseResumed) {
+     array<string> cons=UnitHelpers::GetT1BotConstructors(Global::AISettings::Side);
+     CCircuitDef@ con=ai.GetCircuitDef(cons[0]);
+     array<string> advanced=UnitHelpers::GetT2BotConstructors(Global::AISettings::Side);
+     CCircuitDef@ t2con=ai.GetCircuitDef(advanced[0]);
+     if(con.count-aiBuilderMgr.GetUnfinishedCount(con)+t2con.count-aiBuilderMgr.GetUnfinishedCount(t2con)>0) {
+       _BaseResponseResumed=true; AiLog("[BaseResponseFixture] PASS economy constructor completed after clear");
+     }
+   }
  }
 '''
         if case.get('air_lab_policy_fixture'):
@@ -544,7 +603,7 @@ def prepare(args):
     (directory/'ranged-arena.json').write_text(json.dumps(case,indent=2)+'\n')
     pins={'dll_sha256':hashlib.sha256(args.dll.read_bytes()).hexdigest(),
           'diagnostics':{name:os.environ[name] for name in
-              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
+              ('CIRCUIT_RANGED_TRACE','CIRCUIT_VERIFY_RANGED_QUERIES','CIRCUIT_VERIFY_RANGED_SNAPSHOT','CIRCUIT_VERIFY_RANGED_SHARED','CIRCUIT_PERF_PHASES','CIRCUIT_COMMANDER_TRACE')
               if name in os.environ},
           'files':{str(p.relative_to(staged)):storage.file_hash(p) for p in staged.rglob('*') if p.is_file() and p.suffix in ('.as','.json')},
           'observer_sha256':storage.file_hash(HERE/'widgets/ranged_arena.lua'),
@@ -554,6 +613,8 @@ def prepare(args):
                if args.profile.startswith('experimental_') else ['native legacy economy remains active'])}
     if case.get('commander_trace'):
         pins['diagnostics']['CIRCUIT_COMMANDER_TRACE']='1'
+    if first_factory_skipped:
+        pins['overrides'] += ['FRONT first-factory check (INV-267) skipped: no builder or factory can act (KI-785)']
     if case.get('production'):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
     if case.get('commander_repair_only'):
@@ -569,6 +630,8 @@ def prepare(args):
     if case.get('commander_front_work'):
         pins['overrides'] += [('all commanders' if case.get('coverage_probe') else 'team 0 commanders')
                              +' use real FRONT builder policy; other builders frozen']
+    if case.get('tech_base_response_fixture'):
+        pins['overrides'] += ['TECH role handler and start assigned for supplied frozen-builder fixture; combat definition caps zero; economy production held until first land intrusion; full response and resumed role production retained']
     if case.get('trace_spam'):
         pins['overrides'] += ['TECH layout/economy invariant Tick disabled for supplied buildings; production/lifecycle and spam invariants retained', 'read-only factory task census every 10 seconds']
     if case.get('hold_friendly'):

@@ -235,6 +235,7 @@ public:
     float AssessLaneAdvance(float from,float goal,bool* stale);
     bool LaneWorkAllowed(const springai::AIFloat3& site);
     float LaneCombatDistance(const springai::AIFloat3& from,float memorySeconds);
+    int LocalGroundContact(const springai::AIFloat3& from, float radius, float memorySeconds, springai::AIFloat3& position);
     bool KnownEnemyNear(const springai::AIFloat3& from,float radius,float memorySeconds);
     std::string DescribeLaneFront();
     float GetLaneHeldProgress();

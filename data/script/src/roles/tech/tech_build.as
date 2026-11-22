@@ -724,7 +724,7 @@ namespace TechBuild {
         }
         CCircuitUnit@ tlab = Factory::primaryT1BotLab;
         // D-102: not once the economy is online (reclaiming a lab for metal is pointless late)
-        if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab) && !EcoOnline()) {
+        if (tlab !is null && tlab.id == throwawayLabId && !Lifecycle::IsRetiring(tlab) && !EcoOnline() && !TechBaseResponse::Emergency()) {
             if (tlab.task !is null && (tlab.task.GetType() == int(Task::Type::FACTORY)
                 || tlab.task.GetType() == int(Task::Type::WAIT))) aiFactoryMgr.AbortTask(tlab.task); // never abort a shared idle state
             Lifecycle::Retire(tlab, "the advanced lab is under way; the throwaway T1 lab is reclaimed (D-066)");
@@ -757,7 +757,7 @@ namespace TechBuild {
                 heavyKeptLoggedFor = t2.id;
                 GenericHelpers::LogUtil("[TECH][Build] nuke opening keeps the advanced lab " + t2.id + ": the heavy-rush batch is pending (D-290)", 1);
             }
-            const bool due = (t2 !is null) && !EcoOnline() && !protectedLab
+            const bool due = (t2 !is null) && !EcoOnline() && !protectedLab && !TechBaseResponse::Emergency()
                 && ((AfusUnderWay() && !funded) || rushRelease)
                 && TechReclaim::Fits(t2, fitsWhy);
             if (due && !Lifecycle::IsRetiring(t2)) {

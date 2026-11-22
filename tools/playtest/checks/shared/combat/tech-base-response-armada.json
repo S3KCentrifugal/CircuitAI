@@ -1,0 +1,30 @@
+{
+  "stop_minute": 5,
+  "expect": [
+    {
+      "key": "response",
+      "pattern": "\\[TECH\\]\\[BaseResponse\\] active: land contact",
+      "scope": "any",
+      "by_minute": 2
+    },
+    {
+      "key": "clear",
+      "pattern": "\\[BaseResponseFixture\\] PASS both tiers defended and cleared",
+      "scope": "any",
+      "by_minute": 5
+    },
+    {
+      "key": "resume",
+      "pattern": "\\[BaseResponseFixture\\] PASS economy constructor completed after clear",
+      "scope": "any",
+      "by_minute": 5
+    }
+  ],
+  "forbid": [
+    {
+      "key": "errors",
+      "pattern": "\\[INVARIANT\\]|\\[RangedArena\\].*ERROR|: ERR\\s+:|SCRIPT CRASH|Lib exception|Access violation|has crashed|Fatal:",
+      "scope": "any"
+    }
+  ]
+}

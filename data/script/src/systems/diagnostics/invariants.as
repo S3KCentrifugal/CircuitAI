@@ -87,7 +87,7 @@ namespace Invariants {
         // The finite heavy batch has its own admission budget. Exempt only
         // verified production provenance, not every heavy unit or whole role.
         const bool heavyBatch = TechHeavyRush::IsBatchProduction(u);
-        if (!builder && !coastal && !pressure && !nukeRecon && !heavyBatch && !FrontlineEngineering::IsFiendProduct(u)
+        if (!builder && !coastal && !pressure && !nukeRecon && !heavyBatch && !TechBaseResponse::defenders.exists("" + u.id) && !FrontlineEngineering::IsFiendProduct(u)
             && !TechGantry::IsAdmittedProduction(u) && mi < TechPlan::CombatGate())
             Violation("INV-010", u.circuitDef.GetName(), "combat unit " + u.circuitDef.GetName() + " " + u.id + " produced at +" + int(mi) + " metal under the gate " + int(TechPlan::CombatGate()));
     }
@@ -466,7 +466,7 @@ namespace Invariants {
             const float mStor = aiEconomyMgr.metal.storage;
             const bool high = mStor > 0.0f && aiEconomyMgr.metal.current > Global::RoleSettings::Tech::T2ConstructorBankShare * mStor
                 && Factory::primaryT2BotLab !is null && !Lifecycle::IsRetiring(Factory::primaryT2BotLab)
-                && t2Cons < wanted;
+                && t2Cons < wanted && !TechBaseResponse::Emergency();
             if (!high || t2Cons > t2ConsAtHigh) { t2ConsHighSince = high ? ai.frame : -1; t2ConsAtHigh = t2Cons; }
             else if (t2ConsHighSince < 0) { t2ConsHighSince = ai.frame; t2ConsAtHigh = t2Cons; }
             else if (ai.frame - t2ConsHighSince >= 60 * SECOND) {
