@@ -1720,6 +1720,7 @@ void CInitScript::RegisterMgr()
     r=engine->RegisterObjectMethod("CBattleAnalysis","void SetLaneFrontOptions(float, float, float, float, float)",asMETHOD(CBattleAnalysis,SetLaneFrontOptions),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float LimitLaneAdvance(float, float)",asMETHOD(CBattleAnalysis,LimitLaneAdvance),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float LaneCombatDistance(const AIFloat3& in, float)",asMETHOD(CBattleAnalysis,LaneCombatDistance),asCALL_THISCALL);ASSERT(r>=0);
+    r=engine->RegisterObjectMethod("CBattleAnalysis","int LocalGroundContact(const AIFloat3& in, float, float, AIFloat3& out)",asMETHOD(CBattleAnalysis,LocalGroundContact),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","bool KnownEnemyNear(const AIFloat3& in, float, float)",asMETHOD(CBattleAnalysis,KnownEnemyNear),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","string DescribeLaneFront()",asMETHOD(CBattleAnalysis,DescribeLaneFront),asCALL_THISCALL);ASSERT(r>=0);
     r=engine->RegisterObjectMethod("CBattleAnalysis","float GetLaneHeldProgress()",asMETHOD(CBattleAnalysis,GetLaneHeldProgress),asCALL_THISCALL);ASSERT(r>=0);

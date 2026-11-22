@@ -89,7 +89,9 @@ void CRecruitTask::Update()
 		return;
 	}
 
-	bool hasMetal = economyMgr->GetAvgMetalIncome() * 2.0f > economyMgr->GetMetalPull();
+	// A script-admitted urgent product keeps its declared resource priority.
+    // Energy-empty safety above remains authoritative; ordinary recruits are unchanged.
+    bool hasMetal = preservePriority || economyMgr->GetAvgMetalIncome() * 2.0f > economyMgr->GetMetalPull();
 	if (State::DISENGAGE == state) {
 		if (hasMetal) {
 			state = State::ROAM;  // Not wait

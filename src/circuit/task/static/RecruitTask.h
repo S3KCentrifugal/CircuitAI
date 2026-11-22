@@ -48,12 +48,14 @@ public:
 	RecruitType GetRecruitType() const { return recruitType; }
 	void SetRepeat(bool value) { repeat = value; }
 	bool IsRepeat() const { return repeat; }
+    void SetPreservePriority(bool value) { preservePriority = value; }
 	void SetCompletionRefill(bool value) { completionRefill = value; }
 
 private:
 	RecruitType recruitType;
 	float sqradius;
 	bool repeat = false;
+    bool preservePriority = false; // explicit script admission, task lifetime only
 	bool completionRefill = false;
 	int lastBuildCommandFrame = -1;
 };
