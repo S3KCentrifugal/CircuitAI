@@ -128,14 +128,14 @@ void test_project_power_and_idle_capacity_are_separate() {
     Check(TechEconomyMath::CapacityTarget(0,8,20,600,0,60,10000,10000)==0);
 }
 void test_mex_first_allows_affordable_energy_relief_but_keeps_nuke_recipe() {
-    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,20,20,300,300));
-    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,40,20,600,300));
-    Check(TechEconomyMath::MexesBlockReactor(true,true,true,40,20,600,300));
-    Check(TechEconomyMath::MexesBlockReactor(true,false,false,40,20,600,300));
-    Check(TechEconomyMath::MexesBlockReactor(true,false,true,19,20,600,300));
-    Check(TechEconomyMath::MexesBlockReactor(true,false,true,40,20,299,300));
-    Check(!TechEconomyMath::MexesBlockReactor(false,false,false,0,20,0,300));
-    Check(!TechEconomyMath::MexesBlockReactor(false,true,false,0,20,0,300));
+    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,true,20,20,300,300));
+    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,true,40,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,true,true,true,40,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,false,true,40,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,true,true,19,20,600,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,true,true,40,20,299,300));
+    Check(!TechEconomyMath::MexesBlockReactor(false,false,false,true,0,20,0,300));
+    Check(!TechEconomyMath::MexesBlockReactor(false,true,false,true,0,20,0,300));
 }
 void test_completed_afus_satisfies_fusion_without_abandoning_work() {
     Check(TechEconomyMath::FusionSuperseded(true,false,0));
@@ -195,4 +195,20 @@ void test_air_lab_income_or_full_bank_and_committed_work() {
     Check(TechEconomyMath::AirLabFunded(0,0,1000,80,true));
     Check(!TechEconomyMath::AirLabFunded(0,0,0,80,false));
     Check(!TechEconomyMath::AirLabFunded(79,1000,2000,80,false));
+}
+
+void test_mex_upgrades_keep_scarce_metal_despite_energy_pressure() {
+    Check(TechEconomyMath::MexesBlockReactor(true,false,true,false,27,20,580,300));
+    Check(TechEconomyMath::MexesBlockReactor(true,false,true,false,200,20,3000,300));
+    Check(!TechEconomyMath::MexesBlockReactor(true,false,true,true,27,20,580,300));
+    Check(!TechEconomyMath::MexesBlockReactor(false,false,true,false,27,20,580,300));
+}
+void test_reactor_surplus_requires_complete_window_and_bank_growth() {
+    Check(!TechEconomyMath::SustainedMetalSurplus(false,2,16,0,500,30));
+    Check(!TechEconomyMath::SustainedMetalSurplus(false,16,16,100,129,30));
+    Check(TechEconomyMath::SustainedMetalSurplus(false,16,16,100,130,30));
+    Check(!TechEconomyMath::SustainedMetalSurplus(false,16,16,200,100,30));
+    Check(!TechEconomyMath::SustainedMetalSurplus(false,16,16,100,100,30));
+    Check(TechEconomyMath::SustainedMetalSurplus(true,16,16,100,100,30));
+    Check(!TechEconomyMath::SustainedMetalSurplus(false,16,16,100,100,0));
 }

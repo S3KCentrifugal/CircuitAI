@@ -357,7 +357,7 @@ namespace TechRules {
     bool ReactorRelief(Ctx@ c) {
         if (TechChain::NukeRush() || !c.eco.builderIsT2 || c.eco.energyBuilding) return false;
         return !TechEconomyMath::MexesBlockReactor(true, false,
-            c.eco.ePull > c.ei || c.ei < c.energyTarget, c.mi,
+            c.eco.ePull > c.ei || c.ei < c.energyTarget, TechBuild::ReactorMetalSurplus(), c.mi,
             Global::RoleSettings::Tech::MinimumMetalIncomeForFUS, c.ei,
             Global::RoleSettings::Tech::EcoFusionEnergyIncome)
             && TechChain::MohosPending();
@@ -578,7 +578,7 @@ namespace TechRules {
         table.insertLast(Rule("energy.convert.float", MOBILE,     W4(@EnergyFloatsBank, @NotStalling, @NoDearOrderPending, @NotMetalFull), @DoConverter,    "D-079: before the chain - energy floats (TechChain::EnergyFloats): a converter, whatever the chain is doing"));
         table.insertLast(Rule("power.turret",      MOBILE,       W4(@MetalAhead, @StructureBuilding, @NotStalling, @NoDearOrderPending), @DoPowerTurret, "D-075: metal income above spending while a structure is under construction: a turret, Layout::TurretsAllowed at a time (D-097), else assist the turret going up"));
         table.insertLast(Rule("energy.geo",        MOBILE,       W0(), @DoLocalGeo, "safe local geothermal before discretionary reactors"));
-        table.insertLast(Rule("energy.reactor.relief", MOBILE, W1(@ReactorRelief), @DoEnergy, "D-429: affordable reactor relieves the mex-upgrade energy bottleneck"));
+        table.insertLast(Rule("energy.reactor.relief", MOBILE, W1(@ReactorRelief), @DoEnergy, "D-527: reactor relief requires sustained metal surplus during mex upgrades"));
         table.insertLast(Rule("chain.next",        MOBILE,       W1(@ChainActive), @DoChain,      "the rush chain (D-070): the first unmet target - assist its frame, wait for its order, or order it"));
         table.insertLast(Rule("lab.t1.opening",    MOBILE,       W3(@OpeningDone, @NotIntoT2, @NoT1Lab), @DoStartFactory, "the throwaway first lab at the commander; a constructor uses the pair's slot"));
         table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W3(@OpeningDone, @NoConstructors, @NoLabAtAll), @DoStartFactory, "every constructor and every lab lost: the commander rebuilds a T1 lab"));
