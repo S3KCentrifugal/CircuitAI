@@ -15,7 +15,7 @@
 #include "spring/SpringUnit.h"
 #include "task/common/WaitTask.h"
 #include "task/builder/RepairTask.h"
-#include "control/core/LeaseTask.h"
+#include "control/core/ControlledTask.h"
 #include "unit/action/TravelAction.h"
 #include "spring/SpringCallback.h"
 #include "spring/CustomCommand.h"
@@ -63,7 +63,7 @@ void CCommanderController::StationaryAssist(CCircuitUnit* unit,State& s,int fram
         if(holding && !jammed && RetreatStation(unit,station))
             holding=unit->GetPos(frame).SqDistance2D(station)<=64.f*64.f;
     }
-    if(auto* lease=dynamic_cast<CLeaseTask*>(current))
+    if(auto* lease=dynamic_cast<CControlledTask*>(current))
         holding=lease->GetController()==this && s.mode==Mode::FALLBACK
             && unit->GetPos(frame).SqDistance2D(s.fallback.goal)<=64.f*64.f;
     if(!holding || !unit->GetCircuitDef()->IsAbleToRepair()) { s.work.stationaryAssistOwner=nullptr; return; }

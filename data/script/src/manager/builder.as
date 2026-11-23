@@ -2085,6 +2085,7 @@ namespace Builder {
             // Keep combat-group seats and external/retreat ownership intact.
             if (u.circuitDef !is null && !u.circuitDef.IsAbleToFly()
                 && UnitHelpers::GetConstructorTier(u.circuitDef) == 2 && !CommanderGroup::Owns(u.id)
+                && !IsOnFusion(u) && !FrontTactical::Owns(u) && !FrontAgitator::OnOrder(u) && !SiloAntiNukes::Owns(u)
                 && (u.task is null || (!u.task.IsExternalControlled() && !u.task.IsEnemyReclaim()
                     && u.task.GetType() != int(Task::Type::PLAYER) && u.task.GetType() != int(Task::Type::RETREAT)))) {
                 IUnitTask@ upgrade = aiEconomyMgr.EnqueueLocalMexUpgrade(u, Global::RoleSettings::Front::LocalMexUpgradeRadius);

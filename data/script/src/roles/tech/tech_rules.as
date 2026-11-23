@@ -722,7 +722,7 @@ namespace TechRules {
                 if (r.key == "eco.recover" || r.key == "eco.compact.support") continue;
                 if (r.key == "defence.fortify" || r.key == "mex.upgrade" || r.key == "mex.expand"
                     || r.key == "energy.reclaim" || r.key == "lab.t2" || r.key == "defence.base"
-                    || r.key == "power.t1" || r.key == "fwd.turrets" || r.key == "power.turret" || r.key == "turret.build"
+                    || r.key == "power.t1" || r.key == "fwd.turrets" || r.key == "power.turret" || r.key == "turret.build" || r.key == "turret.refill"
                     || r.key == "weapons.super" || r.key == "weapons.cluster" || r.key == "flank.factory"
                     || r.key == "air.dedicated" || r.key == "air.flex" || r.key == "fwd.t1" || r.key == "fwd.t2.defend"
                     || r.key == "energy.convert.float" || r.key == "energy.float" || r.key == "storage.metal") continue;
