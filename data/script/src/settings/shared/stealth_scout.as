@@ -81,7 +81,7 @@ namespace StealthScout {
         // structure), so the artillery fires at a live target. Ally LOS is
         // shared, so every allied AI's artillery gains from it.
         bool SpotEnabled = true;
-        int SpottersPerAi = 2;
+        int SpottersPerAi = 1;               // owner 2026-11-23: one spotter per AI
         // Our "artillery": mobile ground units with a max range this long.
         float RangedMinRange = 950.0f;
         float RangedReachMargin = 300.0f;   // target within range + this of one of them
