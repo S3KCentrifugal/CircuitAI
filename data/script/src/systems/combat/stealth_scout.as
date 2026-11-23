@@ -54,6 +54,13 @@ namespace StealthScout {
         int holdSince = -1;         // waiting for a contact ahead to move on
         int retreatUntil = 0;       // after a hit: pull back at least until this frame
         int lastDetourLog = -100000;
+        // Spotter squad (owner 2026-11-23)
+        bool spotter = false;
+        bool hasPost = false, parked = false;
+        AIFloat3 spotTarget;        // the structure it watches
+        int spotDef = -1;
+        float spotScore = 0.0f;
+        int parkedFrame = 0, lastUseful = 0, lastSpotCheck = 0, losSince = -1;
     }
 
     array<Scout@> scouts;
@@ -179,25 +186,49 @@ namespace StealthScout {
 
     // Observed enemy ground contacts within r of p (O(G)); reused buffer.
     array<AIFloat3> nearBuf;
+    array<bool> nearStatic;     // parallel to nearBuf: an identified structure
     void Collect(const AIFloat3& in p, float r)
     {
-        nearBuf.resize(0);
+        nearBuf.resize(0); nearStatic.resize(0);
         const int n = aiBattle.GetGroundContactCount();
         for (int i = 0; i < n; ++i) {
             const AIFloat3 c = aiBattle.GetGroundContactPos(i);
-            if (MapHelpers::SqDist(p, c) <= r * r) nearBuf.insertLast(c);
+            if (MapHelpers::SqDist(p, c) > r * r) continue;
+            nearBuf.insertLast(c);
+            nearStatic.insertLast(IsStaticDef(aiBattle.GetGroundContactDefId(i)));
         }
     }
 
-    float NearestIn(const AIFloat3& in p, int& out index)
+    // Spotters (discount = true) measure a structure as if it were
+    // ProxRadius - StaticGap further away: it cannot walk into a still unit.
+    float NearestIn(const AIFloat3& in p, int& out index, bool discount = false)
     {
         float best = 1e30f;
         index = -1;
+        const float extra = AiMax(0.0f, Global::StealthScout::ProxRadius - Global::StealthScout::StaticGap);
         for (uint i = 0; i < nearBuf.length(); ++i) {
-            const float d = MapHelpers::SqDist(p, nearBuf[i]);
+            float d = sqrt(MapHelpers::SqDist(p, nearBuf[i]));
+            if (discount && nearStatic[i]) d += extra;
             if (d < best) { best = d; index = int(i); }
         }
-        return index >= 0 ? sqrt(best) : 1e30f;
+        return best;
+    }
+
+    // defId -> 1 structure, 0 mobile or unknown (radar dot); cached per def.
+    array<int> staticCache;
+    bool IsStaticDef(int defId)
+    {
+        if (defId < 0) return false;
+        if (defId >= int(staticCache.length())) {
+            const uint old = staticCache.length();
+            staticCache.resize(uint(defId + 64));
+            for (uint i = old; i < staticCache.length(); ++i) staticCache[i] = -1;
+        }
+        if (staticCache[defId] < 0) {
+            const CCircuitDef@ d = ai.GetCircuitDef(defId);
+            staticCache[defId] = (d !is null && !d.IsMobile() && !d.IsAbleToFly()) ? 1 : 0;
+        }
+        return staticCache[defId] == 1;
     }
 
     // Straight leg a->b keeps r from every collected contact (samples every 64 elmos).
@@ -531,6 +562,26 @@ namespace StealthScout {
         if (s.escaping) {
             if (!EscapePoint(u, pos, goal)) { s.nextReplan = ai.frame + 2 * SECOND; return; }
             why = "escape";
+        } else if (s.spotter) {
+            s.parked = false;
+            const bool keep = s.hasPost && s.routeFailures == 0
+                && ai.frame - s.goalFrame < Global::StealthScout::GoalTimeoutSeconds * SECOND && PostClear(s.goal);
+            if (keep) { goal = s.goal; why = "spot resume"; }
+            else if (!ChoosePost(s, u, pos, goal)) {
+                if (ai.frame - lastNoTargetLog >= 30 * SECOND) {
+                    lastNoTargetLog = ai.frame;
+                    GenericHelpers::LogUtil("[StealthScout] spot no target unit=" + s.id + " ranged=" + rangedPos.length() + " ghosts="
+                        + aiBattle.GetGhostCount() + " at (" + int(pos.x) + "," + int(pos.z) + "); holding", 1);
+                }
+                s.hasPost = false;
+                Hold(s, pos);
+                s.nextReplan = ai.frame + 10 * SECOND;
+                return;
+            } else {
+                s.hasPost = true; s.goal = goal; s.goalFrame = ai.frame;
+                why = "spot target=(" + int(s.spotTarget.x) + "," + int(s.spotTarget.z) + ") def=" + DefName(s.spotDef)
+                    + " score=" + int(s.spotScore) + " post=" + int(goal.distance2D(s.spotTarget));
+            }
         } else {
             float score = 0.0f, stale = 0.0f;
             const bool keep = s.sector >= 0 && s.routeFailures == 0
@@ -567,6 +618,7 @@ namespace StealthScout {
         if (path is null || path.length() < 2) {
             ++s.routeFailures;
             if (s.sector >= 0) unreachableUntil[s.sector] = ai.frame + Global::StealthScout::UnreachableForgetSeconds * SECOND;
+            if (s.spotter && s.hasPost) { PutAside(s.spotTarget); s.hasPost = false; }
             GenericHelpers::LogUtil("[StealthScout] no route unit=" + s.id + " " + why + " goal=(" + int(goal.x) + "," + int(goal.z)
                 + "); sector put aside", 1);
             s.sector = -1;
@@ -583,6 +635,340 @@ namespace StealthScout {
         GenericHelpers::LogUtil("[StealthScout] route unit=" + s.id + " def=" + u.circuitDef.GetName() + " " + why
             + " from=(" + int(pos.x) + "," + int(pos.z) + ") goal=(" + int(goal.x) + "," + int(goal.z) + ") points=" + s.route.length()
             + " dist=" + int(pos.distance2D(goal)) + (soft ? "" : " hard"), 1);
+    }
+
+    // ---------------- spotter squad (owner 2026-11-23) ----------------
+    // A spotter parks still and cloaked PostDistances from an enemy structure
+    // that our artillery can reach but nobody sees (a ghost: out of radar and
+    // LOS; or a radar-only structure). Its LOS turns that target live for the
+    // whole ally team (engine-shared LOS), so artillery fires aimed volleys
+    // instead of blind ghost ones. Costs per AI: own ranged units refreshed every
+    // RangedRefreshSeconds, O(owned units); a post choice is O((ghosts +
+    // contacts) * ranged) plus SpotCandidates * 28 post probes, at most
+    // MaxRoutesPerSecond per second; a parked spotter costs one LOS lookup and
+    // one O(G) presence scan every SpotCheckSeconds. Commands: one hold when it
+    // parks, nothing while parked.
+    array<AIFloat3> rangedPos;
+    array<float> rangedReach;
+    array<int> rangedDefCache;          // defId -> 1 ranged, 0 not, -1 unknown
+    int rangedFrame = -100000;
+    int spotParks = 0, spotGone = 0, spotSwitch = 0, spotNoLos = 0, spotIdle = 0;
+    int lastSpotOrder = -100000, lastNoTargetLog = -100000;
+
+    bool IsRangedDef(const CCircuitDef@ d)
+    {
+        if (d is null) return false;
+        const int id = d.id;
+        if (id >= int(rangedDefCache.length())) {
+            const uint old = rangedDefCache.length();
+            rangedDefCache.resize(uint(id + 64));
+            for (uint i = old; i < rangedDefCache.length(); ++i) rangedDefCache[i] = -1;
+        }
+        if (rangedDefCache[id] < 0)
+            rangedDefCache[id] = (d.IsMobile() && !d.IsAbleToFly() && d.HasSurfToLand()
+                && d.GetMaxRange() >= Global::StealthScout::RangedMinRange) ? 1 : 0;
+        return rangedDefCache[id] == 1;
+    }
+
+    void RefreshRanged()
+    {
+        if (ai.frame - rangedFrame < Global::StealthScout::RangedRefreshSeconds * SECOND) return;
+        rangedFrame = ai.frame;
+        rangedPos.resize(0); rangedReach.resize(0);
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || !IsRangedDef(u.circuitDef) || u.GetBuildProgress() < 1.0f) continue;
+            rangedPos.insertLast(u.GetPos(ai.frame));
+            rangedReach.insertLast(u.circuitDef.GetMaxRange() + Global::StealthScout::RangedReachMargin);
+        }
+    }
+
+    int RangedInReach(const AIFloat3& in p, AIFloat3& out centroid)
+    {
+        int n = 0;
+        centroid = AIFloat3(0.0f, 0.0f, 0.0f);
+        for (uint k = 0; k < rangedPos.length(); ++k) {
+            if (MapHelpers::SqDist(p, rangedPos[k]) > rangedReach[k] * rangedReach[k]) continue;
+            ++n; centroid = centroid + rangedPos[k];
+        }
+        if (n > 0) centroid = centroid * (1.0f / float(n));
+        return n;
+    }
+
+    // Targets/posts that failed, skipped for SpotAsideSeconds.
+    array<AIFloat3> asidePos;
+    array<int> asideUntil;
+    bool Aside(const AIFloat3& in p)
+    {
+        const float r = Global::StealthScout::SpotClaimRadius;
+        for (int i = int(asidePos.length()) - 1; i >= 0; --i) {
+            if (ai.frame >= asideUntil[i]) { asidePos.removeAt(uint(i)); asideUntil.removeAt(uint(i)); continue; }
+            if (MapHelpers::SqDist(p, asidePos[i]) <= r * r) return true;
+        }
+        return false;
+    }
+    void PutAside(const AIFloat3& in p)
+    {
+        asidePos.insertLast(p);
+        asideUntil.insertLast(ai.frame + Global::StealthScout::SpotAsideSeconds * SECOND);
+    }
+
+    // Script API for other systems (artillery groups, snipe states): ask for a
+    // spotter at pos for `seconds`. weight ~ metal value of what is there.
+    array<AIFloat3> reqPos;
+    array<float> reqWeight;
+    array<int> reqUntil;
+    void RequestSpot(const AIFloat3& in pos, float weight, int seconds)
+    {
+        const float r = Global::StealthScout::SpotClaimRadius;
+        for (uint i = 0; i < reqPos.length(); ++i) {
+            if (MapHelpers::SqDist(pos, reqPos[i]) > r * r) continue;
+            reqWeight[i] = AiMax(reqWeight[i], weight);
+            reqUntil[i] = AiMax(reqUntil[i], ai.frame + seconds * SECOND);
+            return;
+        }
+        reqPos.insertLast(pos); reqWeight.insertLast(weight); reqUntil.insertLast(ai.frame + seconds * SECOND);
+    }
+
+    float TargetScore(const AIFloat3& in p, int defId, const AIFloat3& in from)
+    {
+        const CCircuitDef@ d = null;
+        if (defId >= 0) @d = ai.GetCircuitDef(defId);
+        const float cost = d is null ? 300.0f : d.costM;
+        if (cost < Global::StealthScout::MinTargetCost) return 0.0f;
+        float v = AiMin(cost, 4000.0f);
+        if (d !is null && d.GetMaxRange() >= Global::StealthScout::HeavyRange) v *= Global::StealthScout::HeavyFactor;
+        AIFloat3 c;
+        const int n = RangedInReach(p, c);
+        return v * float(n) / (1.0f + from.distance2D(p) / 4000.0f);
+    }
+
+    array<AIFloat3> candPos;
+    array<int> candDef;
+    array<float> candScore;
+    void AddCandidate(const AIFloat3& in p, int defId, float score)
+    {
+        if (score <= 0.0f) return;
+        const int want = AiMax(1, Global::StealthScout::SpotCandidates);
+        uint at = candScore.length();
+        while (at > 0 && candScore[at - 1] < score) --at;
+        if (int(at) >= want) return;
+        candPos.insertAt(at, p); candDef.insertAt(at, defId); candScore.insertAt(at, score);
+        if (int(candPos.length()) > want) { candPos.removeLast(); candDef.removeLast(); candScore.removeLast(); }
+    }
+
+    bool Claimed(Scout@ s, const AIFloat3& in p)
+    {
+        const float r = Global::StealthScout::SpotClaimRadius;
+        for (uint k = 0; k < scouts.length(); ++k) {
+            if (scouts[k] is s || !scouts[k].spotter || !scouts[k].hasPost) continue;
+            if (MapHelpers::SqDist(scouts[k].spotTarget, p) <= r * r) return true;
+        }
+        return false;
+    }
+
+    // Unseen enemy structures (ghosts + radar-only structures) and requests, best first.
+    void GatherTargets(Scout@ s, const AIFloat3& in from)
+    {
+        candPos.resize(0); candDef.resize(0); candScore.resize(0);
+        if (rangedPos.length() > 0) {
+            const int ng = aiBattle.GetGhostCount();
+            for (int i = 0; i < ng; ++i) {
+                const AIFloat3 p = aiBattle.GetGhostPos(i);
+                if (Claimed(s, p) || Aside(p)) continue;
+                AddCandidate(p, aiBattle.GetGhostDefId(i), TargetScore(p, aiBattle.GetGhostDefId(i), from));
+            }
+            const int nc = aiBattle.GetGroundContactCount();
+            for (int i = 0; i < nc; ++i) {
+                if (aiBattle.IsGroundContactInLos(i)) continue;
+                const int def = aiBattle.GetGroundContactDefId(i);
+                if (!IsStaticDef(def)) continue;
+                const AIFloat3 p = aiBattle.GetGroundContactPos(i);
+                if (Claimed(s, p) || Aside(p)) continue;
+                AddCandidate(p, def, TargetScore(p, def, from));
+            }
+        }
+        for (int i = int(reqPos.length()) - 1; i >= 0; --i) {
+            if (ai.frame >= reqUntil[i]) { reqPos.removeAt(uint(i)); reqWeight.removeAt(uint(i)); reqUntil.removeAt(uint(i)); continue; }
+            if (aiBattle.InLos(reqPos[i]) || Claimed(s, reqPos[i]) || Aside(reqPos[i])) continue;
+            AddCandidate(reqPos[i], -1, reqWeight[i] * 4.0f / (1.0f + from.distance2D(reqPos[i]) / 4000.0f));
+        }
+    }
+
+    // A post keeps ProxRadius from mobile contacts and StaticGap from structures.
+    bool PostClear(const AIFloat3& in q)
+    {
+        Collect(q, Global::StealthScout::ProxRadius + 16.0f);
+        int k;
+        return NearestIn(q, k, true) >= Global::StealthScout::ProxRadius;
+    }
+
+    bool Hot(const AIFloat3& in q)
+    {
+        const int s = SectorAt(q);
+        return s >= 0 && int(hotUntil.length()) == cols * rows && ai.frame < hotUntil[s];
+    }
+
+    // Post on our artillery's side of the target: PostBearingsDeg round the
+    // bearing to the artillery in reach (else to our start), PostDistances out.
+    bool FindPost(CCircuitUnit@ u, const AIFloat3& in target, AIFloat3& out post)
+    {
+        post = target;
+        AIFloat3 toward;
+        if (RangedInReach(target, toward) == 0) toward = u.GetPos(ai.frame);
+        const float base = atan2(toward.z - target.z, toward.x - target.x);
+        for (uint b = 0; b < Global::StealthScout::PostBearingsDeg.length(); ++b) {
+            const float a = base + Global::StealthScout::PostBearingsDeg[b] * 0.0174533f;
+            for (uint k = 0; k < Global::StealthScout::PostDistances.length(); ++k) {
+                AIFloat3 q = target + AIFloat3(cos(a), 0.0f, sin(a)) * Global::StealthScout::PostDistances[k];
+                if (!InMap(q) || Hot(q) || !aiTerrainMgr.CanMoveTo(u, q) || !PostClear(q)) continue;
+                q.y = aiBattle.Height(q);
+                post = q;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool ChoosePost(Scout@ s, CCircuitUnit@ u, const AIFloat3& in pos, AIFloat3& out goal)
+    {
+        goal = pos;
+        RefreshRanged();
+        GatherTargets(s, pos);
+        for (uint k = 0; k < candPos.length(); ++k) {
+            AIFloat3 p;
+            if (!FindPost(u, candPos[k], p)) { PutAside(candPos[k]); continue; }
+            goal = p;
+            s.spotTarget = candPos[k]; s.spotDef = candDef[k]; s.spotScore = candScore[k];
+            return true;
+        }
+        return false;
+    }
+
+    // In LOS: an identified structure (the same def when known) still stands there.
+    bool TargetPresent(Scout@ s)
+    {
+        const int n = aiBattle.GetGroundContactCount();
+        for (int i = 0; i < n; ++i) {
+            if (MapHelpers::SqDist(s.spotTarget, aiBattle.GetGroundContactPos(i)) > 80.0f * 80.0f) continue;
+            const int def = aiBattle.GetGroundContactDefId(i);
+            if (s.spotDef < 0 ? IsStaticDef(def) : def == s.spotDef) return true;
+        }
+        return false;
+    }
+
+    string DefName(int defId)
+    {
+        const CCircuitDef@ d = null;
+        if (defId >= 0) @d = ai.GetCircuitDef(defId);
+        return d is null ? "request" : d.GetName();
+    }
+
+    void Unpost(Scout@ s, const string& in why, bool aside)
+    {
+        GenericHelpers::LogUtil("[StealthScout] spot release unit=" + s.id + " target=(" + int(s.spotTarget.x) + "," + int(s.spotTarget.z)
+            + ") def=" + DefName(s.spotDef) + " " + why + " parked=" + (s.parked ? (ai.frame - s.parkedFrame) / SECOND : -1) + "s", 1);
+        if (aside) PutAside(s.spotTarget);
+        s.hasPost = false; s.parked = false; s.losSince = -1;
+        Queue(s);
+    }
+
+    // Per spotter per Tick, after the evade / detour handling.
+    void SpotTick(Scout@ s, CCircuitUnit@ u, const AIFloat3& in pos)
+    {
+        if (!s.hasPost) {
+            if (ai.frame >= s.nextReplan) Queue(s);
+            return;
+        }
+        if (!s.parked) {
+            const bool arrived = pos.distance2D(s.goal) <= Global::StealthScout::ArriveElmos * 0.6f
+                || (s.task.IsAtEnd(u) && s.issuedEnd >= s.route.length() && pos.distance2D(s.goal) <= Global::StealthScout::ArriveElmos);
+            if (arrived) {
+                Hold(s, pos);
+                s.parked = true; s.parkedFrame = ai.frame; s.lastUseful = ai.frame; s.lastSpotCheck = ai.frame - SECOND * 3; s.losSince = -1;
+                ++spotParks;
+                GenericHelpers::LogUtil("[StealthScout] spot parked unit=" + s.id + " def=" + u.circuitDef.GetName() + " at (" + int(pos.x) + ","
+                    + int(pos.z) + ") target=(" + int(s.spotTarget.x) + "," + int(s.spotTarget.z) + ") def=" + DefName(s.spotDef)
+                    + " dist=" + int(pos.distance2D(s.spotTarget)) + " after " + (ai.frame - s.goalFrame) / SECOND + "s", 1);
+                return;
+            }
+            if (ai.frame - s.goalFrame > Global::StealthScout::GoalTimeoutSeconds * SECOND) { Unpost(s, "timeout", true); return; }
+            if (ai.frame - s.lastMove > Global::StealthScout::StuckSeconds * SECOND && ai.frame >= s.nextReplan) {
+                ++s.routeFailures;
+                if (s.routeFailures >= 2) { Unpost(s, "stuck", true); return; }
+                Queue(s);
+            }
+            return;
+        }
+        s.lastMove = ai.frame;   // parked is not stuck
+        if (ai.frame - s.lastSpotCheck < Global::StealthScout::SpotCheckSeconds * SECOND) return;
+        s.lastSpotCheck = ai.frame;
+        RefreshRanged();
+        if (!aiBattle.InLos(s.spotTarget)) {
+            if (s.losSince < 0) s.losSince = ai.frame;
+            else if (ai.frame - s.losSince > Global::StealthScout::NoLosSeconds * SECOND) { ++spotNoLos; Unpost(s, "no LOS from post", true); }
+            return;
+        }
+        s.losSince = -1;
+        if (!TargetPresent(s)) { ++spotGone; Unpost(s, "target gone", false); return; }
+        AIFloat3 c;
+        const int n = RangedInReach(s.spotTarget, c);
+        if (n > 0 || s.spotDef < 0) s.lastUseful = ai.frame;
+        else if (ai.frame - s.lastUseful > Global::StealthScout::IdleSpotSeconds * SECOND) { ++spotIdle; Unpost(s, "no artillery in reach", true); return; }
+        // Every 30 s: leave for a clearly better unseen target.
+        if ((ai.frame - s.parkedFrame) % (30 * SECOND) < Global::StealthScout::SpotCheckSeconds * SECOND && ai.frame - s.parkedFrame >= 30 * SECOND) {
+            const float now = (s.spotDef < 0) ? s.spotScore : TargetScore(s.spotTarget, s.spotDef, pos);
+            GatherTargets(s, pos);
+            if (candScore.length() > 0 && candScore[0] > now * Global::StealthScout::SwitchFactor) {
+                ++spotSwitch;
+                Unpost(s, "better target score " + int(candScore[0]) + " > " + int(now), false);
+                return;
+            }
+            GenericHelpers::LogUtil("[StealthScout] spotting unit=" + s.id + " target=(" + int(s.spotTarget.x) + "," + int(s.spotTarget.z) + ") def="
+                + DefName(s.spotDef) + " ranged=" + n + " parked=" + (ai.frame - s.parkedFrame) / SECOND + "s hp=" + int(u.GetHealthPercent() * 100.0f) + "%", 1);
+        }
+    }
+
+    int SpotterCount()
+    {
+        int n = 0;
+        for (uint i = 0; i < scouts.length(); ++i) if (scouts[i].spotter) ++n;
+        return n;
+    }
+
+    // Promote a backline scout when the squad is short; order one more when
+    // there is none to promote. Once per second, O(scouts + factories).
+    void SpotSquad()
+    {
+        if (!Global::StealthScout::SpotEnabled) return;
+        int n = SpotterCount();
+        for (uint i = 0; i < scouts.length() && n < Global::StealthScout::SpottersPerAi; ++i) {
+            if (scouts[i].spotter) continue;
+            Scout@ s = scouts[i];
+            s.spotter = true; s.sector = -1; s.hasPost = false; s.parked = false;
+            ++n;
+            GenericHelpers::LogUtil("[StealthScout] promote unit=" + s.id + " to spotter (" + n + "/" + Global::StealthScout::SpottersPerAi + ")", 1);
+            Queue(s);
+        }
+        if (n >= Global::StealthScout::SpottersPerAi || !Global::StealthScout::SpotBuild) return;
+        if (ai.frame - lastSpotOrder < Global::StealthScout::SpotBuildCooldownSeconds * SECOND) return;
+        if (Economy::GetMinMetalIncomeLast10s() < Global::StealthScout::SpotBuildMetalIncome) return;
+        for (uint l = 0; l < Global::StealthScout::SpotLabs.length(); ++l) {
+            for (uint f = 0; f < Factory::factoryList.length(); ++f) {
+                CCircuitUnit@ lab = Factory::factoryList[f];
+                if (lab is null || lab.circuitDef is null || lab.GetBuildProgress() < 1.0f) continue;
+                if (lab.circuitDef.GetName() != Global::StealthScout::SpotLabs[l]) continue;
+                CCircuitDef@ def = ai.GetCircuitDef(Global::StealthScout::SpotLabUnits[l]);
+                if (def is null || !lab.circuitDef.CanBuild(def) || !def.IsAvailable(ai.frame)) continue;
+                IUnitTask@ r = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, def, lab.GetPos(ai.frame), 64.f));
+                if (r is null) continue;
+                lastSpotOrder = ai.frame;
+                GenericHelpers::LogUtil("[StealthScout] spot order " + def.GetName() + " at lab " + lab.id + " (" + lab.circuitDef.GetName()
+                    + ") spotters=" + n + "/" + Global::StealthScout::SpottersPerAi, 1);
+                return;
+            }
+        }
     }
 
     // ---------------- admission ----------------
@@ -612,13 +998,14 @@ namespace StealthScout {
         s.id = u.id; @s.task = task; s.defIndex = di;
         s.lastPos = u.GetPos(ai.frame); s.lastMove = ai.frame; s.admitted = ai.frame;
         s.lastHealth = u.GetHealthPercent();
+        s.spotter = Global::StealthScout::SpotEnabled && SpotterCount() < Global::StealthScout::SpottersPerAi;
         array<AIFloat3> hold = {s.lastPos};
         task.SetRoute(hold);
         scouts.insertLast(s);
         Queue(s);
         const float cost = (di < int(Global::StealthScout::CloakCost.length())) ? Global::StealthScout::CloakCost[di] : 0.0f;
         const float energy = Economy::GetMinEnergyIncomeLast10s();
-        GenericHelpers::LogUtil("[StealthScout] admit unit=" + u.id + " def=" + u.circuitDef.GetName() + " scouts=" + scouts.length()
+        GenericHelpers::LogUtil("[StealthScout] admit unit=" + u.id + " def=" + u.circuitDef.GetName() + " role=" + (s.spotter ? "spotter" : "scout") + " scouts=" + scouts.length()
             + " cloakCost=" + int(cost) + " energyIncome=" + int(energy) + (cost < energy * 0.1f ? " cloak=native-on" : " cloak=LIKELY-OFF")
             + (readmit ? " (re-admit)" : ""), 1);
         return task;
@@ -673,6 +1060,7 @@ namespace StealthScout {
         InitGrid();
         Scan();
         if (scouts.length() > 0) RebuildDensity();
+        SpotSquad();
         for (int i = int(scouts.length()) - 1; i >= 0; --i) {
             Scout@ s = scouts[i];
             CCircuitUnit@ u = ai.GetTeamUnit(s.id);
@@ -697,6 +1085,7 @@ namespace StealthScout {
                     s.escaping = true; s.holdSince = -1; s.sector = -1;
                     s.retreatUntil = ai.frame + Global::StealthScout::RetreatSeconds * SECOND;
                 }
+                if (s.spotter && s.hasPost) { s.hasPost = false; s.parked = false; }   // the post is burned
             }
             s.lastHealth = hp;
             if (ai.frame - s.lastRisk >= 20 * SECOND && NearContact(pos, Global::StealthScout::DecloakRisk)) {
@@ -719,7 +1108,7 @@ namespace StealthScout {
             const float prox = Global::StealthScout::ProxRadius;
             Collect(pos, Global::StealthScout::LookaheadElmos + prox);
             int ci;
-            const float nearest = NearestIn(pos, ci);
+            const float nearest = NearestIn(pos, ci, s.spotter);
             const bool covered = aiBattle.GroundHazard(pos, 0.0f) > 0.0f;
             if (covered != s.inside) {
                 s.inside = covered;   // logged only: weapon coverage does not see a cloaked scout
@@ -732,7 +1121,7 @@ namespace StealthScout {
                 if (!s.escaping && EscapePoint(u, pos, away)) {
                     array<AIFloat3> leg = {away};
                     s.task.SetRoute(leg);
-                    s.escaping = true; s.holdSince = -1;
+                    s.escaping = true; s.holdSince = -1; s.parked = false;
                     // the contact's area costs routes for a while, so the resume goes round it
                     MarkHot(nearBuf[uint(ci)], Global::StealthScout::EvadeHotSeconds);
                     GenericHelpers::LogUtil("[StealthScout] evade unit=" + s.id + " contact " + int(nearest) + " at (" + int(pos.x) + ","
@@ -752,7 +1141,7 @@ namespace StealthScout {
             AIFloat3 prev = pos;
             for (uint k = s.cursor; k < s.route.length() && (run < Global::StealthScout::LookaheadElmos || k < s.cursor + 2); ++k) {
                 int c;
-                if (NearestIn(s.route[k], c) < prox) { blockK = int(k); blockC = c; break; }
+                if (NearestIn(s.route[k], c, s.spotter) < prox) { blockK = int(k); blockC = c; break; }
                 run += prev.distance2D(s.route[k]); prev = s.route[k];
             }
             if (blockK >= 0) {
@@ -782,6 +1171,7 @@ namespace StealthScout {
                 continue;
             }
             if (s.holdSince >= 0) { s.holdSince = -1; IssueWindow(s); }
+            if (s.spotter) { SpotTick(s, u, pos); continue; }
             // Arrival / goal already seen by someone else / timeout / stuck.
             if (s.sector >= 0) {
                 const bool seenMeanwhile = lastSeen[s.sector] > s.goalFrame;
@@ -835,7 +1225,9 @@ namespace StealthScout {
                 else if (ai.frame - lastSeen[k] > Global::StealthScout::MinStaleSeconds * SECOND) ++old;
             }
             GenericHelpers::LogUtil("[StealthScout] summary scouts=" + scouts.length() + " routes=" + planned + " reached=" + reached
-                + " lost=" + lost + " hits=" + hits + " risks=" + risks + " sectors never=" + never + " stale=" + old + " of " + lastSeen.length(), 1);
+                + " lost=" + lost + " hits=" + hits + " risks=" + risks + " sectors never=" + never + " stale=" + old + " of " + lastSeen.length()
+                + " spotters=" + SpotterCount() + " parks=" + spotParks + " gone=" + spotGone + " switch=" + spotSwitch
+                + " noLos=" + spotNoLos + " idle=" + spotIdle + " ranged=" + rangedPos.length(), 1);
         }
     }
 }

@@ -73,5 +73,42 @@ namespace StealthScout {
         bool HoldFire = true;
         int FireResendSeconds = 10;
         int SummarySeconds = 120;
+
+        // ---- Spotter squad (owner 2026-11-23) ----
+        // The first SpottersPerAi stealth units of each AI are spotters, not
+        // backline scouts: each parks still near an enemy structure our
+        // artillery can reach but nobody sees (a ghost, or a radar-only
+        // structure), so the artillery fires at a live target. Ally LOS is
+        // shared, so every allied AI's artillery gains from it.
+        bool SpotEnabled = true;
+        int SpottersPerAi = 2;
+        // Our "artillery": mobile ground units with a max range this long.
+        float RangedMinRange = 950.0f;
+        float RangedReachMargin = 300.0f;   // target within range + this of one of them
+        int RangedRefreshSeconds = 5;
+        float MinTargetCost = 100.0f;       // walls and the like are not worth a spotter
+        float HeavyRange = 900.0f;          // a target structure with this reach (heavy porc) scores x HeavyFactor
+        float HeavyFactor = 2.0f;
+        // Post: PostDistances from the target (spy sight 550, Gremlin 494), on the
+        // side of our artillery, PostBearingsDeg either side of that bearing.
+        array<float> PostDistances = {430.0f, 390.0f, 470.0f, 350.0f};
+        array<float> PostBearingsDeg = {0.0f, 25.0f, -25.0f, 50.0f, -50.0f, 75.0f, -75.0f};
+        // A parked spotter is still and cloaked: a structure can never walk into
+        // it, so structures only need StaticGap; mobile contacts keep ProxRadius.
+        float StaticGap = 170.0f;
+        float SpotClaimRadius = 350.0f;     // one spotter per target area
+        int SpotCandidates = 6;
+        int SpotCheckSeconds = 5;           // parked: target / LOS / usefulness check
+        int NoLosSeconds = 12;              // parked but the target is still not in LOS: new post
+        int IdleSpotSeconds = 240;          // no artillery in reach this long: new target
+        float SwitchFactor = 1.6f;          // a new target must score this much better to leave a working post
+        int SpotAsideSeconds = 300;         // a target/post that failed is skipped this long
+        // Production: one spotter at a time from a finished T2 bot lab (or the
+        // Armada T2 vehicle plant: Gremlin) while short of SpottersPerAi.
+        bool SpotBuild = true;
+        array<string> SpotLabs = {"armalab", "coralab", "legalab", "armavp"};
+        array<string> SpotLabUnits = {"armspy", "corspy", "legaspy", "armgremlin"};
+        float SpotBuildMetalIncome = 20.0f;
+        int SpotBuildCooldownSeconds = 90;  // also how long an order counts as pending
     }
 }
