@@ -121,6 +121,7 @@ const control::CConfigTable<CommanderConfig>& ConfigTable() {
         Doc<&DC::cloakKeep>("doctrine_cloak_keep",0,30),Doc<&DC::hitHold>("doctrine_hit_hold",0,30),
         Doc<&DC::rangedMargin>("doctrine_ranged_margin",0,1000),Doc<&DC::t3Close>("doctrine_t3_close",0,10),
         Doc<&DC::t3Margin>("doctrine_t3_margin",0,1000),Doc<&DC::recloakSeconds>("doctrine_recloak_seconds",0,60),
+        Doc<&DC::t3OnlyShots>("doctrine_t3_only_shots",0,1),Doc<&DC::t3CloakWait>("doctrine_t3_cloak_wait",0,15),
         Doc<&DC::outrangeTier>("doctrine_outrange_tier",1,3),Doc<&DC::spamMinutes>("doctrine_spam_minutes",0,120),
         Doc<&DC::spamCount>("doctrine_spam_count",1,100),Doc<&DC::spamCost>("doctrine_spam_cost",0,2000),
         Doc<&DC::spamRange>("doctrine_spam_range",.5f,6),Doc<&DC::spamHold>("doctrine_spam_hold",0,60),

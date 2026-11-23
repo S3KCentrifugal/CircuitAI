@@ -92,6 +92,7 @@ struct CommanderDoctrineState {
     bool cloak=false;       // last doctrine cloak decision (hysteresis)
     int since=-10000;       // frame the current retreat reason started (minimum hold)
     int approachTarget=-1,approachUntil=-1; // a started T3 approach is kept to its shot (bounded)
+    int shotCloakUntil=-1;  // after any doctrine D-gun: no new funded T3 approach until cloaked again (bounded)
     const char* lastReason=""; // reason held through the minimum retreat time
     int logNext=0;
 };
@@ -302,6 +303,12 @@ struct CommanderDoctrineConfig {
     float t3Close=2;         // a T3 is approached only when D-gun reach is this many seconds away
     float t3Margin=100;      // elmos past a T3's weapon reach that still count as danger
     float recloakSeconds=8;  // bound on the after-shot wait for the cloak to come back
+    // Owner 2026-11-23 (Smolders, unit 14540 vs Titan): with a T3 approached or
+    // near and the cloak funded, the doctrine D-gun takes T3s only (1; 0 = any
+    // enemy in reach, the old rule). After any doctrine D-gun a funded commander
+    // starts no new T3 approach until cloaked again, for at most t3CloakWait s (0 = off).
+    float t3OnlyShots=1;
+    float t3CloakWait=5;
     float outrangeTier=2;    // mobile tier from which an outranging shooter forces a retreat
     float spamMinutes=10,spamCount=5,spamCost=150,spamRange=2,spamHold=5;
     float jammerSearch=3000; // spam retreat looks for an active friendly jammer this far
