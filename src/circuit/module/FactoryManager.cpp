@@ -625,6 +625,7 @@ void CFactoryManager::ReadConfig()
 			boolean("stage_when_blocked", policy.stageWhenBlocked);
 			boolean("fire_at_will", policy.fireAtWill);
 			boolean("always_fire_at_will", policy.alwaysFireAtWill);
+			boolean("spam_no_hazard", policy.spamNoHazard);   // owner 2026-11-23
 			boolean("fire_in_range", policy.fireInRange);
 			boolean("commander_focus", policy.commanderFocus);
 			number("home_hold_radius", policy.homeHoldRadius, 0.f, 4000.f);

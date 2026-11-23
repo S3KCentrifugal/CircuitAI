@@ -60,13 +60,14 @@ static float StaticDanger(const RangedPolicy& p) { return (!p.coordinated && p.s
 namespace {
 // Owner 2026-11-18: kite_min_tech / kite_ignore_fast_dots share the scope.
 struct ExactStaticScope {
-    const CRangedWorld& w; bool prev; float prevTech, prevDot;
-    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()) {
+    const CRangedWorld& w; bool prev; float prevTech, prevDot; const RangedPolicy* prevSpam;
+    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()),prevSpam(w.SpamFilter()) {
         w.SetExactStatic(!p.coordinated && p.staticExactReach);
         w.SetKiteFilter(p.coordinated ? 0.f : p.kiteMinTech,
             (!p.coordinated && p.kiteIgnoreFastDots) ? std::max(1.f,p.spamDotSpeed) : 0.f);
+        w.SetSpamFilter((!p.coordinated && p.spamNoHazard && p.HasSpam()) ? &p : nullptr);   // owner 2026-11-23
     }
-    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); }
+    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); w.SetSpamFilter(prevSpam); }
 };
 }
 
@@ -1127,6 +1128,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     TimingTick(unit,pos,maxRange,false);   // owner 2026-11-16: RANGEDTIME
     const bool report=trace && frame>=traceFrame+150;
     if(report) { traceFrame=frame; ai->LOG("RANGED: sample unit=%d contacts=%u near=%u range=%.1f",id,unsigned(contacts.size()),unsigned(nearby.size()),maxRange); }
+    if(report && world.SpamFilter()!=nullptr) {
+        int ignored=0; for(int i:nearby) if(world.SpamHazardIgnored(contacts[i])) ++ignored;
+        if(ignored>0) ai->LOG("RANGEDTRACE: spam no hazard unit=%d ignored=%d",id,ignored);
+    }
 
     // Individual fire_at_will: which contacts are in weapon reach. Scanned
     // before the withdrawal branch (2026-11-06), so a forward-mount hull

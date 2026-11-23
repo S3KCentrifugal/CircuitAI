@@ -16,6 +16,7 @@
 
 namespace springai { class WeaponMount; }
 namespace circuit {
+struct RangedPolicy;
 class CCircuitAI;
 class CCircuitDef;
 class CCircuitUnit;
@@ -105,9 +106,16 @@ public:
     void SetKiteFilter(float minTech, float dotSpeed) const { kiteMinTech=minTech; kiteDotSpeed=dotSpeed; }
     float KiteMinTech() const { return kiteMinTech; }
     float KiteDotSpeed() const { return kiteDotSpeed; }
+    // Owner 2026-11-23 ("Daedalus stay out of range of valuable targets"): spam_no_hazard. While set (by the
+    // engagement of a hull with that key), a spam contact of that hull's roster has no hazard: no escape from
+    // it, no blocked firing site, path or move. Spam stays excluded as a target by the controller.
+    void SetSpamFilter(const RangedPolicy* p) const { spamFilter=p; }
+    const RangedPolicy* SpamFilter() const { return spamFilter; }
+    bool SpamHazardIgnored(const Contact& c) const;
     bool KiteIgnored(const Contact& c) const;
     float Hz(const Contact& c, float press) const {
         if((kiteMinTech>0.f || kiteDotSpeed>0.f) && KiteIgnored(c)) return 0.f;
+        if(spamFilter!=nullptr && SpamHazardIgnored(c)) return 0.f;
         const float h=HazardFor(c,press);
         if(!exactStatic || !c.def || (c.mobile && !c.ghost) || Pressed(c,press)) return h;
         return std::min(h,std::max(c.armed ? c.groundRange : 0.f,c.explosionRadius));
@@ -190,6 +198,7 @@ private:
     float largestRange = 0.f, largestStaticRange = 0.f, largestSpacing = 0.f;
     mutable bool exactStatic = false;
     mutable float kiteMinTech = 0.f, kiteDotSpeed = 0.f;
+    mutable const RangedPolicy* spamFilter = nullptr;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;

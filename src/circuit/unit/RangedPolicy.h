@@ -145,6 +145,8 @@ struct RangedPolicy {
     // radar dot that is not moving may be porc that outranges us. March legs
     // (and their samples) never come within this distance of one. 0 = off.
     float unknownStaticReach = 0.f;
+    // Owner 2026-11-23: spam of this hull's roster is no hazard (no escape, no blocked site/move); see CRangedWorld::SetSpamFilter.
+    bool spamNoHazard = false;
     // Owner 2026-10-28: permanent fire at will. The controller opens fire when
     // it takes the unit and never sets hold fire (no poke, cohort-hold or spam
     // gating); priority targets still steer the guns. Overrides fireAtWill.

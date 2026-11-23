@@ -1,4 +1,6 @@
 #include "task/fighter/RangedWorld.h"
+#include "unit/RangedPolicy.h"
+#include "unit/CircuitDef.h"
 #include <cstdio>
 #include "util/WeaponReach.h"
 #include "CircuitAI.h"
@@ -305,6 +307,17 @@ bool CRangedWorld::KiteIgnored(const Contact& c) const
         return c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>kiteDotSpeed*kiteDotSpeed;
     }
     return kiteMinTech>0.f && c.mobile && c.tech<kiteMinTech && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
+}
+bool CRangedWorld::SpamHazardIgnored(const Contact& c) const
+{
+    // Identified mobile spam of the hull's roster (the controller's Spam rule for identified contacts),
+    // or a dot last seen as such. Never a ghost (structure) or a commander.
+    const RangedPolicy* p=spamFilter;
+    if(p==nullptr || c.ghost) return false;
+    const CCircuitDef* d=c.def!=nullptr ? c.def : c.seenDef;
+    if(d==nullptr || !d->IsMobile() || d->IsEnemyRoleAny(CCircuitDef::COMM)) return false;
+    if(c.def!=nullptr && !c.mobile) return false;
+    return (p->spamMaxCost>0.f && d->GetCostM()<=p->spamMaxCost) || p->spamDefs.count(d->GetId())>0;
 }
 bool CRangedWorld::Safe(const AIFloat3& from,const AIFloat3& to,float margin,bool escaping,float press,float ghostRange) const
 {

@@ -90,6 +90,7 @@ local function result()
     for u,t in pairs(tracked) do
         n=n+1
         local m=moves[u] or {n=0}
+        echo(string.format("FIRESTATE id=%d samples=%d min=%s low=%d",u,t.fsSamples or 0,tostring(t.fsMin or "-"),t.fsLow or 0))
         echo(string.format("TIMING id=%d def=%s given=%d toFirstMove=%s toFront=%s frontToEngage=%s toEngage=%s how=%s moves=%d dead=%s",
             u,t.def,t.given,secs(t.given,m.first),secs(t.given,t.front),secs(t.front,t.engage),secs(t.given,t.engage),t.how or "-",m.n,tostring(t.dead or "no")))
         if t.front then fsum=fsum+(t.front-t.given); fcount=fcount+1 end
@@ -146,6 +147,19 @@ local function measure(f)
                 if t and not t.engage then
                     t.engage=f; t.how=how
                     echo(string.format("engage frame=%d def=%s how=%s after=%s sinceFront=%s",f,t.def,how,secs(t.given,f),secs(t.front,f)))
+                end
+            end
+        end
+    end
+    -- owner 2026-11-23: the engine fire state of each tracked unit, once a second; any hold/return is logged
+    if f%30==0 then
+        for u,t in pairs(tracked) do
+            if not t.dead then
+                local st=Spring.GetUnitStates(u)
+                local fs=st and (st.firestate or st["firestate"])
+                if fs then
+                    t.fsMin=math.min(t.fsMin or 99,fs); t.fsSamples=(t.fsSamples or 0)+1
+                    if fs<2 then t.fsLow=(t.fsLow or 0)+1; echo(string.format("FIRESTATE low frame=%d id=%d state=%d",f,u,fs)) end
                 end
             end
         end
