@@ -903,6 +903,7 @@
 				"attribute": ["melee"],
 				"fire_state": 2,	// owner 2026-11-23: fire at will all the time
 				"fire_at_will_always": true,
+				"retreat": 0.5,   // owner 2026-11-23: retreat at 50% health to be repaired (trade for the 98% radar reach)
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
