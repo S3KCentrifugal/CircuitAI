@@ -261,7 +261,13 @@ bool CCommanderController::DoctrineCloak(CCircuitUnit* unit,State& s,bool moving
         ai->LOG("[CommanderDoctrine] unit=%i cloak=%i runway=%.1fs moving=%i bank=%.0f",
             unit->GetId(),int(want),std::min(runway,999.f),int(moving),ai->GetEconomyManager()->GetEnergyCur());
     d.cloak=want;
-    writer.CloakFrom(unit,want,s.conceal.requested,want?"doctrine":"doctrine_unfunded");
+    // Owner 2026-11-23 (Smolders, unit 14540 vs a Titan): compare with BAR's own
+    // request flag, not s.conceal.requested. The posture had just cleared
+    // wantcloak ("T3: plan owns the cloak") when the approach task was created
+    // with requested=IsCloaked() (still true for a few frames), so CloakFrom
+    // never re-sent the cloak: the commander walked into the Titan and fled with
+    // wantcloak=0 and 48k energy banked. One rules-param read per doctrine tick.
+    writer.Cloak(unit,want,want?"doctrine":"doctrine_unfunded");
     s.conceal.requested=want;
     return want;
 }

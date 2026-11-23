@@ -274,7 +274,8 @@ void CCommanderController::RetreatConceal(CCircuitUnit* unit,State& s,int frame,
         s.doctrine.cloak=hide;
     }
     writer.FireState(unit,hide?CCircuitDef::FireType::HOLD:CCircuitDef::FireType::RETURN,"retreat");
-    writer.CloakFrom(unit,hide,s.conceal.requested,hide?"retreat hidden":"retreat seen");
+    // Owner 2026-11-23: BAR's request flag, not the cached request (see DoctrineCloak).
+    writer.Cloak(unit,hide,hide?"retreat hidden":"retreat seen");
     s.conceal.requested=hide;
 }
 
