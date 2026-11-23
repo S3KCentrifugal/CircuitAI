@@ -84,5 +84,11 @@ int main()
     assert(AttritionReserve(2460, 230, .5f) == 6);
     assert(AttritionReserve(820, 230, .5f) == 2);
     assert(AttritionReserve(820, 0, .5f) == 0);
+    // Finished before unfinished: tiers are 20x apart (weights x cost).
+    assert(UnfinishedStrikeScale(false, true) == 1.f && UnfinishedStrikeScale(true, false) == 1.f);
+    const float afus = 160000.f, fus = 8000.f, converter = 400.f;
+    assert(afus * UnfinishedStrikeScale(true, true) < fus);        // finished fusion leads unfinished AFUS
+    assert(afus * UnfinishedStrikeScale(true, true) > converter);  // unfinished AFUS still leads converters
+    assert(fus * UnfinishedStrikeScale(true, true) < converter);   // unfinished fusion below finished converters
     std::cout << "air geometry: 300 unique bounded slots and loss thresholds passed\n";
 }
