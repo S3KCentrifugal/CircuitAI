@@ -927,7 +927,7 @@
 				"fire_state": 2,   // owner 2026-11-23: fire at will all the time (always_fire_at_will: never hold/return fire, spam included)
 				"role": ["assault"],
 				"attribute": ["ranged"],
-				"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "always_fire_at_will": true, "spam_no_hazard": true, "unknown_static_reach": 1450, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"ghost_porc_range": 3000, "target_mode": "skirmish", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "always_fire_at_will": true, "spam_no_hazard": true, "unknown_static_reach": 980, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "commander_priority": 100, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
