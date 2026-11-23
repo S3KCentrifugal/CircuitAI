@@ -57,6 +57,9 @@ static constexpr float CLUSTER_CELL = 128.f;
 // Owner 2026-11-06: a radar dot keeps the identity it had in LOS this long
 // (the pre-D-462 history entry's lifetime).
 static constexpr int SEEN_DEF_FRAMES = 60 * FRAMES_PER_SEC;
+static constexpr int STILL_DOT_FRAMES = 20 * FRAMES_PER_SEC;     // owner 2026-11-23
+static constexpr int INHERIT_DOT_FRAMES = 3 * FRAMES_PER_SEC;
+static constexpr int STATIC_SEEN_FRAMES = 15 * 60 * FRAMES_PER_SEC;
 
 const bool CRangedObservation::verify = std::getenv("CIRCUIT_VERIFY_RANGED_SHARED") != nullptr;
 
@@ -135,6 +138,11 @@ void CRangedObservation::BuildContacts(CCircuitAI* ai, std::vector<Contact>& out
 		seenDefsPruned=now;
 		for(auto it=seenDefs.begin();it!=seenDefs.end();) it=(now-it->second.frame>SEEN_DEF_FRAMES) ? seenDefs.erase(it) : std::next(it);
 	}
+	if(now-stillPruned>=FRAMES_PER_SEC*10) {
+		stillPruned=now;
+		for(auto it=stillDots.begin();it!=stillDots.end();) it=(now-it->second.seen>FRAMES_PER_SEC*5) ? stillDots.erase(it) : std::next(it);
+		for(auto it=staticSeen.begin();it!=staticSeen.end();) it=(now-it->second.frame>STATIC_SEEN_FRAMES) ? staticSeen.erase(it) : std::next(it);
+	}
 	// Profile threat suppression must not erase an actual weapon's coverage.
 	// Respect true fog, neutral/dying contacts and BAR's explicit ignoredByAI.
 	for (const auto& [id,e]:ai->GetEnemyManager()->GetEnemyUnits()) {
@@ -155,15 +163,49 @@ void CRangedObservation::BuildContacts(CCircuitAI* ai, std::vector<Contact>& out
 			// a shooter uses it to tell a slow or stationary dot (blind shot
 			// allowed) from one too fast for its shell. Zero until sampled.
 			c.velocity=e->GetVel()*30.f;
-			outEnemies.Add(P(c.pos),int(out.size())); outObjectives.push_back(int(out.size()));
-			out.push_back(c); continue;
+			// Owner 2026-11-23 (radar-only arena: the Bertha was never identified and
+			// survivors wandered). A ground dot within 24 of where it was first seen,
+			// for STILL_DOT_FRAMES, is a still dot. A still dot standing where a
+			// structure was seen (live or ghost, within 48) takes that structure's
+			// identity: hazard, heavy porc and top target rules then apply to it.
+			if(!c.airDot) {
+				auto& s=stillDots[id];
+				if(s.since<0 || s.pos.SqDistance2D(c.pos)>24.f*24.f) { s.pos=c.pos; s.since=now; }
+				s.seen=now;
+				if(now-s.since>=STILL_DOT_FRAMES) c.stillDot=true;
+				if(now-s.since>=INHERIT_DOT_FRAMES) {
+					const int cx=int(c.pos.x/64.f), cz=int(c.pos.z/64.f);
+					CCircuitDef* inherit=nullptr; float best=48.f*48.f;
+					for(int dx=-1;dx<=1;++dx) for(int dz=-1;dz<=1;++dz) {
+						const auto it=staticSeen.find((long long)(cx+dx)*100000+(cz+dz));
+						if(it==staticSeen.end()) continue;
+						const float d2=it->second.pos.SqDistance2D(c.pos);
+						if(d2<best) { best=d2; inherit=it->second.def; }
+					}
+					if(inherit!=nullptr) { c.def=inherit; c.inherited=true; c.stillDot=false; }
+				}
+			}
+			if(!c.def) {
+				outEnemies.Add(P(c.pos),int(out.size())); outObjectives.push_back(int(out.size()));
+				out.push_back(c); continue;
+			}
 		}
-		c.velocity=e->GetVel()*30.f; c.health=std::max(1.f,e->GetHealth());
-		c.radius=e->GetRadius(); c.cost=e->GetCost(); c.los=e->IsInLOS();
+		c.velocity=e->GetVel()*30.f;
+		if(c.inherited) {
+			// No LOS data: the definition's full health and cost, the dot's own radius.
+			c.health=std::max(1.f,c.def->GetHealth()); c.radius=std::max(16.f,e->GetRadius()); c.cost=c.def->GetCostM(); c.los=false;
+		} else {
+			c.health=std::max(1.f,e->GetHealth());
+			c.radius=e->GetRadius(); c.cost=e->GetCost(); c.los=e->IsInLOS();
+		}
 		if(c.los) seenDefs[id]={c.def,now};
+		if(!c.inherited && !c.def->IsMobile() && !c.def->IsAbleToFly()) {
+			auto& s=staticSeen[(long long)int(c.pos.x/64.f)*100000+int(c.pos.z/64.f)];
+			s.def=c.def; s.pos=c.pos; s.frame=now;
+		}
 		c.mobile=c.def->IsMobile();
-		c.armed=c.def->HasSurfToLand() && !e->IsBeingBuilt() && !e->IsDisarmed() && !e->IsParalyzed();
-		if(e->IsIgnore()) {
+		c.armed=c.def->HasSurfToLand() && (c.inherited || (!e->IsBeingBuilt() && !e->IsDisarmed() && !e->IsParalyzed()));
+		if(e->IsIgnore() && !c.inherited) {
 			// The legacy enemy cache intentionally stops health/velocity
 			// updates for profile-ignored contacts. Refresh only observable
 			// fields here, without changing the global cache or other roles.
@@ -260,6 +302,7 @@ void CRangedObservation::BuildGhosts(CCircuitAI* ai)
 		largestGhostHazard=std::max(largestGhostHazard,c.hazardRadius);
 		ghostHazards.Add(P(c.pos),int(ghosts.size()));
 		ghosts.push_back(c);
+		{ auto& s=staticSeen[(long long)int(c.pos.x/64.f)*100000+int(c.pos.z/64.f)]; s.def=gd; s.pos=c.pos; s.frame=ai->GetLastFrame(); }   // owner 2026-11-23
 	}
 	static const bool trace=std::getenv("CIRCUIT_RANGED_TRACE")!=nullptr;
 	static int lastStaleLog=-100000;

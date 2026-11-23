@@ -246,6 +246,7 @@ bool CRangedEngagement::UnknownStaticBlocks(CCircuitUnit* unit,const AIFloat3& f
         unknownStillFrame=frame; unknownStill.clear();
         for(const auto& c:world.Contacts()) {
             if(c.def || c.airDot || c.seenDef || c.pos.y< -20.f) continue;
+            if(c.stillDot && p.porcHazardList) continue;   // owner 2026-11-23: hunted as a structure to 98% of our reach
             if(c.velocity.x*c.velocity.x+c.velocity.z*c.velocity.z>p.spamDotSpeed*p.spamDotSpeed) continue;
             unknownStill.push_back(c.pos);
         }
@@ -1545,8 +1546,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // Precision hulls can opt out of advancing before vision identifies
         // the contact; otherwise they walk into fast assault while arranging
         // a firing band around an apparently harmless unknown target.
-        if(!c.def && !policy.advanceUnknownRadar) { ++unknownObjectives; return; }
-        if((c.def && c.def->IsAbleToFly()) || (c.mobile?!policy.allowMobile:!policy.allowStatic)) return;
+        // Owner 2026-11-23: a still dot (20 s) is a structure for porc_hazards hulls: hunt it.
+        const bool stillStructure=!c.def && c.stillDot && policy.porcHazardList;
+        if(!c.def && !policy.advanceUnknownRadar && !stillStructure) { ++unknownObjectives; return; }
+        if((c.def && c.def->IsAbleToFly()) || ((c.mobile && !stillStructure)?!policy.allowMobile:!policy.allowStatic)) return;
         // Owner 2026-11-21 (Swirly Rock Daedalus idle): spam is never our target, so it is
         // never the objective either. A Peewee as nearest objective parked the hull on a
         // firing site round it (already in reach: stand), fire held, for minutes.
@@ -1599,10 +1602,11 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if(objective<0) for(int i:world.Objectives()) {
         const auto& c=contacts[i];
         if (policy.holdFireline && !c.los) continue;
-        if(!c.def && !policy.advanceUnknownRadar) { ++unknownObjectives; continue; }
+        const bool stillStructure=!c.def && c.stillDot && policy.porcHazardList;   // owner 2026-11-23
+        if(!c.def && !policy.advanceUnknownRadar && !stillStructure) { ++unknownObjectives; continue; }
         if((policy.fireAtWill || policy.alwaysFireAtWill) && Spam(policy,c)) continue;   // owner 2026-11-21: spam is never an objective
         if(!shunned.empty() && Shunned(c.id)) continue;   // owner 2026-11-23
-        if((c.mobile?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
+        if(((c.mobile && !stillStructure)?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
         const float distance=pos.SqDistance2D(c.pos);
         if(kiteFilter && world.KiteIgnored(c)) { if(distance<nearestIgnored) { nearestIgnored=distance; ignoredObjective=i; } continue; }
@@ -1626,7 +1630,13 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             const bool assaultGhost=assaultGo && assaultGhostTarget;
             if (assaultGhost) ghostPos=assaultPos;
             if (assaultGhost || GhostStructure(pos,ghostPos,&policy.topTargetDefs,policy.heavyPorcDefs.empty())) {
-                const float reach=maxRange*policy.rangeFraction;
+                // Owner 2026-11-23: 98% of the real reach from here to the ground under the image:
+                // shorter uphill, longer from a hilltop (engine reach, same as firing sites).
+                ghostPos.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(ghostPos.x,ghostPos.z);
+                float realReach=0.f;
+                for(const auto& w:caps.weapons) if(w.range>=maxRange*0.9f) realReach=std::max(realReach,world.Range(w,pos,ghostPos));
+                if(!(realReach>0.f)) realReach=maxRange;
+                const float reach=realReach*policy.rangeFraction;
                 const float d=std::sqrt(pos.SqDistance2D(ghostPos));
                 if (d<=reach+16.f) {
                     if (frame>=ghostShotFrame) {
@@ -1640,7 +1650,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
                     }
                     return;
                 }
-                if (March(unit,pos,&ghostPos,maxRange)) return;
+                if (March(unit,pos,&ghostPos,realReach)) return;   // stops at 98% of the elevation reach
             }
         }
         if (policy.holdFireline) Hold(unit,true);
@@ -1648,7 +1658,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         return;
     }
     const auto& c=contacts[objective];
-    if(!c.def && !policy.advanceUnknownRadar) {
+    if(!c.def && !policy.advanceUnknownRadar && !(c.stillDot && policy.porcHazardList)) {
         ai->LOG("[INVARIANT] INV-149 precision movement selected an unidentified radar objective");
         return;
     }

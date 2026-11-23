@@ -59,6 +59,13 @@ public:
 		// it as in LOS (within SEEN_DEF_FRAMES), else null. Used only by the
 		// spam rule; targeting still treats the dot as unidentified.
 		CCircuitDef* seenDef = nullptr;
+		// Owner 2026-11-23 (radar-only arena): an unidentified ground dot that has not
+		// moved for STILL_DOT_FRAMES. Treated as a structure for target priority by
+		// porc_hazards hulls (they hunt it instead of wandering). Only when def is null.
+		bool stillDot = false;
+		// Owner 2026-11-23: identity taken from a structure seen at this spot (live or
+		// ghost) for a still, never-identified dot; def is then set and los false.
+		bool inherited = false;
 	};
 	struct Friend {
 		int id; springai::AIFloat3 pos; float radius;
@@ -168,6 +175,13 @@ private:
 	struct SeenDef { CCircuitDef* def=nullptr; int frame=-1; };
 	std::unordered_map<int,SeenDef> seenDefs;
 	int seenDefsPruned = 0;
+	// Owner 2026-11-23: still radar dots (id -> first pos, frame it was first seen there)
+	// and identified structures by 64-elmo cell (def, pos, last frame seen as live or ghost).
+	struct StillDot { springai::AIFloat3 pos; int since=-1; int seen=-1; };
+	std::unordered_map<int,StillDot> stillDots;
+	struct StaticSeen { CCircuitDef* def=nullptr; springai::AIFloat3 pos; int frame=-1; };
+	std::unordered_map<long long,StaticSeen> staticSeen;
+	int stillPruned = 0;
 
 	// Friends: shared per (frame, epoch), cells filled lazily.
 	int friendFrame = -1;

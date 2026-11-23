@@ -13,6 +13,7 @@
 #include "module/MilitaryManager.h"
 #include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "terrain/path/PathFinder.h"
 #include "terrain/path/QueryPathMulti.h"
 #include "unit/action/FightAction.h"
@@ -1074,6 +1075,16 @@ bool ArtyApproach99(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AI
 			const float c = std::cos(a), s = std::sin(a);
 			AIFloat3 p(tp.x + (dir.x * c - dir.z * s) * want, tp.y, tp.z + (dir.x * s + dir.z * c) * want);
 			CTerrainManager::CorrectPosition(p);
+			// owner 2026-11-23: 99% of the real reach from that stand to the target's ground (engine reach: uphill shorter)
+			{
+				const float standY = terrainMgr->GetAreaData()->GetElevationAt(p.x, p.z);
+				const float tgY = terrainMgr->GetAreaData()->GetElevationAt(tp.x, tp.z);
+				const float real = circuit->GetBattle()->ReachAt(cdef, standY, tgY) * 0.99f;
+				if ((real > 0.f) && (real < want)) {
+					p = AIFloat3(tp.x + (dir.x * c - dir.z * s) * real, tp.y, tp.z + (dir.x * s + dir.z * c) * real);
+					CTerrainManager::CorrectPosition(p);
+				}
+			}
 			if (ArtyRealUnsafeAt(circuit, p)) { ++nUnsafe; continue; }
 			// Owner 2026-11-23: the spot must be ground this unit can stand on and get to
 			// (a cliff face passed the 128-elmo area map; 4 Boreas pushed into it 1+ min).
