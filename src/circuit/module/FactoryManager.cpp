@@ -664,6 +664,18 @@ void CFactoryManager::ReadConfig()
 					}
 				}
 			}
+			{   // owner 2026-11-23: heavy_porc group assault
+				const auto& heavy = settings["heavy_porc"];
+				if (!heavy.isNull() && !heavy.isArray()) valid = false;
+				else for (const auto& name : heavy) {
+					if (!name.isString()) { valid = false; continue; }
+					CCircuitDef* heavyDef = circuit->GetCircuitDef(name.asCString());
+					if (heavyDef == nullptr) circuit->LOG("CONFIG %s: %s heavy_porc has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
+					else policy.heavyPorcDefs.insert(heavyDef->GetId());
+				}
+				policy.assaultMinGroup = std::max(1, std::min(20, settings.get("assault_min_group", policy.assaultMinGroup).asInt()));
+				number("assault_max_wait", policy.assaultMaxWait, 0.f, 600.f);
+			}
 			boolean("spam_radar_dots", policy.spamRadarDots);
 			number("spam_dot_speed", policy.spamDotSpeed, 0.f, 200.f);
             number("commander_priority", policy.commanderPriority, 0.001f, 100.f);   // owner 2026-11-15: below 1 = commanders after buildings (Wolverine/Shellshocker 0.01)

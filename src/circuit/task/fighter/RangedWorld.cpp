@@ -313,9 +313,31 @@ bool CRangedWorld::PorcHazardIgnored(const Contact& c) const
     // A structure (live or ghost, identified) outside the hull's porc_hazards list is no hazard.
     // Unidentified dots and blind-hit origins (no def) keep their hazard; mobiles are unchanged.
     const RangedPolicy* p=porcFilter;
-    if(p==nullptr || !p->porcHazardList || c.def==nullptr) return false;
+    if(p==nullptr || !p->porcHazardList) return false;
+    if(porcExempt>=0 && c.id==porcExempt) return true;   // the group's assault target
+    if(c.def==nullptr) return false;
     if(c.mobile && !c.ghost) return false;
     return p->porcHazardDefs.count(c.def->GetId())==0;
+}
+bool CRangedWorld::AssaultJoin(int porc,int unit,int frame,int minGroup,int maxWaitFrames,int& waiting)
+{
+    // Owner 2026-11-23: bounded registry (stale assaults dropped after 60 s, members after 3 s).
+    for(auto it=assaults.begin();it!=assaults.end();) {
+        if(frame-it->second.last>FRAMES_PER_SEC*60) it=assaults.erase(it); else ++it;
+    }
+    Assault& a=assaults[porc];
+    if(a.first<0) a.first=frame;
+    a.last=frame;
+    a.waiting[unit]=frame;
+    for(auto it=a.waiting.begin();it!=a.waiting.end();) {
+        if(frame-it->second>FRAMES_PER_SEC*3) it=a.waiting.erase(it); else ++it;
+    }
+    waiting=int(a.waiting.size());
+    if(a.go<0 && (waiting>=minGroup || frame-a.first>=maxWaitFrames)) {
+        a.go=frame;
+        circuit->LOG("RANGED: assault go porc=%d waiting=%d after=%.0fs",porc,waiting,float(frame-a.first)/FRAMES_PER_SEC);
+    }
+    return a.go>=0;
 }
 bool CRangedWorld::SpamHazardIgnored(const Contact& c) const
 {

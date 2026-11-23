@@ -72,6 +72,12 @@ struct ExactStaticScope {
 };
 }
 
+// Owner 2026-11-23: the heavy porc this unit's group is assaulting is no hazard during its decision.
+struct PorcExemptScope {
+    const CRangedWorld& w; int prev;
+    PorcExemptScope(const CRangedWorld& w,int id) : w(w),prev(w.PorcExempt()) { w.SetPorcExempt(id); }
+    ~PorcExemptScope() { w.SetPorcExempt(prev); }
+};
 CRangedEngagement::CRangedEngagement(CCircuitAI* ai,IUnitTask* owner,CCircuitUnit* unit)
     : ai(ai),owner(owner),worldOwner(ai->GetMilitaryManager()->GetRangedWorld()),world(*worldOwner),
       caps(world.CapabilitiesFor(unit->GetCircuitDef())),id(unit->GetId()),
@@ -404,6 +410,37 @@ bool CRangedEngagement::MarchGoal(const AIFloat3& pos,AIFloat3& goal)
 // Owner 2026-11-23: nearest enemy structure known only as a ghost (identified, last position,
 // not in radar or LOS, not seen empty, not air). Any kind (labs, eco, porc): it is a target, not
 // only a hazard. O(enemies), only for porc_hazards hulls with no live objective.
+// Owner 2026-11-23: heavy porc group assault. The nearest heavy porc (live or ghost) whose reach we are
+// at (hazard + margin + 600) is the one blocking us: join its group; once assault_min_group hulls wait on
+// it (or assault_max_wait passes) the group goes in (see PorcExemptScope). O(contacts + ghosts).
+void CRangedEngagement::UpdateAssault(CCircuitUnit* unit,const AIFloat3& pos,int frame)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    int bestId=-1; float best=std::numeric_limits<float>::max(); AIFloat3 bestPos; bool bestGhost=false;
+    const auto consider=[&](const CRangedWorld::Contact& c,bool ghost) {
+        if(c.def==nullptr || p.heavyPorcDefs.count(c.def->GetId())==0 || (c.mobile && !ghost)) return;
+        const float reach=c.hazardRadius+StaticMargin(p)+600.f;
+        const float d2=pos.SqDistance2D(c.pos);
+        if(d2>reach*reach || d2>=best) return;
+        best=d2; bestId=c.id; bestPos=c.pos; bestGhost=ghost;
+    };
+    for(const auto& c:world.Contacts()) consider(c,false);
+    for(const auto& c:world.Ghosts()) consider(c,true);
+    if(bestId<0) {
+        if(assaultPorc>=0) ai->LOG("RANGED: assault end unit=%d porc=%d (gone or out of reach)",id,assaultPorc);
+        assaultPorc=-1; assaultGo=false; return;
+    }
+    if(bestId!=assaultPorc) { assaultPorc=bestId; assaultGo=false; assaultLogged=false; }
+    assaultPos=bestPos; assaultGhostTarget=bestGhost;
+    int waiting=0;
+    const bool go=world.AssaultJoin(bestId,id,frame,p.assaultMinGroup,int(p.assaultMaxWait*FRAMES_PER_SEC),waiting);
+    if(!assaultLogged) {
+        assaultLogged=true;
+        ai->LOG("RANGED: assault wait unit=%d porc=%d at=%.0f,%.0f ghost=%d waiting=%d",id,bestId,bestPos.x,bestPos.z,int(bestGhost),waiting);
+    }
+    if(go && !assaultGo) ai->LOG("RANGED: assault in unit=%d porc=%d waiting=%d",id,bestId,waiting);
+    assaultGo=go;
+}
 bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal) const
 {
     float best=std::numeric_limits<float>::max();
@@ -452,6 +489,7 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         const int now=ai->GetLastFrame();
         const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
         ExactStaticScope exact(world,p);
+        PorcExemptScope exempt(world,assaultGo?assaultPorc:-1);   // owner 2026-11-23
         world.Refresh();
         const auto points=static_cast<const CQueryPathSingle*>(result)->GetPathInfo()->posPath;
         const AIFloat3 current=unit->GetPos(now);
@@ -1140,6 +1178,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if (policy.ghostVolleys > 0) ai->GetMilitaryManager()->GetArtySnipeState(id,frame).lastCall = frame;
     const auto pos=unit->GetPos(frame);
     if(caps.weapons.empty()) return;
+    if(policy.porcHazardList && !policy.heavyPorcDefs.empty()) UpdateAssault(unit,pos,frame);
+    PorcExemptScope exempt(world,assaultGo?assaultPorc:-1);
     // Discard already traversed waypoints. Validating a route back to its old
     // start incorrectly rejects a successful escape as renewed exposure.
     while(pathCursor<path.size() && (pos.SqDistance2D(path[pathCursor])<4096.f
@@ -1560,6 +1600,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(kiteFilter && world.KiteIgnored(c)) { if(distance<nearestIgnored) { nearestIgnored=distance; ignoredObjective=i; } continue; }
         if(distance<nearest) { nearest=distance; objective=i; }
     }
+    // Owner 2026-11-23: the group's live heavy porc assault target is the objective.
+    if(assaultGo && !assaultGhostTarget && assaultPorc>=0) {
+        for(size_t i=0;i<contacts.size();++i) if(contacts[i].id==assaultPorc) { objective=int(i); break; }
+    }
     const bool ignoredOnly=objective<0 && ignoredObjective>=0;
     if(ignoredOnly) objective=ignoredObjective;
     if(report && unknownObjectives>0) ai->LOG("RANGED: unknown radar approach withheld unit=%d candidates=%d",id,unknownObjectives);
@@ -1570,7 +1614,9 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // 98% of our range of it and fire on its image (attack ground), at most once per 3 s.
         if (!policy.holdFireline && policy.porcHazardList && !closing && frame>=withdrawalUntil && droneTarget<0) {
             AIFloat3 ghostPos;
-            if (GhostStructure(pos,ghostPos)) {
+            const bool assaultGhost=assaultGo && assaultGhostTarget;
+            if (assaultGhost) ghostPos=assaultPos;
+            if (assaultGhost || GhostStructure(pos,ghostPos)) {
                 const float reach=maxRange*policy.rangeFraction;
                 const float d=std::sqrt(pos.SqDistance2D(ghostPos));
                 if (d<=reach+16.f) {

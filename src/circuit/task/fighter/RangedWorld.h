@@ -116,6 +116,11 @@ public:
     void SetPorcFilter(const RangedPolicy* p) const { porcFilter=p; }
     const RangedPolicy* PorcFilter() const { return porcFilter; }
     bool PorcHazardIgnored(const Contact& c) const;
+    // Owner 2026-11-23: the heavy porc this hull's group is assaulting is no hazard for it (set per decision).
+    void SetPorcExempt(int id) const { porcExempt=id; }
+    int PorcExempt() const { return porcExempt; }
+    // Heavy porc assault registry: units waiting on a porc id; true once the group goes in (kept while any member calls).
+    bool AssaultJoin(int porc,int unit,int frame,int minGroup,int maxWaitFrames,int& waiting);
     bool KiteIgnored(const Contact& c) const;
     float Hz(const Contact& c, float press) const {
         if((kiteMinTech>0.f || kiteDotSpeed>0.f) && KiteIgnored(c)) return 0.f;
@@ -205,6 +210,9 @@ private:
     mutable float kiteMinTech = 0.f, kiteDotSpeed = 0.f;
     mutable const RangedPolicy* spamFilter = nullptr;
     mutable const RangedPolicy* porcFilter = nullptr;
+    mutable int porcExempt = -1;
+    struct Assault { std::map<int,int> waiting; int first=-1, go=-1, last=-1; };
+    std::map<int,Assault> assaults;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;

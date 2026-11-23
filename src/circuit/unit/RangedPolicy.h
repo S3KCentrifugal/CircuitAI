@@ -159,6 +159,12 @@ struct RangedPolicy {
     // launchers, nukes and other statics are not. Mobile hazards are unchanged.
     bool porcHazardList = false;
     std::unordered_set<int> porcHazardDefs;
+    // Owner 2026-11-23: heavy porc group assault. Hulls blocked by one of these (live or ghost) wait for
+    // assault_min_group of the same kind of hull (or assault_max_wait seconds), then all treat it as no
+    // hazard, close to range_fraction of their range and fire on it (attack ground if a ghost).
+    std::unordered_set<int> heavyPorcDefs;
+    int assaultMinGroup = 3;
+    float assaultMaxWait = 45.f;
     // Owner 2026-10-28: permanent fire at will. The controller opens fire when
     // it takes the unit and never sets hold fire (no poke, cohort-hold or spam
     // gating); priority targets still steer the guns. Overrides fireAtWill.
