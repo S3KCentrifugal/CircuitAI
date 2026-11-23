@@ -28,6 +28,7 @@
 #include "spring/SpringCallback.h"
 
 #include "AISCommands.h"
+#include "json/json.h"
 #include <map>
 #include <set>
 #include "Log.h"
