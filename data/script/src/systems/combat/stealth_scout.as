@@ -650,7 +650,7 @@ namespace StealthScout {
     // parks, nothing while parked.
     array<AIFloat3> rangedPos;
     array<float> rangedReach;
-    array<int> rangedDefCache;          // defId -> 1 ranged, 0 not, -1 unknown
+    array<int> rangedDefCache;          // defId -> 1 mobile artillery, 2 static artillery, 0 not, -1 unknown
     int rangedFrame = -100000;
     int spotParks = 0, spotGone = 0, spotSwitch = 0, spotNoLos = 0, spotIdle = 0;
     int lastSpotOrder = -100000, lastNoTargetLog = -100000;
@@ -664,10 +664,15 @@ namespace StealthScout {
             rangedDefCache.resize(uint(id + 64));
             for (uint i = old; i < rangedDefCache.length(); ++i) rangedDefCache[i] = -1;
         }
-        if (rangedDefCache[id] < 0)
-            rangedDefCache[id] = (d.IsMobile() && !d.IsAbleToFly() && d.HasSurfToLand()
-                && d.GetMaxRange() >= Global::StealthScout::RangedMinRange) ? 1 : 0;
-        return rangedDefCache[id] == 1;
+        if (rangedDefCache[id] < 0) {
+            int k = 0;
+            if (!d.IsAbleToFly() && d.HasSurfToLand()) {
+                if (d.IsMobile() && d.GetMaxRange() >= Global::StealthScout::RangedMinRange) k = 1;
+                else if (!d.IsMobile() && d.GetMaxRange() >= Global::StealthScout::StaticArtyMinRange) k = 2;
+            }
+            rangedDefCache[id] = k;
+        }
+        return rangedDefCache[id] > 0;
     }
 
     void RefreshRanged()
@@ -680,7 +685,9 @@ namespace StealthScout {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || !IsRangedDef(u.circuitDef) || u.GetBuildProgress() < 1.0f) continue;
             rangedPos.insertLast(u.GetPos(ai.frame));
-            rangedReach.insertLast(u.circuitDef.GetMaxRange() + Global::StealthScout::RangedReachMargin);
+            // mobile: within MobileArtyRadius ("in range or almost"); static: in range
+            rangedReach.insertLast(rangedDefCache[u.circuitDef.id] == 1
+                ? AiMax(Global::StealthScout::MobileArtyRadius, u.circuitDef.GetMaxRange()) : u.circuitDef.GetMaxRange());
         }
     }
 
@@ -735,10 +742,12 @@ namespace StealthScout {
     {
         const CCircuitDef@ d = null;
         if (defId >= 0) @d = ai.GetCircuitDef(defId);
-        const float cost = d is null ? 300.0f : d.costM;
+        // enemy porc only: an identified armed structure
+        if (d is null || d.IsMobile() || !d.HasSurfToLand() || d.GetMaxRange() <= 0.0f) return 0.0f;
+        const float cost = d.costM;
         if (cost < Global::StealthScout::MinTargetCost) return 0.0f;
         float v = AiMin(cost, 4000.0f);
-        if (d !is null && d.GetMaxRange() >= Global::StealthScout::HeavyRange) v *= Global::StealthScout::HeavyFactor;
+        if (d.GetMaxRange() >= Global::StealthScout::HeavyRange) v *= Global::StealthScout::HeavyFactor;
         AIFloat3 c;
         const int n = RangedInReach(p, c);
         return v * float(n) / (1.0f + from.distance2D(p) / 4000.0f);
@@ -915,7 +924,7 @@ namespace StealthScout {
         AIFloat3 c;
         const int n = RangedInReach(s.spotTarget, c);
         if (n > 0 || s.spotDef < 0) s.lastUseful = ai.frame;
-        else if (ai.frame - s.lastUseful > Global::StealthScout::IdleSpotSeconds * SECOND) { ++spotIdle; Unpost(s, "no artillery in reach", true); return; }
+        else if (ai.frame - s.lastUseful > Global::StealthScout::IdleSpotSeconds * SECOND) { ++spotIdle; Unpost(s, "no artillery in reach, next front", true); return; }
         // Every 30 s: leave for a clearly better unseen target.
         if ((ai.frame - s.parkedFrame) % (30 * SECOND) < Global::StealthScout::SpotCheckSeconds * SECOND && ai.frame - s.parkedFrame >= 30 * SECOND) {
             const float now = (s.spotDef < 0) ? s.spotScore : TargetScore(s.spotTarget, s.spotDef, pos);

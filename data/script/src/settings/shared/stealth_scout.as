@@ -82,11 +82,17 @@ namespace StealthScout {
         // shared, so every allied AI's artillery gains from it.
         bool SpotEnabled = true;
         int SpottersPerAi = 1;               // owner 2026-11-23: one spotter per AI
-        // Our "artillery": mobile ground units with a max range this long.
+        // Our "artillery" (owner 2026-11-23): mobile ground units with a max
+        // range of RangedMinRange or more count within MobileArtyRadius of the
+        // target ("in range or almost"); static artillery (T1/T2 porc guns,
+        // LRPCs) of StaticArtyMinRange or more counts only with the target in
+        // its range.
         float RangedMinRange = 950.0f;
-        float RangedReachMargin = 300.0f;   // target within range + this of one of them
+        float MobileArtyRadius = 2000.0f;
+        float StaticArtyMinRange = 1000.0f;
         int RangedRefreshSeconds = 5;
-        float MinTargetCost = 100.0f;       // walls and the like are not worth a spotter
+        // Targets are enemy porc only (an armed structure), heavy porc first.
+        float MinTargetCost = 100.0f;
         float HeavyRange = 900.0f;          // a target structure with this reach (heavy porc) scores x HeavyFactor
         float HeavyFactor = 2.0f;
         // Post: PostDistances from the target (spy sight 550, Gremlin 494), on the
@@ -100,7 +106,7 @@ namespace StealthScout {
         int SpotCandidates = 6;
         int SpotCheckSeconds = 5;           // parked: target / LOS / usefulness check
         int NoLosSeconds = 12;              // parked but the target is still not in LOS: new post
-        int IdleSpotSeconds = 240;          // no artillery in reach this long: new target
+        int IdleSpotSeconds = 45;           // no artillery in reach this long: move to another front
         float SwitchFactor = 1.6f;          // a new target must score this much better to leave a working post
         int SpotAsideSeconds = 300;         // a target/post that failed is skipped this long
         // Production: one spotter at a time from a finished T2 bot lab (or the
