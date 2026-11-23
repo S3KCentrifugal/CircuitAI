@@ -603,6 +603,12 @@ void CFactoryManager::ReadConfig()
 			number("move_floor_seconds", policy.moveFloorSeconds, 0.f, 3.f);
 			number("spam_fire_idle_seconds", policy.spamFireIdleSeconds, 0.f, 120.f);
 			number("unknown_static_reach", policy.unknownStaticReach, 0.f, 3000.f);
+			number("shun_seconds", policy.shunSeconds, 0.f, 600.f);
+			{
+				float refusals = float(policy.shunRefusals);
+				number("shun_refusals", refusals, 1.f, 10.f);
+				policy.shunRefusals = int(refusals);
+			}
 			{
 				float waypoints = float(policy.maxWaypoints);
 				number("max_waypoints", waypoints, 0.f, 32.f);

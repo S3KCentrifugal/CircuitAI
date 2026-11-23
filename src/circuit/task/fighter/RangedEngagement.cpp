@@ -247,6 +247,28 @@ bool CRangedEngagement::UnknownStaticBlocks(CCircuitUnit* unit,const AIFloat3& f
     for(const auto& u:unknownStill) { const float db=u.SqDistance2D(to); if(db<r2 && db<u.SqDistance2D(from)) return true; }
     return false;
 }
+// Owner 2026-11-23 (Salt Reef replay: AI 11 Fatboys below a 200-elmo plateau).
+// Our Trajectory said "clear" where the engine's line of fire hit the cliff lip,
+// so a Fatboy held a target it never fired at; and the nearest plateau contact,
+// with no firing site and the march halted, stayed the objective for minutes.
+// Such a contact is left alone for shun_seconds; the next one is taken. O(shunned).
+bool CRangedEngagement::Shunned(int contact) const
+{
+    if(contact<0) return false;
+    const int frame=ai->GetLastFrame();
+    for(const auto& s:shunned) if(s.first==contact && frame<s.second) return true;
+    return false;
+}
+void CRangedEngagement::Shun(int contact,const char* why)
+{
+    if(contact<0) return;
+    const int frame=ai->GetLastFrame();
+    shunned.erase(std::remove_if(shunned.begin(),shunned.end(),[&](const std::pair<int,int>& s){return s.second<=frame || s.first==contact;}),shunned.end());
+    const float seconds=ai->GetTeamUnit(id) ? ai->GetTeamUnit(id)->GetCircuitDef()->GetRangedPolicy().shunSeconds : 0.f;
+    if(seconds<=0.f) return;
+    shunned.emplace_back(contact,frame+int(seconds*FRAMES_PER_SEC));
+    ai->LOG("RANGED: shun unit=%d target=%d why=%s seconds=%.0f",id,contact,why,seconds);
+}
 bool CRangedEngagement::SafeMove(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,float margin,bool escape)
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
@@ -401,7 +423,8 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
     // sites) and at weapon reach of the goal (the path radius).
     query=finder->CreatePathSingleQuery(unit,ai->GetThreatMap(),pos,goal,stop);
     const std::weak_ptr<int> alive=lifetime;
-    finder->RunQuery(ai->GetScheduler().get(),query,[this,alive,version](const IPathQuery* result) {
+    const int objectiveId=marchObjective;
+    finder->RunQuery(ai->GetScheduler().get(),query,[this,alive,version,objectiveId](const IPathQuery* result) {
         if(alive.expired()) return;
         auto* unit=ai->GetTeamUnit(id);
         if(!unit || unit->GetTask()!=owner || version!=generation || result!=query.get()) return;
@@ -462,10 +485,18 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
             if(trace || !points.empty()) ai->LOG("RANGED: march halt unit=%d points=%u legal=%u cut=%d goal=%.0f,%.0f",
                 id,unsigned(points.size()),unsigned(legal.size()),int(cut),marchGoal.x,marchGoal.z);
             if(trace) ai->LOG("RANGEDTRACE: halt unit=%d at=%.0f,%.0f%s",id,current.x,current.z,why.c_str());
+            // Owner 2026-11-23 (Salt Reef): no firing site was found and the path to this
+            // objective comes back as one point (no way up the plateau), again and again:
+            // after 3 such halts take the next objective. Multi-point halts (the edge of
+            // enemy coverage) keep their objective.
+            if(objectiveId>=0 && p.shunSeconds>0.f && points.size()==1) {
+                if(objectiveId==marchObjective && ++marchObjectiveHalts>=3) { marchObjectiveHalts=0; Shun(objectiveId,"march halts"); }
+            }
             return;
         }
         const int cap=p.maxWaypoints;
         if(cap>=1 && legal.size()>size_t(cap)) legal.resize(cap);
+        marchObjectiveHalts=0;
         path=legal; pathCursor=0; moving=true; issuing=true; destination=legal.back();
         world.SetSlot(id,destination,p.spacing,unit->GetCircuitDef()->GetCostM());
         TRY_UNIT(ai,unit,
@@ -1107,7 +1138,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if(liveWeapon) {
         const int reload=pokeWeapon && weaponIndex==0?pokeReload:liveWeapon->GetReloadFrame();
         if(reload>lastReload && lastReload>=0) {
-            lastShotFrame=frame; failures=0;
+            lastShotFrame=frame; failures=0; refusedCount=0;
             orientUntil=0; // Actual fire completes facing recovery immediately.
             burstUntil=frame+int(caps.weapons[weaponIndex].burst*30.f)+3;
             world.ReserveShot(id,target,reservedDamage,std::min(reload,frame+90));
@@ -1230,6 +1261,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         const auto& c=contacts[i];
         const bool counted=inMax(c); if(counted) ++inReach;
         if(Spam(policy,c)) { if(counted) ++skSpam; continue; } // owner 2026-10-19: never a priority target
+        if(!shunned.empty() && Shunned(c.id)) continue;         // owner 2026-11-23: refused shot / no firing site
         if(!c.los && !policy.allowRadar) { if(counted) ++skLos; continue; }
         if((c.mobile && !policy.allowMobile)||(!c.mobile && !policy.allowStatic)) { if(counted) ++skKind; continue; }
         // D-294 (owner correction): artillery and radar are a pairing, so a
@@ -1384,7 +1416,22 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             world.SetSlot(id,pos,spacing,def->GetCostM());
             return;
         }
-        if(stalled) { ++failures; lastShotFrame=frame; }
+        if(stalled) {
+            ++failures; lastShotFrame=frame;
+            // Owner 2026-11-23 (Salt Reef): the engine never fired at it although our
+            // range and trajectory tests pass (cliff lip). After shun_refusals stalls
+            // on the same target, leave it and take the next target or objective.
+            if(policy.shunSeconds>0.f) {
+                if(refusedTarget!=c.id) { refusedTarget=c.id; refusedCount=0; }
+                if(++refusedCount>=policy.shunRefusals) {
+                    const int refused=c.id;
+                    refusedTarget=-1; refusedCount=0;
+                    Shun(refused,"no shot");
+                    SelectTarget(unit,-1,-1,0.f);
+                    return;
+                }
+            }
+        }
         if(frame<burstUntil) return;
     } else if(droneTarget<0) SelectTarget(unit,-1,-1,0.f);
     if (policy.holdFireline && closing) {
@@ -1419,6 +1466,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // never the objective either. A Peewee as nearest objective parked the hull on a
         // firing site round it (already in reach: stand), fire held, for minutes.
         if((policy.fireAtWill || policy.alwaysFireAtWill) && Spam(policy,c)) return;
+        if(!shunned.empty() && Shunned(c.id)) return;   // owner 2026-11-23: refused shot / no firing site
         // D-294: never approach an identified avoided contact. Unidentified
         // dots stay approachable (advance_unknown_radar owns that): approach
         // is the only way to identify them; the blind SHOT is what is refused.
@@ -1467,6 +1515,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if (policy.holdFireline && !c.los) continue;
         if(!c.def && !policy.advanceUnknownRadar) { ++unknownObjectives; continue; }
         if((policy.fireAtWill || policy.alwaysFireAtWill) && Spam(policy,c)) continue;   // owner 2026-11-21: spam is never an objective
+        if(!shunned.empty() && Shunned(c.id)) continue;   // owner 2026-11-23
         if((c.mobile?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
         const float distance=pos.SqDistance2D(c.pos);
@@ -1481,7 +1530,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // Owner 2026-11-16: nothing identified in radar/LOS. Walk to the front
         // (ghost porc, last known enemy, enemy start) instead of waiting at home.
         if (policy.holdFireline) Hold(unit,true);
-        else if (closing || frame<withdrawalUntil || droneTarget>=0 || !March(unit,pos,nullptr,maxRange)) Disperse(unit);
+        else if (closing || frame<withdrawalUntil || droneTarget>=0 || (SetMarchObjective(-1),!March(unit,pos,nullptr,maxRange))) Disperse(unit);
         return;
     }
     const auto& c=contacts[objective];
@@ -1506,7 +1555,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     AIFloat3 back=pos-c.pos; back.Normalize2D();
     const float baseAngle=std::atan2(back.z,back.x);
     float chosenScore=std::numeric_limits<float>::max(); AIFloat3 chosen=pos; bool found=false;
-    int terrainRejected=0,slotRejected=0,coverageRejected=0,fireRejected=0;
+    int terrainRejected=0,slotRejected=0,coverageRejected=0,fireRejected=0,lineRejected=0,sitesTried=0;
     for(const auto& w:caps.weapons) {
         if(c.def && !(w.category&c.def->GetCategory())) continue;
         // Owner 2026-11-15: the ring radius is the reach from each stand point's own
@@ -1514,6 +1563,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // firing uphill is pulled in, a hilltop stand keeps its longer reach.
         const float flatRange=w.range*policy.rangeFraction;   // angle spacing only
         for(int k=0;k<17;++k) {
+            ++sitesTried;
             const int slot=(k+failures)%17;
             const int side=slot==0?0:((slot%2)?(slot+1)/2:-slot/2);
             const float angle=baseAngle+side*std::max(.12f,spacing/std::max(1.f,flatRange));
@@ -1542,7 +1592,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // D-295: an assist standoff stays behind the allied screen.
             if(assisting && policy.assistScreen && !world.HasScreen(id,point,c.pos)) { ++coverageRejected; continue; }
             if(!world.Trajectory(w,point,c.pos)) { ++fireRejected; continue; }
-            if(world.FriendlyLine(w,id,point,c.pos)) { ++fireRejected; continue; }
+            if(world.FriendlyLine(w,id,point,c.pos)) { ++fireRejected; ++lineRejected; continue; }
             // Forward-fire policy chooses safe advancing/lateral firing sites,
             // never a rearward range correction. O(1) within the existing
             // bounded site loop; independent of other ranged units' kiting.
@@ -1602,7 +1652,14 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     } else if(found) {
         world.SetSlot(id,chosen,spacing,def->GetCostM());
         if(Move(unit,chosen,true) && assisting) { assistCheckFrame=frame; assistCheckRejections=rejections; }
-    } else if(!found && best<0 && droneTarget<0 && !closing && !policy.holdFireline && March(unit,pos,&c.pos,maxRange)) {
+    } else if(!found && best<0 && droneTarget<0 && !closing && !policy.holdFireline && policy.shunSeconds>0.f
+        && sitesTried>0 && terrainRejected+fireRejected==sitesTried && lineRejected==0) {
+        // Owner 2026-11-23 (Salt Reef): every firing site round it is unwalkable or
+        // has no shot (plateau 200+ up: the shell cannot climb it from the foot).
+        // No position exists from our ground: leave it and take the next objective.
+        Shun(c.id,"no firing site");
+    } else if(!found && best<0 && droneTarget<0 && !closing && !policy.holdFireline
+        && (SetMarchObjective(c.id),March(unit,pos,&c.pos,maxRange))) {
         // Owner 2026-11-16: no firing site passes from here (the straight walk
         // from the gantry crosses enemy coverage): walk up to that coverage.
         if(report) ai->LOG("RANGED: march to objective unit=%d target=%d",id,c.id);

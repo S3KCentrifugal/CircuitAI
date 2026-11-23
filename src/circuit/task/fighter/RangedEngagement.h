@@ -93,6 +93,14 @@ private:
     int spamIdleSince=0; bool spamIdleLogged=false;   // owner 2026-11-21: spam_fire_idle_seconds
     std::vector<springai::AIFloat3> unknownStill; int unknownStillFrame=-1;   // owner 2026-11-21: unknown_static_reach
     springai::AIFloat3 marchGoal;
+    // Owner 2026-11-23 (Salt Reef): shun_seconds. Contacts left alone until a
+    // frame: engine-refused shots and objectives with no firing site or path.
+    std::vector<std::pair<int,int>> shunned;   // contact id, until frame
+    int refusedTarget=-1, refusedCount=0;      // stalls on the current target
+    int marchObjective=-1, marchObjectiveHalts=0;   // objective of the march, its no-progress halts
+    bool Shunned(int contact) const;
+    void SetMarchObjective(int contact) { if(contact!=marchObjective) { marchObjective=contact; marchObjectiveHalts=0; } }
+    void Shun(int contact,const char* why);
 };
 }
 #endif

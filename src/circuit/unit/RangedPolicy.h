@@ -145,6 +145,13 @@ struct RangedPolicy {
     // radar dot that is not moving may be porc that outranges us. March legs
     // (and their samples) never come within this distance of one. 0 = off.
     float unknownStaticReach = 0.f;
+    // Owner 2026-11-23 (Salt Reef: Fatboys under a 200-elmo plateau): a target
+    // the engine never fires at (cliff lip; our trajectory model says clear)
+    // after shun_refusals stalls, or an objective with no firing site and no
+    // path towards it, is left alone for shun_seconds and the next one taken.
+    // 0 = off.
+    float shunSeconds = 45.f;
+    int shunRefusals = 2;
     // Owner 2026-11-23: spam of this hull's roster is no hazard (no escape, no blocked site/move); see CRangedWorld::SetSpamFilter.
     bool spamNoHazard = false;
     // Owner 2026-10-28: permanent fire at will. The controller opens fire when
