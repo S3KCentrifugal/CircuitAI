@@ -34,7 +34,7 @@ private:
     bool LegalPath(CCircuitUnit* unit,const std::vector<springai::AIFloat3>& route,bool escape);
     bool SafeMove(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,float margin,bool escape);
     void UpdateAssault(CCircuitUnit* unit,const springai::AIFloat3& pos,int frame);
-    bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal) const;
+    bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal,const std::unordered_set<int>* topDefs=nullptr,bool onlyTop=false) const;
     bool UnknownStaticBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to);
     // Owner 2026-11-16 (Catapults, Daedalus, Myrmidons idle at the gantry): with no
     // shot, no danger and no usable firing site, walk a threat-aware path towards

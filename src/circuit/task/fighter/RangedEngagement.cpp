@@ -441,7 +441,7 @@ void CRangedEngagement::UpdateAssault(CCircuitUnit* unit,const AIFloat3& pos,int
     if(go && !assaultGo) ai->LOG("RANGED: assault in unit=%d porc=%d waiting=%d",id,bestId,waiting);
     assaultGo=go;
 }
-bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal) const
+bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal,const std::unordered_set<int>* topDefs,bool onlyTop) const
 {
     float best=std::numeric_limits<float>::max();
     for(const auto& kv:ai->GetEnemyManager()->GetEnemyUnits()) {
@@ -449,10 +449,12 @@ bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal) const
         if(e==nullptr || e->IsHidden() || e->IsInRadarOrLOS() || e->IsBeingBuilt()) continue;
         const CCircuitDef* d=e->GetCircuitDef();
         if(d==nullptr || d->IsMobile() || d->IsAbleToFly()) continue;
+        if(onlyTop && (topDefs==nullptr || topDefs->count(d->GetId())==0)) continue;   // owner 2026-11-23: other artillery: top targets only
         if(e->GetData().losStatus & (SEnemyData::DEAD|SEnemyData::DYING)) continue;
         const AIFloat3& p=e->GetPos();
         if(!std::isfinite(p.x) || !std::isfinite(p.z) || p.x<0.f || p.z<0.f) continue;
-        const float dist=pos.SqDistance2D(p);
+        float dist=pos.SqDistance2D(p);
+        if(topDefs!=nullptr && topDefs->count(d->GetId())) dist*=1e-4f;   // owner 2026-11-23: top targets first
         if(dist<best) { best=dist; goal=p; }
     }
     return best<std::numeric_limits<float>::max();
@@ -690,6 +692,9 @@ bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape
         }
         auto points=static_cast<const CQueryPathSingle*>(result)->GetPathInfo()->posPath;
         world.Refresh();
+        // Owner 2026-11-23: the group's assault exemption holds for the path check too (arena: every move to
+        // the firing site at 98% of the assaulted Persecutor was rejected here, ~900 times per unit).
+        PorcExemptScope exempt(world,assaultGo?assaultPorc:-1,assaultPos);
         if(world.IsSustainedRush(id)) {
             const auto& plan=world.PlanCohort(unit);
             const auto current=unit->GetPos(ai->GetLastFrame());
@@ -1390,6 +1395,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // puts every structure / commander / T2+ contact above any T1 mobile
             // or dot, and lets SelectTarget's switch ratio leave a held T1 at once.
             if(def->IsPriorityTarget(c.def)) value+=PRIORITY_TIER_OFFSET;
+            // Owner 2026-11-23: top_targets (LRPC, tactical launchers, heavy porc, heavy static artillery) above all.
+            if(c.def && policy.topTargetDefs.count(c.def->GetId())) value+=4.f*PRIORITY_TIER_OFFSET;
             // Owner 2026-11-15: structures_over_slow (see STRUCTURE_TIER_OFFSET); unidentified dots stay below.
             if(c.def && policy.structuresOverSlow>0.f && !SlowMobile(c,policy.structuresOverSlow)) value+=STRUCTURE_TIER_OFFSET;
             if(c.id==target && (heldScoreFrame!=frame || value>heldScore)) { heldScore=value; heldScoreFrame=frame; }
@@ -1552,7 +1559,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         const float dist=pos.SqDistance2D(c.pos);
         if(c.def && !(c.def->GetCategory()&def->GetTargetCategory())) return;
         if(kiteFilter && world.KiteIgnored(c)) { if(dist<nearestIgnored) { nearestIgnored=dist; ignoredObjective=i; } return; }
-        if(dist<nearest) { nearest=dist; objective=i; }
+        const float rank=(c.def && policy.topTargetDefs.count(c.def->GetId())) ? dist*1e-4f : dist;   // owner 2026-11-23: top targets first
+        if(rank<nearest) { nearest=rank; objective=i; }
     };
     // D-295: with no legal shot, prefer the nearest visible contact an allied
     // screen is already fighting (precedence: shot > danger/closing > assist >
@@ -1598,7 +1606,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
         const float distance=pos.SqDistance2D(c.pos);
         if(kiteFilter && world.KiteIgnored(c)) { if(distance<nearestIgnored) { nearestIgnored=distance; ignoredObjective=i; } continue; }
-        if(distance<nearest) { nearest=distance; objective=i; }
+        const float rank=(c.def && policy.topTargetDefs.count(c.def->GetId())) ? distance*1e-4f : distance;   // owner 2026-11-23
+        if(rank<nearest) { nearest=rank; objective=i; }
     }
     // Owner 2026-11-23: the group's live heavy porc assault target is the objective.
     if(assaultGo && !assaultGhostTarget && assaultPorc>=0) {
@@ -1616,7 +1625,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             AIFloat3 ghostPos;
             const bool assaultGhost=assaultGo && assaultGhostTarget;
             if (assaultGhost) ghostPos=assaultPos;
-            if (assaultGhost || GhostStructure(pos,ghostPos)) {
+            if (assaultGhost || GhostStructure(pos,ghostPos,&policy.topTargetDefs,policy.heavyPorcDefs.empty())) {
                 const float reach=maxRange*policy.rangeFraction;
                 const float d=std::sqrt(pos.SqDistance2D(ghostPos));
                 if (d<=reach+16.f) {

@@ -28,6 +28,8 @@
 #include "spring/SpringCallback.h"
 
 #include "AISCommands.h"
+#include <map>
+#include <set>
 #include "Log.h"
 #include "Weapon.h"
 #include "Feature.h"
@@ -838,6 +840,26 @@ void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
  * + 16 of an identified armed structure (live, radar or a ghost that still
  * stands) or of a live (LOS/radar) identified armed mobile. O(known enemies).
  */
+// Owner 2026-11-23 (All That Smolders freeze): the profile's ranged_defaults.porc_hazards allowlist for the
+// native artillery path too. A static not on it (LRPC, tactical launcher, nuke, antinuke) is never porc to wait
+// outside; it is a target to approach. Built once per AI from the config; an empty list keeps the old rule.
+static bool IsListedPorc(CCircuitAI* circuit, const CCircuitDef* d)
+{
+	static std::map<const CCircuitAI*, std::set<int>> lists;
+	auto it = lists.find(circuit);
+	if (it == lists.end()) {
+		std::set<int> ids;
+		const Json::Value& porc = circuit->GetSetupManager()->GetConfig()["ranged_defaults"]["porc_hazards"];
+		if (porc.isArray()) for (const auto& name : porc) {
+			if (!name.isString()) continue;
+			CCircuitDef* pd = circuit->GetCircuitDef(name.asCString());
+			if (pd != nullptr) ids.insert(pd->GetId());
+		}
+		it = lists.emplace(circuit, std::move(ids)).first;
+	}
+	return it->second.empty() || (d != nullptr && it->second.count(d->GetId()) > 0);
+}
+
 bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at, float margin)
 {
 	for (const auto& kv : circuit->GetEnemyInfos()) {
@@ -847,6 +869,7 @@ bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at, float margin)
 		const bool live = e->IsInRadarOrLOS();
 		if (d->IsMobile() ? !live : (!live && GhostGone(circuit, e->GetId()))) continue;
 		if (live && e->IsBeingBuilt()) continue;
+		if (!d->IsMobile() && !IsListedPorc(circuit, d)) continue;   // owner 2026-11-23: LRPC/launchers are no porc
 		const float r = d->GetMaxRange(CCircuitDef::RangeType::LAND);
 		if ((r > 0.f) && (at.SqDistance2D(e->GetPos()) < SQUARE(r + margin))) return true;
 	}
@@ -1034,7 +1057,8 @@ bool ArtyApproach99(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AI
 		if (!cdef->HasSurfToWater() && (e->GetPos().y < -SQUARE_SIZE * 5)) continue;
 		const bool ghost = !e->IsInRadarOrLOS();
 		if (ghost && (GhostDoneHas(st, e->GetData()) || GhostGone(circuit, e->GetId()))) continue;
-		if (d->HasSurfToLand() && (d->GetMaxRange(CCircuitDef::RangeType::LAND) + 16.f > want)) continue;  // outranges: snipe routine
+		// outranges: snipe routine; owner 2026-11-23: only listed porc, an LRPC or tactical launcher is approached
+		if (d->HasSurfToLand() && IsListedPorc(circuit, d) && (d->GetMaxRange(CCircuitDef::RangeType::LAND) + 16.f > want)) continue;
 		const float sq = pos.SqDistance2D(e->GetPos());
 		if (sq <= SQUARE(range)) continue;  // in range: the pick's job
 		if (skipped(e->GetId())) continue;

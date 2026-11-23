@@ -8,7 +8,7 @@ end
 local cfg=VFS.Include("LuaUI/Config/gantry_march.lua")
 local A=0
 local REACH={legerailtank=1000*0.98, legeallterrainmech=1100*0.98}
-if UnitDefNames.corcat then REACH.corcat=(UnitDefNames.corcat.maxWeaponRange or 0)*0.94 end
+for _,n in ipairs({"corcat","armmerl","legbart"}) do if UnitDefNames[n] then REACH[n]=(UnitDefNames[n].maxWeaponRange or 0)*0.97 end end
 local units={}   -- id -> {def, minD, in98, dead, by}
 local done=false
 local function echo(s) Spring.Echo("[T3Arty] "..s) end

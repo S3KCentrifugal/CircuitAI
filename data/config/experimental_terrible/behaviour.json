@@ -224,6 +224,22 @@
 //####|| Evolving Commanders ||###########################################################################################
 //########################################################################################################################
 
+		// Owner 2026-11-23 (All That Smolders freeze): defaults for every ranged-controller hull without its own key.
+
+		// porc_hazards: the only structures that are static danger (direct-fire porc up to Pulsar, Bulwark, Bastion,
+
+		// Persecutor, Rattlesnake, Eviscerator); LRPC, tactical launchers, nukes and antinukes never are.
+
+		// top_targets: LRPC, tactical launchers, heavy porc and heavy static artillery come first (ghosts too).
+
+		"ranged_defaults": {
+
+			"porc_hazards": ["armllt", "armbeamer", "armhlt", "armguard", "armpb", "armclaw", "armamb", "armanni", "corllt", "corhllt", "corhlt", "corpun", "cormaw", "corvipe", "corexp", "cormexp", "cortoast", "cordoom", "leglht", "legmg", "legdtr", "legbombard", "legcluster", "legapopupdef", "legbastion", "legacluster"],
+
+			"top_targets": ["armbrtha", "corint", "leglrpc", "armvulc", "corbuzz", "legstarfall", "cortron", "armemp", "legperdition", "armanni", "cordoom", "legbastion", "cortoast", "armamb", "legacluster"]
+
+		},
+
 		"behaviour": {
 	"legcluster": {"build": false}, // construction veto also applies without the Legion profile fragment
 			"armcom": {

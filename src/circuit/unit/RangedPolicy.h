@@ -163,6 +163,8 @@ struct RangedPolicy {
     // assault_min_group of the same kind of hull (or assault_max_wait seconds), then all treat it as no
     // hazard, close to range_fraction of their range and fire on it (attack ground if a ghost).
     std::unordered_set<int> heavyPorcDefs;
+    // Owner 2026-11-23: top_targets: these come before any other target or objective (ghosts: ghost fire).
+    std::unordered_set<int> topTargetDefs;
     int assaultMinGroup = 3;
     float assaultMaxWait = 45.f;
     // Owner 2026-10-28: permanent fire at will. The controller opens fire when

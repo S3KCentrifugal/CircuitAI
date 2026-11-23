@@ -33,7 +33,7 @@ ROOT = HERE.parents[1]
 MAP = 'Full Metal Plate 1.7'
 HOST_START = (11800, 11800)
 GANTRY = (2200, 1800)
-UNITS = ['legerailtank', 'legerailtank', 'legeallterrainmech', 'legeallterrainmech', 'corcat', 'corcat']
+UNITS = ['legerailtank', 'legerailtank', 'legeallterrainmech', 'legeallterrainmech', 'corcat', 'corcat', 'armmerl', 'armmerl', 'legbart', 'legbart']
 # along the diagonal from the gantry toward the host: u = (0.707, 0.707), perpendicular v = (0.707, -0.707)
 def at(along, side):
     return (GANTRY[0] + 0.7071 * (along + side), GANTRY[1] + 0.7071 * (along - side))
@@ -99,7 +99,7 @@ def main():
     script.write_text(s, encoding='utf-8')
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
     lua = lambda rows: '{' + ','.join('{"%s",%d,%d}' % r for r in rows) + '}'
-    units = [(u, GANTRY[0] + 140 * i, GANTRY[1]) for i, u in enumerate(UNITS)]
+    units = [(u, GANTRY[0] + 140 * (i % 5), GANTRY[1] + 160 * (i // 5)) for i, u in enumerate(UNITS)]
     if a.mode == 'radar':
         units = units + [('legrad', GANTRY[0] - 300, GANTRY[1] - 300)]
     los_on = {'live': 60, 'ghost': 60, 'blind': None, 'radar': None}[a.mode]

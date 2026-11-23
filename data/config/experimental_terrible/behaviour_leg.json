@@ -811,6 +811,8 @@
 			},
 			"legbart": {
 				"role": ["artillery"],
+				"attribute": ["siege", "ranged"],   // owner 2026-11-23: Barrage-style controller (ghost volleys, max range), copy of legbar's policy
+				"ranged": {"ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.97, "spacing": 112, "safety_margin": 48, "static_margin": 12, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

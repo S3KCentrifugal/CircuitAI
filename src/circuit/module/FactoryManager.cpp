@@ -652,7 +652,9 @@ void CFactoryManager::ReadConfig()
 				}
 			}
 			{   // owner 2026-11-23: porc_hazards. Only these structures (live or ghost) are static hazards for this hull.
-				const auto& porc = settings["porc_hazards"];
+				// A hull without its own list takes the profile-wide ranged_defaults.porc_hazards (owner 23:03Z: all
+				// ranged artillery: LRPC, tactical launchers, nukes and antinukes are never porc to wait outside).
+				const auto& porc = settings.isMember("porc_hazards") ? settings["porc_hazards"] : root["ranged_defaults"]["porc_hazards"];
 				if (!porc.isNull() && !porc.isArray()) valid = false;
 				else if (porc.isArray()) {
 					policy.porcHazardList = true;
@@ -675,6 +677,16 @@ void CFactoryManager::ReadConfig()
 				}
 				policy.assaultMinGroup = std::max(1, std::min(20, settings.get("assault_min_group", policy.assaultMinGroup).asInt()));
 				number("assault_max_wait", policy.assaultMaxWait, 0.f, 600.f);
+			}
+			{   // owner 2026-11-23: top_targets (own list, else ranged_defaults.top_targets): LRPC, tactical launchers,
+				// heavy porc and heavy static artillery come first for every ranged artillery hull, ghosts included.
+				const auto& top = settings.isMember("top_targets") ? settings["top_targets"] : root["ranged_defaults"]["top_targets"];
+				if (!top.isNull() && !top.isArray()) valid = false;
+				else for (const auto& name : top) {
+					if (!name.isString()) { valid = false; continue; }
+					CCircuitDef* topDef = circuit->GetCircuitDef(name.asCString());
+					if (topDef != nullptr) policy.topTargetDefs.insert(topDef->GetId());
+				}
 			}
 			boolean("spam_radar_dots", policy.spamRadarDots);
 			number("spam_dot_speed", policy.spamDotSpeed, 0.f, 200.f);
