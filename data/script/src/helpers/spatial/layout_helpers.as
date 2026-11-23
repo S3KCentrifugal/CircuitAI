@@ -121,7 +121,7 @@ namespace LayoutHelpers {
         const AiRole role = Global::AISettings::Role;
         aiTerrainMgr.SetFactoryCorridorPolicy(CorridorsForRole(role), role == AiRole::FRONT);
         CCircuitDef@ requiredGantry = role == AiRole::TECH
-            && aiSetupMgr.ConfigBool("factory_corridors/tech_gantry", true)
+            && aiSetupMgr.ConfigBool("factory_corridors/tech_gantry", false)
             ? ai.GetCircuitDef(UnitHelpers::GetLandGantryForSide(Global::AISettings::Side)) : null;
         aiTerrainMgr.SetFactoryCorridorRequired(requiredGantry is null ? -1 : requiredGantry.id,
             aiSetupMgr.ConfigFloat("factory_corridors/tech_front_fraction", 0.5f));
