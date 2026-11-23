@@ -361,6 +361,15 @@ void CMilitaryManager::ReadConfig()
 	CCircuitDef::RoleName& roleNames = CCircuitDef::GetRoleNames();
 
 	ReadDroneAAConfig();
+	{   // owner 2026-11-23: ranged_defaults.porc_hazards, also for the native artillery path (ArtyRealUnsafeAt, ArtyApproach99)
+		rangedPorcDefs.clear();
+		const Json::Value& porc = root["ranged_defaults"]["porc_hazards"];
+		if (porc.isArray()) for (const auto& name : porc) {
+			if (!name.isString()) continue;
+			CCircuitDef* pd = circuit->GetCircuitDef(name.asCString());
+			if (pd != nullptr) rangedPorcDefs.insert(pd->GetId());
+		}
+	}
 
 	const Json::Value& responses = root["response"];
     // Content policy is explicit JSON, not a faction/unit-name fork. The tag

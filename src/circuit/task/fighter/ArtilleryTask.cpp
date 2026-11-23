@@ -28,7 +28,6 @@
 #include "spring/SpringCallback.h"
 
 #include "AISCommands.h"
-#include "json/json.h"
 #include <map>
 #include <set>
 #include "Log.h"
@@ -846,19 +845,8 @@ void ArtyLockHeld(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 // outside; it is a target to approach. Built once per AI from the config; an empty list keeps the old rule.
 static bool IsListedPorc(CCircuitAI* circuit, const CCircuitDef* d)
 {
-	static std::map<const CCircuitAI*, std::set<int>> lists;
-	auto it = lists.find(circuit);
-	if (it == lists.end()) {
-		std::set<int> ids;
-		const Json::Value& porc = circuit->GetSetupManager()->GetConfig()["ranged_defaults"]["porc_hazards"];
-		if (porc.isArray()) for (const auto& name : porc) {
-			if (!name.isString()) continue;
-			CCircuitDef* pd = circuit->GetCircuitDef(name.asCString());
-			if (pd != nullptr) ids.insert(pd->GetId());
-		}
-		it = lists.emplace(circuit, std::move(ids)).first;
-	}
-	return it->second.empty() || (d != nullptr && it->second.count(d->GetId()) > 0);
+	// The config is read once at load (CMilitaryManager::ReadConfig); reading it here crashed (freed after setup).
+	return circuit->GetMilitaryManager()->IsListedPorc(d);
 }
 
 bool ArtyRealUnsafeAt(CCircuitAI* circuit, const AIFloat3& at, float margin)

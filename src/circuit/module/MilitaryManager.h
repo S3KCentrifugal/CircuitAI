@@ -790,6 +790,8 @@ public:
 	springai::AIFloat3 GetCombatFocusPos() const;
 	float GetMinAttackers() const { return minAttackers; }
 	int GetT3NoRegroup() const { return t3NoRegroup; }
+	// Owner 2026-11-23: profile allowlist of structures that are porc (empty: every armed static is)
+	bool IsListedPorc(const CCircuitDef* d) const { return rangedPorcDefs.empty() || (d != nullptr && rangedPorcDefs.count(d->GetId()) > 0); }
 	float GetAttackWaitSeconds() const { return attackWaitSeconds; }
 	float GetAttackScale() const { return attackScale; }
 	void UpdateDefence();
@@ -899,6 +901,7 @@ private:
 	unsigned int maxScouts = 0;
 	float minAttackers = 0.f;
 	int t3NoRegroup = 3;
+	std::set<int> rangedPorcDefs;
 	/*
 	 * Attack-wave policy, script-set through quota.attackWait / quota.attackScale.
 	 * attackScale > 0 switches a DEFEND squad's promotion bar from the map-wide
