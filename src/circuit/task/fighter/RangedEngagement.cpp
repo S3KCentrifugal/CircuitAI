@@ -74,9 +74,9 @@ struct ExactStaticScope {
 
 // Owner 2026-11-23: the heavy porc this unit's group is assaulting is no hazard during its decision.
 struct PorcExemptScope {
-    const CRangedWorld& w; int prev;
-    PorcExemptScope(const CRangedWorld& w,int id) : w(w),prev(w.PorcExempt()) { w.SetPorcExempt(id); }
-    ~PorcExemptScope() { w.SetPorcExempt(prev); }
+    const CRangedWorld& w; int prev; AIFloat3 prevPos;
+    PorcExemptScope(const CRangedWorld& w,int id,const AIFloat3& at) : w(w),prev(w.PorcExempt()),prevPos(w.PorcExemptPos()) { w.SetPorcExempt(id,at); }
+    ~PorcExemptScope() { w.SetPorcExempt(prev,prevPos); }
 };
 CRangedEngagement::CRangedEngagement(CCircuitAI* ai,IUnitTask* owner,CCircuitUnit* unit)
     : ai(ai),owner(owner),worldOwner(ai->GetMilitaryManager()->GetRangedWorld()),world(*worldOwner),
@@ -489,7 +489,7 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         const int now=ai->GetLastFrame();
         const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
         ExactStaticScope exact(world,p);
-        PorcExemptScope exempt(world,assaultGo?assaultPorc:-1);   // owner 2026-11-23
+        PorcExemptScope exempt(world,assaultGo?assaultPorc:-1,assaultPos);   // owner 2026-11-23
         world.Refresh();
         const auto points=static_cast<const CQueryPathSingle*>(result)->GetPathInfo()->posPath;
         const AIFloat3 current=unit->GetPos(now);
@@ -1179,7 +1179,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     const auto pos=unit->GetPos(frame);
     if(caps.weapons.empty()) return;
     if(policy.porcHazardList && !policy.heavyPorcDefs.empty()) UpdateAssault(unit,pos,frame);
-    PorcExemptScope exempt(world,assaultGo?assaultPorc:-1);
+    PorcExemptScope exempt(world,assaultGo?assaultPorc:-1,assaultPos);
     // Discard already traversed waypoints. Validating a route back to its old
     // start incorrectly rejects a successful escape as renewed exposure.
     while(pathCursor<path.size() && (pos.SqDistance2D(path[pathCursor])<4096.f

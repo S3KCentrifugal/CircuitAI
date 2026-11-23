@@ -33,7 +33,7 @@ ROOT = HERE.parents[1]
 MAP = 'Full Metal Plate 1.7'
 HOST_START = (11800, 11800)
 GANTRY = (2200, 1800)
-UNITS = ['legerailtank', 'legerailtank', 'legeallterrainmech', 'legeallterrainmech']
+UNITS = ['legerailtank', 'legerailtank', 'legeallterrainmech', 'legeallterrainmech', 'corcat', 'corcat']
 # along the diagonal from the gantry toward the host: u = (0.707, 0.707), perpendicular v = (0.707, -0.707)
 def at(along, side):
     return (GANTRY[0] + 0.7071 * (along + side), GANTRY[1] + 0.7071 * (along - side))

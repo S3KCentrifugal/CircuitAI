@@ -2416,7 +2416,7 @@
 				// scouted spam as their set target. Spam (Rover, Rascal, Blitz, Alaris, Incisor, Goblin, Wheelie,
 				// Tick, Grunt, Pawn, and moving unidentified ground dots) is never a picked target; fire at will
 				// opens only while a non-spam target is in reach and no spam is (the pick still fires on hold).
-				"ranged": {"target_mode": "bombardment", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "spam_radar_dots": true},
+				"ranged": {"porc_hazards": ["armllt", "armbeamer", "armhlt", "armguard", "armpb", "armclaw", "armamb", "armanni", "corllt", "corhllt", "corhlt", "corpun", "cormaw", "corvipe", "corexp", "cormexp", "cortoast", "cordoom", "leglht", "legmg", "legdtr", "legbombard", "legcluster", "legapopupdef", "legbastion", "legacluster"], "heavy_porc": ["armanni", "cordoom", "legbastion", "cortoast", "armamb", "legacluster"], "assault_min_group": 3, "assault_max_wait": 45, "target_mode": "bombardment", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "spam_radar_dots": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

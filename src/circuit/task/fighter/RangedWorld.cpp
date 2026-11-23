@@ -315,6 +315,10 @@ bool CRangedWorld::PorcHazardIgnored(const Contact& c) const
     const RangedPolicy* p=porcFilter;
     if(p==nullptr || !p->porcHazardList) return false;
     if(porcExempt>=0 && c.id==porcExempt) return true;   // the group's assault target
+    // ... and every heavy porc of its cluster (within 1200 of it): a Bastion beside the Persecutor
+    // being assaulted otherwise still keeps the group out of range (arena 2026-11-23).
+    if(porcExempt>=0 && c.def!=nullptr && p->heavyPorcDefs.count(c.def->GetId())>0
+        && c.pos.SqDistance2D(porcExemptPos)<=1200.f*1200.f) return true;
     if(c.def==nullptr) return false;
     if(c.mobile && !c.ghost) return false;
     return p->porcHazardDefs.count(c.def->GetId())==0;

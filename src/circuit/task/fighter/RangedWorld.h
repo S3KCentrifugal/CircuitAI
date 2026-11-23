@@ -117,7 +117,8 @@ public:
     const RangedPolicy* PorcFilter() const { return porcFilter; }
     bool PorcHazardIgnored(const Contact& c) const;
     // Owner 2026-11-23: the heavy porc this hull's group is assaulting is no hazard for it (set per decision).
-    void SetPorcExempt(int id) const { porcExempt=id; }
+    void SetPorcExempt(int id,const springai::AIFloat3& at=springai::AIFloat3(-1.f,0.f,-1.f)) const { porcExempt=id; porcExemptPos=at; }
+    const springai::AIFloat3& PorcExemptPos() const { return porcExemptPos; }
     int PorcExempt() const { return porcExempt; }
     // Heavy porc assault registry: units waiting on a porc id; true once the group goes in (kept while any member calls).
     bool AssaultJoin(int porc,int unit,int frame,int minGroup,int maxWaitFrames,int& waiting);
@@ -211,6 +212,7 @@ private:
     mutable const RangedPolicy* spamFilter = nullptr;
     mutable const RangedPolicy* porcFilter = nullptr;
     mutable int porcExempt = -1;
+    mutable springai::AIFloat3 porcExemptPos = springai::AIFloat3(-1.f,0.f,-1.f);
     struct Assault { std::map<int,int> waiting; int first=-1, go=-1, last=-1; };
     std::map<int,Assault> assaults;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
