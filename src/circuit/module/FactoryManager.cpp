@@ -748,6 +748,12 @@ void CFactoryManager::ReadConfig()
 		if (!fire.isNull()) {
 			cdef->SetFireState(fire.asInt());
 		}
+		// Owner 2026-11-23: fire at will always, for ranged (always_fire_at_will) and other hulls (fire_at_will_always)
+		if ((cdef->IsAttrRanged() && cdef->GetRangedPolicy().alwaysFireAtWill)
+			|| (behaviour["fire_at_will_always"].isBool() && behaviour["fire_at_will_always"].asBool())) {
+			cdef->SetAlwaysOpenFire(true);
+			if (cdef->GetFireState() < CCircuitDef::FireType::OPEN) cdef->SetFireState(CCircuitDef::FireType::OPEN);
+		}
 
 		const Json::Value& move = behaviour["move_state"];
 		if (!move.isNull()) {

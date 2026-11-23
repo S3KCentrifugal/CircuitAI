@@ -1413,7 +1413,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // Owner 2026-11-21 (Swirly Rock Daedalus idle): spam is never our target, so it is
         // never the objective either. A Peewee as nearest objective parked the hull on a
         // firing site round it (already in reach: stand), fire held, for minutes.
-        if(policy.fireAtWill && Spam(policy,c)) return;
+        if((policy.fireAtWill || policy.alwaysFireAtWill) && Spam(policy,c)) return;
         // D-294: never approach an identified avoided contact. Unidentified
         // dots stay approachable (advance_unknown_radar owns that): approach
         // is the only way to identify them; the blind SHOT is what is refused.
@@ -1461,7 +1461,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         const auto& c=contacts[i];
         if (policy.holdFireline && !c.los) continue;
         if(!c.def && !policy.advanceUnknownRadar) { ++unknownObjectives; continue; }
-        if(policy.fireAtWill && Spam(policy,c)) continue;   // owner 2026-11-21: spam is never an objective
+        if((policy.fireAtWill || policy.alwaysFireAtWill) && Spam(policy,c)) continue;   // owner 2026-11-21: spam is never an objective
         if((c.mobile?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
         const float distance=pos.SqDistance2D(c.pos);

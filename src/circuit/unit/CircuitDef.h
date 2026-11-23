@@ -293,7 +293,11 @@ public:
 	void ModSurfThreat(float mod) { surfThrMod *= mod; surfThrDmg *= mod; }
 	void ModWaterThreat(float mod) { waterThrMod *= mod; waterThrDmg *= mod; }
 	void SetThreatRange(ThreatType type, int range) { threatRange[static_cast<ThreatT>(type)] = range; }
-	void SetFireState(FireT ft) { fireState = ft; }
+	void SetFireState(FireT ft) { fireState = (alwaysOpenFire && ft < FireType::OPEN) ? FireT(FireType::OPEN) : ft; }
+	// Owner 2026-11-23 ("daedalus should be fire at will all the time"): no task or controller may set
+	// this def below fire at will (hold or return fire); see CCircuitUnit::CmdSetFireState.
+	void SetAlwaysOpenFire(bool v) { alwaysOpenFire = v; }
+	bool IsAlwaysOpenFire() const { return alwaysOpenFire; }
 	void SetMoveState(MoveT mt) { moveState = mt; }
 	void SetReloadTime(int time) { reloadTime = time; }
 
@@ -463,6 +467,7 @@ private:
 	float shieldRadius;
 	float maxShield;
 	FireT fireState;
+	bool alwaysOpenFire = false;
 	MoveT moveState;
 	int reloadTime;  // frames in ticks
 	int category;

@@ -740,6 +740,9 @@ bool CCircuitUnit::RepeatState(int& sent, int& sentFrame, int value)
 void CCircuitUnit::CmdSetFireState(CCircuitDef::FireT state)
 {
     if (IsSlowMissileLauncher(circuitDef->GetDef()->GetName())) state = CCircuitDef::FireType::HOLD;
+    // Owner 2026-11-23: an always-open-fire def is never put on hold or return fire by any task
+    // (spam hold, retreat, artillery/anti-heavy tasks, mass mode, scripts): it stays at fire at will.
+    if (circuitDef->IsAlwaysOpenFire() && state < CCircuitDef::FireType::OPEN) state = CCircuitDef::FireType::OPEN;
     requestedFire=state;
 	// A def whose profile fire state is fire-at-neutral (3: FRONT T1, T2 direct
 	// fire, SEA/TACTICAL T1) keeps it whenever a task opens fire, so walls stay
