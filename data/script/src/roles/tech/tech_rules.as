@@ -44,8 +44,9 @@ The T1 bot lab, as an example of the reasoning the table has to carry
 
   lab.t1.opening   at game start, a throwaway at the commander, to be
                    reclaimed the moment the advanced lab begins
-  lab.t1.recover   every constructor lost and no lab of any tier standing
-                   or ordered: the commander rebuilds one to get builders
+  lab.t1.recover   no lab of any tier standing and nobody free to build the
+                   advanced lab (D-102b): the commander rebuilds one to get
+                   builders
   fwd.t1           D-109: the spam labs go forward (the spam cluster), built
                    by the released T1 land constructors, one per +100 metal
   never            for a T1 front - TECH does not fight T1 lane battles -
@@ -170,6 +171,7 @@ namespace TechRules {
     bool NoT1Lab(Ctx@ c)          { return c.t1Labs == 0 && aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(Global::AISettings::Side))) == 0; }
     bool NoLabAtAll(Ctx@ c)       { return c.t1Labs == 0 && c.t2Labs == 0 && !c.intoT2; }
     bool NoConstructors(Ctx@ c)   { return c.constructors == 0; }
+    bool RecoverT1Lab(Ctx@ c)     { return TechBuild::RecoverT1Lab(); }   // D-102b
 
     bool EcoOnline(Ctx@ c)        { return TechBuild::EcoOnline(); }   // D-102
 
@@ -589,6 +591,7 @@ namespace TechRules {
         table.insertLast(Rule("land.recall",       CONSTRUCTORS, W0(), @DoLandRecall,   "D-109: a tier whose air constructors went down: its land constructors drop a forward job for the eco rows"));
         table.insertLast(Rule("weapons.super",     CONSTRUCTORS, W0(), @DoWeaponsSuper, "D-126 (owner): a super cannon framed or startable: every air constructor builds it"));
         table.insertLast(Rule("keep.current",      MOBILE,       W0(), @DoKeepCurrent,  "the construction the builder is on, when native re-asks"));
+        table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W2(@OpeningDone, @RecoverT1Lab), @DoStartFactory, "every lab lost and nobody free can build the advanced lab (no T1 constructor, no T2 constructor outside the mex upgraders): the commander rebuilds a T1 lab before any other job (D-102b)"));
         table.insertLast(Rule("rush.bootstrap", CON_T1, W0(), @DoRushBootstrap, "retain one safe support-bootstrap journey without claiming a building"));
         table.insertLast(Rule("seat.turret",       CON_T1,       W0(), @DoSeatTurret,   "D-489 (owner): metal floats past the T2 lab: one T1 constructor at base builds only construction turrets on free economy slots"));
         table.insertLast(Rule("pinpointer",        CON_T2,       W0(), @DoPinpointer,   "D-492 (owner): the team has artillery and no Pinpointer: three on the layout"));
@@ -632,7 +635,6 @@ namespace TechRules {
         table.insertLast(Rule("energy.reactor.relief", MOBILE, W1(@ReactorRelief), @DoEnergy, "D-527: reactor relief requires sustained metal surplus during mex upgrades"));
         table.insertLast(Rule("chain.next",        MOBILE,       W1(@ChainActive), @DoChain,      "the rush chain (D-070): the first unmet target - assist its frame, wait for its order, or order it"));
         table.insertLast(Rule("lab.t1.opening",    MOBILE,       W3(@OpeningDone, @NotIntoT2, @NoT1Lab), @DoStartFactory, "the throwaway first lab at the commander; a constructor uses the pair's slot"));
-        table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W3(@OpeningDone, @NoConstructors, @NoLabAtAll), @DoStartFactory, "every constructor and every lab lost: the commander rebuilds a T1 lab"));
         table.insertLast(Rule("mex.expand",        CONSTRUCTORS, W2(@OpeningDone, @MetalBottleneck), @DoExpandMex,    "the nearest open spot within EcoMexExpandRadius while metal is the bottleneck"));
         table.insertLast(Rule("energy.draining",   MOBILE,       W2(@Draining, @EnergyIdle), @DoEnergy,       "the base is stalling: cheapest energy per E/s, a fusion in the fusion era"));
         table.insertLast(Rule("energy.assist",     MOBILE,       W3(@Draining, @EnergyBusy, @EnergyAssistable), @DoAssistEnergy, "stalling and one is going up within EcoAssistRadius: assist it"));

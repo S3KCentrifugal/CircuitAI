@@ -231,13 +231,35 @@ namespace TechBuild {
 
     IUnitTask@ StartFactory(CCircuitUnit@ u)
     {
-        if (!RoleTech::Opening::complete || IntoT2()) return null;
-        if (!T1LabAllowed()) return null;   // D-102 (played: the chain's lab step reordered the T1 lab once the advanced lab was reclaimed)
+        if (!RoleTech::Opening::complete) return null;
+        // D-102b: the rebuild after a raid is not held by a stale advanced-lab order nobody can take
+        const bool recover = RecoverT1Lab();
+        if (!recover) {
+            if (IntoT2()) return null;
+            if (!T1LabAllowed()) return null;   // D-102 (played: the chain's lab step reordered the T1 lab once the advanced lab was reclaimed)
+        }
         const string side = Global::AISettings::Side;
         CCircuitDef@ lab = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
         if (lab is null || !u.circuitDef.CanBuild(lab)) return null;
-        if (lab.count > 0 || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) > 0) return null;
-        if (Layout::HasSpine()) {
+        if (lab.count > 0) return null;
+        if (aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::FACTORY), lab) > 0) {
+            if (!recover) return null;
+            // D-102b: native's replacement-lab order (ResetFactory) is queued but unstaffed
+            // (headless 11-23: it sat 300 s while the commander did chain work): take it,
+            // when it is at home; a queued spam lab far forward is not the rebuild
+            // (headless 11-23: the commander took one five times and it never stood)
+            IBuilderTask@ q = cast<IBuilderTask>(aiBuilderMgr.FindQueuedTask(u, int(Task::BuildType::FACTORY)));
+            const float home = 2.0f * Global::RoleSettings::Tech::ExpCommanderHomeRadius;   // the base and its lab clusters
+            if (q !is null && q.buildDef !is null && q.buildDef.GetName() == lab.GetName()
+                && MapHelpers::SqDist(q.GetBuildPos(), Global::Map::StartPos) <= home * home) {
+                GenericHelpers::LogUtil("[TECH][Build] recover: the commander takes the queued T1 lab order at home (D-102b)", 1);
+                return q;
+            }
+            if (aiBuilderMgr.GetUnfinishedCount(lab) > 0) return null;
+        }
+        // D-102b: a raided base's opening slot can hold the old lab's wreck or the raiders;
+        // the layout (or the commander's ring) places the replacement
+        if (Layout::HasSpine() && !recover) {
             // The opening site predates the campus. Pin it explicitly: the
             // generic fallback may select a different, distant lab reservation.
             IUnitTask@ opening = EnqueueOpeningFactory(lab, Layout::spineOpeningSlot);
@@ -245,7 +267,7 @@ namespace TechBuild {
         }
         // D-101 (owner's rule): only with no construction turret standing may the
         // lab go anywhere; with one, the layout places it
-        if (Layout::TurretsStand()) {
+        if (Layout::TurretsStand() || recover) {
             const int id = Layout::ReserveFactorySite(lab);
             if (id >= 0) {
                 const AIFloat3 p = aiTerrainMgr.GetReservationPos(id);
@@ -257,13 +279,15 @@ namespace TechBuild {
                     aiBuilderMgr.AbortTask(t);
                     return null;
                 }
+                if (recover) GenericHelpers::LogUtil("[TECH][Build] recover: T1 lab ordered at (" + int(p.x) + ", " + int(p.z) + ") by "
+                    + u.circuitDef.GetName() + " " + u.id + " (D-102b)", 1);
                 return t;
             }
         }
         // D-120: with no planned pair (Layout::fallback: cramped ground) the lab
         // goes here too: the slot path below needs a planned slot and failed on
         // every try (played: Tundra Continents, no lab in 30 minutes)
-        if (UnitHelpers::IsCommander(u.circuitDef) && (Layout::HasComplex() || Layout::fallback)) {
+        if (UnitHelpers::IsCommander(u.circuitDef) && (Layout::HasComplex() || Layout::fallback || recover)) {
             const AIFloat3 at = u.GetPos(ai.frame);
             const float step = SQUARE_SIZE * 2;
             // D-120: cramped ground: the nearest footprint may be further out
@@ -378,8 +402,45 @@ namespace TechBuild {
     // D-102 (owner's rule): a T1 lab after the first: always for a restart (no
     // constructor of any tier left); else only with an advanced lab standing, and
     // with fewer than LabRebuildMinT1Cons T1 constructors or the economy online
+    // D-102b (owner 2026-11-23, Proving Grounds: a commander drop killed the advanced
+    // lab and every T1 constructor; the only T2 constructor was the mex upgrader's, the
+    // commander cannot build an advanced lab, and the base idled 25 minutes on a full
+    // bank): T2 bot constructors not dedicated to mex upgrades
+    int FreeT2BotCons()
+    {
+        const array<string> names = UnitHelpers::GetAllT2BotConstructors();
+        int n = UnitDefHelpers::SumUnitDefCounts(names);
+        for (uint i = 0; i < EarlyMexUpgraders::claimed.length(); ++i) {
+            CCircuitUnit@ c = ai.GetTeamUnit(EarlyMexUpgraders::claimed[i]);
+            if (c !is null && c.circuitDef !is null && names.find(c.circuitDef.GetName()) >= 0) --n;
+        }
+        return AiMax(0, n);
+    }
+    // D-102b: no lab of any tier stands or is going up, and nobody free can build the
+    // advanced lab (no T1 constructor, no free T2 constructor): the commander builds a
+    // T1 bot lab and the eco ladder starts again from there
+    // D-102b: with no T1 constructor left, T2 constructors held by other jobs (the
+    // nuke chain, crews, a gift) may never take the advanced lab (headless 11-23: two
+    // armacks, no lab for 10 minutes): after RecoverAdvancedLabWaitSeconds without an
+    // advanced lab frame the T1 lab is built anyway
+    int recoverWaitSince = -1;
+    bool RecoverT1Lab()
+    {
+        const string side = Global::AISettings::Side;
+        CCircuitDef@ t1 = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
+        CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
+        if ((t1 !is null && (t1.count > 0 || aiBuilderMgr.GetUnfinishedCount(t1) > 0))
+            || (t2 !is null && (t2.count > 0 || aiBuilderMgr.GetUnfinishedCount(t2) > 0)) || T1Cons() > 0) {
+            recoverWaitSince = -1;
+            return false;
+        }
+        if (FreeT2BotCons() == 0) return true;
+        if (recoverWaitSince < 0) recoverWaitSince = ai.frame;
+        return ai.frame - recoverWaitSince >= Global::RoleSettings::Tech::RecoverAdvancedLabWaitSeconds * SECOND;
+    }
     bool T1LabAllowed()
     {
+        if (RecoverT1Lab()) return true;   // D-102b
         if (!WasIntoT2()) return true;
         const int cons = T1Cons() + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT2BotConstructors());
         if (cons == 0) return true;
@@ -398,6 +459,11 @@ namespace TechBuild {
             GenericHelpers::LogUtil("[TECH][Build] last factory gone: no lab rebuilt (" + T1Cons() + " T1 constructors, +"
                 + int(Economy::GetMinMetalIncomeLast10s()) + " metal under " + int(Global::RoleSettings::Tech::LabEcoOnlineMetalIncome) + ") (D-102)", 1);
             return "";
+        }
+        if (RecoverT1Lab()) {
+            GenericHelpers::LogUtil("[TECH][Build] last factory gone: no T1 constructor, " + FreeT2BotCons()
+                + " T2 constructors outside the mex upgraders and no advanced lab begun: a T1 bot lab, then the eco ladder again (D-102b)", 1);
+            return UnitHelpers::GetT1BotLabForSide(side);
         }
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
         if (t2 !is null && t2.IsAvailable(ai.frame) && TechFlank::NormalLabCount() == 0) {

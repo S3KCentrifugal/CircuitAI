@@ -470,6 +470,7 @@ namespace Tech {
             float ReclaimOtherPowerRadius = 600.0f;         // D-105: a T2 constructor reclaims only when no other build power is within this of the target
             float LabEcoOnlineMetalIncome = 200.0f;         // D-102: the economy is online: no lab is reclaimed for its metal, T1 labs are for spam, the advanced lab is rebuilt
             int LabRebuildMinT1Cons = 3;                    // D-102: below LabEcoOnlineMetalIncome, this many T1 constructors and no lab is rebuilt
+            int RecoverAdvancedLabWaitSeconds = 60;         // D-102b: no lab, no T1 constructor: this long for a T2 constructor to begin the advanced lab, then the commander builds a T1 lab
             float SpamLabMetalStep = 100.0f;                // D-105: one more spam lab per this much metal income over LabEcoOnlineMetalIncome
             int SpamLabsMax = 6;                            // D-105: the spam labs' ceiling
             int ExpSpamLabs = 1;                            // T1 labs kept for the spam economy once its gate is open and the advanced lab stands

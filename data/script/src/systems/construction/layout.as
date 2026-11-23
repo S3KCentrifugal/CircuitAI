@@ -356,6 +356,7 @@ namespace Layout {
     int overflowSupportSearchFrame = -100000;
     array<int> extraZones;      // D-072: boxes grown behind the first when it was full
     int labSlot = -1;           // D-085: the advanced lab's footprint, reserved at the seed side of the block when the box is planned
+    int labPinFailedSlot = -1;  // D-102b: the advanced lab slot a pin failed on (headless 11-23: after a raid, slot 189 refused every order for 10 minutes)
     int fwdZone = 0;            // D-081: the forward cluster's zone, its own turret group
     int fwdGroup = 0;
     AIFloat3 fwdCentre = AIFloat3(-1.0f, 0.0f, -1.0f);
@@ -852,6 +853,7 @@ namespace Layout {
         }
         if (!AiPinReservation(t, slot)) {
             GenericHelpers::LogUtil("[Layout] could not pin the advanced lab to slot " + slot, 1);
+            if (slot == labSlot) labPinFailedSlot = slot;   // D-102b: the next order repacks the footprint
             // Abort only this task; a failed claim may be owned by another task.
             aiBuilderMgr.AbortTask(t);
             return null;
@@ -2744,7 +2746,8 @@ namespace Layout {
         if (!t2.IsAvailable(ai.frame)) return null;
         if (!Builder::IsT2BotFactoryOffCooldown()) return null;
         if (builder !is null && HasBox() && labSlot >= 0
-            && !aiTerrainMgr.CanReachAtSafe(builder,aiTerrainMgr.GetReservationPos(labSlot),builder.circuitDef.GetBuildDistance())) {
+            && (labSlot == labPinFailedSlot
+                || !aiTerrainMgr.CanReachAtSafe(builder,aiTerrainMgr.GetReservationPos(labSlot),builder.circuitDef.GetBuildDistance()))) {
             const array<int>@ faces = LabFacings();
             // the reachable footprint most turret slots reach; one no slot reaches
             // only when no facing has better (the lab stays flush to the block)
@@ -2759,6 +2762,8 @@ namespace Layout {
                 best = replacement; bestSlots = n;
             }
             if (best < 0) return null;
+            if (labSlot == labPinFailedSlot) GenericHelpers::LogUtil("[Layout] advanced lab slot " + labSlot + " refused its pin: repacked to " + best + " (D-102b)", 1);
+            labPinFailedSlot = -1;
             aiTerrainMgr.ReleaseReservation(labSlot);
             labSlot=best; aiTerrainMgr.SetLayoutInt(BOX+".lab_slot",labSlot);
             return OrderLabOn(t2,labSlot,timeout,false,"on reachable land (" + bestSlots + " turret slots within " + int(reach) + ") at",builder);
