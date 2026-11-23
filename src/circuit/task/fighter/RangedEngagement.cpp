@@ -60,14 +60,15 @@ static float StaticDanger(const RangedPolicy& p) { return (!p.coordinated && p.s
 namespace {
 // Owner 2026-11-18: kite_min_tech / kite_ignore_fast_dots share the scope.
 struct ExactStaticScope {
-    const CRangedWorld& w; bool prev; float prevTech, prevDot; const RangedPolicy* prevSpam;
-    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()),prevSpam(w.SpamFilter()) {
+    const CRangedWorld& w; bool prev; float prevTech, prevDot; const RangedPolicy* prevSpam; const RangedPolicy* prevPorc;
+    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()),prevSpam(w.SpamFilter()),prevPorc(w.PorcFilter()) {
         w.SetExactStatic(!p.coordinated && p.staticExactReach);
         w.SetKiteFilter(p.coordinated ? 0.f : p.kiteMinTech,
             (!p.coordinated && p.kiteIgnoreFastDots) ? std::max(1.f,p.spamDotSpeed) : 0.f);
         w.SetSpamFilter((!p.coordinated && p.spamNoHazard && p.HasSpam()) ? &p : nullptr);   // owner 2026-11-23
+        w.SetPorcFilter((!p.coordinated && p.porcHazardList) ? &p : nullptr);                  // owner 2026-11-23
     }
-    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); w.SetSpamFilter(prevSpam); }
+    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); w.SetSpamFilter(prevSpam); w.SetPorcFilter(prevPorc); }
 };
 }
 
@@ -400,6 +401,25 @@ bool CRangedEngagement::MarchGoal(const AIFloat3& pos,AIFloat3& goal)
     goal=ai->GetEnemyManager()->GetEnemyPos();
     return pos.SqDistance2D(goal)>1000.f*1000.f;
 }
+// Owner 2026-11-23: nearest enemy structure known only as a ghost (identified, last position,
+// not in radar or LOS, not seen empty, not air). Any kind (labs, eco, porc): it is a target, not
+// only a hazard. O(enemies), only for porc_hazards hulls with no live objective.
+bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal) const
+{
+    float best=std::numeric_limits<float>::max();
+    for(const auto& kv:ai->GetEnemyManager()->GetEnemyUnits()) {
+        const CEnemyUnit* e=kv.second;
+        if(e==nullptr || e->IsHidden() || e->IsInRadarOrLOS() || e->IsBeingBuilt()) continue;
+        const CCircuitDef* d=e->GetCircuitDef();
+        if(d==nullptr || d->IsMobile() || d->IsAbleToFly()) continue;
+        if(e->GetData().losStatus & (SEnemyData::DEAD|SEnemyData::DYING)) continue;
+        const AIFloat3& p=e->GetPos();
+        if(!std::isfinite(p.x) || !std::isfinite(p.z) || p.x<0.f || p.z<0.f) continue;
+        const float dist=pos.SqDistance2D(p);
+        if(dist<best) { best=dist; goal=p; }
+    }
+    return best<std::numeric_limits<float>::max();
+}
 bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFloat3* objective,float maxRange)
 {
     if(noMarch) return false;
@@ -477,6 +497,24 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
             if(any) legal.push_back(last);
             break;
         }
+        // Owner 2026-11-23 (porc_hazards hulls): never freeze for anything but listed porc. After 3
+        // refused marches from the same spot, take the first legs anyway when no listed structure
+        // (live or ghost) covers them: the refusal came from mobiles or unknown dots, not porc.
+        if(p.porcHazardList && !points.empty() && legal.empty()) {
+            if(current.SqDistance2D(haltPos)<200.f*200.f) ++haltStreak; else { haltStreak=1; haltPos=current; }
+            size_t take=0; AIFloat3 a=current;
+            for(const auto& q:points) {
+                if(take>=2) break;
+                if(a.SqDistance2D(q)<16.f) continue;
+                if(!world.Safe(a,q,StaticMargin(p),true,p.pressStatic,GhostRange(p))) break;
+                a=q; ++take;
+            }
+            if(haltStreak>=3 && take>0) {
+                for(const auto& q:points) { if(legal.size()>=take) break; if(current.SqDistance2D(q)>=16.f || !legal.empty()) legal.push_back(q); }
+                ai->LOG("RANGED: march push unit=%d at=%.0f,%.0f legs=%u after %d refusals (no listed porc on the way)",id,current.x,current.z,unsigned(legal.size()),haltStreak);
+                haltStreak=0;
+            }
+        } else if(!legal.empty()) haltStreak=0;
         if(points.empty() || legal.empty() || current.SqDistance2D(legal.back())<128.f*128.f) {
             // Nothing safe further on: this is the front (or no path). Wait here.
             marching=false; marchRetryFrame=now+FRAMES_PER_SEC*5;
@@ -1527,8 +1565,29 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if(report && unknownObjectives>0) ai->LOG("RANGED: unknown radar approach withheld unit=%d candidates=%d",id,unknownObjectives);
     if(objective<0) {
         if(report) ai->LOG("RANGED: no objective unit=%d",id);
-        // Owner 2026-11-16: nothing identified in radar/LOS. Walk to the front
-        // (ghost porc, last known enemy, enemy start) instead of waiting at home.
+        // Owner 2026-11-23 (porc_hazards hulls: Daedalus, Myrmidon): a structure we know only as a
+        // ghost (last seen, out of radar and LOS, spot not seen empty) is an objective too: walk to
+        // 98% of our range of it and fire on its image (attack ground), at most once per 3 s.
+        if (!policy.holdFireline && policy.porcHazardList && !closing && frame>=withdrawalUntil && droneTarget<0) {
+            AIFloat3 ghostPos;
+            if (GhostStructure(pos,ghostPos)) {
+                const float reach=maxRange*policy.rangeFraction;
+                const float d=std::sqrt(pos.SqDistance2D(ghostPos));
+                if (d<=reach+16.f) {
+                    if (frame>=ghostShotFrame) {
+                        ghostShotFrame=frame+FRAMES_PER_SEC*3;
+                        if(moving || query) Hold(unit,true);
+                        TRY_UNIT(ai,unit, unit->CmdAttackGround(ghostPos,0,frame+FRAMES_PER_SEC*4); )
+                        if(report || ghostShotLog!=int(ghostPos.x)*100000+int(ghostPos.z)) {
+                            ghostShotLog=int(ghostPos.x)*100000+int(ghostPos.z);
+                            ai->LOG("RANGED: ghost fire unit=%d at=%.0f,%.0f dist=%.0f",id,ghostPos.x,ghostPos.z,d);
+                        }
+                    }
+                    return;
+                }
+                if (March(unit,pos,&ghostPos,maxRange)) return;
+            }
+        }
         if (policy.holdFireline) Hold(unit,true);
         else if (closing || frame<withdrawalUntil || droneTarget>=0 || (SetMarchObjective(-1),!March(unit,pos,nullptr,maxRange))) Disperse(unit);
         return;

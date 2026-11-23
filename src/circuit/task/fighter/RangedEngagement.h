@@ -33,6 +33,7 @@ private:
     void UpdateCohort(CCircuitUnit* unit);
     bool LegalPath(CCircuitUnit* unit,const std::vector<springai::AIFloat3>& route,bool escape);
     bool SafeMove(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,float margin,bool escape);
+    bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal) const;
     bool UnknownStaticBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to);
     // Owner 2026-11-16 (Catapults, Daedalus, Myrmidons idle at the gantry): with no
     // shot, no danger and no usable firing site, walk a threat-aware path towards
@@ -91,6 +92,8 @@ private:
     std::vector<springai::AIFloat3> path;
     bool marching=false; int marchRetryFrame=0;
     int spamIdleSince=0; bool spamIdleLogged=false;   // owner 2026-11-21: spam_fire_idle_seconds
+    int ghostShotFrame=0, ghostShotLog=-1;   // owner 2026-11-23: ghost structure fire
+    int haltStreak=0; springai::AIFloat3 haltPos;   // owner 2026-11-23: no-freeze guard
     std::vector<springai::AIFloat3> unknownStill; int unknownStillFrame=-1;   // owner 2026-11-21: unknown_static_reach
     springai::AIFloat3 marchGoal;
     // Owner 2026-11-23 (Salt Reef): shun_seconds. Contacts left alone until a

@@ -651,6 +651,19 @@ void CFactoryManager::ReadConfig()
 					else policy.spamDefs.insert(spamDef->GetId());
 				}
 			}
+			{   // owner 2026-11-23: porc_hazards. Only these structures (live or ghost) are static hazards for this hull.
+				const auto& porc = settings["porc_hazards"];
+				if (!porc.isNull() && !porc.isArray()) valid = false;
+				else if (porc.isArray()) {
+					policy.porcHazardList = true;
+					for (const auto& name : porc) {
+						if (!name.isString()) { valid = false; continue; }
+						CCircuitDef* porcDef = circuit->GetCircuitDef(name.asCString());
+						if (porcDef == nullptr) circuit->LOG("CONFIG %s: %s porc_hazards has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
+						else policy.porcHazardDefs.insert(porcDef->GetId());
+					}
+				}
+			}
 			boolean("spam_radar_dots", policy.spamRadarDots);
 			number("spam_dot_speed", policy.spamDotSpeed, 0.f, 200.f);
             number("commander_priority", policy.commanderPriority, 0.001f, 100.f);   // owner 2026-11-15: below 1 = commanders after buildings (Wolverine/Shellshocker 0.01)

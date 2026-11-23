@@ -308,6 +308,15 @@ bool CRangedWorld::KiteIgnored(const Contact& c) const
     }
     return kiteMinTech>0.f && c.mobile && c.tech<kiteMinTech && !c.def->IsEnemyRoleAny(CCircuitDef::COMM);
 }
+bool CRangedWorld::PorcHazardIgnored(const Contact& c) const
+{
+    // A structure (live or ghost, identified) outside the hull's porc_hazards list is no hazard.
+    // Unidentified dots and blind-hit origins (no def) keep their hazard; mobiles are unchanged.
+    const RangedPolicy* p=porcFilter;
+    if(p==nullptr || !p->porcHazardList || c.def==nullptr) return false;
+    if(c.mobile && !c.ghost) return false;
+    return p->porcHazardDefs.count(c.def->GetId())==0;
+}
 bool CRangedWorld::SpamHazardIgnored(const Contact& c) const
 {
     // Identified mobile spam of the hull's roster (the controller's Spam rule for identified contacts),

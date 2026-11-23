@@ -112,10 +112,15 @@ public:
     void SetSpamFilter(const RangedPolicy* p) const { spamFilter=p; }
     const RangedPolicy* SpamFilter() const { return spamFilter; }
     bool SpamHazardIgnored(const Contact& c) const;
+    // Owner 2026-11-23: porc_hazards allowlist (see RangedPolicy::porcHazardDefs)
+    void SetPorcFilter(const RangedPolicy* p) const { porcFilter=p; }
+    const RangedPolicy* PorcFilter() const { return porcFilter; }
+    bool PorcHazardIgnored(const Contact& c) const;
     bool KiteIgnored(const Contact& c) const;
     float Hz(const Contact& c, float press) const {
         if((kiteMinTech>0.f || kiteDotSpeed>0.f) && KiteIgnored(c)) return 0.f;
         if(spamFilter!=nullptr && SpamHazardIgnored(c)) return 0.f;
+        if(porcFilter!=nullptr && PorcHazardIgnored(c)) return 0.f;
         const float h=HazardFor(c,press);
         if(!exactStatic || !c.def || (c.mobile && !c.ghost) || Pressed(c,press)) return h;
         return std::min(h,std::max(c.armed ? c.groundRange : 0.f,c.explosionRadius));
@@ -199,6 +204,7 @@ private:
     mutable bool exactStatic = false;
     mutable float kiteMinTech = 0.f, kiteDotSpeed = 0.f;
     mutable const RangedPolicy* spamFilter = nullptr;
+    mutable const RangedPolicy* porcFilter = nullptr;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;
