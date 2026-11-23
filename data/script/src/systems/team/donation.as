@@ -286,6 +286,8 @@ namespace Donation {
         if(EngineeringReplacements::Claim(unit)) return;
         if (TechGantryCrew::ClaimOnBuilt(unit)) return;   // owner, 2026-11-17: built for the due gantry, never donated
         if (_OwnT2Constructors() <= Global::RoleSettings::Tech::DonationKeepT2Constructors) {
+            // owner, 2026-11-23: the kept T2 constructor after the mex upgraders is the antinuke/Pinpointer crew
+            if (TechDefenceCrew::ClaimOnBuilt(unit)) return;
             GenericHelpers::LogUtil("[Team][Donation] T2 constructor " + unit.circuitDef.GetName() + "("
                 + unit.id + ") is ours: TECH keeps its first " + Global::RoleSettings::Tech::DonationKeepT2Constructors, 1);
             return;

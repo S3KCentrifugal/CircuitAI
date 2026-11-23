@@ -10,6 +10,7 @@
 #include "../../manager/builder.as"
 #include "../../manager/factory.as"
 #include "../../systems/construction/silo_antinukes.as"
+#include "../../systems/construction/tech_defence_crew.as"
 #include "../../systems/construction/layout.as"
 #include "../../systems/construction/eco_planner.as"
 #include "../../systems/combat/spam.as"
@@ -328,36 +329,39 @@ namespace TechRules {
     }
     IUnitTask@ DoRecovery(Ctx@ c)       { return TechBuild::RecoverEconomy(c.u); }
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
-    IUnitTask@ DoAntiNuke(Ctx@ c)
+    IUnitTask@ DoAntiNuke(Ctx@ c) { return FirstAntiNuke(c.u, c.mi, c.ei, false); }
+    // The first antinuke for constructor u: assist its frame, else order it. anyDistance (the defence crew,
+    // owner 2026-11-23) skips the first-minute AntiNukeOrderRadius gate.
+    IUnitTask@ FirstAntiNuke(CCircuitUnit@ u, float mi, float ei, bool anyDistance)
     {
         // Its unfinished frame takes every free T2 constructor that can reach
         // it, ahead of new growth: the bigger build-power share wins the metal
         // or energy it stalls on, so the interceptor is stocked by fourteen.
         CCircuitUnit@ frame = Layout::AntiNukeFrame();
         if (frame !is null) {
-            if (!aiTerrainMgr.CanReachAt(c.u, frame.GetPos(ai.frame), c.u.circuitDef.GetBuildDistance())) return null;
+            if (!aiTerrainMgr.CanReachAt(u, frame.GetPos(ai.frame), u.circuitDef.GetBuildDistance())) return null;
             return RoleTech::Tech_TurretRepair(frame, false, Task::Priority::HIGH);
         }
         if (ai.frame < Global::RoleSettings::Tech::AntiNukeAfterSeconds * SECOND
-            || c.mi < Global::RoleSettings::Tech::FirstAntiNukeMetalIncome
-            || c.ei < Global::RoleSettings::Tech::FirstAntiNukeEnergyIncome) return null;
+            || mi < Global::RoleSettings::Tech::FirstAntiNukeMetalIncome
+            || ei < Global::RoleSettings::Tech::FirstAntiNukeEnergyIncome) return null;
         CCircuitDef@ d = ai.GetCircuitDef(UnitHelpers::GetAntiNukeNameForSide(Global::AISettings::Side));
-        if (d is null || !c.u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame)
+        if (d is null || !u.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame)
             || EconomyHelpers::GetAntiNukeCount() > 0
             || aiBuilderMgr.GetQueuedBuildCount(int(Task::BuildType::DEFENCE), d) > 0) return null;
         const int slot = Layout::ReserveAntiNuke();
         if (slot < 0 || aiTerrainMgr.GetReservationState(slot) != 0) return null;
         const AIFloat3 p = aiTerrainMgr.GetReservationPos(slot);
-        if (!aiTerrainMgr.CanReachAt(c.u, p, c.u.circuitDef.GetBuildDistance())) return null;
+        if (!aiTerrainMgr.CanReachAt(u, p, u.circuitDef.GetBuildDistance())) return null;
         // A far constructor walks for a minute: for the first minute only one
         // within AntiNukeOrderRadius of the pad takes the order.
         const float near = Global::RoleSettings::Tech::AntiNukeOrderRadius;
-        if (ai.frame < (Global::RoleSettings::Tech::AntiNukeAfterSeconds + 60) * SECOND
-            && MapHelpers::SqDist(c.u.GetPos(ai.frame), p) > near * near) return null;
+        if (!anyDistance && ai.frame < (Global::RoleSettings::Tech::AntiNukeAfterSeconds + 60) * SECOND
+            && MapHelpers::SqDist(u.GetPos(ai.frame), p) > near * near) return null;
         IUnitTask@ t = aiBuilderMgr.Enqueue(TaskB::Common(Task::BuildType::DEFENCE, Task::Priority::HIGH,
             d, p, 0.0f, true, 300 * SECOND));
         if (t !is null && !AiPinReservation(t, slot)) { aiBuilderMgr.AbortTask(t); return null; }
-        if (t !is null) GenericHelpers::LogUtil("[TECH][AntiNuke] ordered income=" + c.mi + "/" + c.ei + " slot=" + slot, 1);
+        if (t !is null) GenericHelpers::LogUtil("[TECH][AntiNuke] ordered income=" + mi + "/" + ei + " slot=" + slot, 1);
         return t;
     }
     // Owner 2026-11-15: after the first antinuke, one more per scouted enemy silo at the base periphery.
@@ -594,11 +598,11 @@ namespace TechRules {
         table.insertLast(Rule("lab.t1.recover",    COMMANDER,    W2(@OpeningDone, @RecoverT1Lab), @DoStartFactory, "every lab lost and nobody free can build the advanced lab (no T1 constructor, no T2 constructor outside the mex upgraders): the commander rebuilds a T1 lab before any other job (D-102b)"));
         table.insertLast(Rule("rush.bootstrap", CON_T1, W0(), @DoRushBootstrap, "retain one safe support-bootstrap journey without claiming a building"));
         table.insertLast(Rule("seat.turret",       CON_T1,       W0(), @DoSeatTurret,   "D-489 (owner): metal floats past the T2 lab: one T1 constructor at base builds only construction turrets on free economy slots"));
+        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved pad on the economy box periphery (2026-11-02); free T2 constructors assist its frame; armed by fourteen minutes; ahead of Pinpointers, the converter seat and growth (owner 2026-11-23, Smolders: the growth AFUS seat kept the only T2 constructor)"));
         table.insertLast(Rule("pinpointer",        CON_T2,       W0(), @DoPinpointer,   "D-492 (owner): the team has artillery and no Pinpointer: three on the layout"));
         table.insertLast(Rule("seat.converter",    CON_T2,       W0(), @DoSeatConverter, "D-489 (owner): energy floats: one T2 constructor at base builds only advanced energy converters, metal-full admission waived"));
         table.insertLast(Rule("eco.cluster.batch", CON_T1, W0(), @DoClusterBatch, "funded local economy cluster: up to ten distinct turret projects, nearby T1 aircraft only"));
         table.insertLast(Rule("eco.growth", CONSTRUCTORS, W0(), @DoGrowth, "T1 energy retirement: one turret, AFUS and converter worker; air takes over without aborting construction"));
-        table.insertLast(Rule("defence.antinuke", CON_T2, W0(), @DoAntiNuke, "first antinuke from 9:00 at sustained +20 metal/+300 energy, on its reserved pad on the economy box periphery (2026-11-02); free T2 constructors assist its frame; armed by fourteen minutes"));
         table.insertLast(Rule("defence.antinuke.extra", CON_T2, W0(), @DoAntiNukeExtra, "owner 2026-11-15: one more antinuke per scouted enemy silo beyond the first, on a base periphery pad (never off the map, still covering the core)"));
         table.insertLast(Rule("mex.upgrade", CON_T2, W0(), @DoMexUpgrade, "reachable owned mex upgrades before discretionary assistance"));
         table.insertLast(Rule("eco.support", CONSTRUCTORS, W0(), @DoEconomySupport, "build support for an admitted economy site before its reactor or converter"));

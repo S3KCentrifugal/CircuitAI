@@ -879,8 +879,10 @@ namespace Tech {
             /******************** WORKFORCE MINIMUMS ********************/
             // Minimum desired numbers of constructor bots by tech tier
             int MinimumT1ConstructorBots = 2;
-            int MinimumT2ConstructorBots = 3;
-            int T2BotConstructorCap = 3;                    // Retained home pool; requested donations receive separate production headroom
+            // owner 2026-11-23: 3 -> 4; the T2 constructor kept after the mex upgraders is the defence crew
+            // (tech_defence_crew.as: first antinuke and Pinpointers), the next one keeps the general T2 work
+            int MinimumT2ConstructorBots = 4;
+            int T2BotConstructorCap = 4;                    // Retained home pool; requested donations receive separate production headroom
             int FastAssistBotCap = 5;                       // D-417: retained fast-assist pool (Fark, Freaker, legaceb)
             float FastAssistMetalReserve = 2000.0f;
             // D-308: compact banks need mobile support sooner; retain the hard
@@ -892,7 +894,7 @@ namespace Tech {
             // T2 constructors TECH keeps before it builds any for an ally's
             // request (played: every one it made was ferried away, and the
             // advanced lab built nothing else).
-            int DonationKeepT2Constructors = 3;
+            int DonationKeepT2Constructors = 4;             // owner 2026-11-23: 3 -> 4 (the defence crew is one of them)
 
             /******************** BUILDER CAP LIMITS ********************/
             // Hard caps for T1/T2 land builders used when computing income-based limits
@@ -1010,6 +1012,12 @@ namespace Tech {
             int AntiNukeHoldFromSeconds = 11 * 60 + 30;
             int AntiNukeBudgetUntilSeconds = 14 * 60;
             float AntiNukeOrderRadius = 2000.0f;
+            // Owner 2026-11-23 (Smolders: the only free T2 constructor became the growth AFUS seat, antinuke
+            // ordered 19:27): the T2 constructor TECH keeps after its mex upgraders is the defence crew, for
+            // the first antinuke, extra antinukes and Pinpointers (tech_defence_crew.as); never donated.
+            bool DefenceCrewEnabled = true;
+            float DefenceCrewAssistRadius = 900.0f;     // idle: assist what goes up this near the antinuke pad
+            int DefenceCrewAssistSeconds = 20;          // ... for this long, then ask again
             // Owner 2026-11-02: the first antinuke pad sits just outside the economy box,
             // where at least this many of its turret slots still reach it (layout.as)
             int AntiNukePeripheryTurrets = 3;

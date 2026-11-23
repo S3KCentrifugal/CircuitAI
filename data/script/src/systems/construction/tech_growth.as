@@ -17,7 +17,7 @@ namespace TechGrowth {
         if(TechAirFoundry::Owns(u.id) || Team::Ferry::IsGift(u.id) || Team::Recovery::IsGift(u.id)
             || UnitHelpers::IsCommander(u.circuitDef) || SeaConstructor::IsT1(u.circuitDef)
             || SeaConstructor::IsT2(u.circuitDef) || TechHarbour::IsHoverConstructor(u.circuitDef)
-            || FrontlineEngineering::members.exists(""+u.id)) return false;
+            || FrontlineEngineering::members.exists(""+u.id) || TechDefenceCrew::Owns(u.id)) return false;
         return u.task is null || (!u.task.IsExternalControlled() && !u.task.IsEnemyReclaim()
             && u.task.GetType()!=int(Task::Type::PLAYER) && u.task.GetType()!=int(Task::Type::RETREAT));
     }

@@ -2050,6 +2050,11 @@ namespace Builder {
         // gantry guard (tech_air_squads.as); their members never reach the rows below
         // owner, 2026-11-19: a T1 constructor requisitioned to fill a finished gantry to its 40 turrets keeps
         // that work (tech_gantry_fill.as); none left: null and it goes on below as usual
+        // owner, 2026-11-23: TECH's own extra T2 constructor for the first antinuke and Pinpointers (tech_defence_crew.as)
+        if (Global::AISettings::Role == AiRole::TECH) {
+            IUnitTask@ dc = TechDefenceCrew::Work(u);
+            if (dc !is null) return dc;
+        }
         if (Global::AISettings::Role == AiRole::TECH) {
             IUnitTask@ fill = TechGantryFill::Work(u);
             if (fill !is null) return fill;

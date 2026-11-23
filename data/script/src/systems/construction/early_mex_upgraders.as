@@ -38,6 +38,7 @@ namespace EarlyMexUpgraders {
     bool OwnedElsewhere(CCircuitUnit@ u) {
         const int id = u.id;
         if (LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id) || CommanderGroup::Owns(id) || TechAirFoundry::Owns(id)) return true;
+        if (TechDefenceCrew::Owns(id)) return true;   // owner 2026-11-23: TECH's antinuke/Pinpointer constructor
         if (FrontAgitatorCounter::Owns(u) || FrontPorcClusterCounter::Owns(u) || FrontTactical::Owns(u) || TechFlank::Owns(u)) return true;
         if (Team::CatalystTrade::IsGift(id) || Team::CatalystTrade::IsTraded(id)) return true;
         if (Team::Ferry::IsGift(id) || Team::Recovery::IsGift(id)) return true;
