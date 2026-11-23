@@ -557,6 +557,7 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
             score *= allowedStrikeDefs.at(e.cdef->GetId());
             if (local) score *= 8.f;
         }
+        if (preference != 1) score *= air_geometry::UnfinishedStrikeScale(e.isBeingBuilt, isStatic);
         const bool grid = gridRank && e.cdef->IsWind() && WindGridOf(e.id) != nullptr;
 		if ((grid != bestGrid && best != nullptr) ? grid
             : air_geometry::PreferDistrictTarget(district, local, bestLocal, score, bestScore)) {
@@ -591,8 +592,9 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
         }
     }
 	position = aim;
-	circuit->LOG("WAVE: strike target %s(%i) cost %.0f at (%.0f, %.0f), preference %i, grid winds %i of %zu grids",
-			best->cdef->GetDef()->GetName(), strikeTargetId, best->cost, aim.x, aim.z, preference, gridWinds, windGrids.size());
+	circuit->LOG("WAVE: strike target %s(%i) cost %.0f at (%.0f, %.0f), preference %i, grid winds %i of %zu grids, unfinished %i",
+			best->cdef->GetDef()->GetName(), strikeTargetId, best->cost, aim.x, aim.z, preference, gridWinds, windGrids.size(),
+			int(best->isBeingBuilt));
 	return true;
 }
 
@@ -1112,13 +1114,23 @@ bool CAirWaveTask::TryImmediateStrike()
     auto* circuit = manager->GetCircuit();
     CEnemyInfo* current = GetStrikeTarget();
     if (immediateStrikePriority <= 0.f) return TryWindGridStrike(current);
+    bool finishedOnly = false;
+    float finishedFloor = 0.f;
     if (operationPhase == 2 && current != nullptr && current->IsInLOS() && !current->IsHidden()) {
         auto* def = current->GetCircuitDef();
         const auto priority = def == nullptr ? allowedStrikeDefs.end() : allowedStrikeDefs.find(def->GetId());
         // Keep the current priority victim: nearby AFUS must not reset each
         // other's bombing passes. No scan or repeated order while it survives.
         if (priority != allowedStrikeDefs.end() && priority->second >= immediateStrikePriority
-            && !def->IsMobile() && !def->IsAbleToFly()) return false;
+            && !def->IsMobile() && !def->IsAbleToFly()) {
+            // An unfinished victim is kept only until a finished priority
+            // structure is in reach (owner 2026-11-23): the scan below then
+            // looks at finished ones alone and keeps the victim when none is.
+            if (!current->IsBeingBuilt()) return false;
+            finishedOnly = true;
+            // Weights are tier * 1000 / cost: times cost, the tier value.
+            finishedFloor = priority->second * def->GetCostM() * air_geometry::UNFINISHED_STRIKE_SCALE;
+        }
     }
     const AIFloat3 centre = OperationCentre();
     CEnemyInfo* best = nullptr;
@@ -1132,12 +1144,23 @@ bool CAirWaveTask::TryImmediateStrike()
         auto* def = enemy->GetCircuitDef();
         if (def == nullptr || enemy->GetUnit() == nullptr || data->IsFake() || data->IsDead() || data->IsDying()
             || enemy->IsHidden() || completedTargets.count(enemy->GetId())) continue;
-        const auto priority = allowedStrikeDefs.find(def->GetId());
-        if (priority == allowedStrikeDefs.end()) continue;
+        const auto found = allowedStrikeDefs.find(def->GetId());
+        if (found == allowedStrikeDefs.end()) continue;
+        const bool stationary = !def->IsMobile() && !def->IsAbleToFly();
+        if (finishedOnly && enemy->IsBeingBuilt()) continue;
+        // Finished before unfinished (UnfinishedStrikeScale): same order as the launch pick.
+        const std::pair<int, float> scaled(found->first,
+            found->second * air_geometry::UnfinishedStrikeScale(enemy->IsBeingBuilt(), stationary));
+        const auto* priority = &scaled;
         const auto& pos = enemy->GetPos();
         const float distance = centre.SqDistance2D(pos);
-        if (!air_geometry::ImmediateStrikeCandidate(priority->second, immediateStrikePriority,
-            enemy->IsInLOS(), !def->IsMobile() && !def->IsAbleToFly(), distance, immediateStrikeRadius)
+        // Off an unfinished victim, any finished structure whose tier value
+        // beats the victim's scaled one takes over (a finished fusion leads
+        // an unfinished AFUS; converters do not).
+        if (!air_geometry::ImmediateStrikeCandidate(priority->second,
+            finishedOnly ? std::min(immediateStrikePriority, priority->second) : immediateStrikePriority,
+            enemy->IsInLOS(), stationary, distance, immediateStrikeRadius)
+            || (finishedOnly && priority->second * def->GetCostM() < finishedFloor)
             || pos.y < -SQUARE_SIZE * 5) continue;
         if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&pos](const auto& region) {
             return pos.SqDistance2D(region.first) <= SQUARE(region.second);
@@ -1148,7 +1171,7 @@ bool CAirWaveTask::TryImmediateStrike()
             best = enemy; bestPriority = priority->second; bestDistance = distance;
         }
     }
-    if (best == nullptr) return TryWindGridStrike(current);
+    if (best == nullptr) return finishedOnly ? false : TryWindGridStrike(current);
     const int previous = strikeTargetId;
     // Preserve the ordinary disappeared-target accounting when acquisition
     // interrupts the dead-target branch, before replacing its identity.
@@ -1157,8 +1180,9 @@ bool CAirWaveTask::TryImmediateStrike()
     strikeTargetId = best->GetId(); aim = best->GetPos();
     operationTargetHealth = 0.f;
     if (!BeginOperationAttack("visible-priority")) return false;
-    circuit->LOG("WAVE: immediate strike target=%s(%i) previous=%i distance=%.0f priority=%.1f",
-        best->GetCircuitDef()->GetDef()->GetName(), strikeTargetId, previous, std::sqrt(bestDistance), bestPriority);
+    circuit->LOG("WAVE: immediate strike target=%s(%i) previous=%i distance=%.0f priority=%.1f unfinished=%i",
+        best->GetCircuitDef()->GetDef()->GetName(), strikeTargetId, previous, std::sqrt(bestDistance), bestPriority,
+        int(best->IsBeingBuilt()));
     return true;
 }
 

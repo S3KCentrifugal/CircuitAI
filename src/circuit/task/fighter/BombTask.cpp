@@ -6,6 +6,7 @@
  */
 
 #include "task/fighter/BombTask.h"
+#include "task/fighter/AirGeometry.h"
 #include "map/ThreatMap.h"
 #include "module/MilitaryManager.h"
 #include "setup/SetupManager.h"
@@ -378,7 +379,12 @@ void CBombTask::FindTarget()
 
 		// Value per HP: gain against how much has to be chewed through. Health
 		// is current, so a damaged high-value target becomes more attractive.
-		const float value = enemy->GetCost() / std::max(health, 1.f);
+		// An unfinished structure's low health is no bargain (owner 2026-11-23:
+		// finished fusions and AFUS first): value it at full health, scaled down.
+		const bool unfinished = enemy->IsBeingBuilt() && !edef->IsMobile();
+		const float value = unfinished
+			? enemy->GetCost() / std::max(edef->GetHealth(), 1.f) * air_geometry::UnfinishedStrikeScale(true, true)
+			: enemy->GetCost() / std::max(health, 1.f);
 		candidates.emplace_back(ePos, enemy->GetCost());
 
 		const float sqDist = pos.SqDistance2D(ePos);

@@ -5,6 +5,7 @@
  */
 
 #include "task/fighter/EscortStrikeTask.h"
+#include "task/fighter/AirGeometry.h"
 #include "task/fighter/EscortStrikeRules.h"
 #include "module/MilitaryManager.h"
 #include "unit/CircuitUnit.h"
@@ -335,7 +336,9 @@ void CEscortStrikeTask::CollectCandidates()
 		const auto priority = allowedStrikeDefs.find(def->GetId());
 		if (priority == allowedStrikeDefs.end()) continue;
 		if (enemy->GetPos().y < -SQUARE_SIZE * 5) continue;  // deep underwater
-		candidates.push_back({enemy, priority->second});
+		// Finished structures before unfinished ones (owner 2026-11-23).
+		candidates.push_back({enemy, priority->second
+			* air_geometry::UnfinishedStrikeScale(enemy->IsBeingBuilt(), !def->IsMobile() && !def->IsAbleToFly())});
 	}
 }
 

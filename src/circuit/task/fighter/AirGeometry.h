@@ -24,6 +24,17 @@ inline bool OperationTargetClass(int preference, bool mobile, bool flying,
         default: return false;
     }
 }
+// Owner 2026-11-23: a finished enemy structure outranks one still under
+// construction (a fusion/AFUS frame is cheap to lose and quickly restarted).
+// Strike tiers are 20x apart, so 1/30 drops an unfinished structure just below
+// the finished defs of the next tier down: a finished fusion leads an
+// unfinished AFUS, which still leads every converter. Build state is the last
+// one seen in LOS. Mobiles are never scaled.
+constexpr float UNFINISHED_STRIKE_SCALE = 1.f / 30.f;
+inline float UnfinishedStrikeScale(bool beingBuilt, bool stationary)
+{
+    return beingBuilt && stationary ? UNFINISHED_STRIKE_SCALE : 1.f;
+}
 inline bool PreferDistrictTarget(bool committed, bool local, bool bestLocal, float score, float bestScore)
 {
     if (committed && local != bestLocal) return local;
