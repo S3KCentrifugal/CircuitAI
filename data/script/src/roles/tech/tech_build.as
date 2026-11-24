@@ -414,6 +414,9 @@ namespace TechBuild {
             CCircuitUnit@ c = ai.GetTeamUnit(EarlyMexUpgraders::claimed[i]);
             if (c !is null && c.circuitDef !is null && names.find(c.circuitDef.GetName()) >= 0) --n;
         }
+        // owner 2026-11-23: the antinuke/Pinpointer crew never takes the advanced lab either
+        CCircuitUnit@ crew = ai.GetTeamUnit(TechDefenceCrew::crewId);
+        if (crew !is null && crew.circuitDef !is null && names.find(crew.circuitDef.GetName()) >= 0) --n;
         return AiMax(0, n);
     }
     // D-102b: no lab of any tier stands or is going up, and nobody free can build the
