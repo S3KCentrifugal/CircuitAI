@@ -8,6 +8,7 @@
 #include "script/MilitaryScript.h"
 #include "script/ScriptManager.h"
 #include "module/MilitaryManager.h"
+#include "control/group/BattleSquads.h"
 #include "CircuitAI.h"
 #include "unit/CircuitUnit.h"
 #include "util/ExtAS.h"
@@ -73,6 +74,69 @@ static bool CMilitaryManager_TransferUnit(CMilitaryManager* mgr, CCircuitUnit* u
 }
 
 
+// Owner 2026-11-24: battle squads (control/group/BattleSquads.h). Every call is
+// a no-op answer (-1, false, null) before InitMilitary or without the template.
+static bool CMilitaryManager_BattleSquadTemplate(CMilitaryManager* mgr, const std::string& tmpl)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr && squads->HasTemplate(tmpl);
+}
+static int CMilitaryManager_BattleSquadCreate(CMilitaryManager* mgr, const std::string& tmpl, const std::string& label, const AIFloat3& rally)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->Create(tmpl, label, rally) : -1;
+}
+static bool CMilitaryManager_BattleSquadAdd(CMilitaryManager* mgr, int squad, CCircuitUnit* unit)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr && unit != nullptr && mgr->GetCircuit()->GetTeamUnit(unit->GetId()) == unit && squads->Add(squad, unit);
+}
+static bool CMilitaryManager_BattleSquadLaunch(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr && squads->Launch(squad);
+}
+static bool CMilitaryManager_BattleSquadGoal(CMilitaryManager* mgr, int squad, const AIFloat3& goal)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr && squads->SetGoal(squad, goal);
+}
+static bool CMilitaryManager_BattleSquadRelease(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr && squads->Release(squad, "script");
+}
+static IUnitTask* CMilitaryManager_BattleSquadTask(CMilitaryManager* mgr, CCircuitUnit* unit)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->TaskFor(unit) : nullptr;
+}
+static int CMilitaryManager_BattleSquadOf(CMilitaryManager* mgr, int unitId)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->SquadOf(unitId) : -1;
+}
+static int CMilitaryManager_BattleSquadSize(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->Size(squad) : -1;
+}
+static int CMilitaryManager_BattleSquadArmed(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->Armed(squad) : -1;
+}
+static int CMilitaryManager_BattleSquadMember(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->AnyMember(squad) : -1;
+}
+static int CMilitaryManager_BattleSquadOrder(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->OrderOf(squad) : -1;
+}
+
 CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 		: ITaskModuleScript(scr, mgr)
 {
@@ -105,6 +169,19 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueExternalControl(const string& in)", asMETHOD(CMilitaryManager, EnqueueExternalControl), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueEscortStrike()", asMETHOD(CMilitaryManager, EnqueueEscortStrike), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool TransferUnit(CCircuitUnit@, IUnitTask@)", asFUNCTION(CMilitaryManager_TransferUnit), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	// Owner 2026-11-24: battle squads (control/group/BattleSquads.h)
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool BattleSquadTemplate(const string& in)", asFUNCTION(CMilitaryManager_BattleSquadTemplate), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadCreate(const string& in, const string& in, const AIFloat3& in)", asFUNCTION(CMilitaryManager_BattleSquadCreate), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool BattleSquadAdd(int, CCircuitUnit@)", asFUNCTION(CMilitaryManager_BattleSquadAdd), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool BattleSquadLaunch(int)", asFUNCTION(CMilitaryManager_BattleSquadLaunch), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool BattleSquadGoal(int, const AIFloat3& in)", asFUNCTION(CMilitaryManager_BattleSquadGoal), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "bool BattleSquadRelease(int)", asFUNCTION(CMilitaryManager_BattleSquadRelease), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ BattleSquadTask(CCircuitUnit@)", asFUNCTION(CMilitaryManager_BattleSquadTask), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadOf(int)", asFUNCTION(CMilitaryManager_BattleSquadOf), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadSize(int)", asFUNCTION(CMilitaryManager_BattleSquadSize), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadArmed(int)", asFUNCTION(CMilitaryManager_BattleSquadArmed), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadMember(int)", asFUNCTION(CMilitaryManager_BattleSquadMember), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadOrder(int)", asFUNCTION(CMilitaryManager_BattleSquadOrder), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "void DefaultMakeDefence(int, const AIFloat3& in)", asMETHOD(CMilitaryManager, DefaultMakeDefence), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetCombatFocusPos() const", asMETHOD(CMilitaryManager, GetCombatFocusPos), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "array<string>@ GetPorcChain(const string& in, bool) const", asFUNCTION(CMilitaryManager_GetPorcChain), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

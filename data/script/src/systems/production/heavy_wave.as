@@ -31,6 +31,13 @@ latched once reached.
 Log tag [HeavyWave]: count, roll (hit/miss), build k/n, held k/n, launch,
 abort. One wave per AI at a time; no periodic job, no world scan.
 
+Owner 2026-11-24: with Global::HeavyWave::BattleSquad and the behaviour.json
+"squad_formations" template t3_heavy, the same rolls, sizes, late rule and
+deadline hold the wave as a native battle squad at the rally instead of the
+gather task (systems/combat/battle_squads.as). Update (every 30 frames) launches
+it once every expected unit is out, or at the deadline, and it then walks down
+the lane under the battle group's orders, merges and break-up.
+
 ******************************************************************************/
 namespace HeavyWave {
     int heavies = 0;          // heavies produced by our gantries (the first FirstHeavies arm the rolls)
@@ -52,6 +59,7 @@ namespace HeavyWave {
     float unitPower = 0.0f;
     AIFloat3 rally;
     IUnitTask@ gather;
+    int squad = -1;           // owner 2026-11-24: the native battle squad holding this wave (-1: the gather task)
     array<IUnitTask@> recruits;
     array<int> members;
     array<bool> departed;
@@ -93,8 +101,40 @@ namespace HeavyWave {
         return n;
     }
 
+    bool SquadMode() { return Global::HeavyWave::BattleSquad && BattleSquads::Has("t3_heavy"); }
+
+    // Owner 2026-11-24: the battle squad leaves the rally; true when it did.
+    bool LaunchSquad(const string &in why) {
+        if (squad < 0) return false;
+        const int alive = aiMilitaryMgr.BattleSquadSize(squad);
+        if (alive <= 0) {
+            if (alive == 0) aiMilitaryMgr.BattleSquadRelease(squad);
+            squad = -1;
+            return false;
+        }
+        aiMilitaryMgr.BattleSquadLaunch(squad);
+        BattleSquads::Track(squad, rally);
+        GenericHelpers::LogUtil(Tag() + "wave " + waves + " LAUNCH as battle squad " + squad + ": " + alive + " x " + unitName
+            + " (built " + admitted + "/" + size + ") after " + ((ai.frame - started) / SECOND) + " s (" + why + ")", 1);
+        squad = -1;
+        return true;
+    }
+
+    // AiUpdate: launches a held battle squad wave. O(1).
+    void Update() {
+        if (!active || squad < 0) return;
+        if (Alive() > 0 && (Alive() >= expected || ai.frame >= deadline)) {
+            if (LaunchSquad(ai.frame >= deadline ? "deadline" : "complete")) Close("launched");
+        } else if (admitted == 0 && ai.frame >= deadline) {
+            Close("deadline with no unit out");
+        } else if (admitted > 0 && Alive() == 0 && expected == 0) {
+            Close("every held unit lost");
+        }
+    }
+
     void Close(const string &in why) {
         if (!active) return;
+        if (squad >= 0 && !LaunchSquad(why)) squad = -1;   // survivors leave as a squad
         GenericHelpers::LogUtil(Tag() + "wave " + waves + " closed (" + why + "): built " + admitted + "/" + size
             + " alive " + Alive() + "; next roll at " + (nextRoll / SECOND) + " s", 1);
         if (gather !is null && !gather.IsDead()) aiMilitaryMgr.SetGatherPower(gather, 0.0f);   // release survivors
@@ -147,6 +187,7 @@ namespace HeavyWave {
         deadline = started + n * AiMax(1, Global::HeavyWave::GatherSecondsPerUnit) * SECOND;
         rally = RallyFor(g);
         @gather = null;
+        squad = SquadMode() ? aiMilitaryMgr.BattleSquadCreate("t3_heavy", "heavy wave " + waves, rally) : -1;
         recruits.resize(0); members.resize(0); departed.resize(0);
         GenericHelpers::LogUtil(Tag() + "wave " + waves + " hold: " + n + " x " + unitName + " back to back at gantry "
             + g.id + ", rally (" + int(rally.x) + "," + int(rally.z) + "), deadline " + (deadline / SECOND) + " s", 1);
@@ -184,6 +225,7 @@ namespace HeavyWave {
         if (admitted >= size || unit.circuitDef.id != defId
             || unit.GetProducerId() != gantryId || unit.GetProductionFrame() < started) return false;
         members.insertLast(unit.id); departed.insertLast(false); ++admitted;
+        if (squad >= 0) aiMilitaryMgr.BattleSquadAdd(squad, unit);
         GenericHelpers::LogUtil(Tag() + "wave " + waves + " held " + admitted + "/" + size + " " + unitName
             + " " + unit.id + " (alive " + Alive() + ")", 1);
         return true;
@@ -210,6 +252,7 @@ namespace HeavyWave {
         if (!active || unit is null) return null;
         const int member = members.find(unit.id);
         if (member < 0 || departed[member]) return null;
+        if (squad >= 0) return aiMilitaryMgr.BattleSquadTask(unit);   // the battle squad holds it at the rally
         if (gather !is null && gather.IsDead()) { Close("gather task gone"); return null; }
         if (gather is null) {
             const int until = AiMax(deadline, ai.frame + SECOND);
@@ -273,6 +316,7 @@ namespace HeavyWave {
     }
 
     void Load() {
+        squad = -1;   // a native squad outlives a script reload
         Close("reload");
     }
 }  // namespace HeavyWave

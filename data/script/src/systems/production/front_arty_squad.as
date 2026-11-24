@@ -27,6 +27,13 @@
 //   Legion 5 Incinerators, same support. Cortex has none.
 // They move and fight as the vehicle squad, except the lead is the longest-ranged member (ties: the slowest),
 // and the squad keeps the slowest member's pace through the cohesion wait. Log [FRONT][ArtySquad] ... bot squad.
+// Owner (2026-11-24): with ArtySquadBattleSquads and a behaviour.json "squad_formations" template (t2_artillery
+// for the artillery squads, t2_heavy for the heavy and superheavy bot squads) every squad is a native battle
+// squad instead (control/group/BattleSquads.h, systems/combat/battle_squads.as): it gathers at a rally
+// ArtySquadRallyOffset from its plant until complete or its gather deadline, then the native controller ranks,
+// places and orders it (heavies front, radar/jammer/flak middle, artillery back at height-aware reach) and
+// merges or sends it home. This file keeps the rolls, compositions, claims, gather deadline and the log; the
+// lead/pace/ghost logic below runs only for script squads. Log [FRONT][ArtySquad] ... battle squad.
 namespace FrontArtySquad {
     const int OPEN = 2;
     class Squad {
@@ -55,6 +62,7 @@ namespace FrontArtySquad {
         int waitSince;          // frame the lead began waiting for stragglers, -1 when not waiting
         int paceSince;          // frame the lead began pacing for a member short of its place, -1 when not
         bool ghostHeld;         // held or backing out at ghost porc reach (owner, 2026-11-02), for the log
+        int native;             // owner 2026-11-24: the native battle squad (-1: this script squad moves itself)
     }
     array<Squad@> squads;
     int nextSquadId = 1;
@@ -82,6 +90,50 @@ namespace FrontArtySquad {
     }
 
     bool BotEnabled() { return Global::RoleSettings::Front::T2BotSquadChance > 0.0f; }
+
+    // Owner (2026-11-24): hand the squad to a native battle squad of `tmpl`, held at a rally off the plant.
+    void StartNative(Squad@ s, CCircuitUnit@ plant, const string &in tmpl) {
+        s.native = -1;
+        if (!Global::RoleSettings::Front::ArtySquadBattleSquads || !BattleSquads::Has(tmpl)) return;
+        const AIFloat3 rally = BattleSquads::RallyFrom(plant.GetPos(ai.frame), Global::RoleSettings::Front::ArtySquadRallyOffset);
+        s.native = aiMilitaryMgr.BattleSquadCreate(tmpl, s.label + " " + s.id, rally);
+        if (s.native >= 0) GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " is battle squad " + s.native + " (" + tmpl
+            + "), rally (" + int(rally.x) + ", " + int(rally.z) + ")", 1);
+    }
+
+    string OrderName(int order) {
+        if (order == 1) return "advance";
+        if (order == 2) return "attack";
+        if (order == 3) return "hold";
+        if (order == 4) return "withdraw";
+        return "none";
+    }
+
+    // Update for a battle squad: launch at the gather deadline, drop the record once the native squad is gone.
+    void NativeStep(uint index, Squad@ s) {
+        if (!s.released) {
+            if (s.slots.length() > 0 && ai.frame < s.deadline) return;   // still gathering at the rally
+            s.released = true;
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " departs as battle squad " + s.native + " with "
+                + s.members.length() + " member(s) (" + Census(s) + ")"
+                + (s.slots.length() > 0 ? " (" + s.slots.length() + " never came, gather deadline)" : ""), 1);
+            s.slots.resize(0);
+            aiMilitaryMgr.BattleSquadLaunch(s.native);
+            BattleSquads::Track(s.native, s.leadGoal);
+        }
+        if (aiMilitaryMgr.BattleSquadSize(s.native) < 0) {
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": battle squad " + s.native
+                + " ended (merged, home or destroyed); " + s.members.length() + " member(s) left (" + Census(s) + ")", 1);
+            squads.removeAt(index);
+            return;
+        }
+        if (ai.frame >= s.nextLog) {
+            s.nextLog = ai.frame + 20 * SECOND;
+            GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": battle squad " + s.native + " "
+                + OrderName(aiMilitaryMgr.BattleSquadOrder(s.native)) + ", " + aiMilitaryMgr.BattleSquadSize(s.native)
+                + " in the squad, " + s.members.length() + " of ours (" + Census(s) + ")", 1);
+        }
+    }
 
     // Owner (2026-10-31): T2 bot lab squads; arty false = the heavy squad, light (Armada) = the light artillery
     // squad. Unit ids from Beyond-All-Reason unitdefs.
@@ -184,7 +236,7 @@ namespace FrontArtySquad {
         Squad@ s = Squad();
         s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDefId; s.label = label;
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
-        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1; s.ghostHeld = false;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1; s.ghostHeld = false; s.native = -1;
         s.botLabId = botLab is null ? (leadDefId < 0 ? u.id : -1) : botLab.id;
         s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal; s.frontGoal = s.leadGoal; s.leadHeavy = false;
         string queued = "", skipped = "";
@@ -208,6 +260,7 @@ namespace FrontArtySquad {
             return null;
         }
         squads.insertLast(s);
+        StartNative(s, u, label.findFirst("artillery") >= 0 ? "t2_artillery" : "t2_heavy");
         GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " (" + label + ") at factory " + u.id + " (" + side + "): queued " + queued
             + (skipped == "" ? "" : "; unavailable " + skipped), 1);
         return first;
@@ -262,7 +315,7 @@ namespace FrontArtySquad {
         Squad@ s = Squad();
         s.id = nextSquadId++; s.factoryId = u.id; s.started = ai.frame; s.leadDefId = leadDef.id; s.label = "artillery squad";
         s.deadline = ai.frame + AiMax(1, gatherSeconds) * SECOND;
-        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1; s.ghostHeld = false;
+        s.leader = -1; s.released = false; s.nextLog = 0; s.waitSince = -1; s.paceSince = -1; s.ghostHeld = false; s.native = -1;
         s.botLabId = botLab is null ? -1 : botLab.id;
         s.leadGoal = u.GetPos(ai.frame); s.followGoal = s.leadGoal; s.frontGoal = s.leadGoal; s.leadHeavy = false;
         string queued = "", skipped = "";
@@ -296,6 +349,7 @@ namespace FrontArtySquad {
             GenericHelpers::LogUtil("[FRONT][ArtySquad] squad lead '" + lead + "' unavailable at roll; members queued anyway: " + queued, 1);
         }
         squads.insertLast(s);
+        StartNative(s, u, "t2_artillery");
         GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " at factory " + u.id + " (" + side + "): queued " + queued
             + (skipped == "" ? "" : "; unavailable " + skipped), 1);
         return first;
@@ -315,6 +369,7 @@ namespace FrontArtySquad {
             s.slots.removeAt(slot);
             s.members.insertLast(unit.id); s.fireSent.insertLast(-100000); s.joined.insertLast(ai.frame);
             s.slotSent.insertLast(AIFloat3(-1.0f, 0.0f, -1.0f));
+            if (s.native >= 0) aiMilitaryMgr.BattleSquadAdd(s.native, unit);
             GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + ": member " + s.members.length() + " " + unit.circuitDef.GetName()
                 + " " + unit.id + " (" + ClassOf(unit.circuitDef.GetName()) + ")"
                 + (s.slots.length() == 0 ? "; squad complete" : ", " + s.slots.length() + " to come"), 1);
@@ -361,6 +416,7 @@ namespace FrontArtySquad {
     IUnitTask@ MilitaryTask(CCircuitUnit@ unit) {
         if (unit is null) return null;
         Squad@ s = SquadOf(unit.id);
+        if (s !is null && s.native >= 0) return aiMilitaryMgr.BattleSquadTask(unit);   // owner 2026-11-24
         if (s is null || !EnsureRoutes(s)) return null;
         const int k = s.members.find(unit.id);
         if (k >= 0) { unit.SetFireState(OPEN); s.fireSent[k] = ai.frame; }
@@ -408,6 +464,7 @@ namespace FrontArtySquad {
         squads.removeAt(index);
         GenericHelpers::LogUtil("[FRONT][ArtySquad] squad " + s.id + " " + why + ": " + s.members.length() + " member(s) back to normal orders ("
             + Census(s) + ")", 1);
+        if (s.native >= 0) aiMilitaryMgr.BattleSquadRelease(s.native);   // owner 2026-11-24
         if (s.leadRoute !is null && !s.leadRoute.IsDead()) s.leadRoute.Abort();
         if (s.followRoute !is null && !s.followRoute.IsDead()) s.followRoute.Abort();
         if (s.frontRoute !is null && !s.frontRoute.IsDead()) s.frontRoute.Abort();
@@ -607,6 +664,7 @@ namespace FrontArtySquad {
                 if (ai.frame - s.fireSent[k] >= resend) { m.SetFireState(OPEN); s.fireSent[k] = ai.frame; }
                 if (!IsEscort(m.circuitDef.GetName())) ++armed;
             }
+            if (s.native >= 0) { NativeStep(uint(i), s); continue; }   // owner 2026-11-24: the native squad moves it
             if (!s.released) {
                 if (s.slots.length() > 0 && ai.frame < s.deadline) continue;   // still gathering at the plant
                 s.released = true;

@@ -5,6 +5,7 @@
  *      Author: rlcevg
  */
 
+#include "control/group/BattleSquads.h"
 #include "module/MilitaryManager.h"
 #include "terrain/BattleAnalysis.h"
 #include "module/BuilderManager.h"
@@ -1057,6 +1058,10 @@ void CMilitaryManager::InitEconomyScores(const std::vector<CCircuitDef*>&& build
 
 void CMilitaryManager::InitMilitary()
 {
+	// Owner 2026-11-24: battle squads, opt-in by behaviour.json "squad_formations".
+	battleSquads = std::make_unique<CBattleSquads>(circuit, this);
+	battleSquads->ReadConfig(circuit->GetSetupManager()->GetConfig());
+
 	CMetalManager* metalMgr = circuit->GetMetalManager();
 	const CMetalData::Clusters& clusters = metalMgr->GetClusters();
 
@@ -1105,6 +1110,10 @@ void CMilitaryManager::InitMilitary()
 		// Owner 2026-11-23: stealth dodge, every 3 frames (a 60-100 elmo/s raider
 		// closes ~8 elmos between checks; the script's 1 Hz tick let it close ~100).
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateStealthDodge, this), 3, offset % 3);
+
+		// Owner 2026-11-24: battle squads; each squad decides once per its template's period.
+		scheduler->RunJobEvery(CScheduler::GameJob([this]() { if (battleSquads) battleSquads->Update(); }),
+				CBattleSquads::UPDATE_FRAMES, offset + 6);
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -1157,6 +1166,7 @@ int CMilitaryManager::UnitDamaged(CCircuitUnit* unit, CEnemyInfo* attacker)
 
 int CMilitaryManager::UnitDestroyed(CCircuitUnit* unit, CEnemyInfo* attacker)
 {
+	if (battleSquads) battleSquads->UnitDestroyed(unit, circuit->GetLastFrame());  // owner 2026-11-24: the trade ledger
 	DroneAAUnitDestroyed(unit, attacker);  // owner 2026-11-08: dead T1.5 site memory + re-order
 	if (unit->GetCircuitDef()->IsAttrFence()) {
 		UnmarkPorc(unit);
@@ -1336,6 +1346,7 @@ CRetreatTask* CMilitaryManager::EnqueueRetreat()
 
 void CMilitaryManager::DequeueTask(IUnitTask* task, bool done)
 {
+	if (battleSquads) battleSquads->TaskRemoved(task);  // owner 2026-11-24: a squad's route is gone
 	switch (task->GetType()) {
 		case IUnitTask::Type::FIGHTER: {
 			IFighterTask* taskF = static_cast<IFighterTask*>(task);

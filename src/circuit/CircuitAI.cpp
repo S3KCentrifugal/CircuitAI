@@ -21,6 +21,7 @@
 #include "control/unit/commander/CommanderController.h"
 #include "module/FactoryManager.h"
 #include "module/EconomyManager.h"
+#include "control/group/BattleSquads.h"
 #include "module/MilitaryManager.h"
 #include "resource/MetalManager.h"
 #include "terrain/TerrainManager.h"
@@ -403,6 +404,9 @@ int CCircuitAI::HandleGameEvent(int topic, const void* data)
 			struct SEnemyDestroyedEvent* evt = (struct SEnemyDestroyedEvent*)data;
 			CEnemyInfo* enemy = GetEnemyInfo(evt->enemy);
 			if (enemy != nullptr) {
+				// Owner 2026-11-24: a kill by a battle squad member books to its trade ledger.
+				if (evt->attacker >= 0 && militaryManager != nullptr && militaryManager->GetBattleSquads() != nullptr)
+					militaryManager->GetBattleSquads()->EnemyKilled(evt->attacker, enemy->GetCost(), lastFrame);
 				allyTeam->DyingEnemy(enemy->GetData(), lastFrame);
 				ret = 0;
 			} else {

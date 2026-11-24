@@ -811,7 +811,8 @@ namespace AirEmergencyDefense {
             owedCount.set(fkey, count - 1);
             if (count - 1 <= 0) { owed.delete(fkey); owedCount.delete(fkey); }
             // a T2 squad or wave already claimed it: theirs
-            if (FrontArtySquad::SquadOf(u.id) !is null || FrontWaveEscort::EscortWave(u.id) !is null) return null;
+            if (FrontArtySquad::SquadOf(u.id) !is null || FrontWaveEscort::EscortWave(u.id) !is null
+                || aiMilitaryMgr.BattleSquadOf(u.id) >= 0) return null;   // owner 2026-11-24: battle squads too
         }
         Squad@ s = SquadBySerial(serial);
         CRouteTask@ task = EnsureTask(s);

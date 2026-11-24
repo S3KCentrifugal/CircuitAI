@@ -18,6 +18,7 @@
 #include "util/AvailList.h"
 
 #include <vector>
+#include <memory>
 #include <cmath>
 #include <string>
 #include <set>
@@ -33,6 +34,7 @@ class CBDefenceTask;
 class CFGuardTask;
 class CRangedWorld;
 class CAssaultMicro;
+class CBattleSquads;
 
 namespace TaskF {
 	struct SFightTask {
@@ -857,6 +859,8 @@ public:
 	IUnitTask* TryMakeRangedTask(CCircuitUnit* unit);
 	std::shared_ptr<CRangedWorld> GetRangedWorld();
 	bool HasRangedUnits() const;
+	// Owner 2026-11-24: battle squads (control/group/BattleSquads.h); null before InitMilitary.
+	CBattleSquads* GetBattleSquads() const { return battleSquads.get(); }
 
 	// Owner 2026-11-23: native dodge for cloaked stealth scouts / spotters.
 	// Script registers a unit (radius > 0) or removes it (radius <= 0); every
@@ -886,6 +890,7 @@ private:
 	float stealthDodgeStatic = 110.f;
 	int stealthDodgeCount = 0;
 	void UpdateStealthDodge();
+	std::unique_ptr<CBattleSquads> battleSquads;  // owner 2026-11-24
     float aggressionDelta=0.f, automaticAggression=0.f;
     IUnitTask* MakeTask(CCircuitUnit* unit) override;
     void UpdateExternalControl();

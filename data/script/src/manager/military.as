@@ -14,6 +14,7 @@
 #include "../systems/world/coverage_lanes.as"
 #include "../systems/construction/commander_group.as"
 #include "../systems/production/heavy_wave.as"
+#include "../systems/combat/battle_squads.as"
 
 namespace Military {
 
@@ -132,7 +133,10 @@ namespace Military {
 
         IUnitTask@ home = TechBaseResponse::TaskFor(u);
         if (home !is null) return home;
-		IUnitTask@ t = HeavyWave::MilitaryTask(u);   // owner 2026-11-16: a held heavy wave waits at its gantry
+		// Owner 2026-11-24: a battle squad member keeps its squad's route (before the native ranged task)
+		IUnitTask@ t = BattleSquads::MilitaryTask(u);
+		if (t !is null) return t;
+		@t = HeavyWave::MilitaryTask(u);   // owner 2026-11-16: a held heavy wave waits at its gantry
 		if (t !is null) return t;
 		@t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
 		if (t !is null) return t;
@@ -234,6 +238,7 @@ namespace Military {
         AmphibiousOps::lastTick = -100000; // a loaded frame may precede the last live update
         FrontOpener::Load(); // retire ephemeral opener task ownership after reload
         HeavyWave::Load(); // held heavies back to ordinary military policy
+        BattleSquads::Load(); // owner 2026-11-24: native squads keep their last lane goal
         FrontWaveEscort::Load(); // T2 wave escorts back to ordinary military policy
         FrontArtySquad::Load(); // T2 artillery squads too
         ScoutRaid::Reset(); // raid routes are rebuilt through Military::AiMakeTask

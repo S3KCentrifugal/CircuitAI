@@ -390,6 +390,13 @@ namespace Front {
             // Off here (systems/production/front_arty_squad.as).
             float VehicleT2ArtySquadChance = 0.0f;
             int ArtySquadUpdateSeconds = 2;
+            // Owner (2026-11-24): T2 squads (vehicle artillery squad and every T2 bot lab squad) become native battle
+            // squads once out (control/group/BattleSquads.h, systems/combat/battle_squads.as): screen front, utility
+            // middle, artillery back at height-aware reach, routed orders, merge or walk home. False, or no
+            // behaviour.json "squad_formations" template, keeps the script squad below. Rally: ArtySquadRallyOffset
+            // elmos from the plant toward the nearest enemy start while the squad gathers.
+            bool ArtySquadBattleSquads = true;
+            float ArtySquadRallyOffset = 250.0f;
             float ArtySquadRangeFraction = 0.95f;
             float ArtySquadCohesion = 450.0f;
             float ArtySquadFollowBehind = 120.0f;

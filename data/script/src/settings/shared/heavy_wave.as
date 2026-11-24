@@ -23,5 +23,9 @@ namespace HeavyWave {
     int GatherSecondsPerUnit = 240;
     // the held units wait this far from the gantry towards the nearest enemy start (off its exit)
     float RallyOffset = 300.0f;
+    // Owner 2026-11-24: the wave is a native battle squad (behaviour.json "squad_formations" t3_heavy):
+    // held at the rally until the last unit is out or the deadline, then down the lane with the battle
+    // group's orders, merges and break-up. False (or no template) keeps the native gather + ATTACK squad.
+    bool BattleSquad = true;
 }
 }

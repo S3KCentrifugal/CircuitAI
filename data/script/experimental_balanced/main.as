@@ -259,6 +259,8 @@ namespace Main {
         CommanderCombat::Update();
         FrontWaveEscort::Update();   // T2 tank wave escorts follow their wave (no-op without a wave)
         FrontArtySquad::Update();   // T2 artillery squads follow their lead (no-op without a squad)
+        HeavyWave::Update();        // owner 2026-11-24: a held T3 wave launches as a battle squad (no-op otherwise)
+        BattleSquads::Update();     // owner 2026-11-24: lane goals of the launched battle squads
         PorcFrontLine::Tick();  // owner 2026-11-18: our porc front line for site clearing (systems/world/porc_front_line.as)
         T3Unstick::Tick();      // free T3 units penned in by our T1 porc, eco and construction turrets
         AirSightAA::Update();   // owner 2026-11-24: builders that see enemy air drop one AA turret (systems/construction/air_sight_aa.as)
