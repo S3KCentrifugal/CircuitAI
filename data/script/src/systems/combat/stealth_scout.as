@@ -61,6 +61,7 @@ namespace StealthScout {
         int spotDef = -1;
         float spotScore = 0.0f;
         int parkedFrame = 0, lastUseful = 0, lastSpotCheck = 0, losSince = -1, goneChecks = 0, closeTries = 0;
+        bool dodging = false;       // native dodge owns the unit (NativeDodge)
     }
 
     array<Scout@> scouts;
@@ -73,7 +74,7 @@ namespace StealthScout {
     int cols = 0, rows = 0, scanCursor = 0;
     array<int> lastSeen;        // frame the sector was last in ally LOS, -1 never
     array<int> unreachableUntil;
-    int reached = 0, lost = 0, hits = 0, risks = 0, planned = 0;
+    int reached = 0, lost = 0, hits = 0, risks = 0, planned = 0, dodges = 0;
 
     bool Active() { return Global::StealthScout::Enabled; }
 
@@ -105,6 +106,9 @@ namespace StealthScout {
     void InitGrid()
     {
         if (cols > 0) return;
+        if (Global::StealthScout::NativeDodge)
+            aiMilitaryMgr.SetStealthDodgeParams(Global::StealthScout::DodgeStep, Global::StealthScout::DodgeHoldFrames,
+                Global::StealthScout::DodgeStaticRadius);
         const float s = Global::StealthScout::SectorElmos;
         const int si = AiMax(64, int(s));
         cols = AiMax(1, (int(AiTerrainWidth()) + si - 1) / si);
@@ -1024,6 +1028,7 @@ namespace StealthScout {
         array<AIFloat3> hold = {s.lastPos};
         task.SetRoute(hold);
         scouts.insertLast(s);
+        if (Global::StealthScout::NativeDodge) aiMilitaryMgr.SetStealthDodge(u, Global::StealthScout::DodgeRadius);
         Queue(s);
         const float cost = (di < int(Global::StealthScout::CloakCost.length())) ? Global::StealthScout::CloakCost[di] : 0.0f;
         const float energy = Economy::GetMinEnergyIncomeLast10s();
@@ -1036,6 +1041,10 @@ namespace StealthScout {
     void Drop(uint index, bool abort = true)
     {
         Scout@ s = scouts[index];
+        if (Global::StealthScout::NativeDodge) {
+            CCircuitUnit@ du = ai.GetTeamUnit(s.id);
+            if (du !is null) aiMilitaryMgr.SetStealthDodge(du, 0.0f);   // no longer ours to dodge
+        }
         const int q = replanQueue.find(s.id);
         if (q >= 0) replanQueue.removeAt(uint(q));
         CRouteTask@ task = s.task;
@@ -1110,6 +1119,15 @@ namespace StealthScout {
                 if (s.spotter && s.hasPost) { s.hasPost = false; s.parked = false; }   // the post is burned
             }
             s.lastHealth = hp;
+            if (Global::StealthScout::NativeDodge) {
+                // the native dodge moved it: no route, post or evade work until it is done
+                if (aiMilitaryMgr.GetStealthDodgeUntil(u) > ai.frame) {
+                    if (!s.dodging) { s.dodging = true; ++dodges; s.parked = false; s.holdSince = -1; }
+                    s.lastMove = ai.frame;
+                    continue;
+                }
+                if (s.dodging) { s.dodging = false; s.escaping = false; Queue(s); continue; }
+            }
             if (ai.frame - s.lastRisk >= 20 * SECOND && NearContact(pos, Global::StealthScout::DecloakRisk)) {
                 s.lastRisk = ai.frame; ++risks;
                 GenericHelpers::LogUtil("[StealthScout] decloak risk unit=" + s.id + " contact within " + int(Global::StealthScout::DecloakRisk)
@@ -1137,7 +1155,7 @@ namespace StealthScout {
                 GenericHelpers::LogUtil("[StealthScout] " + (covered ? "inside coverage" : "clear of coverage") + " unit=" + s.id
                     + " at (" + int(pos.x) + "," + int(pos.z) + ")", 1);
             }
-            if (nearest < Global::StealthScout::EvadeRadius) {
+            if (!Global::StealthScout::NativeDodge && nearest < Global::StealthScout::EvadeRadius) {
                 // Something is about to walk into us: step away (one MOVE), resume after.
                 AIFloat3 away;
                 if (!s.escaping && EscapePoint(u, pos, away)) {
@@ -1249,7 +1267,8 @@ namespace StealthScout {
             GenericHelpers::LogUtil("[StealthScout] summary scouts=" + scouts.length() + " routes=" + planned + " reached=" + reached
                 + " lost=" + lost + " hits=" + hits + " risks=" + risks + " sectors never=" + never + " stale=" + old + " of " + lastSeen.length()
                 + " spotters=" + SpotterCount() + " parks=" + spotParks + " gone=" + spotGone + " switch=" + spotSwitch
-                + " noLos=" + spotNoLos + " idle=" + spotIdle + " ranged=" + rangedPos.length(), 1);
+                + " noLos=" + spotNoLos + " idle=" + spotIdle + " ranged=" + rangedPos.length() + " dodges=" + dodges
+                + " nativeDodgeMoves=" + (Global::StealthScout::NativeDodge ? aiMilitaryMgr.GetStealthDodgeCount() : -1), 1);
         }
     }
 }

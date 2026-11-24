@@ -92,6 +92,11 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterGlobalProperty("CMilitaryManager aiMilitaryMgr", manager); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ DefaultMakeTask(CCircuitUnit@)", asMETHOD(CMilitaryManager, DefaultMakeTask), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ TryMakeRangedTask(CCircuitUnit@)", asMETHOD(CMilitaryManager, TryMakeRangedTask), asCALL_THISCALL); ASSERT(r >= 0);
+	// Owner 2026-11-23: native dodge for cloaked stealth scouts (systems/combat/stealth_scout.as)
+	r = engine->RegisterObjectMethod("CMilitaryManager", "void SetStealthDodge(CCircuitUnit@, float)", asMETHOD(CMilitaryManager, SetStealthDodge), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetStealthDodgeUntil(CCircuitUnit@) const", asMETHOD(CMilitaryManager, GetStealthDodgeUntil), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "void SetStealthDodgeParams(float, int, float)", asMETHOD(CMilitaryManager, SetStealthDodgeParams), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetStealthDodgeCount() const", asMETHOD(CMilitaryManager, GetStealthDodgeCount), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ Enqueue(const SFightTask& in)", asMETHODPR(CMilitaryManager, Enqueue, (const TaskF::SFightTask&), IFighterTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueGather(const SFightTask& in, const AIFloat3& in, int)", asMETHOD(CMilitaryManager, EnqueueGather), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetGatherPower(IUnitTask@, float)", asMETHOD(CMilitaryManager, SetGatherPower), asCALL_THISCALL); ASSERT(r >= 0);

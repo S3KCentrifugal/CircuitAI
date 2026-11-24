@@ -80,6 +80,17 @@ namespace StealthScout {
         // artillery can reach but nobody sees (a ghost, or a radar-only
         // structure), so the artillery fires at a live target. Ally LOS is
         // shared, so every allied AI's artillery gains from it.
+        // Native dodge (owner 2026-11-23, needs the matching DLL): every 3 frames
+        // a stealth unit with a visible enemy ground unit within DodgeRadius
+        // (structures only within DodgeStaticRadius) moves DodgeStep away;
+        // the script leaves it alone for DodgeHoldFrames after the last contact,
+        // then resumes its route/post. Replaces the script's 1 Hz evade.
+        bool NativeDodge = true;
+        float DodgeRadius = 260.0f;
+        float DodgeStep = 240.0f;
+        int DodgeHoldFrames = 45;
+        float DodgeStaticRadius = 110.0f;
+
         bool SpotEnabled = true;
         int SpottersPerAi = 1;               // owner 2026-11-23: one spotter per AI
         // Our "artillery" (owner 2026-11-23): mobile ground units with a max

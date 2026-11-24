@@ -845,9 +845,31 @@ public:
 	std::shared_ptr<CRangedWorld> GetRangedWorld();
 	bool HasRangedUnits() const;
 
+	// Owner 2026-11-23: native dodge for cloaked stealth scouts / spotters.
+	// Script registers a unit (radius > 0) or removes it (radius <= 0); every
+	// stealthDodgeInterval frames a registered unit with a visible enemy ground
+	// unit inside its radius gets one MOVE away. Script reads the frame the
+	// dodge holds until and leaves the unit alone till then.
+	void SetStealthDodge(CCircuitUnit* unit, float radius);
+	int GetStealthDodgeUntil(CCircuitUnit* unit) const;
+	void SetStealthDodgeParams(float step, int holdFrames, float staticRadius);
+	int GetStealthDodgeCount() const { return stealthDodgeCount; }
+
 private:
 	std::shared_ptr<CRangedWorld> rangedWorld;
 	std::shared_ptr<CAssaultMicro> assaultMicro;  // owner 2026-11-08
+	struct SStealthDodge {
+		float radius = 0.f;
+		int until = 0;           // dodge holds until this frame
+		int lastCmd = -1000;
+		springai::AIFloat3 dir;  // last dodge direction (unit length)
+	};
+	std::unordered_map<ICoreUnit::Id, SStealthDodge> stealthDodge;
+	float stealthDodgeStep = 240.f;
+	int stealthDodgeHold = 45;
+	float stealthDodgeStatic = 110.f;
+	int stealthDodgeCount = 0;
+	void UpdateStealthDodge();
     float aggressionDelta=0.f, automaticAggression=0.f;
     IUnitTask* MakeTask(CCircuitUnit* unit) override;
     void UpdateExternalControl();

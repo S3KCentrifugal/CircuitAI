@@ -1077,6 +1077,9 @@ void CMilitaryManager::InitMilitary()
 		// Owner 2026-11-08: shared Mace/Thug/Satyr/Aggravator/Rocketeer/Ballista micro.
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateAssaultMicro, this),
 				FRAMES_PER_SEC / 2, offset + 5);
+		// Owner 2026-11-23: stealth dodge, every 3 frames (a 60-100 elmo/s raider
+		// closes ~8 elmos between checks; the script's 1 Hz tick let it close ~100).
+		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::UpdateStealthDodge, this), 3, offset % 3);
 
 		scheduler->RunJobEvery(CScheduler::GameJob(&CMilitaryManager::Watchdog, this),
 								FRAMES_PER_SEC * 60,
@@ -2462,6 +2465,89 @@ void CMilitaryManager::UpdateSpamFireHold()
 			circuit->LOG("SPAMHOLD: %s %d targets %d (task type %d)", cdef->GetDef()->GetName(), unit->GetId(), best, int(task->GetType()));
 			TRY_UNIT(circuit, unit, unit->CmdPriorityTarget(best); )
 		}
+	}
+}
+
+void CMilitaryManager::SetStealthDodge(CCircuitUnit* unit, float radius)
+{
+	if (unit == nullptr) return;
+	if (radius <= 0.f) { stealthDodge.erase(unit->GetId()); return; }
+	stealthDodge[unit->GetId()].radius = radius;
+}
+
+int CMilitaryManager::GetStealthDodgeUntil(CCircuitUnit* unit) const
+{
+	if (unit == nullptr) return 0;
+	auto it = stealthDodge.find(unit->GetId());
+	return it == stealthDodge.end() ? 0 : it->second.until;
+}
+
+void CMilitaryManager::SetStealthDodgeParams(float step, int holdFrames, float staticRadius)
+{
+	stealthDodgeStep = std::max(64.f, step);
+	stealthDodgeHold = std::max(6, holdFrames);
+	stealthDodgeStatic = std::max(0.f, staticRadius);
+}
+
+void CMilitaryManager::UpdateStealthDodge()
+{
+	// Cost: every 3 frames, per registered unit (script keeps at most a dozen
+	// per AI) one engine radius query returning K visible enemy ids, O(K) enemy
+	// lookups; a MOVE only while a contact is inside the radius, re-sent at
+	// most every 15 frames unless the escape direction turns by > 45 degrees.
+	if (stealthDodge.empty()) return;
+	const int frame = circuit->GetLastFrame();
+	CEnemyManager* enemyMgr = circuit->GetEnemyManager();
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	for (auto it = stealthDodge.begin(); it != stealthDodge.end();) {
+		CCircuitUnit* unit = circuit->GetTeamUnit(it->first);
+		if (unit == nullptr || unit->IsDead()) { it = stealthDodge.erase(it); continue; }
+		SStealthDodge& d = it->second;
+		const AIFloat3 pos = unit->GetPos(frame);
+		const std::vector<int>& ids = circuit->GetCallback()->GetEnemyUnitIdsIn(pos, d.radius, false);
+		AIFloat3 push(0.f, 0.f, 0.f);
+		float nearest = d.radius;
+		for (int id : ids) {
+			const CEnemyUnit* e = enemyMgr->GetEnemyUnit(id);
+			if (e == nullptr) continue;
+			const CCircuitDef* edef = e->GetCircuitDef();
+			if (edef != nullptr && edef->IsAbleToFly()) continue;  // planes pass in a moment
+			AIFloat3 away = pos - e->GetPos();
+			away.y = 0.f;
+			const float dist = std::max(1.f, away.Length2D());
+			// a structure cannot walk into a cloaked unit: only very close ones count
+			if (edef != nullptr && !edef->IsMobile() && dist > stealthDodgeStatic) continue;
+			nearest = std::min(nearest, dist);
+			push += away * ((d.radius - dist) / (dist * d.radius) + 0.05f / dist);
+		}
+		const float plen = push.Length2D();
+		if (plen < 1e-4f) { ++it; continue; }
+		AIFloat3 dir = push / plen;
+		dir.y = 0.f;
+		const bool turned = d.dir.x * dir.x + d.dir.z * dir.z < 0.707f;
+		d.until = frame + stealthDodgeHold;
+		if (!turned && frame - d.lastCmd < 15) { ++it; continue; }
+		// away first, then 45 and 90 degrees either side; a point the unit can reach
+		static const float angles[] = {0.f, 0.785f, -0.785f, 1.571f, -1.571f};
+		for (float a : angles) {
+			const float c = std::cos(a), s = std::sin(a);
+			const AIFloat3 v(dir.x * c - dir.z * s, 0.f, dir.x * s + dir.z * c);
+			AIFloat3 to = pos + v * stealthDodgeStep;
+			CTerrainManager::CorrectPosition(to);
+			if (!terrainMgr->CanMoveToPos(unit->GetArea(), to)) continue;
+			TRY_UNIT(circuit, unit,
+				unit->CmdMoveTo(to, UNIT_CMD_OPTION, frame + FRAMES_PER_SEC * 3);
+			)
+			if (frame - d.lastCmd > FRAMES_PER_SEC * 10) {
+				circuit->LOG("STEALTHDODGE: %s %d contact %.0f away, moving %.0f toward (%.0f,%.0f)",
+					unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), nearest, stealthDodgeStep, to.x, to.z);
+			}
+			d.lastCmd = frame;
+			d.dir = v;
+			++stealthDodgeCount;
+			break;
+		}
+		++it;
 	}
 }
 
