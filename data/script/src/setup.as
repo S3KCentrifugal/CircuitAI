@@ -29,6 +29,7 @@
 #include "manager/factory.as"
 #include "manager/economy.as"
 #include "systems/construction/metal_economy.as"
+#include "systems/construction/air_sight_aa.as"
 #include "systems/combat/commander_combat.as"
 
 namespace Factory {

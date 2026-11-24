@@ -2033,6 +2033,8 @@ namespace Builder {
 			return aiBuilderMgr.Enqueue(TaskB::Wait(2 * SECOND));
 		// owner, 2026-11-18: crew released from a lolcannon site abandoned for its casualties fly home first
 		{ IUnitTask@ ev = LolCannon::EvacWork(u); if (ev !is null) return ev; }
+		// owner, 2026-11-24: a builder that sees enemy air drops one AA turret, then resumes (air_sight_aa.as)
+		{ IUnitTask@ aa = AirSightAA::Work(u); if (aa !is null) return aa; }
 		// owner, 2026-11-15: antinukes against scouted enemy silos come first (silo_antinukes.as). Played (v5):
 		// asked from Front_BuilderAiMakeTask they came after the seat work, mex upgraders and radars, so
 		// FRONT's T2 constructors never reached them and recruits were taken back.
@@ -2401,6 +2403,7 @@ namespace Builder {
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
 		FrontT2LabCrew::TaskRemoved(task, done);   // owner, 2026-11-23: drops the crew's order handles
+		AirSightAA::TaskRemoved(task, done);       // owner, 2026-11-24: AA interrupt order ended, resume marked
 		TechBuild::ReactorTaskRemoved(task);
 		SeaEconomy::Removed(task);
 		MetalEconomy::Removed(task, done);

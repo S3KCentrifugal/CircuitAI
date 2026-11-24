@@ -259,6 +259,7 @@ namespace Main {
         FrontArtySquad::Update();   // T2 artillery squads follow their lead (no-op without a squad)
         PorcFrontLine::Tick();  // owner 2026-11-18: our porc front line for site clearing (systems/world/porc_front_line.as)
         T3Unstick::Tick();      // free T3 units penned in by our T1 porc, eco and construction turrets
+        AirSightAA::Update();   // owner 2026-11-24: builders that see enemy air drop one AA turret (systems/construction/air_sight_aa.as)
 
 		if (Global::profileController !is null) {
 			Global::profileController.MainUpdate();
