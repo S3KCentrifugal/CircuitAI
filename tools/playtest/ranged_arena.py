@@ -64,7 +64,7 @@ def prepare(args):
         '--map',case['map'],'--map-file',str(starts),'--role',role,'--roles','all','--ally-spots',case.get('ally_spots','1'),
         '--side',case.get('side','armada'),
         '--engine',getattr(args,'engine','recoil_2026.07.04'),'--speed',str(args.speed),'--mode',getattr(args,'mode','fast'),'--minutes',str(args.minutes),
-        '--shots','','--width','1280','--height','720','--lean-render','--bonus','0',
+        '--shots','','--width','1280','--height','720','--lean-render','--bonus','50',
         '--ai-option','profile='+args.profile,'--ai-option','random_seed='+str(args.seed),
         '--modoption','deathmode=neverend','--modoption','startenergy='+str(case.get('start_energy',1000000)),
         '--modoption','startmetal='+str(case.get('start_metal',1000)),

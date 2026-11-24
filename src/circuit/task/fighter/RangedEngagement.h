@@ -37,7 +37,7 @@ private:
     bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal,const std::unordered_set<int>* topDefs=nullptr,bool onlyTop=false) const;
     bool UnknownStaticBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to);
     // Owner 2026-11-24 (Centurion D-gunned by a commander that cloaked): commander_reach_margin hulls
-    // remember each commander they saw for LOST_COMMANDER_SECONDS after it leaves radar and LOS. Its last
+    // remember each commander they saw for LOST_COMMANDER_SECONDS (60 s) after it leaves radar and LOS. Its last
     // position stays danger (its range + margin, growing with the time it has been unseen): escape, and no
     // move or march into it. Never a target.
     struct LostCommander { int id; springai::AIFloat3 pos; float range; int seen; };

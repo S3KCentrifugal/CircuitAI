@@ -260,9 +260,9 @@ bool CRangedEngagement::UnknownStaticBlocks(CCircuitUnit* unit,const AIFloat3& f
 // Owner 2026-11-24 (Centurion arena: a corcom cloaked while retreating; the Centurion had no contact,
 // marched towards the enemy start and walked into D-gun range). Seen commanders are kept for
 // LOST_COMMANDER_SECONDS once they leave radar and LOS. O(nearby + remembered) per decision.
-static constexpr float LOST_COMMANDER_SECONDS = 20.f;
+static constexpr float LOST_COMMANDER_SECONDS = 60.f;
 static constexpr float LOST_COMMANDER_SPEED = 40.f;    // elmos/s it may have walked unseen
-static constexpr float LOST_COMMANDER_GROWTH = 160.f;  // most added to its reach
+static constexpr float LOST_COMMANDER_GROWTH = 240.f;  // most added to its reach
 void CRangedEngagement::UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& close,int frame)
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
@@ -1330,6 +1330,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     float urgency=0.f;
     const bool forward=std::any_of(caps.weapons.begin(),caps.weapons.end(),[](const auto& w){return w.forward;});
     const float escapeSeconds=ranged::EscapeSeconds(caps.speed,caps.turnRate,caps.acceleration,forward,policy.reactionSeconds);
+    const AIFloat3 ownVelocity=world.CommanderReach() ? unit->GetUnit()->GetVel()*30.f : AIFloat3(0.f,0.f,0.f);   // owner 2026-11-24
     for(int i:nearby) {
         // Owner 2026-10-19: a pressed static defence is fought, not escaped;
         // only its death blast still pushes the hull back.
@@ -1339,7 +1340,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // only spends MOVEs. It remains a hazard for Safe/DangerSign below.
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue;
         const float d=std::sqrt(pos.SqDistance2D(c.pos));
-        const float closingSpeed=ranged::ClosingSpeed(P(pos),P(c.pos),P(c.velocity));
+        // Owner 2026-11-24 (Centurion D-gunned walking at a charging commander): with commander_reach_margin a
+        // commander's closing speed counts our own approach too (relative velocity), so the hull turns away in time.
+        const bool cmdRel=world.CommanderReach() && CRangedWorld::CommanderContact(c);
+        const float closingSpeed=ranged::ClosingSpeed(P(pos),P(c.pos),P(cmdRel ? c.velocity-ownVelocity : c.velocity));
         const float reach=hazard+(c.mobile?policy.safetyMargin:StaticMargin(policy))+closingSpeed*escapeSeconds;
         if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
     }
