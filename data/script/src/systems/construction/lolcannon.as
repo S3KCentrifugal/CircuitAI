@@ -1099,7 +1099,7 @@ namespace LolCannon {
     // ---------------------------------------------------------------- terrain blockers (owner 2026-11-19)
 
     // the muzzle over the ground for the low-arc cannons; < 0 for the Starfall (not checked)
-    float ArcMuzzle(CCircuitDef@ gun)
+    float ArcMuzzle(const CCircuitDef@ gun)
     {
         if (gun is null || !Global::LolCannon::ArcCheck) return -1.0f;
         const string n = gun.GetName();
