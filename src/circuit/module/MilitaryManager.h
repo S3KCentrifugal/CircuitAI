@@ -791,6 +791,7 @@ public:
 	float GetMinAttackers() const { return minAttackers; }
 	int GetT3NoRegroup() const { return t3NoRegroup; }
 	// Owner 2026-11-23: profile allowlist of structures that are porc (empty: every armed static is)
+	bool IsTopTarget(const CCircuitDef* d) const { return d != nullptr && rangedTopDefs.count(d->GetId()) > 0; }
 	bool IsListedPorc(const CCircuitDef* d) const { return rangedPorcDefs.empty() || (d != nullptr && rangedPorcDefs.count(d->GetId()) > 0); }
 	float GetAttackWaitSeconds() const { return attackWaitSeconds; }
 	float GetAttackScale() const { return attackScale; }
@@ -902,6 +903,7 @@ private:
 	float minAttackers = 0.f;
 	int t3NoRegroup = 3;
 	std::set<int> rangedPorcDefs;
+	std::set<int> rangedTopDefs;   // owner 2026-11-24: ranged_defaults.top_targets
 	/*
 	 * Attack-wave policy, script-set through quota.attackWait / quota.attackScale.
 	 * attackScale > 0 switches a DEFEND squad's promotion bar from the map-wide

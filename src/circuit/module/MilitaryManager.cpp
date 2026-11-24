@@ -369,6 +369,15 @@ void CMilitaryManager::ReadConfig()
 			CCircuitDef* pd = circuit->GetCircuitDef(name.asCString());
 			if (pd != nullptr) rangedPorcDefs.insert(pd->GetId());
 		}
+		// owner 2026-11-24: ranged_defaults.top_targets (LRPC, tactical launchers, heavy porc) also
+		// count as heavy ghosts for ghost_volleys_heavy (GhostFireStep)
+		rangedTopDefs.clear();
+		const Json::Value& top = root["ranged_defaults"]["top_targets"];
+		if (top.isArray()) for (const auto& name : top) {
+			if (!name.isString()) continue;
+			CCircuitDef* td = circuit->GetCircuitDef(name.asCString());
+			if (td != nullptr) rangedTopDefs.insert(td->GetId());
+		}
 	}
 
 	const Json::Value& responses = root["response"];
