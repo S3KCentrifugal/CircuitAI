@@ -744,6 +744,8 @@ void CFactoryManager::ReadConfig()
             boolean("static_exact_reach", policy.staticExactReach);
             number("kite_min_tech", policy.kiteMinTech, 0.f, 4.f);           // owner 2026-11-18 (Astraeus 2)
             boolean("kite_ignore_fast_dots", policy.kiteIgnoreFastDots);
+            number("commander_reach_margin", policy.commanderReachMargin, 0.f, 512.f);   // owner 2026-11-23 (Centurion)
+            if (policy.commanderReachMargin >= 0.f && policy.coordinated) valid = false;
             if ((policy.kiteMinTech > 0.f || policy.kiteIgnoreFastDots) && policy.coordinated) valid = false;
             // The cohort controller has its own static admission (assault list).
             if (policy.pressStatic > 0.f && policy.coordinated) valid = false;

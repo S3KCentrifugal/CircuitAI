@@ -214,6 +214,14 @@ struct RangedPolicy {
     // than spam_dot_speed is no hazard either. Individual controller only.
     float kiteMinTech = 0.f;
     bool kiteIgnoreFastDots = false;
+    // Owner 2026-11-23 (Centurion): -1 = off. An identified enemy commander's
+    // hazard is its own ground weapon range + this margin, not its 350 death
+    // blast + safety_margin, so a hull that outranges a commander's laser by
+    // a little (Centurion 325 vs 300) can fire on it from range_fraction, backs
+    // off while it closes (closing-speed escape) and re-sites onto it while it
+    // retreats. Its blast no longer blocks the shot (own or friendly splash).
+    // Individual controller only.
+    float commanderReachMargin = -1.f;
     bool HasSpam() const { return spamMaxCost>0.f || !spamDefs.empty() || spamRadarDots; }
     // Owner 2026-11-02: "stay out of weapon range of ghost images that are
     // porc and wait for other units to give LOS". 0 = off. An armed structure

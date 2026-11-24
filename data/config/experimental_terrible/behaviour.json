@@ -1541,7 +1541,9 @@
 			},
 			"armwar": {
 				"role": ["riot", "anti_spam"],
-				"attribute": ["skirmish", "rare"],
+				"attribute": ["skirmish", "rare", "ranged"],
+				// Owner 2026-11-23: Centurion controller on the Sharpshooter ranged (kiting) controller: moves to 99% of its 325 laser (98-100%), steps back from anything shorter-ranged that closes and keeps shooting, always fires at will (it is there to kill spam). Commanders (in LOS or identified on radar) are the priority target (commander_priority 100) and count only their 300 laser + 16 as danger, not the 350 death blast (commander_reach_margin, needs this DLL): it backs off while a commander walks at it and follows to 99% range when the commander retreats. Anti-spam screen units keep their screen: Military::AiMakeTask asks AntiSpam before the ranged controller, which never takes an assigned unit.
+				"ranged": {"ghost_porc_range": 3000, "always_fire_at_will": true, "commander_priority": 100, "target_mode": "skirmish", "advance_unknown_radar": true, "range_fraction": 0.99, "commander_reach_margin": 16, "spacing": 96, "safety_margin": 48, "static_margin": 12, "static_exact_reach": true, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0,
 				"retreat": 0

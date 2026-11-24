@@ -343,6 +343,10 @@ bool CRangedWorld::AssaultJoin(int porc,int unit,int frame,int minGroup,int maxW
     }
     return a.go>=0;
 }
+bool CRangedWorld::CommanderContact(const Contact& c)
+{
+    return !c.ghost && c.mobile && c.def!=nullptr && c.def->IsEnemyRoleAny(CCircuitDef::COMM);
+}
 bool CRangedWorld::SpamHazardIgnored(const Contact& c) const
 {
     // Identified mobile spam of the hull's roster (the controller's Spam rule for identified contacts),

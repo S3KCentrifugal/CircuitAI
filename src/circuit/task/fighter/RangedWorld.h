@@ -123,10 +123,18 @@ public:
     // Heavy porc assault registry: units waiting on a porc id; true once the group goes in (kept while any member calls).
     bool AssaultJoin(int porc,int unit,int frame,int minGroup,int maxWaitFrames,int& waiting);
     bool KiteIgnored(const Contact& c) const;
+    // Owner 2026-11-23 (Centurion): commander_reach_margin, set like exactStatic by the engagement of a hull
+    // with that key. An identified mobile enemy commander's Hz is its ground range + adjust (adjust = the
+    // margin - safety_margin, since callers add safety_margin to mobiles), ignoring its death blast.
+    void SetCommanderReach(bool on, float adjust) const { commanderReach=on; commanderAdjust=adjust; }
+    bool CommanderReach() const { return commanderReach; }
+    float CommanderAdjust() const { return commanderAdjust; }
+    static bool CommanderContact(const Contact& c);
     float Hz(const Contact& c, float press) const {
         if((kiteMinTech>0.f || kiteDotSpeed>0.f) && KiteIgnored(c)) return 0.f;
         if(spamFilter!=nullptr && SpamHazardIgnored(c)) return 0.f;
         if(porcFilter!=nullptr && PorcHazardIgnored(c)) return 0.f;
+        if(commanderReach && CommanderContact(c)) return c.armed ? std::max(1.f,c.groundRange+commanderAdjust) : 0.f;
         const float h=HazardFor(c,press);
         if(!exactStatic || !c.def || (c.mobile && !c.ghost) || Pressed(c,press)) return h;
         return std::min(h,std::max(c.armed ? c.groundRange : 0.f,c.explosionRadius));
@@ -213,6 +221,8 @@ private:
     mutable const RangedPolicy* porcFilter = nullptr;
     mutable int porcExempt = -1;
     mutable springai::AIFloat3 porcExemptPos = springai::AIFloat3(-1.f,0.f,-1.f);
+    mutable bool commanderReach = false;
+    mutable float commanderAdjust = 0.f;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;

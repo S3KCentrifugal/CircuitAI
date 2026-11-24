@@ -60,15 +60,17 @@ static float StaticDanger(const RangedPolicy& p) { return (!p.coordinated && p.s
 namespace {
 // Owner 2026-11-18: kite_min_tech / kite_ignore_fast_dots share the scope.
 struct ExactStaticScope {
-    const CRangedWorld& w; bool prev; float prevTech, prevDot; const RangedPolicy* prevSpam; const RangedPolicy* prevPorc;
-    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()),prevSpam(w.SpamFilter()),prevPorc(w.PorcFilter()) {
+    const CRangedWorld& w; bool prev; float prevTech, prevDot; const RangedPolicy* prevSpam; const RangedPolicy* prevPorc; bool prevCmd; float prevCmdAdjust;
+    ExactStaticScope(const CRangedWorld& w,const RangedPolicy& p) : w(w),prev(w.ExactStatic()),prevTech(w.KiteMinTech()),prevDot(w.KiteDotSpeed()),prevSpam(w.SpamFilter()),prevPorc(w.PorcFilter()),
+            prevCmd(w.CommanderReach()),prevCmdAdjust(w.CommanderAdjust()) {
+        w.SetCommanderReach(!p.coordinated && p.commanderReachMargin>=0.f,p.commanderReachMargin-p.safetyMargin);   // owner 2026-11-23 (Centurion)
         w.SetExactStatic(!p.coordinated && p.staticExactReach);
         w.SetKiteFilter(p.coordinated ? 0.f : p.kiteMinTech,
             (!p.coordinated && p.kiteIgnoreFastDots) ? std::max(1.f,p.spamDotSpeed) : 0.f);
         w.SetSpamFilter((!p.coordinated && p.spamNoHazard && p.HasSpam()) ? &p : nullptr);   // owner 2026-11-23
         w.SetPorcFilter((!p.coordinated && p.porcHazardList) ? &p : nullptr);                  // owner 2026-11-23
     }
-    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); w.SetSpamFilter(prevSpam); w.SetPorcFilter(prevPorc); }
+    ~ExactStaticScope() { w.SetExactStatic(prev); w.SetKiteFilter(prevTech,prevDot); w.SetSpamFilter(prevSpam); w.SetPorcFilter(prevPorc); w.SetCommanderReach(prevCmd,prevCmdAdjust); }
 };
 }
 
@@ -1362,8 +1364,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             // Destroying energy storage can kill nearby allies even when our
             // own weapon is precise. Keep clear of its loaded death blast and
             // withhold the shot until the exposed cohort can leave it.
-            if(c.explosionRadius>0.f && pos.SqDistance2D(c.pos)<std::pow(c.explosionRadius+caps.radius,2.f)) continue;
-            if(world.FriendlySplash(id,c.pos,std::max(w.splash,c.explosionRadius))) { if(inMax(c)) ++skFriend; continue; }
+            // Owner 2026-11-23 (Centurion): commander_reach_margin fights a commander inside its blast.
+            const float blast=(world.CommanderReach() && CRangedWorld::CommanderContact(c)) ? 0.f : c.explosionRadius;
+            if(blast>0.f && pos.SqDistance2D(c.pos)<std::pow(blast+caps.radius,2.f)) continue;
+            if(world.FriendlySplash(id,c.pos,std::max(w.splash,blast))) { if(inMax(c)) ++skFriend; continue; }
             if(world.FriendlyLine(w,id,pos,c.pos)) { if(inMax(c)) ++skFriend; continue; }
             const int armor=c.armor;
             const float damage=policy.mode==RangedPolicy::Mode::CARRIER?c.health:
