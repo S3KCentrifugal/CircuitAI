@@ -698,6 +698,22 @@ int FusionsBeforeAfus = 2;
             // assist deadline window.
             int CommanderFactoryAssistGuardTimeoutSeconds = 10; // default: 10-second guard tasks
 
+            /******************** T1 ECONOMY BLOCKS ********************/
+            // Owner 2026-11-24 (Moonshine, AI 8): advanced solars and T1 energy converters are
+            // packed into dense blocks (footprints touching), one open block per kind, a new
+            // block when the last is full (systems/air/air_t1_blocks.as). Off = old field search.
+            bool T1Blocks = true;
+            int T1BlockColumns = 3;
+            int T1BlockRows = 3;
+            float T1BlockRearOffset = 192.0f;    // lattice anchor behind the start
+            int T1BlockSearchRings = 5;          // lattice rings around the anchor
+            float T1BlockMaxRadius = 1400.0f;    // block centre at most this far from the start
+            float T1BlockBaySeparation = 200.0f; // clear of aircraft plant bays
+            float T1BlockMinimumFill = 0.75f;    // share of a block's slots that must reserve
+            float T1BlockRetrySeconds = 15.0f;   // after a failed block search
+            float T1BlockFallbackSeconds = 60.0f; // no block fits this long: the old field search
+            float T1BlockSlotHoldSeconds = 4.0f;  // one order per slot per this many seconds
+
         }
 }
 }

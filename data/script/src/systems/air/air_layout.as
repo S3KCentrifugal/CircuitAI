@@ -5,6 +5,7 @@
 // AIR sites use native reservation/claim/frame ownership. No TECH controller calls.
 #include "../../helpers/spatial/air_home.as"
 #include "air_eco_layout.as"
+#include "air_t1_blocks.as"
 
 namespace AirLayout {
     const float AllyClearHalfExtentScale = 0.5f;
@@ -479,6 +480,13 @@ namespace AirLayout {
         }
         if (d.GetName() == UnitHelpers::GetWindNameForSide(UnitHelpers::GetSideForUnitName(d.GetName())))
             return PlaceWind(u, d, priority, walkRadius);
+        // Owner 2026-11-24: advanced solars and T1 converters go into dense blocks.
+        // The field search below only serves a commander building locally or a
+        // home with no room for a block for T1BlockFallbackSeconds.
+        if (AirT1Blocks::Kind(d) >= 0) {
+            IUnitTask@ block = AirT1Blocks::Place(u, d, type, priority, walkRadius);
+            if (block !is null || (!AirT1Blocks::CommanderLocal(u, walkRadius) && !AirT1Blocks::FallbackDue(d))) return block;
+        }
         return PlaceField(u, d, type, priority, reactor, walkRadius);
     }
     // Unmanaged economy placement: deterministic ring search around the start
