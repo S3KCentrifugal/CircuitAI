@@ -164,6 +164,7 @@ namespace AirBuild {
                 // dies. Such links are tombstones, not newly available work.
                 if (pending[i] is null || pending[i].IsDead()) continue;
                 if (projects.findByRef(pending[i]) >= 0) continue;
+                if (AirSightAA::Ours(pending[i])) continue;   // owner 2026-11-24: a builder's AA interrupt order (air_sight_aa.as)
                 IBuilderTask@ t = cast<IBuilderTask>(pending[i]);
                 if (t !is null && t.target is null) {
                     GenericHelpers::LogUtil("[AIR][Claim] cancel unowned native order " + (t.buildDef is null ? "?" : t.buildDef.GetName()), 1);
