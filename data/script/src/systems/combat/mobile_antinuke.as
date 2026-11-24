@@ -99,7 +99,7 @@ namespace MobileAntiNuke {
     }
     bool IsMobileAnti(const CCircuitDef@ d) { return NameIndex(d) >= 0; }
 
-    float Coverage(CCircuitDef@ d)
+    float Coverage(const CCircuitDef@ d)
     {
         const int k = NameIndex(d);
         float r = d is null ? 0.0f : aiBattle.InterceptorCoverage(d);
@@ -153,7 +153,7 @@ namespace MobileAntiNuke {
         if (len > 1.0f) axis = AIFloat3(dx / len, 0.0f, dz / len);
     }
 
-    bool IsPorc(CCircuitDef@ d)
+    bool IsPorc(const CCircuitDef@ d)
     {
         if (d is null || d.IsMobile() || !d.HasSurfToLand()) return false;
         const float r = d.GetMaxRange();
@@ -260,13 +260,14 @@ namespace MobileAntiNuke {
     }
 
     // A reachable point at or behind p (toward home)
-    bool Reach(CCircuitUnit@ u, AIFloat3 &inout p)
+    bool Reach(CCircuitUnit@ u, const AIFloat3 &in p, AIFloat3 &out r)
     {
+        r = p;
         for (int s = 0; s < 8; ++s) {
             AIFloat3 q = p - axis * (float(s) * 64.0f);
             if (!InMap(q)) continue;
             q.y = aiBattle.Height(q);
-            if (aiTerrainMgr.CanMoveTo(u, q)) { p = q; return true; }
+            if (aiTerrainMgr.CanMoveTo(u, q)) { r = q; return true; }
         }
         return false;
     }
@@ -380,7 +381,9 @@ namespace MobileAntiNuke {
             if (a.task is null || a.task.IsDead() || !(u.task is a.task)) continue;   // re-admitted by AiMakeTask when idle
             string mode;
             AIFloat3 p = (groupOf[i] >= 0) ? PostFor(u, groups[groupOf[i]], 0, mode) : PostFor(u, null, spare++, mode);
-            if (!Reach(u, p)) continue;
+            AIFloat3 reached;
+            if (!Reach(u, p, reached)) continue;
+            p = reached;
             if (a.hasPost && MapHelpers::SqDist(p, a.post) < Global::MobileAntiNuke::Retarget * Global::MobileAntiNuke::Retarget) continue;
             if (ai.frame - a.lastOrder < Global::MobileAntiNuke::RetargetSeconds * SECOND) continue;
             array<AIFloat3> route = {p};
@@ -391,7 +394,7 @@ namespace MobileAntiNuke {
     }
 
     // ---------------- production ----------------
-    CCircuitDef@ BuildableBy(CCircuitDef@ lab)
+    CCircuitDef@ BuildableBy(const CCircuitDef@ lab)
     {
         if (lab is null) return null;
         // our side's unit first
