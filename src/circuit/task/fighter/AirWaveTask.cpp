@@ -468,6 +468,8 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
     requiredBombers = 0;
     int bestRequired = 0;
     float bestLocalAA = 0.f, bestRisk = 0.f;
+    float blockedScore = -1.f;  // best finished static this wave is too small for
+    int blockedRequired = 0;
     float enemyArmy = 0.f;
     for (const auto& e : circuit->GetEnemyManager()->GetHostileDatas())
         if (!e.IsDead() && !e.IsFake() && e.cdef != nullptr && e.cdef->IsMobile()) enemyArmy += e.cost;
@@ -513,6 +515,7 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
             || (preference == 4 && !economic))) continue;
         float routeRisk = 0.f;
         float localAA = 0.f;
+        bool forceShort = false;
         std::vector<AIFloat3> candidateRoute;
         int required = 0;
         if (safeFlight) {
@@ -531,7 +534,7 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
                 required += air_geometry::AttritionReserve(localAA, bomberMetal, localAAReserve);
             }
             if (requiredBombers == 0 || required < requiredBombers) requiredBombers = required;
-            if (!committed && (missionPolicy ? expectedCount < required : damageBudget < e.health * damageMargin)) continue;
+            forceShort = !committed && (missionPolicy ? expectedCount < required : damageBudget < e.health * damageMargin);
         }
 		if (preference == 1) {
 			score = e.pos.SqDistance2D(base);                                   // deepest
@@ -558,6 +561,16 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
             if (local) score *= 8.f;
         }
         if (preference != 1) score *= air_geometry::UnfinishedStrikeScale(e.isBeingBuilt, isStatic);
+        if (forceShort) {
+            // Too strong for this wave. A finished structure here still keeps
+            // every lower-scored unfinished frame from being picked instead
+            // (owner 2026-11-23): its small health is what made the frame
+            // "killable" while the finished fusions and AFUS were not.
+            if (preference != 1 && isStatic && !e.isBeingBuilt && score > blockedScore) {
+                blockedScore = score; blockedRequired = required;
+            }
+            continue;
+        }
         const bool grid = gridRank && e.cdef->IsWind() && WindGridOf(e.id) != nullptr;
 		if ((grid != bestGrid && best != nullptr) ? grid
             : air_geometry::PreferDistrictTarget(district, local, bestLocal, score, bestScore)) {
@@ -572,6 +585,13 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
 	if (best == nullptr) {
 		return false;
 	}
+    if (best->isBeingBuilt && !best->cdef->IsMobile() && blockedScore > bestScore && !bestGrid) {
+        // Wait for the force the finished target needs rather than bomb a frame.
+        requiredBombers = blockedRequired;
+        circuit->LOG("WAVE: unfinished %s(%i) skipped: a finished target needs %i bombers, available %i",
+            best->cdef->GetDef()->GetName(), best->id, blockedRequired, expectedCount);
+        return false;
+    }
     if (missionPolicy) {
         requiredBombers = bestRequired; ingress = bestIngress;
         staticAssault = best->cdef->IsAttacker() && !best->cdef->IsMobile();

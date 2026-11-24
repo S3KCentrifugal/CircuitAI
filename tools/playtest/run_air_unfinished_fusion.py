@@ -32,6 +32,8 @@ def main():
     p.add_argument('--stage2-min', type=float, default=6)
     p.add_argument('--wall', type=float, default=30)
     p.add_argument('--seed', type=int, default=1621)
+    p.add_argument('--bombers', type=int, default=30)
+    p.add_argument('--stage-only', action='store_true', help='stage, then launch with BAR\scripts\headless-slot.ps1')
     p.add_argument('--engine', default='recoil_2026.09.03')
     a = p.parse_args()
     d = a.dir.resolve()
@@ -73,7 +75,11 @@ def main():
         path.write_text(t[:brace + 1] + '\n if (ai.frame >= 0) return ' + manager + '.Enqueue(' + descriptor
                         + '); // controlled combat\n' + t[brace + 1:])
     (d / 'LuaUI/Config').mkdir(parents=True, exist_ok=True)
-    (d / 'LuaUI/Config/air_unfinished.lua').write_text('return {team=%d, stage2=%d}\n' % (nteam, int(a.stage2_min * 60 * 30)))
+    (d / 'LuaUI/Config/air_unfinished.lua').write_text('return {team=%d, stage2=%d, bombers=%d}\n'
+                                                       % (nteam, int(a.stage2_min * 60 * 30), a.bombers))
+    if a.stage_only:
+        print(d / 'script.txt')
+        return 0
     while headless_count() >= 3:
         print('[airunfinished] waiting for a headless slot', flush=True)
         time.sleep(30)

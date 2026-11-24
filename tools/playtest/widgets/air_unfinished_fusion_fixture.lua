@@ -31,13 +31,17 @@ local watched={}
 local function defName(d) return d and UnitDefs[d] and UnitDefs[d].name or "?" end
 local function supply(s)
     local ox=(s-1)*900
-    give("armpnix",0,2600,11200,20); give("armhawk",0,2400,11200,12)
     local ux,uz=dry(3300+ox,8300)
     frames[s]={ux,uz}
     give("armacv",T,ux-150,uz+150,1)
     give("armfus",T,3900+ox,7300,1)
     give("armafus",T,4600+ox,6300,1)
-    log("stage="..s.." supplied pnix=20 hawk=12 unfinished_afus=("..math.floor(ux)..","..math.floor(uz)..") fus afus")
+    log("stage="..s.." targets unfinished_afus=("..math.floor(ux)..","..math.floor(uz)..") fus afus")
+end
+-- The bombers come 40 s after the targets, so the unfinished frame exists before any pick.
+local function bombers(s)
+    give("armpnix",0,2600,11200,cfg.bombers); give("armhawk",0,2400,11200,12)
+    log("stage="..s.." supplied pnix="..cfg.bombers.." hawk=12")
 end
 function widget:UnitCreated(id,def,team)
     if team~=T then return end
@@ -66,7 +70,9 @@ function widget:GameFrame(f)
         log("loaded team="..T.."; god mode, global LOS, supplied units")
     end
     if f==450 then stage=1; supply(1) end
+    if f==450+1200 then bombers(1) end
     if f==cfg.stage2 then stage=2; supply(2) end
+    if f==cfg.stage2+1200 then bombers(2) end
     if #queue>0 and f%10==0 then Spring.SendCommands(table.remove(queue,1)) end
     -- the constructor starts the AFUS frame once, then keeps (stalled) building it
     if f%30==0 then
