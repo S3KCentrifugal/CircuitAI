@@ -202,9 +202,10 @@ void CArtilleryController::Decide(CCircuitUnit* unit, control::ArtilleryState& s
 		if ((facts.mobile || cfg->ghostFire <= 0.f) && !(e.los || e.radar)) return;
 		if (!s.skip.empty() && skipped(e.id)) return;
 		artillery::Contact c{e.id, artillery::Classify(facts, cfg->heavyCost), facts.range, distSq};
-		// Owner 2026-11-23: an enemy counter-artillery gun (our tier's list) in
-		// height-aware reach outranks everything: snipe it before it snipes us.
-		if (counters != nullptr && cfg->counterSnipe > 0.f && std::binary_search(counters->begin(), counters->end(), e.defId)) {
+		// Owner 2026-11-23: an enemy counter-artillery gun (our tier's list) or an
+		// enemy commander in height-aware reach: second only to construction turrets.
+		if (counters != nullptr && cfg->counterSnipe > 0.f && c.kind != Kind::Support
+			&& (std::binary_search(counters->begin(), counters->end(), e.defId) || def->IsEnemyRoleAny(CCircuitDef::COMM))) {
 			const AIFloat3 to(e.pos.x, e.elevation, e.pos.z);
 			const float reach = ai->GetBattle()->EffectiveRange(unit->GetCircuitDef(), at, to);
 			if (distSq <= reach * reach) c.kind = Kind::Counter;

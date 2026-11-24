@@ -4,12 +4,13 @@
 // from the side's combat snapshot; tests/artillery_targeting_test.cpp names a
 // test after each rule.
 //
-// Owner 2026-11-23: first of all an enemy counter-artillery gun in height-aware
-// reach (counter): T1 guns snipe enemy Gauntlet/Agitator/Amputator, T2 guns those
-// and enemy Rattlesnake/Persecutor/Eviscerator. The controller marks them.
+// Owner 2026-11-23: order support > counter > heavy > static. Counter = an enemy
+// counter-artillery gun (T1 guns: Gauntlet/Agitator/Amputator; T2 guns: those and
+// Rattlesnake/Persecutor/Eviscerator) or an enemy commander, in height-aware reach;
+// the controller marks them.
 //
 // Order: an enemy construction turret or resurrection bot in range (support),
-// then a heavy unit within a share of the range (heavy), then the known enemy
+// then counter, then a heavy unit within a share of the range (heavy), then the known enemy
 // static weapon with the longest range (static). A static aim is kept until the
 // enemy is gone or out of reach; only a higher kind replaces an aim. Spam (a
 // mobile unit that is neither heavy nor support) is never chosen.
@@ -18,7 +19,7 @@
 
 namespace circuit::artillery {
 
-enum class Kind : int { None = 0, Static = 1, Heavy = 2, Support = 3, Counter = 4 };
+enum class Kind : int { None = 0, Static = 1, Heavy = 2, Counter = 3, Support = 4 };
 
 // What the rules need of an enemy unit's definition.
 struct DefFacts {

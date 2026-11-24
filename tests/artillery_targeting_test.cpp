@@ -98,11 +98,14 @@ static void PopupClosesUnderFire()
 
 static void CounterBeforeEverything()
 {
-	// Owner 2026-11-23: an enemy counter-artillery gun (marked by the controller) outranks support.
-	const std::vector<Contact> c = {{3, Kind::Support, 0, 100}, {5, Kind::Counter, 1245, 900000}, {2, Kind::Heavy, 400, 50}};
-	Check(c[Choose(-1, c)].id == 5, "a counter gun is aimed before support, heavy and static");
-	Check(c[Choose(3, c)].id == 5, "a counter gun preempts a support aim");
-	Check(AimChangeAllowed(true, Kind::Support, Kind::Counter), "INV-265: support to counter is lawful");
+	// Owner 2026-11-23: support > counter (enemy artillery gun or commander, marked by the controller) > heavy > static.
+	const std::vector<Contact> c = {{3, Kind::Support, 0, 100}, {5, Kind::Counter, 1245, 900000}, {2, Kind::Heavy, 400, 50}, {6, Kind::Static, 1600, 10}};
+	Check(c[Choose(-1, c)].id == 3, "a construction turret stays first");
+	const std::vector<Contact> n = {{5, Kind::Counter, 1245, 900000}, {2, Kind::Heavy, 400, 50}, {6, Kind::Static, 1600, 10}};
+	Check(n[Choose(-1, n)].id == 5, "a counter gun or commander is aimed before heavy and static");
+	Check(n[Choose(2, n)].id == 5, "a counter gun preempts a heavy aim");
+	Check(c[Choose(5, c)].id == 3, "support preempts a counter aim");
+	Check(AimChangeAllowed(true, Kind::Heavy, Kind::Counter), "INV-265: heavy to counter is lawful");
 	Check(InReach({5, Kind::Counter, 1245, 1300.f * 1300.f}, 1380, .5f), "a counter gun counts at full range");
 	Check(!CloseUnderFire(Kind::Counter, false), "a counter aim keeps a pop-up open");
 }
