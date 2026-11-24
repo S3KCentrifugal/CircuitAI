@@ -24,20 +24,20 @@ namespace SpecialCreek {
 		StartSpot(AIFloat3(  2723, 0,    440), AiRole::FRONT,  false), // P1  lane 1/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  1795, 0,   2147), AiRole::AIR,    false), // P2  lane 2/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  1800, 0,   3720), AiRole::FRONT,  false), // P3  lane 3/8, middle of 2 mexes (moved from a lane it shared)
-		StartSpot(AIFloat3(  3360, 0,   5296), AiRole::FRONT,  false), // P4  lane 4/8, middle of 2 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3(  2712, 0,   5592), AiRole::FRONT,  false), // P4  lane 4/8, middle of 2 mexes (moved from a lane it shared)
 		StartSpot(AIFloat3(  1688, 0,   7088), AiRole::FRONT,  false), // P5  lane 5/8, middle of 2 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  2616, 0,   8019), AiRole::FRONT,  false), // P6  lane 6/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  2259, 0,  10531), AiRole::FRONT,  false), // P7  lane 7/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(   397, 0,  11523), AiRole::TECH,   false), // P8  lane 8/8, middle of 3 mexes (engine spawn was in this lane)
 		// Team 2
 		StartSpot(AIFloat3( 13661, 0,    440), AiRole::FRONT,  false), // P9  lane 8/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3( 14589, 0,   2147), AiRole::AIR,    false), // P10 lane 7/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3( 16208, 0,   3920), AiRole::TECH,   false), // P11 lane 6/8, middle of 2 mexes (moved from a lane it shared)
-		StartSpot(AIFloat3( 13024, 0,   5296), AiRole::FRONT,  false), // P12 lane 5/8, middle of 2 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3( 14589, 0,   2147), AiRole::TECH,   false), // P10 lane 7/8, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3( 14584, 0,   3720), AiRole::FRONT,  false), // P11 lane 6/8, middle of 2 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3( 13672, 0,   5592), AiRole::FRONT,  false), // P12 lane 5/8, middle of 2 mexes (moved from a lane it shared)
 		StartSpot(AIFloat3( 14696, 0,   7088), AiRole::FRONT,  false), // P13 lane 4/8, middle of 2 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3( 13768, 0,   8019), AiRole::FRONT,  false), // P14 lane 3/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3( 14125, 0,  10531), AiRole::FRONT,  false), // P15 lane 2/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3( 13808, 0,  11840), AiRole::FRONT,  false)  // P16 lane 1/8, middle of 2 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3( 13808, 0,  11840), AiRole::AIR,    false)  // P16 lane 1/8, middle of 2 mexes (moved from a lane it shared)
 	};
 
 	// Base per-map unit limits

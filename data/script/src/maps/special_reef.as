@@ -22,21 +22,21 @@ namespace SpecialReef {
 	StartSpot@[] spots = {
 		// Team 1
 		StartSpot(AIFloat3(  3467, 0,    341), AiRole::TECH,   false), // P1  lane 1/8, middle of 3 mexes (moved from a lane it shared)
-		StartSpot(AIFloat3(  3531, 0,   1616), AiRole::AIR,    false), // P2  lane 2/8, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  3531, 0,   1616), AiRole::FRONT,  false), // P2  lane 2/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  3589, 0,   3120), AiRole::FRONT,  false), // P3  lane 3/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  1717, 0,   5563), AiRole::FRONT,  false), // P4  lane 4/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  1467, 0,   6613), AiRole::FRONT,  false), // P5  lane 5/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  1392, 0,   7781), AiRole::FRONT,  false), // P6  lane 6/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  3563, 0,   8965), AiRole::FRONT,  false), // P7  lane 7/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3(  3909, 0,  11525), AiRole::FRONT,  false), // P8  lane 8/8, middle of 3 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3(  2731, 0,  11787), AiRole::AIR,    false), // P8  lane 8/8, middle of 3 mexes (moved from a lane it shared)
 		// Team 2
-		StartSpot(AIFloat3(  6331, 0,    763), AiRole::FRONT,  false), // P9  lane 8/8, middle of 3 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3(  7509, 0,    501), AiRole::AIR,    false), // P9  lane 8/8, middle of 3 mexes (moved from a lane it shared)
 		StartSpot(AIFloat3(  6677, 0,   3323), AiRole::FRONT,  false), // P10 lane 7/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  6688, 0,   4864), AiRole::FRONT,  false), // P11 lane 6/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3(  8523, 0,   6725), AiRole::FRONT,  false), // P12 lane 5/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3(  8491, 0,   7797), AiRole::FRONT,  false), // P13 lane 4/8, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  7552, 0,   5269), AiRole::FRONT,  false), // P12 lane 5/8, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  8523, 0,   6725), AiRole::FRONT,  false), // P13 lane 4/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  6651, 0,   9168), AiRole::FRONT,  false), // P14 lane 3/8, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3(  6709, 0,  10672), AiRole::AIR,    false), // P15 lane 2/8, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  6709, 0,  10672), AiRole::FRONT,  false), // P15 lane 2/8, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  6773, 0,  11947), AiRole::TECH,   false)  // P16 lane 1/8, middle of 3 mexes (moved from a lane it shared)
 	};
 

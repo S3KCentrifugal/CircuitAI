@@ -28,15 +28,15 @@ namespace WhyDidILetPtaQ {
 		StartSpot(AIFloat3(  2405, 0,   7861), AiRole::AIR,    false), // P5  lane 4/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  2952, 0,   9064), AiRole::FRONT,  false), // P6  lane 5/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  4603, 0,  12168), AiRole::FRONT,  false), // P7  lane 6/7, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3(  6501, 0,  13640), AiRole::FRONT,  false), // P8  lane 7/7, middle of 3 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3(  5931, 0,  12835), AiRole::FRONT,  false), // P8  lane 7/7, middle of 3 mexes (moved from a lane it shared)
 		// Team 2
-		StartSpot(AIFloat3( 11992, 0,   4803), AiRole::AIR,    false), // P9  lane 7/7, middle of 3 mexes (moved from a lane it shared)
-		StartSpot(AIFloat3( 11109, 0,   5704), AiRole::SEA,    false), // P10 middle of 3 mexes, engine team 8
-		StartSpot(AIFloat3( 10133, 0,   5805), AiRole::FRONT,  false), // P11 lane 6/7, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3( 11109, 0,   5704), AiRole::SEA,    false), // P9  middle of 3 mexes, engine team 8
+		StartSpot(AIFloat3( 10133, 0,   5805), AiRole::FRONT,  false), // P10 lane 6/7, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3( 13005, 0,   5808), AiRole::TECH,   false), // P11 lane 6/7 shared (only 6 lanes had a site), middle of 3 mexes
 		StartSpot(AIFloat3( 12341, 0,   7333), AiRole::FRONT,  false), // P12 lane 5/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3( 12099, 0,   8523), AiRole::FRONT,  false), // P13 lane 4/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3( 10432, 0,  10581), AiRole::FRONT,  false), // P14 lane 3/7, middle of 3 mexes (engine spawn was in this lane)
-		StartSpot(AIFloat3( 11936, 0,  12123), AiRole::TECH,   false), // P15 lane 2/7, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3( 11936, 0,  12123), AiRole::AIR,    false), // P15 lane 2/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3( 10384, 0,  13371), AiRole::FRONT,  false)  // P16 lane 1/7, middle of 3 mexes (engine spawn was in this lane)
 	};
 

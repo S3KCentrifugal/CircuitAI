@@ -28,9 +28,9 @@ namespace SailAway {
 		StartSpot(AIFloat3(  9763, 0,   1517), AiRole::AIR,    true), // P5  lane 1/5, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  8259, 0,   1725), AiRole::SEA,    true), // P6  middle of 3 mexes, engine team 4
 		StartSpot(AIFloat3(  5219, 0,   2328), AiRole::SEA,    true), // P7  middle of 3 mexes, engine team 5
-		StartSpot(AIFloat3(  3320, 0,   2419), AiRole::FRONT,  true), // P8  lane 4/5, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  3320, 0,   2419), AiRole::FRONT,  true), // P8  middle of 3 mexes, engine team 1
 		// Team 2
-		StartSpot(AIFloat3(  6920, 0,   7821), AiRole::FRONT,  true), // P9  lane 4/5, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  6920, 0,   7821), AiRole::FRONT,  true), // P9  middle of 3 mexes, engine team 8
 		StartSpot(AIFloat3(  5021, 0,   7912), AiRole::SEA,    true), // P10 middle of 3 mexes, engine team 12
 		StartSpot(AIFloat3(  1981, 0,   8515), AiRole::SEA,    true), // P11 middle of 3 mexes, engine team 11
 		StartSpot(AIFloat3(   477, 0,   8723), AiRole::AIR,    true), // P12 lane 1/5, middle of 3 mexes (engine spawn was in this lane)

@@ -22,7 +22,7 @@ namespace WorldInFlames {
 	StartSpot@[] spots = {
 		// Team 1
 		StartSpot(AIFloat3(  1744, 0,    475), AiRole::SEA,    true), // P1  middle of 3 mexes, engine team 4
-		StartSpot(AIFloat3(  6496, 0,    619), AiRole::FRONT,  false), // P2  lane 1/4, middle of 3 mexes (engine spawn was in this lane)
+		StartSpot(AIFloat3(  6364, 0,    916), AiRole::FRONT,  false), // P2  lane 1/4, middle of 2 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  3872, 0,   2339), AiRole::AIR,    false), // P3  lane 2/4, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  6248, 0,   2774), AiRole::SEA,    true), // P4  engine spawn, engine team 6
 		StartSpot(AIFloat3(  4475, 0,   2983), AiRole::SEA,    false), // P5  engine spawn, engine team 0

@@ -37,7 +37,7 @@ namespace JadeEmpress {
 		StartSpot(AIFloat3( 11952, 0,  10197), AiRole::FRONT,  false), // P13 lane 4/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3( 10779, 0,  11189), AiRole::FRONT,  false), // P14 lane 3/7, middle of 3 mexes (engine spawn was in this lane)
 		StartSpot(AIFloat3(  7376, 0,  11312), AiRole::FRONT,  false), // P15 lane 2/7, middle of 3 mexes (moved from a lane it shared)
-		StartSpot(AIFloat3(  5168, 0,  12379), AiRole::FRONT,  false)  // P16 lane 1/7, middle of 3 mexes (moved from a lane it shared)
+		StartSpot(AIFloat3(  5963, 0,  12032), AiRole::FRONT,  false)  // P16 lane 1/7, middle of 3 mexes (moved from a lane it shared)
 	};
 
 	// Base per-map unit limits
