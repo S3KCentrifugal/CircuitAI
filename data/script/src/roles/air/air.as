@@ -709,6 +709,8 @@ namespace RoleAir {
     // wave escorts/bombers. Other aircraft retain their native task selection.
     IUnitTask@ Air_MilitaryAiMakeTask(CCircuitUnit@ u)
     {
+        IUnitTask@ picketTask = AirRadarPickets::TaskFor(u);   // owner 2026-11-24: lane radar pickets
+        if (picketTask !is null) return picketTask;
         IUnitTask@ defenceTask = AirBaseResponse::TaskFor(u);
         if (defenceTask !is null) { AirScoutSweep::Exclude(u); return defenceTask; }
         IUnitTask@ sweepTask = AirScoutSweep::TaskFor(u);
@@ -734,6 +736,7 @@ namespace RoleAir {
     void Air_MilitaryAiUnitRemoved(CCircuitUnit@ unit, Unit::UseAs usage)
     {
         AirProduction::Removed(unit);
+        AirRadarPickets::Removed(unit);
         AirWaves::OnUnitRemoved(unit);
         AirLiches::Removed(unit);
     }

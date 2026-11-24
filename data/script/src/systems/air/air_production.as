@@ -4,6 +4,7 @@
 #include "air_raids.as"
 #include "air_recon.as"
 #include "air_scout_sweep.as"
+#include "air_radar_pickets.as"
 #include "air_base_response.as"
 #include "air_naval_support.as"
 #include "../../helpers/math/air_math.as"
@@ -152,6 +153,9 @@ namespace AirProduction {
         // A requested, sustained-income scout package precedes discretionary
         // workforce growth. Actual base/air emergencies keep their reserve.
         if (!emergency) {
+            // owner 2026-11-24: one radar picket per FRONT lane, restocked
+            @t = AirRadarPickets::Produce(u);
+            if (t !is null) return t;
             @t = AirScoutSweep::Produce(u);
             if (t !is null) return t;
         } else {
@@ -321,6 +325,7 @@ namespace AirProduction {
         AirBaseResponse::Reset();
         AirRecon::Reset();
         AirScoutSweep::Reset();
+        AirRadarPickets::Reset();
         AirOperations::Reset();
         AirRaids::Reset();
         if (openingScout !is null && !openingScout.IsDead()) openingScout.Abort();
@@ -394,6 +399,7 @@ namespace AirProduction {
         AirBaseResponse::Tick();
         AirRecon::Tick();
         AirScoutSweep::Tick();
+        AirRadarPickets::Tick();
         AirNavalSupport::Tick();
         AirOperations::Tick();
         AirRaids::Update();

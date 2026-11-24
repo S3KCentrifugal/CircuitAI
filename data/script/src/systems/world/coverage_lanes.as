@@ -692,6 +692,7 @@ namespace CoverageLanes {
             }
         }
         aiTerrainMgr.SetFactoryLane(team,points);
+        AirRadarPickets::Corridor(team,points);   // owner 2026-11-24: AIR's lane radar pickets
         if(claim)aiEconomyMgr.SetMexCorridor(team,points,width>0.f?width:halfWidth);
         GenericHelpers::LogUtil("[CoverageLane] corridor from team "+team+" points="+points.length()+(claim?"":" (claim off)"),1);
         return true;

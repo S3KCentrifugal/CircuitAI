@@ -256,6 +256,29 @@ int FusionsBeforeAfus = 2;
             float WindGridLink = 72.0f;
             float WindGridPriority = 2.5f;
             int RadarWaveSize = 20;
+            // Lane radar pickets (owner 2026-11-24, systems/air/air_radar_pickets.as): one T2
+            // radar plane per FRONT lane (at most RadarPicketCount), RadarPicketBehind elmos
+            // behind the lane's frontline. After a loss the lane's next plane stands
+            // RadarPicketFallback further back for RadarPicketFallbackSeconds; two losses
+            // within RadarPicketQuickSeconds stop the lane's restock for
+            // RadarPicketSuspendSeconds (-1 = rest of the game).
+            bool RadarPicketEnabled = true;
+            int RadarPicketCount = 6;
+            float RadarPicketBehind = 700.0f;
+            float RadarPicketFallback = 600.0f;
+            int RadarPicketFallbackSeconds = 300;
+            int RadarPicketQuickSeconds = 180;
+            int RadarPicketSuspendSeconds = 600;
+            float RadarPicketLateral = 700.0f;      // lane half-width for the frontline scan
+            float RadarPicketEnemyCost = 300.0f;    // enemy metal that marks the enemy edge
+            float RadarPicketDefaultShare = 0.35f;  // front with nothing known
+            float RadarPicketMinProgress = 400.0f;  // never closer to the lane's start
+            float RadarPicketThreatStep = 200.0f;   // known AA over the post: back off
+            float RadarPicketThreatBack = 800.0f;
+            float RadarPicketPatrolRadius = 180.0f;
+            float RadarPicketMetal = 30.0f;
+            float RadarPicketEnergy = 1000.0f;
+            int RadarPicketScanSeconds = 12;        // every lane's front refreshed this often
             // Mixed sweeps supersede the old continuous twenty-radar controller.
             bool ScoutSweepEnabled = true;
             int ScoutSweepT1Count = 10;

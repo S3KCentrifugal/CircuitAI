@@ -100,7 +100,7 @@ namespace AirScoutSweep {
         nukedAt = at; nukedSpread = spread;
     }
     bool Draftable(CCircuitUnit@ u, dictionary@ picked, bool ownMembers) {
-        if (u is null || u.GetBuildProgress() < 1.0f || !AirRecon::Controlled(u) || picked.exists(""+u.id)
+        if (u is null || u.GetBuildProgress() < 1.0f || !AirRecon::Controlled(u) || picked.exists(""+u.id) || AirRadarPickets::Owns(u.id)
             || Flying(u.id) || (!ownMembers && members.exists(""+u.id)) || AirOperations::Committed(u.id)) return false;
         IUnitTask@ task = u.task;
         if (task !is null && (task.GetType() == int(Task::Type::RETREAT) || task.IsExternalControlled())) return false;
@@ -387,7 +387,7 @@ namespace AirScoutSweep {
         GenericHelpers::LogUtil("[AIR][ScoutSweep] package requested scouts="+Wanted(0)+" radar="+Wanted(1)+(wantUrgent ? " (nuke, ungated)" : ""),1);
     }
     IUnitTask@ TaskFor(CCircuitUnit@ u) {
-        if (!Enabled() || !AirEconomy::Active() || !AirRecon::Controlled(u)) return null;
+        if (!Enabled() || !AirEconomy::Active() || !AirRecon::Controlled(u) || AirRadarPickets::Owns(u.id)) return null;
         CRouteTask@ task;
         const string key=""+u.id;
         if (flying.get(key,@task) && task !is null && !task.IsDead()) return task;
@@ -421,6 +421,7 @@ namespace AirScoutSweep {
             CCircuitUnit@ u=ai.GetTeamUnit(parseInt(ids[i]));
             if (u !is null && Kind(u.circuitDef.GetName())==kind) ++outside;
         }
+        if (kind==1) outside+=AirRadarPickets::Count();   // lane pickets are not the package's
         const int missing=Wanted(kind)-(projected-outside);
         if (missing<=0) return null;
         if (!caps.exists(def.GetName())) caps.set(def.GetName(),int(def.maxThisUnit));
