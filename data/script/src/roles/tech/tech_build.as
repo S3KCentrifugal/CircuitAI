@@ -527,6 +527,7 @@ namespace TechBuild {
             CCircuitUnit@ cand = ai.GetTeamUnit(id);
             if (cand is null) { airConsSeen.delete(keys[i]); continue; }
             if (id == airConvId || id == airAfusId) continue;
+            if (LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id)) continue;   // Bismuth 11-24: role went to a storage-crew legaca
             // the advanced fusions first: the role that stalled the economy (D-108)
             if (airAfusId < 0) { airAfusId = id; GenericHelpers::LogUtil("[TECH][Air] " + id + " takes over the advanced fusions (D-108)", 1); DropOtherJob(id, 2); }
             else if (airConvId < 0) { airConvId = id; GenericHelpers::LogUtil("[TECH][Air] " + id + " takes over the converters (D-108)", 1); DropOtherJob(id, 1); }
@@ -551,6 +552,7 @@ namespace TechBuild {
         RefillAirRoles();
         if (u.id == airConvId) return 1;
         if (u.id == airAfusId) return 2;
+        if (LolCannon::IsCrew(u.id) || LrpcBlock::IsCrew(u.id)) return 0;
         if (airConvId < 0) {
             airConvId = u.id;
             GenericHelpers::LogUtil("[TECH][Air] " + u.circuitDef.GetName() + " " + u.id + " is dedicated to advanced energy converters (D-107)", 1);

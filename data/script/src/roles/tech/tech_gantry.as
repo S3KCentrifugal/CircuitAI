@@ -1036,6 +1036,9 @@ namespace TechGantryCrew {
     bool IsT2Builder(CCircuitUnit@ u) {
         if (u is null || u.circuitDef is null || !u.circuitDef.IsMobile() || UnitHelpers::IsCommander(u.circuitDef)) return false;
         if (UnitHelpers::GetConstructorTier(u.circuitDef) != 2 || TechBuild::IsDedicatedAirCon(u)) return false;
+        // Bismuth Valley 11-24 team 8: the growth AFUS worker (the only T2 constructor on it) was taken at
+        // 32:13 on its way to the frame; no AFUS for 8 min. The growth seats stay on the energy.
+        if (TechGrowth::Dedicated(u)) return false;
         if ((Builder::primaryT2AirConstructor !is null && Builder::primaryT2AirConstructor.id == u.id)
             || (Builder::secondaryT2AirConstructor !is null && Builder::secondaryT2AirConstructor.id == u.id)) return false;
         CCircuitDef@ gantry = TechGantryScale::landDef;

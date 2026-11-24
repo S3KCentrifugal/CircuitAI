@@ -653,6 +653,16 @@ namespace LolCannon {
         return kind;
     }
 
+    // TECH's dedicated energy builders (D-108 air AFUS/converter builders, the growth seats) are never
+    // crew; while a D-108 role is vacant a T2 air constructor is left for it. Bismuth Valley 11-24
+    // team 8: storage crew took both D-108 builders at 42:16 and 42:56; no AFUS after 43 min.
+    bool TechEnergyBuilder(CCircuitUnit@ u)
+    {
+        if (Global::AISettings::Role != AiRole::TECH || u is null) return false;
+        if (TechBuild::IsDedicatedAirCon(u) || TechGrowth::Dedicated(u)) return true;
+        return TechBuild::IsT2AirCon(u) && TechBuild::AirRoleVacant();
+    }
+
     bool Claim(CCircuitUnit@ u, int kind, const string &in how)
     {
         if (u is null || kind < 0 || kind > GROUND) return false;
@@ -668,6 +678,7 @@ namespace LolCannon {
     {
         if (!Enabled() || (phase != BUILD && phase != CLEAR) || unit is null || unit.circuitDef is null || crewOf.exists(Key(unit.id))) return;
         if (LrpcBlock::IsCrew(unit.id)) return;   // the TECH heavy LRPC block's crew (owner, 2026-11-02)
+        if (TechEnergyBuilder(unit)) return;
         const string name = unit.circuitDef.GetName();
         const bool standIn = groundLabs.exists(Key(unit.GetProducerId())) && unit.GetProductionFrame() >= started;
         Claim(unit, KindFor(name, standIn), "new");
@@ -718,6 +729,7 @@ namespace LolCannon {
             IBuilderTask@ own = cast<IBuilderTask>(u.task);
             if (own !is null && !own.IsDead() && own.target !is null && own.GetBuildType() < int(Task::BuildType::REPAIR)) continue;
             if (Team::CatalystTrade::IsTraded(u.id)) continue;   // a Cortex T2 traded to us for Catalysts (owner, 2026-11-13)
+            if (TechEnergyBuilder(u)) continue;
             const bool standIn = groundT2 && T2_GROUND.find(u.circuitDef.GetName()) >= 0;
             const int kind = KindFor(u.circuitDef.GetName(), standIn);
             if (kind < 0 || !Claim(u, kind, standIn ? "taken off its task, ground stand-in" : "taken off its task")) continue;
