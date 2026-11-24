@@ -35,6 +35,13 @@ float EcoBlockHaloElmos = 240.0f;   // packing ground around the turret block, i
 float EcoBlockMinGround = 0.6f;     // flat x buildable share of the block's zone
 int EcoBlockMax = 6;
 int EcoBlockTurretsInFlight = 2;    // turret orders at once per busy block
+// Owner 2026-11-24: where the T1 wind field goes. 0 block beside it; 1 reclaim the site
+// first, then the block there; 2 block beside, then a second block re-reserved on the
+// cleared site; 3 block over the field at once, turrets added as the winds are reclaimed.
+int EcoBlockWindMode = 0;
+int EcoBlockSiteWaitSeconds = 600;  // modes 1-3: reserve anyway (or give up) this long after the first reactor
+int EcoBlockSiteLeftover = 2;       // modes 1-2: the site counts as clear with this many T1 energy structures left
+int EcoBlockSiteReclaimConcurrent = 4; // reclaim jobs at once while a site is clearing
 float EcoBlockConverterDrawShare = 1.0f; // advanced converters' total draw stays under this share of energy income
 int EcoBlockFirstSeconds = 90;     // the first block's ground is reserved this early (no T1 sprawl over it)
 // Owner 2026-11-24: two ordinary fusions stand before the first advanced fusion

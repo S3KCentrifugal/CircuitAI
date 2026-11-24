@@ -74,7 +74,8 @@ namespace AirThinHome {
     }
     int ReclaimConcurrent()
     {
-        const int base = Global::RoleSettings::Air::ReclaimEnergyConcurrent;
+        int base = Global::RoleSettings::Air::ReclaimEnergyConcurrent;
+        if (AirEcoLayout::SiteClearing()) base = AiMax(base, Global::RoleSettings::Air::EcoBlockSiteReclaimConcurrent);
         return Active() ? AiMax(base, Global::RoleSettings::Air::ThinHomeReclaimConcurrent) : base;
     }
 }

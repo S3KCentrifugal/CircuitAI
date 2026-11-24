@@ -439,6 +439,8 @@ namespace AirEcoLayout {
         int facing = 0;
         int afusSlot = -1;
         AIFloat3 centre;
+        array<int> extra;  // EcoBlockWindMode 3: later zones over the same rectangle as its T1 energy is reclaimed
+        bool site = false; // reserved over the reclaimed T1 energy field
         array<int> work;   // reservations this AI ordered here (economy), pruned as they finish
     }
     array<Block@> blocks;
@@ -454,6 +456,7 @@ namespace AirEcoLayout {
         ids.resize(0);
         CCircuitDef@ nano = BlockNano();
         if (b is null || nano is null || b.zone <= 0 || b.group <= 0) return;
+        // A group scope covers every zone the band was laid in (native keys it by group).
         array<int> scoped;
         aiTerrainMgr.GetScopedReservationIds(b.zone, b.group, nano, scoped);
         for (uint i = 0; i < scoped.length(); ++i) if (aiTerrainMgr.GetReservationState(scoped[i]) >= 0) ids.insertLast(scoped[i]);
@@ -476,6 +479,9 @@ namespace AirEcoLayout {
         aiTerrainMgr.SetLayoutInt(b.key + ".afus", b.afusSlot);
         aiTerrainMgr.SetLayoutInt(b.key + ".x", int(b.centre.x));
         aiTerrainMgr.SetLayoutInt(b.key + ".z", int(b.centre.z));
+        aiTerrainMgr.SetLayoutInt(b.key + ".site", b.site ? 1 : 0);
+        aiTerrainMgr.SetLayoutInt(b.key + ".extraCount", int(b.extra.length()));
+        for (uint i = 0; i < b.extra.length(); ++i) aiTerrainMgr.SetLayoutInt(b.key + ".extra." + i, b.extra[i]);
     }
     void InitBlocks()
     {
@@ -489,6 +495,9 @@ namespace AirEcoLayout {
             b.facing = aiTerrainMgr.GetLayoutInt(b.key + ".facing", AirLayout::facing);
             b.afusSlot = aiTerrainMgr.GetLayoutInt(b.key + ".afus", -1);
             b.centre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(b.key + ".x", -1)), 0.0f, float(aiTerrainMgr.GetLayoutInt(b.key + ".z", -1)));
+            b.site = aiTerrainMgr.GetLayoutInt(b.key + ".site", 0) != 0;
+            const int extras = AiMin(16, aiTerrainMgr.GetLayoutInt(b.key + ".extraCount", 0));
+            for (int e = 0; e < extras; ++e) b.extra.insertLast(aiTerrainMgr.GetLayoutInt(b.key + ".extra." + e, 0));
             blocks.insertLast(b);
         }
         IndexBlocks();
@@ -634,6 +643,12 @@ namespace AirEcoLayout {
             const float draw = float(d.count + aiBuilderMgr.GetUnfinishedCount(d)) * AiMax(1.0f, aiEconomyMgr.GetEnergyUse(d));
             if (draw >= AiMax(0.0f, Global::RoleSettings::Air::EcoBlockConverterDrawShare) * aiEconomyMgr.energy.income) return null;
         }
+        // EcoBlockWindMode 1: no block until the T1 energy field is reclaimed; the first
+        // reactors and converters use the old field ring search meanwhile.
+        if (WindMode() == 1 && blocks.length() == 0 && !SiteGivenUp())
+            return AirLayout::PlaceField(u, d, type, priority, AirBuild::IsReactor(d), 0.0f);
+        // Mode 3: the overlay block is tried before a side block is searched for.
+        if (WindMode() == 3 && blocks.length() == 0 && siteState < 2) PlanSite();
         CCircuitDef@ nano = BlockNano();
         const AIFloat3 anchor = u.GetPos(ai.frame);
         const uint count = blocks.length();
@@ -653,7 +668,8 @@ namespace AirEcoLayout {
             int until = 0;
             if (id < 0 && blockNoRoom.get(noRoomKey, until) && ai.frame < until) continue;
             const bool held = id >= 0;
-            if (id < 0) id = aiTerrainMgr.PackNearGroup(b.zone, d, b.group, b.facing, anchor, 0.0f, 0.0f, 0);
+            for (int z = -1; z < int(b.extra.length()) && id < 0; ++z)
+                id = aiTerrainMgr.PackNearGroup(z < 0 ? b.zone : b.extra[z], d, b.group, b.facing, anchor, 0.0f, 0.0f, 0);
             if (id < 0) { blockNoRoom.set(noRoomKey, ai.frame + 20 * SECOND); continue; }
             if (!aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(id), u.circuitDef.GetBuildDistance())) {
                 if (!held) aiTerrainMgr.ReleaseReservation(id);
@@ -699,13 +715,239 @@ namespace AirEcoLayout {
     {
         if (ai.frame - blockPlanFrame < 5 * SECOND) return;
         blockPlanFrame = ai.frame;
-        // The first block is held early, before the T1 wind/converter field covers the home disc.
-        if (blocks.length() == 0) { if (ai.frame >= Global::RoleSettings::Air::EcoBlockFirstSeconds * SECOND) ReserveBlock(); return; }
+        const int mode = WindMode();
+        // Modes 0 and 2: the first block is held early, beside the T1 wind/converter field.
+        if (blocks.length() == 0 && (mode == 0 || mode == 2)) {
+            if (ai.frame >= Global::RoleSettings::Air::EcoBlockFirstSeconds * SECOND) ReserveBlock();
+            return;
+        }
         if (!(AirEconomy::PreparingFusion() || AirEconomy::HasReactor())) return;
+        if (mode != 0 && PlanSite()) return;
+        if (blocks.length() == 0) return;
         // Plan the next block before the newest one is full (converters ask often).
         Block@ last = blocks[blocks.length() - 1];
         CCircuitDef@ conv = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));
         if (conv !is null && !aiTerrainMgr.CanPackNearGroup(last.zone, conv, last.group, last.facing, 0.0f, 0.0f)) ReserveBlock();
+    }
+    // ------------------------------------------------------------------------
+    // Owner 2026-11-24 (All That Glitters): the T1 winds should make way for the
+    // block, not push it aside. Air::EcoBlockWindMode picks one of three ways:
+    //   1 reclaim first: no block until the T1 energy in the site rectangle is
+    //     reclaimed; reactors use the field ring search meanwhile.
+    //   2 beside, then move: the early block beside the field as mode 0; once the
+    //     site rectangle is clear a block is re-reserved where the winds stood.
+    //   3 overlay: the block is reserved over the field at once (turret slots only on
+    //     free cells); every 10 s a new zone over the same rectangle takes the cells
+    //     reclaim has freed and the turret band is laid again into the same group.
+    // The site is the densest patch of this AI's own T1 energy (wind, solar, advanced
+    // solar, T1 converter); AirReclaim takes the site's structures first, still under
+    // its energy-margin and concurrency rules, so energy is replaced progressively.
+    // Cost: ChooseSite O(n^2) once (n own T1 energy <= ~150); SiteClutter O(owned)
+    // every 5 s while a site is clearing; growth one ReserveZone + LayBand per 10 s.
+    // ------------------------------------------------------------------------
+    int WindMode() { return Global::RoleSettings::Air::EcoBlockWindMode; }
+    AIFloat3 site = AIFloat3(-1.0f, 0.0f, -1.0f);
+    int siteState = 0;   // 0 none, 1 clearing, 2 reserved or given up
+    int siteFrame = 0, siteGrowFrame = 0;
+    bool siteGivenUp = false;
+    bool SiteGivenUp() { return siteGivenUp; }
+    bool SiteClearing() { return WindMode() != 0 && site.x >= 0.0f && (siteState == 1 || (siteState == 2 && WindMode() == 3 && !siteGivenUp)); }
+    void BlockHalves(int cols, int rows, float halo, float &out halfAcross, float &out halfAlong, float &out bandAcross, float &out bandAlong)
+    {
+        CCircuitDef@ nano = BlockNano();
+        const float nanoSize = nano is null ? 48.0f : float(AiMax(nano.GetFootprintX(), nano.GetFootprintZ())) * SQUARE_SIZE * 2.0f;
+        bandAcross = float(cols) * nanoSize * 0.5f;
+        bandAlong = float(rows) * nanoSize * 0.5f;
+        halfAcross = bandAcross + halo;
+        halfAlong = bandAlong + halo;
+    }
+    bool InSite(const AIFloat3 &in p)
+    {
+        if (site.x < 0.0f) return false;
+        float ha, hl, ba, bl;
+        BlockHalves(Global::RoleSettings::Air::EcoBlockTurretColumns, Global::RoleSettings::Air::EcoBlockTurretRows,
+            Global::RoleSettings::Air::EcoBlockHaloElmos, ha, hl, ba, bl);
+        const bool odd = (AirLayout::facing & 1) == 1;
+        const float dx = abs(p.x - site.x), dz = abs(p.z - site.z);
+        return (odd ? dz : dx) <= ha + 24.0f && (odd ? dx : dz) <= hl + 24.0f;
+    }
+    bool IsT1Energy(const CCircuitDef@ d)
+    {
+        if (d is null) return false;
+        const string n = d.GetName();
+        const string s = UnitHelpers::GetSideForUnitName(n);
+        return n == UnitHelpers::GetWindNameForSide(s) || n == UnitHelpers::GetSolarNameForSide(s)
+            || n == UnitHelpers::GetAdvSolarNameForSide(s) || n == UnitHelpers::GetEnergyConverterNameForSide(s);
+    }
+    // AirReclaim: true for a structure the site wants gone first.
+    bool ReclaimFirst(const AIFloat3 &in p) { return SiteClearing() && InSite(p); }
+    bool ChooseSite()
+    {
+        float ha, hl, ba, bl;
+        BlockHalves(Global::RoleSettings::Air::EcoBlockTurretColumns, Global::RoleSettings::Air::EcoBlockTurretRows,
+            Global::RoleSettings::Air::EcoBlockHaloElmos, ha, hl, ba, bl);
+        array<AIFloat3> pts;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null || !IsT1Energy(u.circuitDef)) continue;
+            const AIFloat3 p = u.GetPos(ai.frame);
+            if (AirHome::EconomySite(p)) pts.insertLast(p);
+        }
+        const float r = AiMin(ha, hl);
+        int best = -1, bestCount = 0;
+        for (uint i = 0; i < pts.length(); ++i) {
+            int c = 0;
+            for (uint j = 0; j < pts.length(); ++j) if (MapHelpers::SqDist(pts[i], pts[j]) < r * r) ++c;
+            if (c > bestCount) { bestCount = c; best = int(i); }
+        }
+        if (best < 0 || bestCount < 4) return false;
+        AIFloat3 sum(0.0f, 0.0f, 0.0f);
+        int n = 0;
+        for (uint j = 0; j < pts.length(); ++j)
+            if (MapHelpers::SqDist(pts[best], pts[j]) < r * r) { sum.x += pts[j].x; sum.z += pts[j].z; ++n; }
+        site = AIFloat3(sum.x / float(n), 0.0f, sum.z / float(n));
+        GenericHelpers::LogUtil("[AIR][EcoSite] mode " + WindMode() + " site at " + int(site.x) + "," + int(site.z)
+            + " over " + n + " T1 energy structures (" + pts.length() + " in the home disc)", 1);
+        return true;
+    }
+    int SiteClutter()
+    {
+        int n = 0;
+        array<Id>@ ids = ai.GetOwnedUnitIds();
+        for (uint i = 0; i < ids.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u !is null && IsT1Energy(u.circuitDef) && InSite(u.GetPos(ai.frame))) ++n;
+        }
+        return n;
+    }
+    // A block at (or within a few steps of) a given centre; minSlots turret slots needed.
+    Block@ ReserveBlockAt(const AIFloat3 &in centre, int minSlots)
+    {
+        CCircuitDef@ nano = BlockNano();
+        if (nano is null || int(blocks.length()) >= Global::RoleSettings::Air::EcoBlockMax) return null;
+        const int cols = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretColumns);
+        const int rows = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretRows);
+        float ha, hl, ba, bl;
+        BlockHalves(cols, rows, AiMax(64.0f, Global::RoleSettings::Air::EcoBlockHaloElmos), ha, hl, ba, bl);
+        const int f = AirLayout::facing;
+        // Played (Glitters mode 3): the site lay 200 elmos from the start, beside the plant's
+        // exit corridor and allied plans; the 3x3 search never found a zone. Rings out to 3 steps.
+        for (int k = 0; k < 49; ++k) {
+            const int ring = k == 0 ? 0 : k < 9 ? 1 : k < 25 ? 2 : 3;
+            const int side = 2 * ring + 1, first = (side - 2) * (side - 2);
+            const int idx = k - (ring == 0 ? 0 : first);
+            int ox = 0, oz = 0;
+            if (ring > 0) {
+                const int per = 2 * ring;   // cells per edge, walking the ring
+                const int edge = idx / per, off = idx % per;
+                ox = edge == 0 ? -ring + off : edge == 1 ? ring : edge == 2 ? ring - off : -ring;
+                oz = edge == 0 ? -ring : edge == 1 ? -ring + off : edge == 2 ? ring : ring - off;
+            }
+            const AIFloat3 c = AirLayout::Offset(centre, f, float(ox) * 96.0f, float(oz) * 96.0f);
+            if (!AirLayout::Inside(c, AiMax(ha, hl)) || aiTerrainMgr.IsZoneAlly(c)) continue;
+            const int zone = aiTerrainMgr.ReserveZone(c, f, ha, hl, false);
+            if (zone <= 0) continue;
+            const int group = aiTerrainMgr.LayBand(zone, nano, AirLayout::Offset(c, f, 0.0f, bl), f, cols, rows, 0, false, true, false, 0);
+            if (group <= 0 || aiTerrainMgr.GetGroupCount(group, false) < minSlots) {
+                if (group > 0) aiTerrainMgr.ReleaseGroup(group);
+                aiTerrainMgr.ReleaseZone(zone);
+                continue;
+            }
+            Block b;
+            b.key = BlockPrefix() + blocks.length();
+            b.zone = zone; b.group = group; b.facing = f; b.centre = c; b.site = true;
+            CCircuitDef@ afus = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+            if (afus !is null) b.afusSlot = aiTerrainMgr.PackNearGroup(zone, afus, group, f, c, 0.0f, 0.0f, 0);
+            blocks.insertLast(b);
+            SaveBlock(b);
+            IndexBlocks();
+            GenericHelpers::LogUtil("[AIR][EcoSite] block " + b.key + " over the T1 energy field at " + int(c.x) + "," + int(c.z)
+                + " zone=" + zone + " turrets=" + aiTerrainMgr.GetGroupCount(group, false) + " afusSlot=" + b.afusSlot
+                + " after " + ((ai.frame - siteFrame) / SECOND) + " s", 1);
+            return b;
+        }
+        return null;
+    }
+    // Mode 3: add the cells reclaim has freed to the site block, turret band included.
+    void GrowSiteBlock()
+    {
+        if (WindMode() != 3 || ai.frame - siteGrowFrame < 10 * SECOND) return;
+        siteGrowFrame = ai.frame;
+        CCircuitDef@ nano = BlockNano();
+        if (nano is null) return;
+        const int cols = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretColumns);
+        const int rows = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretRows);
+        float ha, hl, ba, bl;
+        BlockHalves(cols, rows, AiMax(64.0f, Global::RoleSettings::Air::EcoBlockHaloElmos), ha, hl, ba, bl);
+        for (uint i = 0; i < blocks.length(); ++i) {
+            Block@ b = blocks[i];
+            if (!b.site || b.extra.length() >= 16) continue;
+            if (SiteClutter() == 0 && aiTerrainMgr.GetGroupCount(b.group, false) >= cols * rows) { siteGivenUp = true; return; }
+            const int zone = aiTerrainMgr.ReserveZone(b.centre, b.facing, ha, hl, false);
+            if (zone <= 0) continue;
+            const int before = aiTerrainMgr.GetGroupCount(b.group, false);
+            aiTerrainMgr.LayBand(zone, nano, AirLayout::Offset(b.centre, b.facing, 0.0f, bl), b.facing, cols, rows, 0, false, true, false, b.group);
+            b.extra.insertLast(zone);
+            SaveBlock(b);
+            IndexBlocks();
+            GenericHelpers::LogUtil("[AIR][EcoSite] " + b.key + " grew: zone " + zone + " turrets " + before + " -> "
+                + aiTerrainMgr.GetGroupCount(b.group, false) + ", T1 energy left in the site " + SiteClutter(), 1);
+        }
+    }
+    int siteLogFrame = -100000;
+    // A wind slot whose turbine is gone keeps its persistent 3x3 zone, and the block's zone
+    // cannot take those cells: release the site's empty wind slots. O(wind slots).
+    void ReleaseSiteWindSlots()
+    {
+        for (uint c = 0; c < AirLayout::windClusters.length(); ++c)
+            for (uint s = 0; s < AirLayout::windClusters[c].slots.length(); ++s) {
+                const int slot = AirLayout::windClusters[c].slots[s];
+                if (aiTerrainMgr.GetReservationState(slot) == 0 && aiTerrainMgr.GetReservationUnit(slot) is null
+                    && InSite(aiTerrainMgr.GetReservationPos(slot))) aiTerrainMgr.ReleasePersistentBuilding(slot);
+            }
+    }
+    // Called from PlanBlocks every 5 s in modes 1-3; true when it used the tick.
+    bool PlanSite()
+    {
+        const int mode = WindMode();
+        if (siteState == 2) { GrowSiteBlock(); return false; }
+        if (siteState == 0) {
+            // Modes 1 and 2 wait for reclaim, which starts with the first completed reactor.
+            if (mode != 3 && !AirEconomy::HasReactor()) return false;
+            if (!ChooseSite()) {
+                if (ai.frame >= (Global::RoleSettings::Air::EcoBlockFirstSeconds + 600) * SECOND) { siteState = 2; siteGivenUp = true; }
+                return false;
+            }
+            siteState = 1; siteFrame = ai.frame;
+        }
+        // Played (Glitters mode 3): the site was chosen at 8 minutes, nothing reclaims before
+        // the first reactor, and the 300 s wait ran out first. The wait counts from the reactor.
+        if (!AirEconomy::HasReactor()) siteFrame = ai.frame;
+        ReleaseSiteWindSlots();
+        const int clutter = SiteClutter();
+        if (ai.frame - siteLogFrame >= 60 * SECOND) {
+            siteLogFrame = ai.frame;
+            GenericHelpers::LogUtil("[AIR][EcoSite] clearing: " + clutter + " T1 energy left in the site, "
+                + ((ai.frame - siteFrame) / SECOND) + " s since the first reactor", 1);
+        }
+        const bool waited = ai.frame - siteFrame >= Global::RoleSettings::Air::EcoBlockSiteWaitSeconds * SECOND;
+        const int cols = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretColumns);
+        if (mode == 3) {
+            Block@ b = ReserveBlockAt(site, 1);
+            if (b !is null || waited) { siteState = 2; if (b is null) siteGivenUp = true; }
+            return b !is null;
+        }
+        // Played (Glitters mode 1): 10 of 15 site structures were reclaimed in 300 s; the last
+        // few wait on the energy margin. EcoBlockSiteLeftover of them may stay as holes.
+        if (clutter > Global::RoleSettings::Air::EcoBlockSiteLeftover && !waited) return mode == 1;
+        Block@ b = ReserveBlockAt(site, cols);
+        siteState = 2;
+        if (b is null) {
+            siteGivenUp = true;
+            GenericHelpers::LogUtil("[AIR][EcoSite] no block fits the cleared site (" + clutter + " T1 energy left); ordinary blocks", 1);
+        }
+        return b !is null;
     }
     void AuditBlockReactors()
     {

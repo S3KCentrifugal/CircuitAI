@@ -57,7 +57,13 @@ namespace AirReclaim {
         if (AirThinHome::T1ConvertersRetired() && AirThinHome::replaceCredit >= Global::RoleSettings::Air::ConverterDraw
             && AirEconomy::bankE >= aiEconomyMgr.energy.storage * Global::RoleSettings::Air::ThinHomeConverterReclaimBank)
             names.insertLast(UnitHelpers::GetEnergyConverterNameForSide(side));
+        // Air::EcoBlockWindMode: T1 converters standing on the eco-block site go too
+        // (only those on the site), and site structures are taken before any others.
+        const bool siteOnlyConverters = AirEcoLayout::SiteClearing() && names.length() == 3;
+        if (siteOnlyConverters) names.insertLast(UnitHelpers::GetEnergyConverterNameForSide(side));
         array<Id>@ ids = ai.GetOwnedUnitIds();
+        // Two passes while an eco-block site is clearing: its structures first, any tier.
+        for (uint pass = AirEcoLayout::SiteClearing() ? 0 : 1; pass < 2; ++pass)
         for (uint tier = 0; tier < names.length(); ++tier) {
 
             CCircuitUnit@ best = null;
@@ -69,7 +75,10 @@ namespace AirReclaim {
                 for (uint j = 0; j < jobs.length(); ++j) if (jobs[j].target == u.id) pending = true;
                 if (pending || !CandidateFits(u,pendingOutput,pendingRefund) || !AirHome::EconomySite(u.GetPos(ai.frame))
                     || !aiTerrainMgr.CanReachAt(worker, u.GetPos(ai.frame), worker.circuitDef.GetBuildDistance())) continue;
-                const float sq = MapHelpers::SqDist(worker.GetPos(ai.frame), u.GetPos(ai.frame));
+                const bool first = AirEcoLayout::ReclaimFirst(u.GetPos(ai.frame));
+                if ((tier == 3 && siteOnlyConverters && !first) || (pass == 0 && !first)) continue;
+                // Site structures rank ahead of every other one of their tier (distance / 100).
+                const float sq = MapHelpers::SqDist(worker.GetPos(ai.frame), u.GetPos(ai.frame)) * (first ? 0.0001f : 1.0f);
                 if (sq < distance) { @best = u; distance = sq; }
             }
             if (best is null) continue;
@@ -81,7 +90,7 @@ namespace AirReclaim {
                     if (aiTerrainMgr.GetReservationUnit(AirLayout::windClusters[c].slots[s]) is best)
                         job.slot = AirLayout::windClusters[c].slots[s];
             jobs.insertLast(job);
-            if (tier == 3) AirThinHome::replaceCredit -= Global::RoleSettings::Air::ConverterDraw;
+            if (tier == 3 && !siteOnlyConverters) AirThinHome::replaceCredit -= Global::RoleSettings::Air::ConverterDraw;
             Lifecycle::Retire(best, tier == 3 ? "AIR T1 converter retired past the first fusion (thin home)" : "AIR low-tier energy replaced by completed reactor");
             if (!AirEconomy::HasReactor()) Invariants::Violation("INV-110", "AIR", "low-tier energy reclaim without completed reactor");
             GenericHelpers::LogUtil("[AIR][Reclaim] " + names[tier] + " id=" + best.id + " worker=" + worker.id, 1);
