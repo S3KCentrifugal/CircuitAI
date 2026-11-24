@@ -104,6 +104,7 @@ private:
     bool marching=false; int marchRetryFrame=0;
     int spamIdleSince=0; bool spamIdleLogged=false;   // owner 2026-11-21: spam_fire_idle_seconds
     int ghostShotFrame=0, ghostShotLog=-1;   // owner 2026-11-23: ghost structure fire
+    int fullLogged=-1;   // owner 2026-11-24: last full-reach target logged
     int haltStreak=0; springai::AIFloat3 haltPos;   // owner 2026-11-23: no-freeze guard
     int assaultPorc=-1; bool assaultGo=false, assaultGhostTarget=false, assaultLogged=false; springai::AIFloat3 assaultPos;   // owner 2026-11-23: heavy porc assault
     std::vector<springai::AIFloat3> unknownStill; int unknownStillFrame=-1;   // owner 2026-11-21: unknown_static_reach

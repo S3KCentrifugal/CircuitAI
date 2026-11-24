@@ -1326,6 +1326,27 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             || std::any_of(caps.weapons.begin(),caps.weapons.end(),[&](const auto& w){return world.Trajectory(w,pos,c.pos);})))
             (spam?spamInRange:otherInRange)=true;
     }
+    // Owner 2026-11-24 (Baryon AI 8 Catapults held fire with Rovers in range while an Arbiter
+    // and a Freaker stood at 1326-1349, inside the real 1350 but past the 94% pick): with spam
+    // in reach, the best non-spam ground enemy within the full height-aware weapon reach is the
+    // priority target and fire stays open; HOLD only when only spam is in range. A mobile
+    // non-spam enemy up to 300 past reach is the step-in candidate (see below).
+    int fullTarget=-1, stepTarget=-1; float fullScore=-1.f, stepDist=std::numeric_limits<float>::max();
+    if(policy.fireAtWill && spamInRange) for(int i:nearby) {
+        const auto& c=contacts[i];
+        if(!c.def || c.pos.y< -20.f || c.def->IsAbleToFly() || Spam(policy,c)) continue;
+        if(!(c.def->GetCategory()&def->GetTargetCategory()) || (c.def->GetCategory()&policy.avoidCategory)) continue;
+        if(shunned.size() && Shunned(c.id)) continue;
+        float reach=0.f;
+        for(const auto& w:caps.weapons) if(w.category&c.def->GetCategory()) reach=std::max(reach,world.Range(w,pos,c.pos));
+        if(!(reach>0.f)) continue;
+        const float d=std::sqrt(pos.SqDistance2D(c.pos));
+        if(d<=reach+c.radius) {
+            float s=std::max(1.f,c.cost)*(c.mobile?1.f:1.5f);
+            if(def->IsPriorityTarget(c.def) || policy.topTargetDefs.count(c.def->GetId())) s+=1e6f;
+            if(s>fullScore) { fullScore=s; fullTarget=i; }
+        } else if(c.mobile && d<=reach+c.radius+300.f && d<stepDist) { stepDist=d; stepTarget=i; }
+    }
     const CRangedWorld::Contact* closing=nullptr;
     float urgency=0.f;
     const bool forward=std::any_of(caps.weapons.begin(),caps.weapons.end(),[](const auto& w){return w.forward;});
@@ -1404,7 +1425,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(forward) {
             // 2026-11-06: this early return skipped the hold below, so engine
             // autofire could take spam while the hull backed off.
-            if(policy.fireAtWill) UpdateFireState(unit,!spamInRange && otherInRange);
+            if(policy.fireAtWill) UpdateFireState(unit,(!spamInRange && otherInRange) || fullTarget>=0);
+            if(fullTarget>=0) SelectTarget(unit,contacts[fullTarget].id,0,0.f,fullScore);   // owner 2026-11-24
             return;
         }
     }
@@ -1536,7 +1558,32 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         && frame-spamIdleSince>=int(policy.spamFireIdleSeconds*FRAMES_PER_SEC);
     if(spamIdleFire && !spamIdleLogged) { ai->LOG("RANGED: spam idle fire unit=%d after=%.0fs",id,policy.spamFireIdleSeconds); spamIdleLogged=true; }
     if(!spamIdleFire) spamIdleLogged=false;
-    if(policy.fireAtWill) UpdateFireState(unit,spamIdleFire || (!spamInRange && (best>=0 || otherInRange || droneTarget>=0)));
+    if(policy.fireAtWill) UpdateFireState(unit,spamIdleFire || fullTarget>=0
+        || (!spamInRange && (best>=0 || otherInRange || droneTarget>=0)));
+    // Owner 2026-11-24: non-spam in full reach while spam holds the volley: it is the target.
+    if(best<0 && droneTarget<0 && fullTarget>=0) {
+        const auto& c=contacts[fullTarget];
+        if(fullLogged!=c.id) { fullLogged=c.id; ai->LOG("RANGED: full reach target unit=%d target=%d def=%s dist=%.0f spam=1",id,c.id,c.def->GetDef()->GetName(),std::sqrt(pos.SqDistance2D(c.pos))); }
+        SelectTarget(unit,c.id,0,0.f,fullScore);
+    }
+    // Owner 2026-11-24: step in on a mobile non-spam enemy just past reach (up to 300) while only
+    // spam is in range; the step must stay outside listed porc reach (Safe with the porc filter).
+    if(best<0 && droneTarget<0 && fullTarget<0 && stepTarget>=0 && !closing && frame>=withdrawalUntil && !moving && !query) {
+        const auto& c=contacts[stepTarget];
+        AIFloat3 dir=c.pos-pos; dir.y=0.f; const float d=std::sqrt(dir.SqLength2D());
+        if(d>1.f) {
+            dir/=d;
+            float reach=0.f; for(const auto& w:caps.weapons) if(w.category&c.def->GetCategory()) reach=std::max(reach,world.Range(w,pos,c.pos));
+            AIFloat3 step=pos+dir*std::min(300.f,d-reach*0.95f+32.f);
+            CTerrainManager::CorrectPosition(step);
+            step.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(step.x,step.z);
+            ExactStaticScope exact(world,policy);
+            if(world.Safe(pos,step,StaticMargin(policy),false,policy.pressStatic,GhostRange(policy)) && world.FreeSlot(id,step,policy.spacing) && Move(unit,step,false)) {
+                ai->LOG("RANGED: step in unit=%d target=%d def=%s dist=%.0f reach=%.0f",id,c.id,c.def->GetDef()->GetName(),d,reach);
+                return;
+            }
+        }
+    }
     if(best<0 && droneTarget>=0) {
         const auto& c=contacts[droneTarget];
         if(report) ai->LOG("RANGED: drone target unit=%d target=%d dist=%.0f spam=%d",id,c.id,std::sqrt(pos.SqDistance2D(c.pos)),int(spamInRange));
