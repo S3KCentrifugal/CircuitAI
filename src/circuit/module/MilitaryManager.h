@@ -272,7 +272,9 @@ public:
 		int fullFireCount = 2;          // at this many stocked, the floor is minFraction now
 		// Regional stockpiled launchers (Perdition, Catalyst) aim by unit scan,
 		// CSuperTask::SelectLauncherTarget, not by enemy-group centroid.
-		int launcherMobileMaxAge = 900;       // frames a mobile's last known position stays usable
+		int launcherMobileMaxAge = 0;         // frames a mobile's last known position stays usable (0: tracked now only)
+		float launcherMaxDrift = 0.5f;        // a mobile may move at most this x AoE between order and impact
+		int launcherRecheckFrames = 30;       // a stocked launcher with an open order re-checks its aim this often
 		int launcherMinTargets = 1;           // raise to require a clump inside the blast
 		bool launcherStructuresFirst = false; // rank any structure above any mobile
 	};

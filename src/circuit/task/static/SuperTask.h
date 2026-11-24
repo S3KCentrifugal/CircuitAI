@@ -147,6 +147,12 @@ private:
 	// flight (frames), flight alone in *flight. False with no timing for the def.
 	bool SyncPredict(CCircuitUnit* unit, const springai::AIFloat3& pos, int frame, float& delay, float& flight) const;
 	int areaRank = -1;            // the rank SelectAreaTarget picked at the last scan, -1 none
+	// Owner 2026-11-24 (Hera Planum Perdition fired at empty ground): a regional
+	// stockpiled launcher (Perdition, Catalyst) re-checks its open order this
+	// often while stocked, and drops it when the aim point no longer holds a target.
+	bool IsAreaLauncher(CCircuitDef* cdef) const;
+	float LauncherImpactFrames(CCircuitUnit* unit, CCircuitDef* cdef, const springai::AIFloat3& pos) const;
+	int launcherCheckFrame = -1;
 	bool areaPeacePool = false;   // SelectAreaTarget is scanning the peace (unarmed) pool
 	int syncHoldSince = -1;       // first frame of the current sync hold, -1 none
 	springai::AIFloat3 syncLogPos = springai::AIFloat3(-1.f, 0.f, -1.f);  // the hold logged last

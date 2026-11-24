@@ -106,6 +106,7 @@ void CSuperTask::Update()
 	CCircuitAI* circuit = manager->GetCircuit();
 	const int frame = circuit->GetLastFrame();
 	CCircuitUnit* unit = *units.begin();
+	bool isRecheck = false;  // a launcher's quick re-check of its open order (below)
 
 	// D-124 (owner): a nuclear missile launched: a smiley face on the map over
 	// the target. The weapon-fired event is the hook (CCircuitAI::WeaponFired);
@@ -153,7 +154,18 @@ void CSuperTask::Update()
 			return;
 		}
 	} else if (targetFrame + TARGET_DELAY > frame) {
-		return;
+		// Owner 2026-11-24: an open attack-ground order of a stocked launcher is
+		// re-checked every launcher_recheck_seconds, not every 10 s: the missile
+		// leaves 6-7 s after the order and lands 7-8 s later, so a 10 s old aim
+		// lands on ground its target left long ago.
+		const int recheck = circuit->GetMilitaryManager()->GetStockInfo().launcherRecheckFrames;
+		if (!((State::ENGAGE == state) && !isTargetOverride && (frame - launcherCheckFrame >= recheck)
+			&& IsAreaLauncher(unit->GetCircuitDef()) && (unit->GetUnit()->GetStockpile() > 0)))
+		{
+			return;
+		}
+		launcherCheckFrame = frame;
+		isRecheck = true;
 	}
 
 	// Owner 2026-11-03: a Juno the commander group built to probe a jammed
@@ -251,14 +263,24 @@ void CSuperTask::Update()
 	// stockpile floor, so it is not thrown at a lone scout.
 	if (cdef->IsAttrStock() && isRegional && (empWd != nullptr)) {
 		const float floor = StockedShotFloor(unit, cdef, frame, empWd->GetCostMShot());
+		const AIFloat3 prevAim = targetPos;
 		if (SelectLauncherTarget(unit, cdef, floor)) {
+			if (isRecheck && (prevAim.SqDistance2D(targetPos) < SQUARE(cdef->GetAoe() * 0.25f))) {
+				targetPos = prevAim;  // the open order still lands on its target: leave it alone
+				return;
+			}
 			if (!SyncLaunch(unit, cdef, frame)) ExecuteAttack(unit);
 		} else {
+			if (isRecheck) {
+				circuit->LOG("LAUNCHER %s(%i): aim (%i,%i) has no target any more, holds the shot",
+						cdef->GetDef()->GetName(), unit->GetId(), int(prevAim.x), int(prevAim.z));
+			}
 			TRY_UNIT(circuit, unit,
 				unit->CmdStop();
 			)
 			SetTarget(nullptr);
 			targetFrame = frame;
+			state = State::ROAM;
 		}
 		return;
 	}
@@ -801,9 +823,20 @@ bool CSuperTask::SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, flo
 	// only for priority targets: the ordinary pick is unchanged.
 	return SelectAreaTarget(unit, cdef, "LAUNCHER", SQUARE(cdef->GetAoe()),
 			st.launcherMinTargets, st.launcherMobileMaxAge,
-			[this, &st, canTargetCat, prio, cdef](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
+			[this, &st, canTargetCat, prio, cdef, unit](const SEnemyData& e, CCircuitDef* edef, int& rank, float& value) {
 		if ((canTargetCat & edef->GetCategory()) == 0) {
 			return false;  // outside the weapon's target category (aircraft for napalm)
+		}
+		// Owner 2026-11-24 (Hera Planum, Perdition fired at empty ground): a
+		// mobile is a target only if it will still be inside the blast when the
+		// missile lands, 13-15 s after the order. Its current speed over that
+		// time may carry it at most launcher_max_drift x the AoE away.
+		if (edef->IsMobile() && (st.launcherMaxDrift > 0.f)) {
+			const float sqSpeed = e.vel.SqLength2D();  // elmos per frame
+			const float t = LauncherImpactFrames(unit, cdef, e.pos);
+			if (sqSpeed * SQUARE(t) > SQUARE(st.launcherMaxDrift * cdef->GetAoe())) {
+				return false;
+			}
 		}
 		value = e.cost;
 		const int pr = prio ? LauncherPriorityRank(e, edef, cdef) : -1;
@@ -818,6 +851,35 @@ bool CSuperTask::SelectLauncherTarget(CCircuitUnit* unit, CCircuitDef* cdef, flo
 		return true;
 	}, minValue, /*avoidFriendly*/ true, /*allEnemies*/ prio, false, false, nullptr, nullptr, nullptr,
 			prio ? LAUNCHER_PRIO_RANKS : 0);
+}
+
+/*
+ * A regional stockpiled launcher (Perdition, Catalyst): the units the
+ * SelectLauncherTarget branch of Update aims, see there.
+ */
+bool CSuperTask::IsAreaLauncher(CCircuitDef* cdef) const
+{
+	if (!cdef->IsAttrStock() || IsPulse(cdef) || IsNukeSilo(cdef)) return false;
+	const CWeaponDef* wd = cdef->GetWeaponDef();
+	if (wd == nullptr) return false;
+	CMilitaryManager* policyMgr = manager->GetCircuit()->GetMilitaryManager();
+	if (policyMgr->GetEmpInfo().isEnabled && cdef->IsRespRoleAny(policyMgr->GetEmpInfo().empRole) && wd->IsParalyzer()) return false;
+	const float mapDiag = std::sqrt(SQUARE(float(CTerrainManager::GetTerrainWidth())) + SQUARE(float(CTerrainManager::GetTerrainHeight())));
+	return cdef->GetMaxRange() < mapDiag;
+}
+
+/*
+ * Order to impact at pos, frames: the launcher timing table (delay + flight,
+ * the same one sync volleys use), else 15 s.
+ */
+float CSuperTask::LauncherImpactFrames(CCircuitUnit* unit, CCircuitDef* cdef, const AIFloat3& pos) const
+{
+	const CMilitaryManager::SLauncherPrioInfo& lp = manager->GetCircuit()->GetMilitaryManager()->GetLauncherPrioInfo();
+	auto it = lp.timing.find(cdef->GetId());
+	if (it == lp.timing.end()) return 15.f * FRAMES_PER_SEC;
+	const float dist = position.distance2D(pos);
+	return CMilitaryManager::SLauncherPrioInfo::Interp(it->second.delay, dist)
+			+ CMilitaryManager::SLauncherPrioInfo::Interp(it->second.flight, dist);
 }
 
 /*

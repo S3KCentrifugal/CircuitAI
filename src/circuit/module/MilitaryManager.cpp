@@ -638,13 +638,16 @@ void CMilitaryManager::ReadConfig()
 		stockInfo.patienceSeconds = std::max(0.f, stockCfg.get("patience_seconds", 240.f).asFloat());
 		stockInfo.minFraction = std::min(1.f, std::max(0.f, stockCfg.get("min_fraction", 0.25f).asFloat()));
 		stockInfo.fullFireCount = std::max(0, stockCfg.get("full_fire_count", 2).asInt());
-		stockInfo.launcherMobileMaxAge = std::max(0, stockCfg.get("launcher_mobile_max_age", 30).asInt()) * FRAMES_PER_SEC;
+		stockInfo.launcherMobileMaxAge = std::max(0, stockCfg.get("launcher_mobile_max_age", 0).asInt()) * FRAMES_PER_SEC;
+		stockInfo.launcherMaxDrift = std::max(0.f, stockCfg.get("launcher_max_drift", 0.5f).asFloat());
+		stockInfo.launcherRecheckFrames = std::max(1, int(stockCfg.get("launcher_recheck_seconds", 1.f).asFloat() * FRAMES_PER_SEC));
 		stockInfo.launcherMinTargets = std::max(1, stockCfg.get("launcher_min_targets", 1).asInt());
 		stockInfo.launcherStructuresFirst = stockCfg.get("launcher_structures_first", false).asBool();
 	}
-	circuit->LOG("CONFIG %s: stockpile patience=%.0fs minFraction=%.2f fullFireCount=%i launcher(maxAge=%is minTargets=%i structuresFirst=%i)",
+	circuit->LOG("CONFIG %s: stockpile patience=%.0fs minFraction=%.2f fullFireCount=%i launcher(maxAge=%is minTargets=%i structuresFirst=%i maxDrift=%.2f recheck=%if)",
 			cfgName.c_str(), stockInfo.patienceSeconds, stockInfo.minFraction, stockInfo.fullFireCount,
-			stockInfo.launcherMobileMaxAge / FRAMES_PER_SEC, stockInfo.launcherMinTargets, int(stockInfo.launcherStructuresFirst));
+			stockInfo.launcherMobileMaxAge / FRAMES_PER_SEC, stockInfo.launcherMinTargets, int(stockInfo.launcherStructuresFirst),
+			stockInfo.launcherMaxDrift, stockInfo.launcherRecheckFrames);
 
 	/*
 	 * Mobile sensor escort. Reuses the same "jammer" and "radar" role tags the

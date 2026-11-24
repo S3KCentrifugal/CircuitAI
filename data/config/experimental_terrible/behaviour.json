@@ -176,7 +176,10 @@
 			// Tactical launchers (Perdition 2300, Catalyst 2250) aim by scanning units in range
 			// and valuing the metal inside the blast; enemy-group centroids never came within
 			// reach of a launcher sat in a cluster (every logged tick: inRange=0).
-			"launcher_mobile_max_age": 30,     // seconds a mobile's last known position stays usable
+			"launcher_mobile_max_age": 0,      // seconds a mobile's last known position stays usable (0: radar/LOS now only)
+			// Owner 2026-11-24 (Hera Planum Perdition fired at empty ground): order to impact is 13-15 s.
+			"launcher_max_drift": 0.5,         // a mobile is a target only if its speed moves it < this x AoE by impact
+			"launcher_recheck_seconds": 1,     // a stocked launcher with an open order re-checks the aim this often
 			"launcher_min_targets": 1,         // raise to require a clump inside the blast
 			"launcher_structures_first": false // true ranks any structure above any mobile
 		},
