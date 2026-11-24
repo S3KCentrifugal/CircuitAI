@@ -257,6 +257,60 @@ bool CRangedEngagement::UnknownStaticBlocks(CCircuitUnit* unit,const AIFloat3& f
     for(const auto& u:unknownStill) { const float db=u.SqDistance2D(to); if(db<r2 && db<u.SqDistance2D(from)) return true; }
     return false;
 }
+// Owner 2026-11-24 (Centurion arena: a corcom cloaked while retreating; the Centurion had no contact,
+// marched towards the enemy start and walked into D-gun range). Seen commanders are kept for
+// LOST_COMMANDER_SECONDS once they leave radar and LOS. O(nearby + remembered) per decision.
+static constexpr float LOST_COMMANDER_SECONDS = 20.f;
+static constexpr float LOST_COMMANDER_SPEED = 40.f;    // elmos/s it may have walked unseen
+static constexpr float LOST_COMMANDER_GROWTH = 160.f;  // most added to its reach
+void CRangedEngagement::UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& near,int frame)
+{
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    if(p.coordinated || p.commanderReachMargin<0.f) return;
+    const auto& contacts=world.Contacts();
+    for(int i:near) {
+        const auto& c=contacts[i];
+        if(!CRangedWorld::CommanderContact(c) || !c.armed) continue;
+        auto it=std::find_if(lostCommanders.begin(),lostCommanders.end(),[&](const LostCommander& l){return l.id==c.id;});
+        if(it==lostCommanders.end()) lostCommanders.push_back({c.id,c.pos,c.groundRange,frame});
+        else { it->pos=c.pos; it->range=c.groundRange; it->seen=frame; }
+    }
+    auto* enemies=ai->GetEnemyManager();
+    lostCommanders.erase(std::remove_if(lostCommanders.begin(),lostCommanders.end(),[&](LostCommander& l){
+        if(frame-l.seen>int(LOST_COMMANDER_SECONDS*FRAMES_PER_SEC)) return true;
+        const CEnemyUnit* e=enemies->GetEnemyUnit(l.id);
+        if(e!=nullptr && (e->GetData().losStatus & (SEnemyData::DEAD|SEnemyData::DYING))) return true;
+        if(e!=nullptr && e->IsInRadarOrLOS() && l.seen!=frame) { l.pos=e->GetPos(); l.seen=frame; }   // visible beyond our query
+        return false;
+    }),lostCommanders.end());
+}
+float CRangedEngagement::LostCommanderReach(const LostCommander& l,int frame) const
+{
+    const float unseen=float(frame-l.seen)/FRAMES_PER_SEC;
+    const auto* u=ai->GetTeamUnit(id);
+    const float margin=u ? u->GetCircuitDef()->GetRangedPolicy().commanderReachMargin : 0.f;
+    return l.range+std::max(0.f,margin)+std::min(LOST_COMMANDER_GROWTH,LOST_COMMANDER_SPEED*unseen);
+}
+bool CRangedEngagement::LostCommanderBlocks(CCircuitUnit* unit,const AIFloat3& from,const AIFloat3& to,bool escape) const
+{
+    if(lostCommanders.empty()) return false;
+    const int frame=ai->GetLastFrame();
+    for(const auto& l:lostCommanders) {
+        if(l.seen==frame) continue;   // visible: the live contact is the hazard
+        const float r=LostCommanderReach(l,frame);
+        // A move that ends inside, or (not escaping) passes through, the remembered reach. An escape
+        // that ends farther from it than it starts is always allowed.
+        const float dTo=l.pos.SqDistance2D(to);
+        if(escape) { if(dTo<r*r && dTo<=l.pos.SqDistance2D(from)) return true; continue; }
+        if(dTo<r*r) return true;
+        const AIFloat3 d=to-from; const float len2=d.x*d.x+d.z*d.z;
+        float t=len2>1.f ? ((l.pos.x-from.x)*d.x+(l.pos.z-from.z)*d.z)/len2 : 0.f;
+        t=std::max(0.f,std::min(1.f,t));
+        const float x=from.x+d.x*t-l.pos.x, z=from.z+d.z*t-l.pos.z;
+        if(x*x+z*z<r*r && from.SqDistance2D(l.pos)>=r*r) return true;
+    }
+    return false;
+}
 // Owner 2026-11-23 (Salt Reef replay: AI 11 Fatboys below a 200-elmo plateau).
 // Our Trajectory said "clear" where the engine's line of fire hit the cliff lip,
 // so a Fatboy held a target it never fired at; and the nearest plateau contact,
@@ -284,6 +338,7 @@ bool CRangedEngagement::SafeMove(CCircuitUnit* unit,const AIFloat3& from,const A
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
     ExactStaticScope exact(world,p);
     if(UnknownStaticBlocks(unit,from,to)) return false;
+    if(LostCommanderBlocks(unit,from,to,escape)) return false;   // owner 2026-11-24 (Centurion)
     return p.coordinated && p.engagementSeconds>0.f ? world.CohortSafe(unit,from,to,margin,escape)
         :world.Safe(from,to,margin,escape,p.pressStatic,GhostRange(p));
 }
@@ -1299,6 +1354,21 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
     }
     if(report && !ghostNearby.empty()) ai->LOG("RANGED: ghost porc reach unit=%d ghosts=%u",id,unsigned(ghostNearby.size()));
+    // Owner 2026-11-24 (Centurion): a commander that vanished (cloak) stays danger at its last spot.
+    UpdateLostCommanders(unit,nearby,frame);
+    for(const auto& l:lostCommanders) {
+        if(l.seen==frame) continue;
+        const float reach=LostCommanderReach(l,frame);
+        const float d=std::sqrt(pos.SqDistance2D(l.pos));
+        if(d<reach && reach-d>urgency) {
+            lostContact=CRangedWorld::Contact{}; lostContact.id=l.id; lostContact.pos=l.pos; lostContact.mobile=true; lostContact.armed=true;
+            lostContact.groundRange=l.range; lostContact.hazardRadius=reach;
+            const CEnemyUnit* e=ai->GetEnemyManager()->GetEnemyUnit(l.id);
+            lostContact.def=e ? e->GetCircuitDef() : nullptr;
+            closing=&lostContact; urgency=reach-d;
+            if(trace) ai->LOG("RANGED: lost commander unit=%d commander=%d unseen=%.1fs d=%.0f reach=%.0f",id,l.id,float(frame-l.seen)/FRAMES_PER_SEC,d,reach);
+        }
+    }
     if (policy.ghostVolleys > 0 && (closing || frame < withdrawalUntil) && ghostFire.target >= 0) {
         GhostFireStep(ai,unit,pos,frame,ghostFire,ghostSupport,policy.ghostVolleys,false,policy.ghostVolleysHeavy);
     }

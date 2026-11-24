@@ -36,6 +36,16 @@ private:
     void UpdateAssault(CCircuitUnit* unit,const springai::AIFloat3& pos,int frame);
     bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal,const std::unordered_set<int>* topDefs=nullptr,bool onlyTop=false) const;
     bool UnknownStaticBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to);
+    // Owner 2026-11-24 (Centurion D-gunned by a commander that cloaked): commander_reach_margin hulls
+    // remember each commander they saw for LOST_COMMANDER_SECONDS after it leaves radar and LOS. Its last
+    // position stays danger (its range + margin, growing with the time it has been unseen): escape, and no
+    // move or march into it. Never a target.
+    struct LostCommander { int id; springai::AIFloat3 pos; float range; int seen; };
+    std::vector<LostCommander> lostCommanders;
+    CRangedWorld::Contact lostContact;   // the one escaped from this decision (closing points at it)
+    void UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& near,int frame);
+    float LostCommanderReach(const LostCommander& l,int frame) const;
+    bool LostCommanderBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,bool escape) const;
     // Owner 2026-11-16 (Catapults, Daedalus, Myrmidons idle at the gantry): with no
     // shot, no danger and no usable firing site, walk a threat-aware path towards
     // the objective (or the nearest known enemy) and stop where the walk would
