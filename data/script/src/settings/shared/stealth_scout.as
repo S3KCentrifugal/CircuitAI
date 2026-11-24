@@ -111,7 +111,7 @@ namespace StealthScout {
         int SpotAsideSeconds = 300;         // a target/post that failed is skipped this long
         // Production: one spotter at a time from a finished T2 bot lab (or the
         // Armada T2 vehicle plant: Gremlin) while short of SpottersPerAi.
-        bool SpotBuild = true;
+        bool SpotBuild = false;             // owner 2026-11-23: no replacement orders; the squad fills from spies the factories build on their normal weights
         array<string> SpotLabs = {"armalab", "coralab", "legalab", "armavp"};
         array<string> SpotLabUnits = {"armspy", "corspy", "legaspy", "armgremlin"};
         float SpotBuildMetalIncome = 20.0f;
