@@ -742,6 +742,43 @@ public:
 	std::pair<terrain::SArea*, bool> GetCurrentMapArea(CCircuitDef* cdef, const int indexSector);
 	int GetSectorIndex(const springai::AIFloat3& position) const { return terrainData->GetSectorIndex(position); }
 	bool CanMoveToPos(terrain::SArea* area, const springai::AIFloat3& destination);
+	// Owner 2026-11-23 (Pawn Retreat, AI 13 Boreas pushing into a cliff face): fine
+	// ground reach on the engine's 16-elmo slope map with the unit's own move type
+	// (the area map above is 128-elmo coarse). STEEP = the goal cell is too steep / deep
+	// for it; POCKET = a closed patch (cliff-locked plateau or pit) the unit is not in;
+	// CUT = the unit's own ground is closed off near it and the goal is outside; COARSE =
+	// another area (CanMoveToPos). Air / no move type: always OK. Cached, budgeted.
+	enum class GroundReach : int { OK = 0, STEEP, POCKET, CUT, COARSE };
+	static const char* GroundReachName(GroundReach r);
+	GroundReach CheckGroundReach(CCircuitUnit* unit, const springai::AIFloat3& from, const springai::AIFloat3& to);
+	// The goal moved to the nearest cell within radius that passes CheckGroundReach,
+	// preferring the side toward `from`; false (to unchanged) when none is found.
+	bool SnapGroundGoal(CCircuitUnit* unit, const springai::AIFloat3& from, springai::AIFloat3& to, float radius);
+	// A goal a unit stalled at (order live, no progress): treated as unreachable for
+	// that move type for 60 s (96-elmo cells).
+	// Cheap guard for any ground MOVE / FIGHT / PATROL goal: only when the goal cell
+	// itself is too steep or deep for the unit, move it to the nearest cell it can
+	// stand on within radius (toward `from` on ties). No flood fill. True if moved.
+	bool SnapSteepGoal(CCircuitUnit* unit, const springai::AIFloat3& from, springai::AIFloat3& to, float radius);
+	void MarkGroundGoalBad(CCircuitUnit* unit, const springai::AIFloat3& to);
+	bool IsGroundGoalBad(CCircuitUnit* unit, const springai::AIFloat3& to);
+private:
+	bool GroundCellOk(const terrain::SMobileType* mt, int cx, int cz) const;
+	// BFS on 16-elmo cells inside [x0,x1]x[z0,z1] from (sx,sz): 1 = (gx,gz) reached,
+	// 0 = not; touchedBorder = the search reached the window edge (ground goes on).
+	int GroundBfs(const terrain::SMobileType* mt, int sx, int sz, int x0, int z0, int x1, int z1,
+			int gx, int gz, bool& touchedBorder);
+	bool GroundReachBudget();
+	std::unordered_map<std::uint64_t, std::pair<int, std::int8_t>> groundPocketCache;  // key -> (expire, enclosed)
+	std::unordered_map<std::uint64_t, std::pair<int, std::int8_t>> groundPairCache;    // key -> (expire, verdict)
+	std::unordered_map<std::uint64_t, int> groundBadGoals;  // key -> expire frame
+	std::vector<std::uint32_t> groundBfsMark;  // visit stamps, window-sized
+	std::vector<int> groundBfsQueue;
+	std::uint32_t groundBfsStamp = 0;
+	int groundBudgetFrame = -1;
+	int groundBudgetUsed = 0;
+	int groundPurgeFrame = -1;
+public:
 	bool IsMovementDestinationFree(CCircuitDef* def, const springai::AIFloat3& destination) const;
 	springai::AIFloat3 GetBuildPosition(CCircuitDef* cdef, const springai::AIFloat3& position);
 	springai::AIFloat3 GetMovePosition(terrain::SArea* sourceArea, const springai::AIFloat3& position);

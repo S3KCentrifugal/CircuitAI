@@ -34,6 +34,7 @@
 #include "FeatureDef.h"
 
 #include "task/fighter/MissileTargetPolicy.h"
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -1015,8 +1016,16 @@ bool ArtyApproach99(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AI
 	const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
 	const float want = range * 0.99f;
 	const int canTargetCat = cdef->GetTargetCategory();
-	CEnemyInfo* best = nullptr;
-	float bestSq = std::numeric_limits<float>::max();
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	// Owner 2026-11-23 (Pawn Retreat): a target whose every approach spot was out of
+	// ground reach is skipped for a while; expired entries dropped here.
+	st.approachSkip.erase(std::remove_if(st.approachSkip.begin(), st.approachSkip.end(),
+			[frame](const std::pair<int, int>& e) { return e.second < frame; }), st.approachSkip.end());
+	auto skipped = [&st](int id) {
+		for (const auto& e : st.approachSkip) if (e.first == id) return true;
+		return false;
+	};
+	std::vector<std::pair<float, CEnemyInfo*>> cands;
 	for (const auto& kv : circuit->GetEnemyInfos()) {
 		CEnemyInfo* e = kv.second;
 		const CCircuitDef* d = (e != nullptr) ? e->GetCircuitDef() : nullptr;
@@ -1028,30 +1037,81 @@ bool ArtyApproach99(CCircuitAI* circuit, CCircuitUnit* unit, int frame, const AI
 		if (d->HasSurfToLand() && (d->GetMaxRange(CCircuitDef::RangeType::LAND) + 16.f > want)) continue;  // outranges: snipe routine
 		const float sq = pos.SqDistance2D(e->GetPos());
 		if (sq <= SQUARE(range)) continue;  // in range: the pick's job
-		if (sq < bestSq) { bestSq = sq; best = e; }
+		if (skipped(e->GetId())) continue;
+		cands.emplace_back(sq, e);
 	}
-	if (best == nullptr) {
-		st.approachTarget = -1;
-		return false;
-	}
-	const AIFloat3 tp = best->GetPos();
-	AIFloat3 dir = pos - tp;
-	dir.y = 0.f;
-	if (dir.Length2D() < 1.f) dir = AIFloat3(1.f, 0.f, 0.f);
-	dir.Normalize2D();
+	// nearest first; at most 3 targets tried per call (13 spots each)
+	const size_t tryN = std::min<size_t>(3, cands.size());
+	std::partial_sort(cands.begin(), cands.begin() + tryN, cands.end(),
+			[](const std::pair<float, CEnemyInfo*>& x, const std::pair<float, CEnemyInfo*>& y) { return x.first < y.first; });
+	CEnemyInfo* best = nullptr;
 	bool found = false;
 	AIFloat3 spot;
-	for (int k = 0; (k <= 12) && !found; ++k) {
-		const int step = (k + 1) / 2 * ((k % 2) ? 1 : -1);  // 0, +1, -1, +2, -2, ... (x 15 deg)
-		const float a = step * 0.261799f;
-		const float c = std::cos(a), s = std::sin(a);
-		AIFloat3 p(tp.x + (dir.x * c - dir.z * s) * want, tp.y, tp.z + (dir.x * s + dir.z * c) * want);
-		CTerrainManager::CorrectPosition(p);
-		if (!ArtyRealUnsafeAt(circuit, p)) { spot = p; found = true; }
+	for (size_t ci = 0; (ci < tryN) && !found; ++ci) {
+		CEnemyInfo* e = cands[ci].second;
+		const AIFloat3 tp = e->GetPos();
+		AIFloat3 dir = pos - tp;
+		dir.y = 0.f;
+		if (dir.Length2D() < 1.f) dir = AIFloat3(1.f, 0.f, 0.f);
+		dir.Normalize2D();
+		int nUnsafe = 0, nSteep = 0, nPocket = 0, nCut = 0, nArea = 0;
+		for (int k = 0; (k <= 12) && !found; ++k) {
+			const int step = (k + 1) / 2 * ((k % 2) ? 1 : -1);  // 0, +1, -1, +2, -2, ... (x 15 deg)
+			const float a = step * 0.261799f;
+			const float c = std::cos(a), s = std::sin(a);
+			AIFloat3 p(tp.x + (dir.x * c - dir.z * s) * want, tp.y, tp.z + (dir.x * s + dir.z * c) * want);
+			CTerrainManager::CorrectPosition(p);
+			if (ArtyRealUnsafeAt(circuit, p)) { ++nUnsafe; continue; }
+			// Owner 2026-11-23: the spot must be ground this unit can stand on and get to
+			// (a cliff face passed the 128-elmo area map; 4 Boreas pushed into it 1+ min).
+			const CTerrainManager::GroundReach gr = terrainMgr->CheckGroundReach(unit, pos, p);
+			if (gr != CTerrainManager::GroundReach::OK) {
+				// a cliff face beside a flat spot still in range: try the nearest flat cell within 96
+				AIFloat3 q = p;
+				if ((gr == CTerrainManager::GroundReach::STEEP) && terrainMgr->SnapGroundGoal(unit, pos, q, 96.f)
+					&& (q.SqDistance2D(tp) <= SQUARE(range * 0.995f)) && !ArtyRealUnsafeAt(circuit, q)) {
+					spot = q; found = true; best = e;
+					break;
+				}
+				switch (gr) {
+					case CTerrainManager::GroundReach::STEEP:  ++nSteep; break;
+					case CTerrainManager::GroundReach::POCKET: ++nPocket; break;
+					case CTerrainManager::GroundReach::CUT:    ++nCut; break;
+					default:                                   ++nArea; break;
+				}
+				continue;
+			}
+			spot = p; found = true; best = e;
+		}
+		if (!found && (nSteep + nPocket + nCut + nArea > 0)) {
+			st.approachSkip.emplace_back(e->GetId(), frame + FRAMES_PER_SEC * 45);
+			circuit->LOG("APPROACHSKIP: %s %i skips %s %i 45 s: no reachable spot (unsafe %i steep %i pocket %i cut %i area %i)",
+					cdef->GetDef()->GetName(), unit->GetId(), e->GetCircuitDef()->GetDef()->GetName(), e->GetId(),
+					nUnsafe, nSteep, nPocket, nCut, nArea);
+		}
 	}
 	if (!found) {
 		st.approachTarget = -1;
 		return false;
+	}
+	// Stall guard: the order is live but the unit has not moved 24 elmo in 8 s while
+	// still short of the spot: mark the spot bad for this move type, drop the target.
+	if ((st.approachTarget == best->GetId()) && (pos.SqDistance2D(spot) > SQUARE(48.f))) {
+		if ((st.approachStallFrame < 0) || (pos.SqDistance2D(st.approachStallPos) > SQUARE(24.f))) {
+			st.approachStallPos = pos;
+			st.approachStallFrame = frame;
+		} else if (frame - st.approachStallFrame >= FRAMES_PER_SEC * 8) {
+			terrainMgr->MarkGroundGoalBad(unit, spot);
+			st.approachSkip.emplace_back(best->GetId(), frame + FRAMES_PER_SEC * 45);
+			circuit->LOG("APPROACHSTALL: %s %i stalled 8 s at %.0f from (%.0f, %.0f) for %s %i: spot marked bad, target skipped 45 s",
+					cdef->GetDef()->GetName(), unit->GetId(), std::sqrt(pos.SqDistance2D(spot)), spot.x, spot.z,
+					best->GetCircuitDef()->GetDef()->GetName(), best->GetId());
+			st.approachTarget = -1;
+			st.approachStallFrame = -1;
+			return false;
+		}
+	} else {
+		st.approachStallFrame = -1;
 	}
 	const bool changed = (st.approachTarget != best->GetId()) || (spot.SqDistance2D(st.approachSpot) > SQUARE(100.f));
 	if (changed) {

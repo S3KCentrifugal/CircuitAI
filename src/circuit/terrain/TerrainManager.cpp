@@ -7124,4 +7124,259 @@ void CTerrainManager::LogTerrainAt(CCircuitDef* cdef, const AIFloat3& position)
 }
 #endif
 
+
+/*
+ * Owner 2026-11-23 (Pawn Retreat, AI 13 Boreas): fine ground reach. The area map
+ * (CanMoveToPos) is 128 elmo per cell, so a cliff face or a cliff-locked plateau
+ * top beside open ground passes it; the engine then stops the unit at the cliff
+ * foot and the AI re-sends the same MOVE every few seconds. This works on the
+ * engine slope map (16 elmo, 1 - cos slope, the unit of MoveDef maxSlope).
+ */
+namespace {
+constexpr int GR_CELL = SQUARE_SIZE * 2;      // slope map cell, elmo
+constexpr int GR_POCKET_R = 40;               // pocket test window half-size, cells (640 elmo)
+constexpr float GR_PAIR_MAX = 1200.f;         // cut test only for goals this near, elmo
+constexpr int GR_PAIR_MARGIN = 16;            // cut test window margin, cells (256 elmo)
+constexpr int GR_BUDGET = 24;                 // flood fills per frame per AI
+inline std::uint64_t GrKey(int kind, int mid, int a, int b, int c = 0, int d = 0) {
+	// kind 3 bits | mobile 7 | a 12 | b 12 | c 15 | d 15
+	return (std::uint64_t(kind & 7) << 61) | (std::uint64_t(mid & 127) << 54)
+			| (std::uint64_t(a & 4095) << 42) | (std::uint64_t(b & 4095) << 30)
+			| (std::uint64_t(c & 32767) << 15) | std::uint64_t(d & 32767);
+}
+}
+
+const char* CTerrainManager::GroundReachName(GroundReach r)
+{
+	switch (r) {
+		case GroundReach::OK:     return "ok";
+		case GroundReach::STEEP:  return "steep";
+		case GroundReach::POCKET: return "pocket";
+		case GroundReach::CUT:    return "cut";
+		case GroundReach::COARSE: return "area";
+	}
+	return "?";
+}
+
+bool CTerrainManager::GroundCellOk(const SMobileType* mt, int cx, int cz) const
+{
+	const FloatVec& slope = terrainData->GetSlopeMap();
+	const int sx = terrainData->GetSlopeMapXSize();
+	if ((sx <= 0) || slope.empty()) return true;
+	const int sz = int(slope.size()) / sx;
+	if ((cx < 0) || (cz < 0) || (cx >= sx) || (cz >= sz)) return false;
+	const float h = areaData->GetElevationAt(cx * GR_CELL + GR_CELL / 2, cz * GR_CELL + GR_CELL / 2);
+	if (h > mt->maxElevation) return false;
+	if (h < 0.f) {
+		if (mt->canHover || mt->canFloat) return true;  // on the water surface slope does not count
+		if (h < mt->minElevation) return false;
+	}
+	return slope[cz * sx + cx] <= mt->maxSlope;
+}
+
+bool CTerrainManager::GroundReachBudget()
+{
+	const int frame = circuit->GetLastFrame();
+	if (frame != groundBudgetFrame) { groundBudgetFrame = frame; groundBudgetUsed = 0; }
+	if (groundBudgetUsed >= GR_BUDGET) return false;
+	++groundBudgetUsed;
+	return true;
+}
+
+int CTerrainManager::GroundBfs(const SMobileType* mt, int sx, int sz, int x0, int z0, int x1, int z1,
+		int gx, int gz, bool& touchedBorder)
+{
+	touchedBorder = false;
+	const int mapX = terrainData->GetSlopeMapXSize();
+	const int mapZ = int(terrainData->GetSlopeMap().size()) / std::max(1, mapX);
+	// The window edge counts as "ground goes on" only where it is not the map edge.
+	const bool openW = x0 > 0, openE = x1 < mapX - 1, openN = z0 > 0, openS = z1 < mapZ - 1;
+	x0 = std::max(0, x0); z0 = std::max(0, z0);
+	x1 = std::min(mapX - 1, x1); z1 = std::min(mapZ - 1, z1);
+	if ((sx < x0) || (sx > x1) || (sz < z0) || (sz > z1)) return 0;
+	const int w = x1 - x0 + 1, hgt = z1 - z0 + 1;
+	if (groundBfsMark.size() < size_t(w * hgt)) groundBfsMark.assign(w * hgt, 0);
+	if (++groundBfsStamp == 0) { std::fill(groundBfsMark.begin(), groundBfsMark.end(), 0); groundBfsStamp = 1; }
+	groundBfsQueue.clear();
+	auto push = [&](int x, int z) {
+		const int i = (z - z0) * w + (x - x0);
+		if (groundBfsMark[i] == groundBfsStamp) return;
+		groundBfsMark[i] = groundBfsStamp;
+		if (!GroundCellOk(mt, x, z)) return;
+		groundBfsQueue.push_back(i);
+	};
+	push(sx, sz);
+	for (size_t q = 0; q < groundBfsQueue.size(); ++q) {
+		const int i = groundBfsQueue[q];
+		const int x = x0 + i % w, z = z0 + i / w;
+		if ((x == gx) && (z == gz)) return 1;
+		if (((x == x0) && openW) || ((x == x1) && openE) || ((z == z0) && openN) || ((z == z1) && openS)) touchedBorder = true;
+		if (x > x0) push(x - 1, z);
+		if (x < x1) push(x + 1, z);
+		if (z > z0) push(x, z - 1);
+		if (z < z1) push(x, z + 1);
+	}
+	return 0;
+}
+
+CTerrainManager::GroundReach CTerrainManager::CheckGroundReach(CCircuitUnit* unit, const AIFloat3& from, const AIFloat3& to)
+{
+	if (unit == nullptr) return GroundReach::OK;
+	const CCircuitDef* cdef = unit->GetCircuitDef();
+	if (cdef->IsAbleToFly()) return GroundReach::OK;
+	const SMobileType* mt = GetMobileTypeById(cdef->GetMobileId());
+	if ((mt == nullptr) || terrainData->GetSlopeMap().empty()) return GroundReach::OK;
+	if (!CanMoveToPos(unit->GetArea(), to)) return GroundReach::COARSE;
+	const int frame = circuit->GetLastFrame();
+	const int mid = cdef->GetMobileId();
+	if (IsGroundGoalBad(unit, to)) return GroundReach::STEEP;
+
+	const int gx = int(to.x) / GR_CELL, gz = int(to.z) / GR_CELL;
+	if (!GroundCellOk(mt, gx, gz)) return GroundReach::STEEP;
+	int fx = int(from.x) / GR_CELL, fz = int(from.z) / GR_CELL;
+	if ((fx == gx) && (fz == gz)) return GroundReach::OK;
+	if (!GroundCellOk(mt, fx, fz)) {  // standing on a slope edge: start from a passable neighbour
+		bool found = false;
+		for (int r = 1; (r <= 2) && !found; ++r) {
+			for (int dz = -r; (dz <= r) && !found; ++dz) {
+				for (int dx = -r; (dx <= r) && !found; ++dx) {
+					if (GroundCellOk(mt, fx + dx, fz + dz)) { fx += dx; fz += dz; found = true; }
+				}
+			}
+		}
+		if (!found) return GroundReach::OK;  // unknown: keep the old behaviour
+	}
+
+	if (frame - groundPurgeFrame > FRAMES_PER_SEC * 30) {
+		groundPurgeFrame = frame;
+		for (auto it = groundPairCache.begin(); it != groundPairCache.end(); ) it = (it->second.first < frame) ? groundPairCache.erase(it) : std::next(it);
+		for (auto it = groundPocketCache.begin(); it != groundPocketCache.end(); ) it = (it->second.first < frame) ? groundPocketCache.erase(it) : std::next(it);
+		for (auto it = groundBadGoals.begin(); it != groundBadGoals.end(); ) it = (it->second < frame) ? groundBadGoals.erase(it) : std::next(it);
+	}
+
+	// 1) near goal: the unit's own ground reaches it, or is closed off without it
+	if (from.SqDistance2D(to) <= SQUARE(GR_PAIR_MAX)) {
+		const std::uint64_t key = GrKey(1, mid, fx / 4, fz / 4, gx, gz);
+		auto it = groundPairCache.find(key);
+		if ((it != groundPairCache.end()) && (it->second.first >= frame)) {
+			if (it->second.second != int(GroundReach::OK)) return GroundReach(it->second.second);
+		} else {
+			if (!GroundReachBudget()) return GroundReach::OK;
+			bool border = false;
+			const int reached = GroundBfs(mt, fx, fz,
+					std::min(fx, gx) - GR_PAIR_MARGIN, std::min(fz, gz) - GR_PAIR_MARGIN,
+					std::max(fx, gx) + GR_PAIR_MARGIN, std::max(fz, gz) + GR_PAIR_MARGIN, gx, gz, border);
+			if (reached == 1) {
+				groundPairCache[key] = {frame + FRAMES_PER_SEC * 15, std::int8_t(GroundReach::OK)};
+				return GroundReach::OK;
+			}
+			if (!border) {  // the unit's ground is closed inside the window and the goal is not on it
+				groundPairCache[key] = {frame + FRAMES_PER_SEC * 15, std::int8_t(GroundReach::CUT)};
+				return GroundReach::CUT;
+			}
+			// the way round leaves the window: the pocket test decides
+			groundPairCache[key] = {frame + FRAMES_PER_SEC * 15, std::int8_t(GroundReach::OK)};
+		}
+	}
+
+	// 2) the goal's own patch: a closed pocket (cliff-locked) the unit is not in
+	const std::uint64_t pkey = GrKey(2, mid, 0, 0, gx, gz);
+	auto pit = groundPocketCache.find(pkey);
+	std::int8_t enclosed;
+	if ((pit != groundPocketCache.end()) && (pit->second.first >= frame)) {
+		enclosed = pit->second.second;
+	} else {
+		if (!GroundReachBudget()) return GroundReach::OK;
+		bool border = false;
+		GroundBfs(mt, gx, gz, gx - GR_POCKET_R, gz - GR_POCKET_R, gx + GR_POCKET_R, gz + GR_POCKET_R, -1, -1, border);
+		enclosed = border ? 0 : 1;
+		groundPocketCache[pkey] = {frame + FRAMES_PER_SEC * 120, enclosed};
+	}
+	if (enclosed == 0) return GroundReach::OK;
+	// closed: OK only when the unit stands in the same patch
+	if ((std::abs(fx - gx) > GR_POCKET_R) || (std::abs(fz - gz) > GR_POCKET_R)) return GroundReach::POCKET;
+	if (!GroundReachBudget()) return GroundReach::OK;
+	bool border = false;
+	return (GroundBfs(mt, gx, gz, gx - GR_POCKET_R, gz - GR_POCKET_R, gx + GR_POCKET_R, gz + GR_POCKET_R, fx, fz, border) == 1)
+			? GroundReach::OK : GroundReach::POCKET;
+}
+
+bool CTerrainManager::SnapGroundGoal(CCircuitUnit* unit, const AIFloat3& from, AIFloat3& to, float radius)
+{
+	if (CheckGroundReach(unit, from, to) == GroundReach::OK) return false;
+	const SMobileType* mt = GetMobileTypeById(unit->GetCircuitDef()->GetMobileId());
+	if (mt == nullptr) return false;
+	const int gx = int(to.x) / GR_CELL, gz = int(to.z) / GR_CELL;
+	const int rmax = std::max(1, int(radius) / GR_CELL);
+	AIFloat3 best;
+	bool found = false;
+	int checks = 0;
+	for (int r = 1; (r <= rmax) && !found && (checks < 16); ++r) {
+		if ((r > 2) && (r % 2)) continue;  // past 32 elmo, rings 32 elmo apart
+		// candidates on this ring, best (near the goal, toward the unit) first
+		std::vector<std::pair<float, AIFloat3>> ring;
+		for (int dz = -r; dz <= r; ++dz) {
+			for (int dx = -r; dx <= r; ++dx) {
+				if ((std::abs(dx) != r) && (std::abs(dz) != r)) continue;
+				if (!GroundCellOk(mt, gx + dx, gz + dz)) continue;
+				AIFloat3 p((gx + dx) * GR_CELL + GR_CELL / 2, to.y, (gz + dz) * GR_CELL + GR_CELL / 2);
+				if (!geom::is_in_map(p)) continue;
+				ring.emplace_back(std::sqrt(p.SqDistance2D(to)) + 0.25f * std::sqrt(p.SqDistance2D(from)), p);
+			}
+		}
+		std::sort(ring.begin(), ring.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+		for (const auto& c : ring) {
+			if (++checks > 16) break;
+			if (CheckGroundReach(unit, from, c.second) == GroundReach::OK) { best = c.second; found = true; break; }
+		}
+	}
+	if (!found) return false;
+	to = best;
+	return true;
+}
+
+bool CTerrainManager::SnapSteepGoal(CCircuitUnit* unit, const AIFloat3& from, AIFloat3& to, float radius)
+{
+	if ((unit == nullptr) || unit->GetCircuitDef()->IsAbleToFly() || terrainData->GetSlopeMap().empty()) return false;
+	const SMobileType* mt = GetMobileTypeById(unit->GetCircuitDef()->GetMobileId());
+	if (mt == nullptr) return false;
+	const int gx = int(to.x) / GR_CELL, gz = int(to.z) / GR_CELL;
+	if (GroundCellOk(mt, gx, gz)) return false;
+	const int rmax = std::max(1, int(radius) / GR_CELL);
+	for (int r = 1; r <= rmax; ++r) {
+		float bestScore = std::numeric_limits<float>::max();
+		AIFloat3 best;
+		for (int dz = -r; dz <= r; ++dz) {
+			for (int dx = -r; dx <= r; ++dx) {
+				if ((std::abs(dx) != r) && (std::abs(dz) != r)) continue;
+				if (!GroundCellOk(mt, gx + dx, gz + dz)) continue;
+				AIFloat3 p((gx + dx) * GR_CELL + GR_CELL / 2, to.y, (gz + dz) * GR_CELL + GR_CELL / 2);
+				if (!geom::is_in_map(p)) continue;
+				const float score = p.SqDistance2D(to) + 0.0625f * p.SqDistance2D(from);
+				if (score < bestScore) { bestScore = score; best = p; }
+			}
+		}
+		if (bestScore < std::numeric_limits<float>::max()) {
+			to = best;
+			return true;
+		}
+	}
+	return false;
+}
+
+void CTerrainManager::MarkGroundGoalBad(CCircuitUnit* unit, const AIFloat3& to)
+{
+	if (unit == nullptr) return;
+	const int mid = unit->GetCircuitDef()->GetMobileId();
+	groundBadGoals[GrKey(3, mid, int(to.x) / 96, int(to.z) / 96)] = circuit->GetLastFrame() + FRAMES_PER_SEC * 60;
+}
+
+bool CTerrainManager::IsGroundGoalBad(CCircuitUnit* unit, const AIFloat3& to)
+{
+	if ((unit == nullptr) || groundBadGoals.empty()) return false;
+	const int mid = unit->GetCircuitDef()->GetMobileId();
+	auto it = groundBadGoals.find(GrKey(3, mid, int(to.x) / 96, int(to.z) / 96));
+	return (it != groundBadGoals.end()) && (it->second >= circuit->GetLastFrame());
+}
+
 } // namespace circuit

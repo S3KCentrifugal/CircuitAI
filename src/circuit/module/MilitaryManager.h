@@ -644,6 +644,11 @@ public:
 		int approachTarget = -1;  // APPROACH99 target and order
 		int approachOrderUntil = -1;
 		springai::AIFloat3 approachSpot;
+		// Owner 2026-11-23 (Pawn Retreat): targets with no reachable approach spot, skipped
+		// until the frame (id, until); and the stall guard (order live, no progress).
+		std::vector<std::pair<int, int>> approachSkip;
+		springai::AIFloat3 approachStallPos;
+		int approachStallFrame = -1;
 		int holdLogKey = -1;      // 2026-11-08 hold before move: last logged reason (target id) ...
 		int holdLogFrame = -1;    // ... and when (one line per change or per 10 s)
 		int skipLogFrame = -1;    // ghost-skip reason lines, at most one per 10 s per unit

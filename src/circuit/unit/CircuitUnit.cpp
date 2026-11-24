@@ -310,6 +310,27 @@ void CCircuitUnit::CmdRemove(std::vector<float>&& params, short options)
 	SendCustomCommand(unit->GetSkirmishAIId(), id, CMD_REMOVE, params, options);
 }
 
+// Owner 2026-11-23 (Pawn Retreat): a ground MOVE / FIGHT / PATROL goal on a cell the
+// unit cannot stand on (cliff face, steep slope, too deep) moves to the nearest cell
+// it can, within 160 elmo. O(1) when the goal is fine. One log line per AI per 10 s.
+static AIFloat3 GroundGoal(CCircuitUnit* u, ITaskModule* manager, const AIFloat3& pos)
+{
+	if ((manager == nullptr) || u->GetCircuitDef()->IsAbleToFly()) return pos;
+	CCircuitAI* circuit = manager->GetCircuit();
+	AIFloat3 goal = pos;
+	const int frame = circuit->GetLastFrame();
+	const AIFloat3 here = u->GetPos(frame);
+	if (!circuit->GetTerrainManager()->SnapSteepGoal(u, here, goal, 160.f)) return pos;
+	static std::map<int, int> logged;
+	int& last = logged[circuit->GetSkirmishAIId()];
+	if (frame - last >= FRAMES_PER_SEC * 10) {
+		last = frame;
+		circuit->LOG("[ReachSnap] %s %i goal (%.0f, %.0f) not standable, sent to (%.0f, %.0f)",
+				u->GetCircuitDef()->GetDef()->GetName(), u->GetId(), pos.x, pos.z, goal.x, goal.z);
+	}
+	return goal;
+}
+
 void CCircuitUnit::CmdMoveTo(const AIFloat3& pos, short options, int timeout)
 {
 	if (IsMicroBlocked()) return;
@@ -344,7 +365,7 @@ void CCircuitUnit::CmdMoveTo(const AIFloat3& pos, short options, int timeout)
 		commMoveFrame = now;
 	}
 	if (!LagAllowMove()) return;
-	unit->MoveTo(pos, options, timeout);
+	unit->MoveTo(GroundGoal(this, manager, pos), options, timeout);
 //	unit->ExecuteCustomCommand(CMD_RAW_MOVE, {pos.x, pos.y, pos.z}, options, timeout);
 }
 
@@ -359,7 +380,7 @@ void CCircuitUnit::CmdFightTo(const AIFloat3& pos, short options, int timeout)
 	if (IsMicroBlocked()) return;
 	assert(geom::is_in_map(pos));
 	if (!LagAllowMove() || !LagAllowTurret()) return;
-	unit->Fight(pos, options, timeout);
+	unit->Fight(GroundGoal(this, manager, pos), options, timeout);
 }
 
 void CCircuitUnit::CmdPatrolTo(const AIFloat3& pos, short options, int timeout)
@@ -367,7 +388,7 @@ void CCircuitUnit::CmdPatrolTo(const AIFloat3& pos, short options, int timeout)
 	if (IsMicroBlocked()) return;
 	assert(geom::is_in_map(pos));
 	if (!LagAllowMove() || !LagAllowTurret()) return;
-	unit->PatrolTo(pos, options, timeout);
+	unit->PatrolTo(GroundGoal(this, manager, pos), options, timeout);
 }
 
 void CCircuitUnit::CmdStationaryGroundTarget(const AIFloat3& pos)
