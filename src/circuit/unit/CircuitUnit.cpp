@@ -427,6 +427,15 @@ void CCircuitUnit::CmdStop(short options, int timeout)
 	}
 }
 
+void CCircuitUnit::CmdPriorityTarget(int enemyId)
+{
+    if (enemyId == priorityTarget || enemyId < 0) return;
+    if (!LagAllowTarget()) return;
+    ClearPriorityTarget();
+    SendTaskTarget(enemyId);
+    priorityTarget = enemyId;
+}
+
 void CCircuitUnit::CmdSetTarget(CEnemyInfo* enemy)
 {
     if (circuitDef->GetTargetMinCost() <= 0.f) return;

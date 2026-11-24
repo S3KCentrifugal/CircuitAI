@@ -2407,33 +2407,39 @@ void CMilitaryManager::UpdateSpamFireHold()
 		// The ranged controller (ARTY task of a ranged hull) owns its fire state.
 		if (task->GetType() == IUnitTask::Type::FIGHTER
 			&& static_cast<IFighterTask*>(task)->GetFightType() == IFighterTask::FightType::ARTY) continue;
-		// Owner 2026-11-24 (Baryon AI 8 Catapult 4770): never hold fire while retreating (only
-		// commanders may): a held retreat skipped shots at a Titan in range. Def fire state.
-		if (task->GetType() == IUnitTask::Type::RETREAT) {
-			if (unit->GetRequestedFireState() != cdef->GetFireState()) {
-				circuit->LOG("SPAMHOLD: %s %d default fire state (retreat)", cdef->GetDef()->GetName(), unit->GetId());
-				unit->TrySetFireState(cdef->GetFireState());
-			}
-			continue;
-		}
 		auto world = GetRangedWorld();
 		if (!refreshed) { world->Refresh(); refreshed = true; }
 		const AIFloat3& pos = unit->GetPos(frame);
 		const float range = cdef->GetMaxRange(CCircuitDef::RangeType::LAND);
-		world->Nearby(pos, range + 400.f, nearby);
+		world->Nearby(pos, range + 64.f, nearby);
+		// Owner 2026-11-24 (Baryon AI 8 Catapults retreating past Titans): hold only when
+		// everything in weapon range is spam. With any non-spam ground enemy in range, keep
+		// the def fire state and make the best one the priority target (BAR priority fire
+		// also applies during the retreat MOVE): heavy porc / LRPC / TML / priority defs
+		// (Titan) first, then structures, then cost. Same rule while idle.
 		bool spam = false;
+		int best = -1; float bestScore = -1.f;
 		for (int i : nearby) {
 			const auto& c = world->Contacts()[i];
-			if (c.pos.y < -20.f || (c.def != nullptr && c.def->IsAbleToFly()) || !CRangedEngagement::Spam(p, c)) continue;
-			const float reach = range + c.radius + 200.f;  // same early hold as the controller
-			if (pos.SqDistance2D(c.pos) <= SQUARE(reach)) { spam = true; break; }
+			if (c.pos.y < -20.f || (c.def != nullptr && c.def->IsAbleToFly()) || c.airDot) continue;
+			if (pos.SqDistance2D(c.pos) > SQUARE(range + c.radius)) continue;
+			if (CRangedEngagement::Spam(p, c)) { spam = true; continue; }
+			if (c.def == nullptr || !(c.def->GetCategory() & cdef->GetTargetCategory())) continue;
+			float score = std::max(1.f, c.cost) * (c.mobile ? 1.f : 1.5f);
+			if (cdef->IsPriorityTarget(c.def) || IsTopTarget(c.def)) score += 1e6f;
+			if (score > bestScore) { bestScore = score; best = c.id; }
 		}
-		const CCircuitDef::FireT want = spam ? CCircuitDef::HOLD : cdef->GetFireState();
+		const bool hold = spam && best < 0;
+		const CCircuitDef::FireT want = hold ? CCircuitDef::HOLD : cdef->GetFireState();
 		if (unit->GetRequestedFireState() != want) {
 			circuit->LOG("SPAMHOLD: %s %d %s (task type %d)", cdef->GetDef()->GetName(), unit->GetId(),
-				spam ? "holds: spam in reach" : "default fire state", int(task->GetType()));
+				hold ? "holds: only spam in range" : "default fire state", int(task->GetType()));
 		}
 		unit->TrySetFireState(want);  // repeats are dropped by CmdSetFireState
+		if (best >= 0 && unit->GetPriorityTarget() != best) {
+			circuit->LOG("SPAMHOLD: %s %d targets %d (task type %d)", cdef->GetDef()->GetName(), unit->GetId(), best, int(task->GetType()));
+			TRY_UNIT(circuit, unit, unit->CmdPriorityTarget(best); )
+		}
 	}
 }
 

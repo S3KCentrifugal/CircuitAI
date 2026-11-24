@@ -58,14 +58,8 @@ void CRetreatTask::AssignTo(CCircuitUnit* unit)
 
 	CCircuitAI* circuit = manager->GetCircuit();
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	// Owner 2026-11-24: only commanders may hold fire while retreating (their controller
-	// writes it, D-388). Every other unit keeps its own fire state (fire at will), ret_hold
-	// (Sharpshooter) included: a retreating hull still shoots a Titan in range.
-	const bool controlled = circuit->GetControllers() && circuit->GetControllers()->OwnerOf(unit) != nullptr;
-	const bool commander = cdef->IsRoleComm() || controlled;
 	TRY_UNIT(circuit, unit,
-		unit->CmdSetFireState(commander && cdef->IsAttrRetHold() ? CCircuitDef::FireType::HOLD
-			: commander ? CCircuitDef::FireType::OPEN : cdef->GetFireState());
+		unit->CmdSetFireState(cdef->IsAttrRetHold() ? CCircuitDef::FireType::HOLD : CCircuitDef::FireType::OPEN);
 	)
 	if (cdef->IsAttrBoost()) {
 		unit->SetTaskFrame(circuit->GetLastFrame());  // avoid UnitIdle on find_pad
@@ -93,11 +87,13 @@ void CRetreatTask::AssignTo(CCircuitUnit* unit)
 	// and fire state from that controller, the single writer (D-389: cloaked
 	// only when hidden from a real threat). Every other unit keeps the
 	// pre-D-388 rule: cloak on retreat, hold fire only for ret_hold ranged units.
+	const bool controlled = circuit->GetControllers() && circuit->GetControllers()->OwnerOf(unit) != nullptr;
 	if (unit->GetCircuitDef()->IsAbleToCloak() && !controlled) {
 		TRY_UNIT(manager->GetCircuit(), unit,
 			unit->CmdCloak(true);
-			// Owner 2026-11-24: no HOLD/RETURN on retreat for non-commanders (was: ret_hold ranged
-			// HOLD, other cloakers RETURN, to keep the cloak). The fire state set above stays.
+			// Opted-in precision retreat must not decloak on return fire.
+			unit->CmdSetFireState((cdef->IsAttrRanged() && cdef->IsAttrRetHold())
+				? CCircuitDef::FireType::HOLD : CCircuitDef::FireType::RETURN);
 		)
 	}
 

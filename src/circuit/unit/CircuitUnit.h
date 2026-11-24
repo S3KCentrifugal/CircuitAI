@@ -185,6 +185,9 @@ public:
 	void CmdWantedSpeed(float speed = NO_SPEED_LIMIT);
 	void CmdStop(short options = 0, int timeout = INT_MAX);
 	void CmdSetTarget(CEnemyInfo* enemy);
+	// Owner 2026-11-24: priority target by enemy id (spam hold: best non-spam in range); no min-cost gate.
+	void CmdPriorityTarget(int enemyId);
+	int GetPriorityTarget() const { return priorityTarget; }
 	void ClearPriorityTarget();
 	// BAR SET_TARGET on behalf of a task. Held back, but remembered, while a
 	// commander target owns the unit's priority list; restored on its release.
