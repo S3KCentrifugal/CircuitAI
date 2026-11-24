@@ -772,6 +772,7 @@ namespace TechBuild {
         TechReclaim::Tick();   // D-290: pause a script reclaim whose refund stopped fitting the bank
         RefillAirRoles();                                  // D-108
         TechGrowth::Tick();
+        TechConverterAssist::PaceTick();   // owner 2026-11-23: converter frame hand-off (off unless ConverterHandoffProgress > 0)
         if (airConvId >= 0) LiftCapForRole(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));   // D-108
         if (airAfusId >= 0) LiftCapForRole(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));           // D-108
         if (airAfusId >= 0) Layout::HoldAfusSetAhead();    // D-108

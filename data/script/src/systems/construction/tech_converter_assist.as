@@ -73,6 +73,35 @@ namespace TechConverterAssist {
     bool ConverterWorker(CCircuitUnit@ u) {
         return u !is null && (TechSurplusSeats::ConverterWorker(u) || TechDefenceCrew::Owns(u.id));
     }
+    // From TechBuild::Tick: native does not re-ask a builder while it builds (played C1/C2 11-23: Pace never
+    // saw a frame), so the pacing check runs here on the converter workers (at most four ids) and only
+    // aborts the build; the worker's next ask (Pace, then the crew or seat rows) lays down the next frame.
+    int lastPace = -100000;
+    void PaceTick() {
+        if (!On() || Global::RoleSettings::Tech::ConverterHandoffProgress <= 0.0f || ai.frame - lastPace < SECOND) return;
+        lastPace = ai.frame;
+        if (!TechChain::EnergyBankFloats() || aiEconomyMgr.isEnergyStalling) return;
+        CCircuitDef@ d = Def();
+        if (d is null) return;
+        array<int> ids = { TechDefenceCrew::crewId, TechSurplusSeats::converter.id, TechBuild::airConvId,
+            TechGrowth::active ? TechGrowth::converterId : -1 };
+        Prune();
+        for (uint i = 0; i < ids.length(); ++i) {
+            if (ids[i] < 0) continue;
+            CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
+            if (u is null) continue;
+            CCircuitUnit@ f = OnConverter(u, d);
+            IBuilderTask@ cur = (u.task is null) ? null : cast<IBuilderTask>(u.task);
+            if (f is null || cur is null || Task::BuildType(cur.GetBuildType()) != Task::BuildType::CONVERT) continue;
+            if (f.GetBuildProgress() < Global::RoleSettings::Tech::ConverterHandoffProgress
+                || Helpers(f.id) < Global::RoleSettings::Tech::ConverterHandoffMinAssist) continue;
+            GenericHelpers::LogUtil("[TECH][ConvAssist] converter worker " + u.id + " hands frame " + f.id + " ("
+                + int(f.GetBuildProgress() * 100) + "%, " + Helpers(f.id) + " air helpers) on", 1);
+            aiBuilderMgr.AbortTask(u.task);
+            return;   // one hand-off per second
+        }
+    }
+
     // manager/builder.as AiMakeTask (TECH), before keep.current: the converter worker hands a far-along,
     // helped frame to the air constructors and lays down the next one
     IUnitTask@ Pace(CCircuitUnit@ u) {
