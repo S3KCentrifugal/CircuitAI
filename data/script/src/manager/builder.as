@@ -2083,6 +2083,9 @@ namespace Builder {
             // first, so no other FRONT rung re-asks it away (losing its only unit kills the order)
             if (FrontAgitatorCounter::Owns(u)) return u.task;
             if (FrontPorcClusterCounter::Owns(u)) return u.task;   // owner 2026-11-14: T1.5 porc cluster counter job
+            // owner, 2026-11-23: the dedicated T1 constructor's only job is the first T2 factory (front_t2_lab_crew.as);
+            // null once released, and it goes on below as any other constructor
+            if (FrontT2LabCrew::Owns(u)) { IUnitTask@ t2lab = FrontT2LabCrew::Work(u); if (t2lab !is null) return t2lab; }
             // owner, 2026-11-12: a T1 constructor requisitioned for gantry caretakers keeps that work,
             // seat or not (front_gantry_nanos.as); none left: null and it goes on below as usual
             IUnitTask@ caretaker=FrontGantryNanos::Work(u);
@@ -2229,6 +2232,7 @@ namespace Builder {
 	{
 		LolCannon::TaskAdded(task);   // owner, 2026-10-21: a lolcannon outside its program is aborted
 		T3Unstick::TaskAdded(task);   // the engine's self-reclaim of a stuck T3 is aborted (owner, 2026-10-20)
+		FrontT2LabCrew::TaskAdded(task);   // owner, 2026-11-23: any live T2 factory order (front_t2_lab_crew.as)
 		if (Global::AISettings::Role == AiRole::FRONT) FrontLayout::Prepare(task);
 		if (Global::AISettings::Role == AiRole::TECH && Global::RoleSettings::Tech::ExperimentalBuild)
 			Invariants::ConstructionAdmitted(task);
@@ -2396,6 +2400,7 @@ namespace Builder {
 
 	void AiTaskRemoved(IUnitTask@ task, bool done)
 	{
+		FrontT2LabCrew::TaskRemoved(task, done);   // owner, 2026-11-23: drops the crew's order handles
 		TechBuild::ReactorTaskRemoved(task);
 		SeaEconomy::Removed(task);
 		MetalEconomy::Removed(task, done);
@@ -2597,6 +2602,7 @@ namespace Builder {
 			return;
 		}
 
+        if (usage == Unit::UseAs::BUILDER && FrontT2LabCrew::OnAdded(unit)) return;   // owner 2026-11-23: no seat while on the T2 job
         if (usage == Unit::UseAs::BUILDER && FrontConstructors::OnAdded(unit)) return;
 
 		// Handle constructor-specific registration
@@ -2961,6 +2967,7 @@ namespace Builder {
 		EarlyMexUpgraders::UnitRemoved(unit);
 		TechAirSquads::UnitRemoved(unit);
         FrontConstructors::OnRemoved(unit);
+        FrontT2LabCrew::OnRemoved(unit);
         CommanderGroup::OnRemoved(unit);
 
 		// Ensure any per-builder task mapping is cleared for this unit

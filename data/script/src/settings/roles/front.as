@@ -474,6 +474,12 @@ namespace Front {
             // Vehicle-specific T2 thresholds
             float MinimumMetalIncomeForFirstT2VehiclePlant = 50.0f;
 
+            // Owner 2026-11-23: once a first-T2 trigger passes, a T1 lab/plant builds one extra T1 constructor whose
+            // only job is the first T2 factory; released into the builder pool when it stands (front_t2_lab_crew.as)
+            bool T2LabCrewEnabled = true;
+            float T2LabCrewLogSeconds = 30.0f;          // [FRONT][T2Lab] gate line, at most this often per AI
+            float T2LabCrewMaxBlockedSeconds = 300.0f;  // a crew blocked this long from ordering is released
+
             int MaxT2BotLabs = 1;
             int MaxT2VehicleLabs = 1;
 

@@ -155,6 +155,9 @@ namespace Factory {
             if(support !is null) return support;
             IUnitTask@ front=CommanderGroup::Recruit(u);
             if(front !is null) return front;
+            // owner, 2026-11-23: one extra T1 constructor for the first T2 factory once a trigger passes (front_t2_lab_crew.as)
+            IUnitTask@ t2crew=FrontT2LabCrew::FactoryMakeTask(u);
+            if(t2crew !is null) return t2crew;
             if(FrontConstructors::OpeningPending(u)) return aiFactoryMgr.Enqueue(TaskS::Wait(true,SECOND));
         }
 		IUnitTask@ recovery = Team::Recovery::FactoryMakeTask(u);

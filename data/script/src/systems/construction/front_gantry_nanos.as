@@ -324,7 +324,7 @@ namespace FrontGantryNanos {
         if (u is null || u.circuitDef is null || nanoDef is null) return false;
         if (UnitHelpers::IsCommander(u.circuitDef) || UnitHelpers::GetConstructorTier(u.circuitDef) != 1 || !u.circuitDef.CanBuild(nanoDef)) return false;
         if (Team::Ferry::IsGift(u.id) || Team::Recovery::IsGift(u.id)) return false;
-        if (FrontTactical::Owns(u) || FrontAgitator::OnOrder(u) || CommanderGroup::Owns(u.id)) return false;
+        if (FrontTactical::Owns(u) || FrontAgitator::OnOrder(u) || CommanderGroup::Owns(u.id) || FrontT2LabCrew::Owns(u)) return false;
         IUnitTask@ t = u.task;
         if (t is null || t.IsDead()) return true;
         if (t.IsExternalControlled() || t.GetType() == int(Task::Type::PLAYER) || t.GetType() == int(Task::Type::RETREAT)) return false;

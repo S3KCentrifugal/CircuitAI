@@ -1,5 +1,6 @@
 #include "../../helpers/math/front_constructor_math.as"
 #include "front_eco_blocks.as"
+#include "front_t2_lab_crew.as"
 // Stable FRONT seats, assigned in completion order rather than engine unit-ID
 // order. A casualty opens only its own seat; surviving workers never reshuffle.
 namespace FrontConstructors {

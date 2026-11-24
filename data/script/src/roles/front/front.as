@@ -231,6 +231,7 @@ namespace RoleFront {
         FrontConstructors::Watch();   // D-465: stale geothermal orders of the energy seat, every second
         FrontGantryNanos::Tick();     // owner 2026-11-12: gantry caretakers, T1 constructors requisitioned (front_gantry_nanos.as)
         FrontGantryClear::Tick();     // owner 2026-11-18: a gantry site cleared of our rear porc / eco (front_gantry_clear.as)
+        FrontT2LabCrew::Tick();       // owner 2026-11-23: first T2 factory crew release + [FRONT][T2Lab] gate line
         // Delay dynamic quota adjustments until 5 minutes into the game to avoid
         // early-game oscillations while armies and caches are still forming.
         if (ai.frame < FRONT_DYNAMIC_QUOTA_DELAY_FRAMES) {
@@ -1267,6 +1268,7 @@ namespace RoleFront {
         // Determine cap: 35 metal income per lab (e.g., 70 -> 2 labs)
         int t1BuilderCap = 5 * int(metalIncome / Global::RoleSettings::Front::MetalIncomePerT1Builder);
         if (t1BuilderCap < Global::RoleSettings::Front::MinBuilderCap) t1BuilderCap = Global::RoleSettings::Front::MinBuilderCap;
+        t1BuilderCap += FrontT2LabCrew::ExtraCap();   // owner 2026-11-23: room for the T2 factory crew
 
         string side = Global::AISettings::Side;
         
