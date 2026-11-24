@@ -55,9 +55,9 @@ namespace StartPick {
 	// every spot already taken. Deterministic: every ally computes the same list.
 	// Cost: once per AI at start; O(M^2) over the map's M mex spots (M is a few hundred).
 	array<AIFloat3>@ ExtraSpots(const array<AIFloat3>& in taken, uint want, uint lanes) {
-		array<AIFloat3> out;
+		array<AIFloat3> spots;
 		const int M = ai.GetMetalSpotCount();
-		if (M <= 0 || want == 0 || lanes == 0 || !HasOwnPoly()) return out;
+		if (M <= 0 || want == 0 || lanes == 0 || !HasOwnPoly()) return spots;
 		// attack axis
 		float ox = 0, oz = 0, ex = 0, ez = 0;
 		const array<AIFloat3>@ own = StartBoxes::boxes[ai.allyTeamId];
@@ -74,7 +74,7 @@ namespace StartPick {
 		}
 		float ux = ex - ox, uz = ez - oz;
 		const float ul = sqrt(ux * ux + uz * uz);
-		if (ul < 1.0f) return out;
+		if (ul < 1.0f) return spots;
 		const float vx = -uz / ul, vz = ux / ul;  // across the attack axis
 		// lane cuts: equal mex counts by projection on v
 		array<float> pv(M);
@@ -116,8 +116,8 @@ namespace StartPick {
 			laneUsed[ln] = true;
 		}
 		const float sp2 = Global::StartPick::ExtraSpacing * Global::StartPick::ExtraSpacing;
-		for (int pass = 0; pass < 2 && out.length() < want; ++pass) {
-			for (uint ln = 0; ln < lanes && out.length() < want; ++ln) {
+		for (int pass = 0; pass < 2 && spots.length() < want; ++pass) {
+			for (uint ln = 0; ln < lanes && spots.length() < want; ++ln) {
 				if (pass == 0 && laneUsed[ln]) continue;
 				int pick = -1;
 				for (uint c = 0; c < cpos.length(); ++c) {
@@ -131,12 +131,12 @@ namespace StartPick {
 				}
 				if (pick < 0) continue;
 				if (pass == 0) laneUsed[ln] = true;
-				out.insertLast(cpos[pick]);
+				spots.insertLast(cpos[pick]);
 				all.insertLast(cpos[pick]);
 			}
 		}
-		Log("extra spots: " + out.length() + " of " + want + " wanted (" + lanes + " lanes, " + cpos.length() + " in-box clusters)");
-		return out;
+		Log("extra spots: " + spots.length() + " of " + want + " wanted (" + lanes + " lanes, " + cpos.length() + " in-box clusters)");
+		return spots;
 	}
 
 	int RolePriority(AiRole r) {
