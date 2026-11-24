@@ -88,6 +88,13 @@ namespace CommanderGroup {
         if(!enabled) return;
         desired=CommanderGroupMath::DesiredT2(desired,aiEconomyMgr.metal.income,aiEconomyMgr.energy.income,
             firstM,firstE,secondM,secondE,thirdM,thirdE);
+        // owner 2026-11-23: the porc cluster seat (Front::PorcClusterSeat) is recruited once seat 0 stands and the
+        // cluster rule has work at its T2 gate, without waiting for the second/third-seat income
+        const int clusterSeat=Global::RoleSettings::Front::PorcClusterSeat;
+        if(clusterSeat>0 && clusterSeat<3 && desired<clusterSeat+1 && members[0]>=0 && FrontPorcClusterCounter::WantsSeat()) {
+            desired=clusterSeat+1;
+            GenericHelpers::LogUtil("[CommanderGroup] desired="+desired+" for the porc cluster seat "+clusterSeat,1);
+        }
         aiTerrainMgr.SetLayoutInt("front.group.desired",desired);
         if(ai.GetTeamUnit(economy) is null) economy=-1;
         aiTerrainMgr.SetLayoutInt("front.group.economy",economy);
@@ -103,7 +110,8 @@ namespace CommanderGroup {
         FrontPorcClusterCounter::Update();
         for(uint i=0;i<members.length();++i)
             aiBuilderMgr.SetCommanderCombatOption("commander_group_member"+i,
-                float((FrontAgitatorCounter::Holds(members[i]) || FrontPorcClusterCounter::Holds(members[i]))?-1:members[i]));
+                float((FrontAgitatorCounter::Holds(members[i]) || FrontPorcClusterCounter::Holds(members[i])
+                    || FrontPorcClusterCounter::IsDedicated(members[i]))?-1:members[i]));   // owner 2026-11-23: cluster seat never takes native group work
         // owner 2026-11-01: the group's T1 constructor also builds forward agitators (front_agitator.as GroupPull);
         // while it is on one, native group work must not take it back, so it is unpublished meanwhile
         CCircuitUnit@ con=ai.GetTeamUnit(FrontConstructors::seats[2]);

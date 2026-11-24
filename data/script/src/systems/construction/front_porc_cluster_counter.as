@@ -31,6 +31,14 @@
 // (FrontConstructors COMMANDER seat). The builder must be within PorcClusterReach of the site. One job at a time;
 // the builder is unpublished from native group work while on it (CommanderGroup::Update / PublishUnit), is kept
 // first in AiMakeTask, and gets its old task back after.
+// Dedicated seat (owner 2026-11-23, Front::PorcClusterSeat, default 1 = the group's second T2 seat): once it stands,
+// it is the only T2 seat this rule uses. Each scan it first reclaims a flagged T1 gun whose T2 gun stands (the seat
+// itself, unpublished while on it; nanos and native builders may help), then builds a T2 upgrade gun behind a
+// flagged cluster, and only then a T2 gun for a new cluster. Between jobs it guards the commander. CommanderGroup
+// recruits it as soon as WantsSeat() (T2 gate passes, work pending) with seat 0 standing. Without it the old seats
+// 0..2 do the T2 work and the reclaim is queued for native builders; upgrades still come before new clusters.
+// A built T1 gun is flagged by the build task's own target id (fallback: ours within PorcClusterFlagRadius of the
+// site); flagged guns are left out of front_agitator.as's 3-gun reclaim (IsClusterGun).
 // Every unit / task handle is checked for null (and IsDead) before use. Log [FRONT][PorcCluster].
 // Cost: one owned-unit scan, plus the battle snapshot contacts + ghosts filtered to static ground guns, every
 // PorcClusterScanSeconds while on; clustering O(T^2) over our own T1.5 turrets; site search (~90 points x nearby
@@ -47,6 +55,7 @@ namespace FrontPorcClusterCounter {
     const int ReclaimSeconds = 180;         // reclaim order timeout
     const int ReclaimTries = 5;             // a flagged gun still standing after this many reclaim orders is unflagged
     const int ReclaimRetrySeconds = 20;     // a reclaim that ended with the gun standing is queued again after this
+    const int GuardLogSeconds = 60;
 
     class Turret {
         AIFloat3 pos;
@@ -97,7 +106,10 @@ namespace FrontPorcClusterCounter {
     int jobUnit = -1;
     bool jobT2 = false;
     int jobKind = 0;           // 0 gun for an open cluster, 1 T2 upgrade gun
-    int jobOld = -1;           // kind 1: the flagged T1 gun
+    int jobOld = -1;           // kind 1: the flagged T1 gun; kind 2 (seat reclaim): the gun being reclaimed
+    int jobTarget = -1;        // the build order's frame (unit id), seen while the order is open
+    IUnitTask@ guard;          // the dedicated seat's guard between jobs
+    int guardLog = -100000;
     // the reclaim of a flagged T1 gun whose T2 gun stands: queued for native builders and nanos, like the stuck-T3
     // reclaims (t3_unstick.as); no seat is put on it (a reclaim order dies the moment its only builder is pulled off)
     IUnitTask@ rcTask;
@@ -119,7 +131,8 @@ namespace FrontPorcClusterCounter {
         holds.deleteAll(); waits.deleteAll();
         flagged.deleteAll(); flagSites.resize(0); flagSiteUntil.resize(0);
         @rcTask = null; rcOld = -1; rcKey = "";
-        stage = 0; jobUnit = -1; jobT2 = false; jobKind = 0; jobOld = -1; @order = null; @prevTask = null; jobKey = "";
+        stage = 0; jobUnit = -1; jobT2 = false; jobKind = 0; jobOld = -1; jobTarget = -1; @order = null; @prevTask = null; jobKey = "";
+        @guard = null; guardLog = -100000;
     }
 
     void AddDefs(const array<string>@ names, array<CCircuitDef@>@ into) {
@@ -181,7 +194,8 @@ namespace FrontPorcClusterCounter {
     void FlagGuns() {
         for (int i = int(flagSites.length()) - 1; i >= 0; --i) {
             int best = -1;
-            float bestSq = FlagRadius * FlagRadius;
+            const float fr = AiMax(FlagRadius, Global::RoleSettings::Front::PorcClusterFlagRadius);
+            float bestSq = fr * fr;
             for (uint g = 0; g < guns.length(); ++g) {
                 if (guns[g] is null || guns[g].t2 || !guns[g].done) continue;
                 const float sq = MapHelpers::SqDist(guns[g].pos, flagSites[i]);
@@ -378,7 +392,7 @@ namespace FrontPorcClusterCounter {
         CCircuitUnit@ u = ai.GetTeamUnit(jobUnit);
         IUnitTask@ prev = prevTask;
         const int id = jobUnit;
-        stage = 0; jobUnit = -1; @order = null; @prevTask = null;
+        stage = 0; jobUnit = -1; jobTarget = -1; @order = null; @prevTask = null;
         CommanderGroup::next = 0;   // republish the seat on the next group update
         if (u is null || u.circuitDef is null) { Log("builder " + id + " gone; nothing to return"); return null; }
         if (prev is null || prev.IsDead() || Busy(u)) { Log("builder " + id + " back to group work (its old task is gone)"); return null; }
@@ -429,8 +443,17 @@ namespace FrontPorcClusterCounter {
 
     void TaskRemoved(IUnitTask@ task, bool done) {
         if (task is null) return;
-        if (rcTask !is null && rcTask is task) { ReclaimEnded(done ? "done" : "dropped"); return; }
+        if (guard !is null && guard is task) { @guard = null; return; }
+        if (rcTask !is null && rcTask is task) {
+            ReclaimEnded(done ? "done" : "dropped");
+            // the dedicated seat's own reclaim: the job ends with it (ReclaimEnded set any retry hold)
+            if (stage == 1 && jobKind == 2 && order is task) { @order = null; Finish("reclaim ended"); }
+            return;
+        }
         if (stage == 0 || !(order is task)) return;
+        // the frame this order built: its own target, else the id seen while it was open
+        IBuilderTask@ bt = cast<IBuilderTask>(task);
+        if (bt !is null && bt.target !is null) jobTarget = bt.target.id;
         @order = null;
         if (!done) {
             holds.set(jobKey, ai.frame + HoldSeconds * SECOND);
@@ -440,8 +463,18 @@ namespace FrontPorcClusterCounter {
         Log((jobKind == 1 ? "T2 upgrade gun" : "gun") + " built at " + At(jobSite) + " behind cluster " + jobKey + " in " + ((ai.frame - orderFrame) / SECOND) + " s"
             + (jobKind == 1 ? "; flagged T1 gun " + jobOld + " is reclaimed once it stands" : ""));
         // owner 2026-11-18: a T1 gun of this rule is flagged for a later T2 upgrade
+        // owner 2026-11-23: by the frame's id (Live 11-23: guns placed 185-230 from the ordered site were never
+        // found within 128 of it); the site search stays as the fallback when no id was seen
         if (jobKind == 0 && !jobT2 && Global::RoleSettings::Front::PorcClusterUpgrade) {
-            flagSites.insertLast(jobSite); flagSiteUntil.insertLast(ai.frame + FlagSiteSeconds * SECOND);
+            CCircuitUnit@ built = jobTarget >= 0 ? ai.GetTeamUnit(jobTarget) : null;
+            if (built !is null && built.circuitDef !is null && In(t1Defs, built.circuitDef) && ai.IsOwnedUnit(built)) {
+                if (!flagged.exists("" + built.id)) {
+                    flagged.set("" + built.id, 0);
+                    Log("T1 gun " + built.id + " at " + At(built.GetPos(ai.frame)) + " flagged for a T2 upgrade (by id)");
+                }
+            } else {
+                flagSites.insertLast(jobSite); flagSiteUntil.insertLast(ai.frame + FlagSiteSeconds * SECOND);
+            }
         }
         lastScan = -100000;
         Finish("built");
@@ -473,9 +506,14 @@ namespace FrontPorcClusterCounter {
                 return;
             }
             if (FrontRecovery::Active()) { Abort("base recovery"); return; }
-            if (!OrderLive()) { Abort("order lost"); return; }
+            if (!OrderLive()) {
+                if (jobKind == 2) { @order = null; Finish("reclaim order gone"); return; }   // ReclaimEnded holds the retry
+                Abort("order lost");
+                return;
+            }
             IBuilderTask@ b = cast<IBuilderTask>(order);
-            if (b !is null && b.target is null && ai.frame - orderFrame >= FrameDeadlineSeconds * SECOND) {
+            if (b !is null && b.target !is null && jobKind != 2) jobTarget = b.target.id;
+            if (b !is null && b.target is null && jobKind != 2 && ai.frame - orderFrame >= FrameDeadlineSeconds * SECOND) {
                 Abort("no frame after " + FrameDeadlineSeconds + " s");
                 return;
             }
@@ -485,8 +523,33 @@ namespace FrontPorcClusterCounter {
         if (FrontRecovery::Active()) return;
         if (ai.frame - lastScan < Global::RoleSettings::Front::PorcClusterScanSeconds * SECOND) return;
         Scan();
-        Start();
-        if (stage == 0) FollowUp();
+        // owner 2026-11-23: flagged guns first (reclaim, then upgrade), new clusters after. Live 11-23 (Moonshine
+        // AI 10/14/15): with new clusters first, T2 seats at the group for 14-20 min never upgraded 5 flagged guns
+        FollowUp();
+        if (stage == 0) Start();
+    }
+
+    // The dedicated cluster seat (Front::PorcClusterSeat) when it stands; null when off or vacant
+    CCircuitUnit@ DedicatedSeat() {
+        const int s = Global::RoleSettings::Front::PorcClusterSeat;
+        if (s < 0 || s >= 3 || uint(s) >= CommanderGroup::members.length()) return null;
+        CCircuitUnit@ u = ai.GetTeamUnit(CommanderGroup::members[s]);
+        if (u is null || u.circuitDef is null || Pick(t2Defs, u) is null) return null;
+        return u;
+    }
+    bool IsDedicated(int id) {
+        CCircuitUnit@ d = DedicatedSeat();
+        return d !is null && id >= 0 && d.id == id;
+    }
+    // front_agitator.as: a flagged gun is this rule's (upgraded and reclaimed here), not one of its agitators
+    bool IsClusterGun(int id) { return id >= 0 && flagged.exists("" + id); }
+    // CommanderGroup::Update: recruit the dedicated seat early while the T2 gate passes and there is cluster work
+    bool WantsSeat() {
+        if (!On() || !Global::RoleSettings::Front::PorcClusterUpgrade || Global::RoleSettings::Front::PorcClusterSeat < 0) return false;
+        if (Economy::GetMinMetalIncomeLast10s() <= Global::RoleSettings::Front::PorcClusterT2MinMetalIncome) return false;
+        if (flagged.getSize() > 0) return true;
+        for (uint i = 0; i < clusters.length(); ++i) if (clusters[i] !is null && !clusters[i].covered) return true;
+        return false;
     }
 
     // The nearest free T2 seat at the group that can build a T2 gun; `any` whether the group has such a seat at all
@@ -495,8 +558,11 @@ namespace FrontPorcClusterCounter {
         CCircuitUnit@ best = null;
         float bestSq = 1e30f;
         const float join = Global::RoleSettings::Front::PorcClusterT2JoinRadius;
+        // owner 2026-11-23: once the dedicated seat stands, only it takes cluster T2 work
+        CCircuitUnit@ ded = DedicatedSeat();
         for (uint s = 0; s < 3 && s < CommanderGroup::members.length(); ++s) {
             CCircuitUnit@ u = ai.GetTeamUnit(CommanderGroup::members[s]);
+            if (ded !is null && !(u is ded)) continue;
             if (u is null || u.circuitDef is null || Pick(t2Defs, u) is null) continue;
             any = true;
             if (!Free(u)) continue;
@@ -511,7 +577,7 @@ namespace FrontPorcClusterCounter {
     void Launch(CCircuitUnit@ b, IUnitTask@ o, bool t2, int kind, int old, const string &in key, const AIFloat3 &in site) {
         if (b is null || o is null) return;
         @prevTask = (b.task !is null && !b.task.IsDead()) ? b.task : null;
-        @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKind = kind; jobOld = old; jobKey = key; jobSite = site; orderFrame = ai.frame;
+        @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKind = kind; jobOld = old; jobKey = key; jobSite = site; orderFrame = ai.frame; jobTarget = -1;
         if (t2) {
             for (uint s = 0; s < 3 && s < CommanderGroup::members.length(); ++s)
                 if (CommanderGroup::members[s] == b.id) aiBuilderMgr.SetCommanderCombatOption("commander_group_member" + s, -1.0f);
@@ -546,6 +612,23 @@ namespace FrontPorcClusterCounter {
                     continue;
                 }
                 if (rcTask !is null || rcOld >= 0) continue;   // one reclaim at a time
+                // owner 2026-11-23: the dedicated seat reclaims it itself (unpublished while on it, so native group
+                // work cannot pull it off and kill the order); without that seat it is queued for native builders
+                CCircuitUnit@ ded = DedicatedSeat();
+                if (ded !is null) {
+                    if (stage != 0 || !Free(ded) || MapHelpers::SqDist(ded.GetPos(ai.frame), op) > reach * reach) continue;
+                    IUnitTask@ ro = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, old, ReclaimSeconds * SECOND));
+                    if (ro is null || ro.IsDead()) {
+                        holds.set(c.key, ai.frame + HoldSeconds * SECOND);
+                        Log("cluster " + c.key + ": seat reclaim of flagged T1 gun " + oid + " refused natively; held " + HoldSeconds + " s");
+                        continue;
+                    }
+                    @rcTask = ro; rcOld = oid; rcKey = c.key; rcFrame = ai.frame;
+                    Log("T2 " + ded.circuitDef.GetName() + " " + ded.id + " (cluster seat) reclaims flagged T1 gun " + old.circuitDef.GetName() + " " + oid
+                        + " at " + At(op) + ": the T2 gun of cluster " + c.key + " [" + c.names + "] stands");
+                    Launch(ded, ro, true, 2, oid, c.key, op);
+                    return;
+                }
                 IUnitTask@ o = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, old, ReclaimSeconds * SECOND));
                 if (o is null || o.IsDead()) {
                     holds.set(c.key, ai.frame + HoldSeconds * SECOND);
@@ -604,8 +687,8 @@ namespace FrontPorcClusterCounter {
         for (uint k = 0; k < byFwd.length(); ++k) {
             Cluster@ c = clusters[byFwd[k]];
             if (c is null) continue;
-            int until = -1;
-            if (holds.get(c.key, until) && ai.frame < until) continue;
+            int64 until = -1;   // dictionary ints read through int64 (memory: as-dictionary-int64)
+            if (holds.get(c.key, until) && int64(ai.frame) < until) continue;
             // the builder: a T2 seat at the group (income gate), else the group's T1 constructor. A cluster holding a
             // T2 pop-up always gets a T2 gun (owner 2026-11-15): no income gate, no T1 fallback; it waits for a T2
             // seat to reach the group, and is skipped while the group has none
@@ -624,9 +707,9 @@ namespace FrontPorcClusterCounter {
                 @b = T2Seat(centre, anyT2);
                 if (b !is null) { t2 = true; waits.delete(c.key); }
                 else if (anyT2) {
-                    int since = -1;
+                    int64 since = -1;
                     if (!waits.get(c.key, since)) { since = ai.frame; waits.set(c.key, since); Log("cluster " + c.key + ": waiting up to " + Global::RoleSettings::Front::PorcClusterT2WaitSeconds + " s for a T2 seat to reach the group"); }
-                    if (ai.frame - since < Global::RoleSettings::Front::PorcClusterT2WaitSeconds * SECOND) continue;
+                    if (int64(ai.frame) - since < int64(Global::RoleSettings::Front::PorcClusterT2WaitSeconds * SECOND)) continue;
                 }
             }
             if (b is null) {
@@ -651,7 +734,7 @@ namespace FrontPorcClusterCounter {
                 Global::RoleSettings::Front::PorcClusterShake, true, OrderTimeoutSeconds * SECOND));
             if (o is null) { holds.set(c.key, ai.frame + HoldSeconds * SECOND); Log("cluster " + c.key + ": " + d.GetName() + " order refused"); continue; }
             @prevTask = (b.task !is null && !b.task.IsDead()) ? b.task : null;
-            @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKind = 0; jobOld = -1; jobKey = c.key; jobSite = site; orderFrame = ai.frame;
+            @order = o; stage = 1; jobUnit = b.id; jobT2 = t2; jobKind = 0; jobOld = -1; jobKey = c.key; jobSite = site; orderFrame = ai.frame; jobTarget = -1;
             // unpublish before the assign: native group work takes a still-published seat straight back
             if (t2) {
                 for (uint s = 0; s < 3 && s < CommanderGroup::members.length(); ++s)
@@ -672,9 +755,32 @@ namespace FrontPorcClusterCounter {
 
     // CommanderGroup::Work: on the job it keeps the order; a finished job hands back its old task
     IUnitTask@ Work(CCircuitUnit@ u) {
-        if (u is null || stage == 0 || u.id != jobUnit) return null;
-        if (stage == 4) return Return(false);
-        if (OrderLive()) return order;
-        return null;
+        if (u is null) return null;
+        if (stage != 0 && u.id == jobUnit) {
+            if (stage == 4) {
+                IUnitTask@ back = Return(false);
+                if (back !is null || !IsDedicated(u.id)) return back;
+            } else if (OrderLive()) return order;
+            else return null;
+        }
+        return SeatGuard(u);
+    }
+
+    // owner 2026-11-23: between jobs the dedicated seat only assists: it guards the commander (else the group's T1
+    // constructor), so it stays with the group and helps its builds and repairs. A guard is never a framed build, so
+    // Free() lets the next cluster job take the seat at once. Null for every other unit (native group work as before).
+    IUnitTask@ SeatGuard(CCircuitUnit@ u) {
+        if (!On() || u is null || !IsDedicated(u.id) || Busy(u)) return null;
+        if (guard !is null && !guard.IsDead()) return guard;
+        @guard = null;
+        CCircuitUnit@ t = ai.GetTeamUnit(aiBuilderMgr.FrontCommanderId());
+        if (t is null) @t = ai.GetTeamUnit(FrontConstructors::seats[FrontConstructors::COMMANDER]);
+        if (t is null || t is u) return null;
+        @guard = GuardHelpers::AssignWorkerGuard(u, t, Task::Priority::NORMAL, true, Global::RoleSettings::Front::PorcClusterSeatGuardSeconds * SECOND);
+        if (guard !is null && ai.frame - guardLog >= GuardLogSeconds * SECOND) {
+            guardLog = ai.frame;
+            Log("cluster seat " + u.circuitDef.GetName() + " " + u.id + " guards " + t.circuitDef.GetName() + " " + t.id + " between jobs");
+        }
+        return guard;
     }
 }

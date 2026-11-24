@@ -364,7 +364,8 @@ namespace FrontAgitatorCounter {
             for (uint s = 0; s < 3 && s < CommanderGroup::members.length(); ++s) {
                 CCircuitUnit@ u = ai.GetTeamUnit(CommanderGroup::members[s]);
                 if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f || Busy(u)) continue;
-                if (FrontTactical::Owns(u) || FrontAgitator::OnOrder(u) || LolCannon::IsCrew(u.id) || FrontPorcClusterCounter::Holds(u.id)) continue;
+                if (FrontTactical::Owns(u) || FrontAgitator::OnOrder(u) || LolCannon::IsCrew(u.id) || FrontPorcClusterCounter::Holds(u.id)
+                    || FrontPorcClusterCounter::IsDedicated(u.id)) continue;   // owner 2026-11-23: the porc cluster seat
                 CCircuitDef@ d = Pick(heavyDefs, u);
                 if (d is null) continue;
                 const AIFloat3 site = HeavySite(d, t);

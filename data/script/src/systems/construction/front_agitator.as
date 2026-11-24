@@ -375,7 +375,10 @@ namespace FrontAgitator {
                 const AIFloat3 gp = u.GetPos(ai.frame);
                 placed.insertLast(gp);
                 kinds[gk].forwardMost = AiMax(kinds[gk].forwardMost, Along(gp));
-                if (u.GetBuildProgress() >= 1.0f) {
+                // owner 2026-11-23: a porc cluster gun (flagged for its T2 upgrade) is not one of ours to cap; it sits
+                // behind our porc, so it was the "furthest back" and was reclaimed at once (Smolders 11-23 AI 11:
+                // reclaimed the second it was flagged, rebuilt 4 times on the same spot)
+                if (u.GetBuildProgress() >= 1.0f && !FrontPorcClusterCounter::IsClusterGun(u.id)) {
                     ++finishedAgitators;
                     if (Along(gp) < backmostAlong) { backmostAlong = Along(gp); backmostAgitator = u.id; }
                 }

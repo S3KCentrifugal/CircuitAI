@@ -673,7 +673,14 @@ namespace Front {
             // owner 2026-11-18: a T1 gun this rule built is flagged; once the T2 gate passes and a T2 seat is at the group,
             // the faction's T2 gun goes behind that cluster, and once it stands the flagged T1 gun is reclaimed
             bool PorcClusterUpgrade = true;
-            int PorcClusterT2WaitSeconds = 60;            // T2 seat on its way: the T1 waits this long, then builds
+            // owner 2026-11-23: one commander-group T2 seat (this index of CommanderGroup::members, -1: off) does only
+            // the porc cluster work: upgrades and reclaims of flagged T1 guns first, then T2 guns for new clusters;
+            // between jobs it guards (assists) the commander. Recruited as soon as the T2 gate passes and seat 0
+            // stands, without waiting for the group's second-seat income. Other seats leave cluster T2 work to it.
+            int PorcClusterSeat = 1;
+            int PorcClusterSeatGuardSeconds = 20;         // guard order timeout between jobs
+            float PorcClusterFlagRadius = 300.0f;         // fallback when the built gun's id was not seen: ours this near the site
+            int PorcClusterT2WaitSeconds = 60;           // T2 seat on its way: the T1 waits this long, then builds
             float PorcClusterShake = 32.0f;
             float PorcClusterReach = 3000.0f;             // the builder must be this near the forward turret
             int PorcClusterMax = 6;                       // covered clusters at most
