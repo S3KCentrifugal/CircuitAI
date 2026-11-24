@@ -631,6 +631,22 @@ namespace RoleFront {
             assistRequired = false;
             return false;
         }
+        // Owner 2026-11-24 (Baryon: teams 10/11 built a second T1 vehicle plant
+        // at ~6 min): native's factory switch skips the income check, so it
+        // re-picked the same T1 plant once the army passed 1.2 x its cost. A
+        // FRONT keeps one T1 ground factory; the rez lab has its own rule, and
+        // a lost lab (count 0) can still be replaced here.
+        if (facDef !is null) {
+            const string n = facDef.GetName();
+            const bool isGroundT1 = UnitHelpers::GetAllT1BotLabs().find(n) >= 0
+                || UnitHelpers::GetAllT1VehicleLabs().find(n) >= 0;
+            if (isGroundT1
+                && UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1BotLabs())
+                 + UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllT1VehicleLabs()) > 0) {
+                assistRequired = false;
+                return false;
+            }
+        }
         const bool isOK = (armyCost > Global::RoleSettings::Front::SwitchFactoryCostMultiplier * facDef.costM * float(factoryCount)) || (metalCurrent > facDef.costM);
         assistRequired = !isOK;
         return isOK;
