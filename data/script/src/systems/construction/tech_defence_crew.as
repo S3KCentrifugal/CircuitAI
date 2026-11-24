@@ -46,7 +46,8 @@ namespace TechDefenceCrew {
         const CCircuitDef@ d = cur.target !is null ? cur.target.circuitDef : cur.buildDef;
         if (d is null) return false;
         const string n = d.GetName();
-        return UnitHelpers::GetAllAntiNukes().find(n) >= 0 || TechPinpointers::Def() !is null && n == TechPinpointers::Def().GetName();
+        return UnitHelpers::GetAllAntiNukes().find(n) >= 0 || TechPinpointers::Def() !is null && n == TechPinpointers::Def().GetName()
+            || n == UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side);
     }
     bool OnAssist(CCircuitUnit@ u) {
         IBuilderTask@ cur = (u.task is null) ? null : cast<IBuilderTask>(u.task);
@@ -81,7 +82,20 @@ namespace TechDefenceCrew {
             if (t !is null) return t;
             @u = ai.GetTeamUnit(id); if (u is null) { Release("lost"); return null; }
         }
-        // 4. a short assist near the antinuke pad, or wait there; the timeout brings it back to ask
+        // 4. advanced converters while energy floats (a converter worker: the seat waivers apply)
+        if (Global::RoleSettings::Tech::DefenceCrewConverters && TechChain::EnergyBankFloats() && !aiEconomyMgr.isEnergyStalling) {
+            CCircuitDef@ conv = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));
+            if (conv !is null && u.circuitDef.CanBuild(conv)) {
+                if (TechConverterAssist::OnConverter(u, conv) !is null) return u.task;
+                TechBuild::LiftCapForRole(conv.GetName());
+                @t = TechBuild::BuildByLayout(u, conv.GetName(), Task::BuildType::CONVERT);
+                if (t !is null) return t;
+                @u = ai.GetTeamUnit(id); if (u is null) { Release("lost"); return null; }
+                @t = TechBuild::AssistNearestOf(u, conv.GetName());
+                if (t !is null) return t;
+            }
+        }
+        // 5. a short assist near the antinuke pad, or wait there; the timeout brings it back to ask
         if (OnAssist(u)) return u.task;
         AIFloat3 home = AIFloat3(-1, -1, -1);
         const int slot = Layout::ReserveAntiNuke();

@@ -11,6 +11,7 @@
 #include "../../manager/factory.as"
 #include "../../systems/construction/silo_antinukes.as"
 #include "../../systems/construction/tech_defence_crew.as"
+#include "../../systems/construction/tech_converter_assist.as"
 #include "../../systems/construction/layout.as"
 #include "../../systems/construction/eco_planner.as"
 #include "../../systems/combat/spam.as"
@@ -328,6 +329,7 @@ namespace TechRules {
         return TechBuild::AssistAfus(c.u);
     }
     IUnitTask@ DoRecovery(Ctx@ c)       { return TechBuild::RecoverEconomy(c.u); }
+    IUnitTask@ DoAirConvertAssist(Ctx@ c) { return TechConverterAssist::Work(c.u); }
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
     IUnitTask@ DoAntiNuke(Ctx@ c) { return FirstAntiNuke(c.u, c.mi, c.ei, false); }
     // The first antinuke for constructor u: assist its frame, else order it. anyDistance (the defence crew,
@@ -606,6 +608,7 @@ namespace TechRules {
         table.insertLast(Rule("defence.antinuke.extra", CON_T2, W0(), @DoAntiNukeExtra, "owner 2026-11-15: one more antinuke per scouted enemy silo beyond the first, on a base periphery pad (never off the map, still covering the core)"));
         table.insertLast(Rule("mex.upgrade", CON_T2, W0(), @DoMexUpgrade, "reachable owned mex upgrades before discretionary assistance"));
         table.insertLast(Rule("eco.support", CONSTRUCTORS, W0(), @DoEconomySupport, "build support for an admitted economy site before its reactor or converter"));
+        table.insertLast(Rule("air.convert.assist", CONSTRUCTORS, W0(), @DoAirConvertAssist, "owner 2026-11-23: while energy floats, air constructors without a dedicated role help the nearest advanced converter frame (at most AirConverterAssistPerFrame each)"));
         table.insertLast(Rule("air.reactor", CONSTRUCTORS, W0(), @DoAirReactor, "idle air constructors prioritize the shared advanced fusion while energy is short; a floating bank yields to conversion and bounded build power"));
         table.insertLast(Rule("engineering.front", MOBILE, W1(@T2LandReleased), @DoEngineering, "Released T2 bots and fast assistants reinforce the least-progressed reachable FRONT lane"));
         table.insertLast(Rule("eco.recover",       MOBILE,       W0(), @DoRecovery, "D-306: restore safe lost layout capacity before discretionary growth"));

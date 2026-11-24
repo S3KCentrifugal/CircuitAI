@@ -1016,8 +1016,17 @@ namespace Tech {
             // ordered 19:27): the T2 constructor TECH keeps after its mex upgraders is the defence crew, for
             // the first antinuke, extra antinukes and Pinpointers (tech_defence_crew.as); never donated.
             bool DefenceCrewEnabled = true;
+            bool DefenceCrewConverters = true;          // owner 2026-11-23: between jobs, advanced converters while energy floats
             float DefenceCrewAssistRadius = 900.0f;     // idle: assist what goes up this near the antinuke pad
             int DefenceCrewAssistSeconds = 20;          // ... for this long, then ask again
+            // Owner 2026-11-23 (Smolders headless: bank full from ~18:00, 50-70% of TECH's energy sent to allies,
+            // 0-4 converters, up to 61 T1 air constructors idle): tech_converter_assist.as
+            bool AirConverterAssist = true;             // air constructors without a dedicated role help advanced converter frames while energy floats
+            float AirConverterAssistRadius = 4000.0f;
+            int AirConverterAssistPerFrame = 8;
+            int AirConverterAssistSeconds = 30;
+            float ConverterHandoffProgress = 0.0f;      // > 0: the converter worker leaves a frame this far along (and helped) and lays down the next
+            int ConverterHandoffMinAssist = 2;          // ... air helpers sent to that frame
             // Owner 2026-11-02: the first antinuke pad sits just outside the economy box,
             // where at least this many of its turret slots still reach it (layout.as)
             int AntiNukePeripheryTurrets = 3;

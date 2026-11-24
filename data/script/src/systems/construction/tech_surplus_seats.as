@@ -174,7 +174,8 @@ namespace TechSurplusSeats {
     {
         if (worker is null) return false;
         return worker.id == converter.id || worker.id == TechBuild::airConvId
-            || (TechGrowth::active && worker.id == TechGrowth::converterId);
+            || (TechGrowth::active && worker.id == TechGrowth::converterId)
+            || TechDefenceCrew::Owns(worker.id);   // owner 2026-11-23: the antinuke/Pinpointer crew builds converters between jobs
     }
     bool ConverterSeatWaived(CCircuitUnit@ worker)
     {

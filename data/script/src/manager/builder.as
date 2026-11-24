@@ -2052,6 +2052,8 @@ namespace Builder {
         // that work (tech_gantry_fill.as); none left: null and it goes on below as usual
         // owner, 2026-11-23: TECH's own extra T2 constructor for the first antinuke and Pinpointers (tech_defence_crew.as)
         if (Global::AISettings::Role == AiRole::TECH) {
+            IUnitTask@ pace = TechConverterAssist::Pace(u);   // owner, 2026-11-23: converter worker hands helped frames on
+            if (pace !is null) return pace;
             IUnitTask@ dc = TechDefenceCrew::Work(u);
             if (dc !is null) return dc;
         }
