@@ -420,7 +420,7 @@ void CRangedEngagement::UpdateAssault(CCircuitUnit* unit,const AIFloat3& pos,int
     int bestId=-1; float best=std::numeric_limits<float>::max(); AIFloat3 bestPos; bool bestGhost=false;
     const auto consider=[&](const CRangedWorld::Contact& c,bool ghost) {
         if(c.def==nullptr || p.heavyPorcDefs.count(c.def->GetId())==0 || (c.mobile && !ghost)) return;
-        const float reach=c.hazardRadius+StaticMargin(p)+600.f;
+        const float reach=std::max(2000.f,c.hazardRadius+StaticMargin(p)+600.f);   // owner 22:56Z: all artillery within 2000 focus it
         const float d2=pos.SqDistance2D(c.pos);
         if(d2>reach*reach || d2>=best) return;
         best=d2; bestId=c.id; bestPos=c.pos; bestGhost=ghost;

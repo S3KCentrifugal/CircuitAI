@@ -4,6 +4,7 @@
 #include "terrain/RangedGeometry.h"
 #include "AIFloat3.h"
 #include <deque>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -93,6 +94,12 @@ public:
 	private:
 		CRangedObservation* owner;
 	};
+
+	// Owner 2026-11-23 (22:56Z): heavy porc assaults shared by every AI of the ally team, so
+	// all our artillery within 2000 of the same porc waits for and goes in with each other.
+	// Key porc id; waiting = unit id -> last frame. Pruned in CRangedWorld::AssaultJoin.
+	struct Assault { std::map<int,int> waiting; int first=-1, go=-1, last=-1; };
+	std::map<int,Assault> assaults;
 
 	CRangedObservation(CAllyTeam* allyTeam, CCircuitAI* reader);
 	CRangedObservation(const CRangedObservation&) = delete;

@@ -213,8 +213,6 @@ private:
     mutable const RangedPolicy* porcFilter = nullptr;
     mutable int porcExempt = -1;
     mutable springai::AIFloat3 porcExemptPos = springai::AIFloat3(-1.f,0.f,-1.f);
-    struct Assault { std::map<int,int> waiting; int first=-1, go=-1, last=-1; };
-    std::map<int,Assault> assaults;
     // Largest slot radius since Refresh (FreeSlot also bounds by the
     // observation's friend radius); only widens exact broad phases.
     float largestFriendRadius = 0.f;

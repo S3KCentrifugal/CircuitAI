@@ -325,11 +325,11 @@ bool CRangedWorld::PorcHazardIgnored(const Contact& c) const
 }
 bool CRangedWorld::AssaultJoin(int porc,int unit,int frame,int minGroup,int maxWaitFrames,int& waiting)
 {
-    // Owner 2026-11-23: bounded registry (stale assaults dropped after 60 s, members after 3 s).
-    for(auto it=assaults.begin();it!=assaults.end();) {
-        if(frame-it->second.last>FRAMES_PER_SEC*60) it=assaults.erase(it); else ++it;
+    // Owner 2026-11-23: bounded registry (stale observation->assaults dropped after 60 s, members after 3 s).
+    for(auto it=observation->assaults.begin();it!=observation->assaults.end();) {
+        if(frame-it->second.last>FRAMES_PER_SEC*60) it=observation->assaults.erase(it); else ++it;
     }
-    Assault& a=assaults[porc];
+    CRangedObservation::Assault& a=observation->assaults[porc];
     if(a.first<0) a.first=frame;
     a.last=frame;
     a.waiting[unit]=frame;
