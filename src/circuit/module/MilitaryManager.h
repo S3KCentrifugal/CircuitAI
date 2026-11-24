@@ -791,6 +791,11 @@ public:
 	float GetMinAttackers() const { return minAttackers; }
 	int GetT3NoRegroup() const { return t3NoRegroup; }
 	// Owner 2026-11-23: profile allowlist of structures that are porc (empty: every armed static is)
+	// Owner 2026-11-24: one ranking from the existing high-value lists (no hard-coded units):
+	// commanders > artillery_commander heavy_units > heavy role / T3 mobiles > artillery_snipe
+	// threats + direct_threats (heavy porc) > ranged_defaults top_targets (LRPC, tactical launchers)
+	// > the shooter's priority_min_tech targets > structures > the rest; cost breaks ties.
+	float HighValueScore(const CCircuitDef* shooter, const CCircuitDef* e, float cost, bool mobile) const;
 	bool IsTopTarget(const CCircuitDef* d) const { return d != nullptr && rangedTopDefs.count(d->GetId()) > 0; }
 	bool IsListedPorc(const CCircuitDef* d) const { return rangedPorcDefs.empty() || (d != nullptr && rangedPorcDefs.count(d->GetId()) > 0); }
 	float GetAttackWaitSeconds() const { return attackWaitSeconds; }

@@ -2388,6 +2388,20 @@ void CMilitaryManager::UpdateCommanderSnipe()
 	}
 }
 
+float CMilitaryManager::HighValueScore(const CCircuitDef* shooter, const CCircuitDef* e, float cost, bool mobile) const
+{
+	if (e == nullptr) return 0.f;
+	float tier = 0.f;
+	if (e->IsRoleComm() || e->IsEnemyRoleAny(CCircuitDef::COMM)) tier = 8.f;
+	else if (artyCommInfo.heavyMaxSqSpeed.count(e->GetId()) > 0) tier = 7.f;
+	else if (mobile && (e->IsRoleHeavy() || e->GetTechLevel() >= 3.f)) tier = 6.f;
+	else if (artySnipeInfo.threats.count(e->GetId()) > 0 || artySnipeInfo.directThreats.count(e->GetId()) > 0) tier = 5.f;
+	else if (IsTopTarget(e)) tier = 4.f;
+	else if (shooter != nullptr && shooter->IsPriorityTarget(e)) tier = 3.f;
+	else if (!mobile) tier = 1.f;
+	return tier * 1.e6f + std::max(0.f, std::min(cost, 999999.f));
+}
+
 void CMilitaryManager::UpdateSpamFireHold()
 {
 	// Every 15 frames: O(team units) def filter; the ranged snapshot is read
@@ -2425,8 +2439,7 @@ void CMilitaryManager::UpdateSpamFireHold()
 			if (pos.SqDistance2D(c.pos) > SQUARE(range + c.radius)) continue;
 			if (CRangedEngagement::Spam(p, c)) { spam = true; continue; }
 			if (c.def == nullptr || !(c.def->GetCategory() & cdef->GetTargetCategory())) continue;
-			float score = std::max(1.f, c.cost) * (c.mobile ? 1.f : 1.5f);
-			if (cdef->IsPriorityTarget(c.def) || IsTopTarget(c.def)) score += 1e6f;
+			const float score = HighValueScore(cdef, c.def, c.cost, c.mobile);
 			if (score > bestScore) { bestScore = score; best = c.id; }
 		}
 		const bool hold = spam && best < 0;
