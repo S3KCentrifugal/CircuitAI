@@ -339,7 +339,8 @@ namespace AirEmergencyDefense {
             if (u is null || u.circuitDef is null) { heavyIds.delete(keys[i]); continue; }
             if (memberOf.exists(keys[i])) continue;   // already patrolling an emergency spot: stays there
             string why = HeavyBusy(u);
-            if (why == "" && !aiTerrainMgr.CanTraverse(u.circuitDef, u.GetPos(ai.frame), e.site)) why = "cannot reach";
+            CCircuitDef@ hd = ai.GetCircuitDef(u.circuitDef.GetName());   // CanTraverse takes a non-const def
+            if (why == "" && (hd is null || !aiTerrainMgr.CanTraverse(hd, u.GetPos(ai.frame), e.site))) why = "cannot reach";
             if (why != "") { ++skipped; if (skipped <= 4) skips += (skips == "" ? "" : ", ") + u.circuitDef.GetName() + " " + u.id + " " + why; continue; }
             if (!aiMilitaryMgr.TransferUnit(u, task)) continue;
             s.members.insertLast(u.id);
