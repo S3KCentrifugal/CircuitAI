@@ -45,6 +45,21 @@
 		"momentum_prior": 600, "momentum_half_life": 120,
 		"break_size": 2, "size_max": 32, "merge_radius": 1500, "home_radius": 1200, "period": 1, "log": 1
 	},
+	"t3_rush": {
+		"screen": ["armraz", "corshiva", "legeallterrainmech"],
+		"utility": ["armmark", "armaser", "armaak", "armseer", "armjam", "armyork", "corvoyr", "corspec", "coraak", "corvrad", "coreter", "corsent",
+			"legaradk", "legajamk", "legadvaabot", "legavrad", "legavjam", "legvflak"],
+		"artillery": ["armvang", "corcat", "legerailtank"],
+		"utility_ahead": 140, "screen_ahead": 160, "spacing": 120, "row_width": 600, "row_depth": 120,
+		"range_fraction": 0.95, "screen_range_fraction": 0.9, "min_screen_distance": 96,
+		"threat_radius": 2200, "engage_radius": 2800, "static_weight": 1.5,
+		"advantage_enter": 1.1, "advantage_exit": 0.6,
+		"pace_step": 300, "pace_tolerance": 240, "wait_seconds": 25, "repath": 72, "withdraw_step": 600,
+		"withdraw_screen_delay": 2, "order_min_seconds": 5,
+		"momentum_prior": 2000, "momentum_half_life": 180,
+		"break_size": 3, "size_max": 24, "merge_radius": 2000, "home_radius": 1500,
+		"ghost_margin": 50, "ghost_max_range": 1800, "period": 1, "log": 1
+	},
 	"t3_heavy": {
 		"screen": ["armbanth", "corkorg", "legeheatraymech"],
 		"utility": [], "artillery": [],

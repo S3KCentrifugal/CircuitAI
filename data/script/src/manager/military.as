@@ -15,6 +15,7 @@
 #include "../systems/construction/commander_group.as"
 #include "../systems/production/heavy_wave.as"
 #include "../systems/combat/battle_squads.as"
+#include "../systems/production/tech_rush_squad.as"
 
 namespace Military {
 
@@ -131,12 +132,13 @@ namespace Military {
 			return st;
 		}
 
+        // Owner 2026-11-24: a battle squad member keeps its squad's route: before TECH's home
+        // response and the native ranged task, so no other owner pulls it away each second
+        IUnitTask@ squadTask = BattleSquads::MilitaryTask(u);
+        if (squadTask !is null) return squadTask;
         IUnitTask@ home = TechBaseResponse::TaskFor(u);
         if (home !is null) return home;
-		// Owner 2026-11-24: a battle squad member keeps its squad's route (before the native ranged task)
-		IUnitTask@ t = BattleSquads::MilitaryTask(u);
-		if (t !is null) return t;
-		@t = HeavyWave::MilitaryTask(u);   // owner 2026-11-16: a held heavy wave waits at its gantry
+		IUnitTask@ t = HeavyWave::MilitaryTask(u);   // owner 2026-11-16: a held heavy wave waits at its gantry
 		if (t !is null) return t;
 		@t = LolCannonScouts::MilitaryTask(u);   // TECH with no AIR: its lolcannon scouts fly to the strike area
 		if (t !is null) return t;
@@ -199,6 +201,7 @@ namespace Military {
 		GremlinEcoFire::UnitAdded(unit);  // Gremlins fire only at enemy economy
 		ThugFireAtWill::UnitAdded(unit);  // Thugs and Maces always fire at will (owner 2026-10-19)
 		HeavyWave::UnitAdded(unit);       // owner 2026-11-16: counts our gantry heavies, admits held wave members
+		TechRushSquad::UnitAdded(unit);   // owner 2026-11-24: the t3rush opening's battle squad
 		AirEmergencyDefense::UnitAdded(unit);   // owner 2026-11-24: TECH heavy T3s an air emergency can send
 		MobileAntiNuke::UnitAdded(unit);        // owner 2026-11-24: the FRONT mobile antinuke we ordered (ours or an ally's)
 
@@ -215,6 +218,7 @@ namespace Military {
         CommanderGroup::OnRemoved(unit);
         TechHeavyDelivery::Removed(unit);
         HeavyWave::UnitRemoved(unit);
+        TechRushSquad::UnitRemoved(unit);
         TechCapitalRush::Removed(unit);
 		Team::Ferry::OnUnitRemoved(unit);
 		IdleReclaim::UnitRemoved(unit); // a lost unit marks a wreck site
@@ -239,6 +243,7 @@ namespace Military {
         FrontOpener::Load(); // retire ephemeral opener task ownership after reload
         HeavyWave::Load(); // held heavies back to ordinary military policy
         BattleSquads::Load(); // owner 2026-11-24: native squads keep their last lane goal
+        TechRushSquad::Load();
         FrontWaveEscort::Load(); // T2 wave escorts back to ordinary military policy
         FrontArtySquad::Load(); // T2 artillery squads too
         ScoutRaid::Reset(); // raid routes are rebuilt through Military::AiMakeTask

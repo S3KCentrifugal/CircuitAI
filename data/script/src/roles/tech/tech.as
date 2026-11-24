@@ -346,6 +346,7 @@ namespace RoleTech
 			if (!d.IsAvailable(ai.frame)) continue;
 			IUnitTask@ t = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, d, gantry.GetPos(ai.frame), 64.f));
 			if (t is null) continue;
+			if (g_t3RushOrdered == 0) TechRushSquad::Begin(gantry, pair, total);   // owner 2026-11-24: the opening is one battle squad
 			g_t3RushNext = int((i + 1) % pair.length());
 			++g_t3RushEach[i];
 			if (TechHeavyChoice::IsMarauderClass(pair[i])) TechHeavyChoice::rushAdmitUntil = ai.frame + 180 * SECOND;   // INV-198: the opening's own

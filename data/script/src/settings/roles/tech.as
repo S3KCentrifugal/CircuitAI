@@ -422,6 +422,13 @@ namespace Tech {
             array<string> T3RushCortex = { "corshiva", "corcat" };                  // Shiva + Catapult
             array<string> T3RushLegion = { "legerailtank", "legeallterrainmech" };  // Daedalus + Myrmidon
             int T3RushUnitCount = 10;
+            // Owner (2026-11-24): the t3rush units are one native battle squad (systems/production/tech_rush_squad.as,
+            // behaviour.json t3_rush): a finished T2 factory builds T3RushSquadUtilityEach radar, jammer and flak of its
+            // type; it holds T3RushSquadRallyOffset off the gantry until full (or T3RushSquadGatherSeconds), then moves out.
+            bool T3RushSquad = true;
+            int T3RushSquadUtilityEach = 2;
+            int T3RushSquadGatherSeconds = 1500;
+            float T3RushSquadRallyOffset = 300.0f;
             int FrontReclaimAtCount = 3;                    // D-114: this many land factories on the map retire the base's land factories
             float FrontBaseRadius = 1200.0f;                // D-114: a land factory within this of the base centre is the base's
             int FrontBaseReclaimSeconds = 240;              // D-114: INV-044: a base land factory still standing this long after the count is reached
