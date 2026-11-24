@@ -60,7 +60,7 @@ namespace StealthScout {
         AIFloat3 spotTarget;        // the structure it watches
         int spotDef = -1;
         float spotScore = 0.0f;
-        int parkedFrame = 0, lastUseful = 0, lastSpotCheck = 0, losSince = -1;
+        int parkedFrame = 0, lastUseful = 0, lastSpotCheck = 0, losSince = -1, goneChecks = 0, closeTries = 0;
     }
 
     array<Scout@> scouts;
@@ -578,7 +578,7 @@ namespace StealthScout {
                 s.nextReplan = ai.frame + 10 * SECOND;
                 return;
             } else {
-                s.hasPost = true; s.goal = goal; s.goalFrame = ai.frame;
+                s.hasPost = true; s.goal = goal; s.goalFrame = ai.frame; s.closeTries = 0;
                 why = "spot target=(" + int(s.spotTarget.x) + "," + int(s.spotTarget.z) + ") def=" + DefName(s.spotDef)
                     + " score=" + int(s.spotScore) + " post=" + int(goal.distance2D(s.spotTarget));
             }
@@ -654,6 +654,7 @@ namespace StealthScout {
     int rangedFrame = -100000;
     int spotParks = 0, spotGone = 0, spotSwitch = 0, spotNoLos = 0, spotIdle = 0;
     int lastSpotOrder = -100000, lastNoTargetLog = -100000;
+    IUnitTask@ spotOrder;               // the pending recruit: no second order while it lives (s1 11-23: 32 orders for 8 spotters)
 
     bool IsRangedDef(const CCircuitDef@ d)
     {
@@ -891,11 +892,20 @@ namespace StealthScout {
             return;
         }
         if (!s.parked) {
-            const bool arrived = pos.distance2D(s.goal) <= Global::StealthScout::ArriveElmos * 0.6f
-                || (s.task.IsAtEnd(u) && s.issuedEnd >= s.route.length() && pos.distance2D(s.goal) <= Global::StealthScout::ArriveElmos);
+            const float dg = pos.distance2D(s.goal);
+            // s1 11-23: parking 500-600 out at a route's end lost LOS (sight 494-550): park
+            // within 120 of the post; a route ending short gets one direct leg, twice at most.
+            if (dg > 120.0f && s.task.IsAtEnd(u) && s.issuedEnd >= s.route.length() && s.closeTries < 2) {
+                ++s.closeTries;
+                array<AIFloat3> leg = {s.goal};
+                s.task.SetRoute(leg);
+                s.route = leg; s.cursor = 0; s.issuedEnd = 1;
+                return;
+            }
+            const bool arrived = dg <= 120.0f || (s.closeTries >= 2 && s.task.IsAtEnd(u) && dg <= Global::StealthScout::ArriveElmos);
             if (arrived) {
                 Hold(s, pos);
-                s.parked = true; s.parkedFrame = ai.frame; s.lastUseful = ai.frame; s.lastSpotCheck = ai.frame - SECOND * 3; s.losSince = -1;
+                s.parked = true; s.goneChecks = 0; s.parkedFrame = ai.frame; s.lastUseful = ai.frame; s.lastSpotCheck = ai.frame - SECOND * 3; s.losSince = -1;
                 ++spotParks;
                 GenericHelpers::LogUtil("[StealthScout] spot parked unit=" + s.id + " def=" + u.circuitDef.GetName() + " at (" + int(pos.x) + ","
                     + int(pos.z) + ") target=(" + int(s.spotTarget.x) + "," + int(s.spotTarget.z) + ") def=" + DefName(s.spotDef)
@@ -920,7 +930,9 @@ namespace StealthScout {
             return;
         }
         s.losSince = -1;
-        if (!TargetPresent(s)) { ++spotGone; Unpost(s, "target gone", false); return; }
+        // two misses in a row: the contact list can lag the first LOS frame
+        if (!TargetPresent(s)) { if (++s.goneChecks >= 2) { ++spotGone; Unpost(s, "target gone", false); } return; }
+        s.goneChecks = 0;
         AIFloat3 c;
         const int n = RangedInReach(s.spotTarget, c);
         if (n > 0 || s.spotDef < 0) s.lastUseful = ai.frame;
@@ -962,6 +974,7 @@ namespace StealthScout {
         }
         if (n >= Global::StealthScout::SpottersPerAi || !Global::StealthScout::SpotBuild) return;
         if (ai.frame - lastSpotOrder < Global::StealthScout::SpotBuildCooldownSeconds * SECOND) return;
+        if (spotOrder !is null && !spotOrder.IsDead() && ai.frame - lastSpotOrder < 300 * SECOND) return;
         if (Economy::GetMinMetalIncomeLast10s() < Global::StealthScout::SpotBuildMetalIncome) return;
         for (uint l = 0; l < Global::StealthScout::SpotLabs.length(); ++l) {
             for (uint f = 0; f < Factory::factoryList.length(); ++f) {
@@ -972,7 +985,7 @@ namespace StealthScout {
                 if (def is null || !lab.circuitDef.CanBuild(def) || !def.IsAvailable(ai.frame)) continue;
                 IUnitTask@ r = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH, def, lab.GetPos(ai.frame), 64.f));
                 if (r is null) continue;
-                lastSpotOrder = ai.frame;
+                lastSpotOrder = ai.frame; @spotOrder = r;
                 GenericHelpers::LogUtil("[StealthScout] spot order " + def.GetName() + " at lab " + lab.id + " (" + lab.circuitDef.GetName()
                     + ") spotters=" + n + "/" + Global::StealthScout::SpottersPerAi, 1);
                 return;
