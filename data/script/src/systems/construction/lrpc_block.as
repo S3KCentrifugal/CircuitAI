@@ -419,6 +419,9 @@ namespace LrpcBlock {
     {
         if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f || Tier(u.circuitDef) == 0) return false;
         if (u.task !is null && u.task.GetType() == int(Task::Type::PLAYER)) return false;
+        // TECH's dedicated energy builders stay on the energy (Bismuth A/B 11-24: the 75% crew took both D-108
+        // builders every 20 s, each replacement too, and AFUS growth stopped at 21)
+        if (LolCannon::TechEnergyBuilder(u)) return false;
         return !LolCannon::IsCrew(u.id) && !Team::Ferry::IsGift(u.id) && !Team::Recovery::IsGift(u.id);
     }
 
