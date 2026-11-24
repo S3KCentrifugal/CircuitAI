@@ -151,7 +151,7 @@ bool CBattleSquads::Add(int squad, CCircuitUnit* unit)
     const auto old = squadOf.find(id);
     if (old != squadOf.end()) return old->second == squad;
     Member m;
-    m.id = id; m.rank = RankOf(templates[s.tmpl], unit->GetCircuitDef());
+    m.id = id; m.rank = RankOf(templates[s.tmpl], unit->GetCircuitDef()); m.joined = ai->GetLastFrame();
     s.members.push_back(m);
     squadOf[id] = squad;
     return true;
@@ -281,10 +281,13 @@ void CBattleSquads::UnitDestroyed(CCircuitUnit* unit, int frame)
     Squad& q = s->second;
     const BattleSquadTemplate& t = templates[q.tmpl];
     trade::Loss(q.trades, unit->GetCircuitDef()->GetCostM(), frame, int(t.momentumHalfLife * FRAMES_PER_SEC));
-    q.members.erase(std::remove_if(q.members.begin(), q.members.end(), [&](const Member& m) { return m.id == unit->GetId(); }),
-        q.members.end());
-    if (t.log > 0.f) ai->LOG("SQUAD: lost squad=%i unit=%s %i left=%u frame=%i", q.id, unit->GetCircuitDef()->GetDef()->GetName(),
-        unit->GetId(), unsigned(q.members.size()), frame);
+    const auto gone = std::find_if(q.members.begin(), q.members.end(), [&](const Member& m) { return m.id == unit->GetId(); });
+    if (gone == q.members.end()) return;
+    // The field life per rank is the A/B measure: does the screen soak for the guns?
+    if (t.log > 0.f) ai->LOG("SQUAD: lost squad=%i unit=%s %i rank=%s life=%i launched=%i left=%u frame=%i", q.id,
+        unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(), squad_formation::Name(gone->rank),
+        (frame - gone->joined) / FRAMES_PER_SEC, int(q.launched), unsigned(q.members.size() - 1), frame);
+    q.members.erase(gone);
 }
 
 void CBattleSquads::EnemyKilled(int attackerId, float metal, int frame)
@@ -544,11 +547,20 @@ void CBattleSquads::Decide(Squad& s, int frame)
 
     if (t.log > 0.f && frame >= s.nextLog) {
         s.nextLog = frame + 20 * FRAMES_PER_SEC;
-        int ranks[3] = {};
-        for (const Member& m : s.members) ++ranks[int(m.rank)];
-        ai->LOG("SQUAD: status squad=%i label=%s order=%s screen=%i utility=%i artillery=%i own=%.0f hostile=%.0f momentum=%.2f killed=%.0f lost=%.0f anchor=%.0f,%.0f centre=%.0f,%.0f target=%i frame=%i",
-            s.id, s.label.c_str(), battle_group::Name(s.order), ranks[0], ranks[1], ranks[2], own, hostile, s.momentum,
-            s.trades.killed, s.trades.lost, s.anchor.x, s.anchor.z, centre.x, centre.z, s.target, frame);
+        // Each rank's mean place along the axis to the enemy, from the centre: the
+        // wanted order is screen > utility > artillery (O(M), once per 20 s).
+        int ranks[3] = {}; float along[3] = {};
+        for (const Member& m : s.members) {
+            ++ranks[int(m.rank)];
+            if (CCircuitUnit* u = ai->GetTeamUnit(m.id)) {
+                const AIFloat3& p = u->GetPos(frame);
+                along[int(m.rank)] += (p.x - centre.x) * s.forward.x + (p.z - centre.z) * s.forward.z;
+            }
+        }
+        for (int r = 0; r < 3; ++r) if (ranks[r] > 0) along[r] /= float(ranks[r]);
+        ai->LOG("SQUAD: status squad=%i label=%s order=%s screen=%i utility=%i artillery=%i along=%.0f/%.0f/%.0f own=%.0f hostile=%.0f momentum=%.2f killed=%.0f lost=%.0f anchor=%.0f,%.0f centre=%.0f,%.0f target=%i frame=%i",
+            s.id, s.label.c_str(), battle_group::Name(s.order), ranks[0], ranks[1], ranks[2], along[0], along[1], along[2],
+            own, hostile, s.momentum, s.trades.killed, s.trades.lost, s.anchor.x, s.anchor.z, centre.x, centre.z, s.target, frame);
     }
 }
 

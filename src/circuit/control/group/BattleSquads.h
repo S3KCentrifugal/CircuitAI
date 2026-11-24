@@ -116,6 +116,7 @@ private:
         Rank rank = Rank::SCREEN;
         springai::AIFloat3 sent = springai::AIFloat3(-1.f, 0.f, -1.f);
         int fireFrame = -100000;
+        int joined = 0;  // frame it joined (the loss log's field life)
     };
     struct Squad {
         int id = -1, tmpl = -1;
