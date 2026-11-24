@@ -29,7 +29,7 @@
 // (GantryMakeTask, before the gantry's normal providers) for the squad. TECH
 // answers as well: every TECH with a finished gantry whose start is within
 // AirEmergencyDefenseTechRadius of the spot (TechTakes) sends its standing heavy
-// T3s once (SendHeavies: Thor, Titan, Juggernaut, Sol Invictus not already in a
+// T3s once (SendHeavies, at most AirEmergencyDefenseTechHeavyLimit, nearest first: Thor, Titan, Juggernaut, Sol Invictus not already in a
 // squad, a heavy delivery, a retreat or a player order; held heavy-wave members leave the wave) and
 // keeps them, and the gantry products, on patrol like FRONT squads. TECH has no
 // hand-off: it never sends "airemg|pass". Heavies are tracked by id from
@@ -321,14 +321,18 @@ namespace AirEmergencyDefense {
         return "";
     }
 
-    // Send this TECH's standing heavies (not in a squad yet) to the squad, once per answer.
+    // Send this TECH's standing heavies (not in a squad yet) to the squad, once per answer:
+    // at most AirEmergencyDefenseTechHeavyLimit per emergency (owner 2026-11-24: 1), nearest to the spot first.
     int SendHeavies(Emergency@ e, Squad@ s)
     {
-        if (heavyIds.getSize() == 0) return 0;
+        const int limit = Global::RoleSettings::Front::AirEmergencyDefenseTechHeavyLimit;
+        if (heavyIds.getSize() == 0 || limit == 0) return 0;
         CRouteTask@ task = EnsureTask(s);
         if (task is null) return 0;
-        int sent = 0, skipped = 0;
+        int sent = 0, skipped = 0, spare = 0;
         string skips = "";
+        array<CCircuitUnit@> ready;
+        array<float> dist;
         array<string>@ keys = heavyIds.getKeys();
         for (uint i = 0; i < keys.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
@@ -338,20 +342,33 @@ namespace AirEmergencyDefense {
             CCircuitDef@ hd = ai.GetCircuitDef(u.circuitDef.GetName());   // CanTraverse takes a non-const def
             if (why == "" && (hd is null || !aiTerrainMgr.CanTraverse(hd, u.GetPos(ai.frame), e.site))) why = "cannot reach";
             if (why != "") { ++skipped; if (skipped <= 4) skips += (skips == "" ? "" : ", ") + u.circuitDef.GetName() + " " + u.id + " " + why; continue; }
+            ready.insertLast(u); dist.insertLast(MapHelpers::SqDist(u.GetPos(ai.frame), e.site));
+        }
+        // nearest first: selection over the free heavies (bounded by the heavies alive)
+        array<bool> used(ready.length(), false);
+        for (uint n = 0; n < ready.length(); ++n) {
+            int best = -1;
+            for (uint i = 0; i < ready.length(); ++i)
+                if (!used[i] && (best < 0 || dist[i] < dist[best])) best = int(i);
+            if (best < 0) break;
+            used[best] = true;
+            if (limit > 0 && sent >= limit) { ++spare; continue; }
+            CCircuitUnit@ u = ready[best];
             if (!aiMilitaryMgr.TransferUnit(u, task)) continue;
             // a heavy held for a heavy wave leaves the wave: the wave stops waiting for it
             // (HeavyWave::UnitRemoved lowers the power the gather waits for; no-op for non-members)
             HeavyWave::UnitRemoved(u);
             s.members.insertLast(u.id);
-            memberOf.set(keys[i], s.serial);
+            memberOf.set("" + u.id, s.serial);
             if (!s.finalDone) ++s.joined;
             u.SetFireState(2);
             ++sent;
             GenericHelpers::LogUtil(Tag() + " squad " + s.serial + ": heavy " + u.circuitDef.GetName() + " " + u.id
                 + " sent to (" + int(e.site.x) + "," + int(e.site.z) + ") (" + s.members.length() + ")", 1);
         }
-        if (skipped > 0)
-            GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": " + skipped + " heavy(s) kept back: " + skips, 1);
+        if (skipped > 0 || spare > 0)
+            GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": " + spare + " free heavy(s) stay (limit " + limit + ")"
+                + (skipped > 0 ? ", " + skipped + " kept back: " + skips : ""), 1);
         return sent;
     }
 

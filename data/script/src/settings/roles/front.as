@@ -785,7 +785,7 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             // (FRONT and TECH) build AirEmergencyDefenseT3Units (Razorback, Demon, Praetorian: each gantry the one
             // it can build), over their normal production; the units join the emergency's patrol squad.
             // TECH answers too: every TECH with a finished T3 gantry whose start is within
-            // AirEmergencyDefenseTechRadius of the spot (0 = any distance) sends its standing heavy T3s
+            // AirEmergencyDefenseTechRadius of the spot (0 = any distance) sends up to AirEmergencyDefenseTechHeavyLimit standing heavy T3s
             // (AirEmergencyDefenseTechHeavies: Thor, Titan, Juggernaut, Sol Invictus) to the spot once, when it
             // answers, and its gantries build the T3 units above. Everything sent stays on patrol after the
             // emergency ends (and through later emergencies elsewhere). TECH never passes an emergency on
@@ -793,7 +793,8 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             bool AirEmergencyDefenseT3 = true;
             array<string> AirEmergencyDefenseT3Units = { "armraz", "cordemon", "legeshotgunmech" };
             array<string> AirEmergencyDefenseTechHeavies = { "armthor", "armbanth", "corkorg", "legeheatraymech" };
-            float AirEmergencyDefenseTechRadius = 0.0f;      // 0 = any distance (Flats and Forests: TECH 10.5k from AIR)
+            float AirEmergencyDefenseTechRadius = 5000.0f;     // owner 2026-11-24: spot to TECH start (0 = any distance)
+            int AirEmergencyDefenseTechHeavyLimit = 1;          // owner 2026-11-24: standing heavies per emergency, nearest first (-1 = all); gantry builds unlimited
         }
 }
 }
