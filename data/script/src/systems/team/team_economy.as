@@ -117,6 +117,7 @@ namespace TeamEconomy {
     {
         const float stor = aiEconomyMgr.metal.storage;
         float lowest = (stor > 0.0f) ? aiEconomyMgr.metal.current / stor : 1.0f;
+        float mostFree = 0.0f;   // the largest free metal room of an allied AI
         int ais = 0;
         for (int i = 0; i < n; ++i) {
             const int tid = TeamEconomy::TeamAt(i);
@@ -124,14 +125,21 @@ namespace TeamEconomy {
             ++ais;
             const float fill = TeamEconomy::MetalFill(tid);
             if (fill < lowest) lowest = fill;
+            const float room = TeamEconomy::Metal(tid, TeamEconomy::FREE);
+            if (room > mostFree) mostFree = room;
         }
+        // owner 2026-11-24: the fill band alone held a big-storage ally with thousands free (Tartar:
+        // team 9 at ~60% with 2.9-4.5k free, three full AIs paused 3.3 min, INV-033 x7); room for a
+        // real donation, the same test INV-033 makes, resumes too
+        const bool roomy = stor > 0.0f && mostFree >= Global::RoleSettings::Tech::TeamShareAiResumeFree * stor;
         const bool was = aiSharePaused;
         if (ais == 0) aiSharePaused = false;
-        else if (!aiSharePaused && lowest >= Global::RoleSettings::Tech::TeamShareAiPauseAbove) aiSharePaused = true;
-        else if (aiSharePaused && lowest < Global::RoleSettings::Tech::TeamShareAiResumeBelow) aiSharePaused = false;
+        else if (!aiSharePaused && lowest >= Global::RoleSettings::Tech::TeamShareAiPauseAbove && !roomy) aiSharePaused = true;
+        else if (aiSharePaused && (lowest < Global::RoleSettings::Tech::TeamShareAiResumeBelow || roomy)) aiSharePaused = false;
         if (was != aiSharePaused)
             GenericHelpers::LogUtil("[" + Team::Roster::RoleName(Global::AISettings::Role) + "][Share] AI-to-AI donations "
-                + (aiSharePaused ? "paused" : "resumed") + ": lowest allied AI metal fill " + int(lowest * 100.0f) + "% (" + ais + " allied AIs)", 1);
+                + (aiSharePaused ? "paused" : "resumed") + ": lowest allied AI metal fill " + int(lowest * 100.0f) + "%, most free "
+                + int(mostFree) + " (" + ais + " allied AIs)", 1);
     }
 
     void ShareOverflow()

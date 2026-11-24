@@ -228,6 +228,11 @@ namespace Front {
             // the native gate at 250 opened 250 times and no gantry was ever picked; 250 from smrt-test, 225 from 2026-10-25
             float MetalIncomeForGantry = 125.0f;
             float EnergyIncomeForGantry = 2300.0f;
+            // Owner 2026-11-24 (Tartar, team 13 held 9-10k metal and a full energy bank for 7 min at +73..133
+            // metal): the income gate is waived while the metal bank holds this many gantries' metal cost and
+            // the energy bank is at least GantryBankEnergyFill of storage. 0 turns the waiver off.
+            float GantryBankMetalCosts = 1.0f;
+            float GantryBankEnergyFill = 0.5f;
             // Owner (2026-10-25): without the eco ladder, the T2 constructors order the gantry themselves at
             // MetalIncomeForGantry (roles/front/front.as Front_TryLadderGantry), not the native factory switch
             bool DirectGantry = true;

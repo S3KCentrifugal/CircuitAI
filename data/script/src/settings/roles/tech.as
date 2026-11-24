@@ -452,6 +452,7 @@ namespace Tech {
             float TeamShareMinAmount = 25.0f;               // D-106: smaller gifts are not sent
             float TeamShareAiPauseAbove = 0.80f;            // owner 2026-10-24: every allied AI (us included) at or over this metal fill stops AI-to-AI donations
             float TeamShareAiResumeBelow = 0.50f;           // owner 2026-10-24: ... until one allied AI drops under this fill
+            float TeamShareAiResumeFree = 0.25f;            // owner 2026-11-24: ... or until one allied AI has this share of OUR storage free (INV-033's test; Tartar: 3.3 min paused while team 9 had 2.9-4.5k free)
             // Air squads (owner, 2026-11-18; systems/construction/tech_air_squads.as): while our metal bank is at
             // AirSquadsMetalFill or more and AI-to-AI donations are paused (every allied AI full, the ping-pong guard
             // above), the T1/T2 air plants build two reserved squads of air constructors:

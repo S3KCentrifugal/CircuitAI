@@ -1185,16 +1185,26 @@ namespace RoleFront {
     // at its gantry step, or before it once income is there (a FRONT at +225 whose advanced fusion never
     // stood waited for good); without it (Front::DirectGantry), the same order by our T2 constructors in place
     // of the native factory switch, which wanted the gantry's cost in the bank or 1.2x it per factory in army
+    // Owner 2026-11-24: a bank that already pays for the gantry waives the income gate (Tartar: team 13
+    // sat on 9-10k metal and a full energy bank for 7 min while "metal income +73..133 of 125")
+    bool Front_GantryBankPaid(CCircuitDef@ gantry) {
+        const float k = Global::RoleSettings::Front::GantryBankMetalCosts;
+        if (k <= 0.0f || gantry is null) return false;
+        const float es = aiEconomyMgr.energy.storage;
+        return aiEconomyMgr.metal.current >= k * gantry.costM
+            && es > 0.0f && aiEconomyMgr.energy.current >= Global::RoleSettings::Front::GantryBankEnergyFill * es;
+    }
     IUnitTask@ Front_TryLadderGantry(CCircuitUnit@ u) {
         if (!FrontEcoLadder::IsLadderT2(u)) return null;
-        if (FrontEcoLadder::On()) {
-            const int stage = FrontEcoLadder::Stage();
-            if (stage > FrontEcoLadder::S_GANTRY) return null;
-            if (stage < FrontEcoLadder::S_GANTRY && Economy::GetMinMetalIncomeLast10s() < Front_GantryMetalIncome()) return null;
-        } else if (!Global::RoleSettings::Front::DirectGantry) return null;
         const string side = Global::AISettings::Side;
         CCircuitDef@ gantry = ai.GetCircuitDef(UnitHelpers::GetLandGantryForSide(side));
         if (gantry is null || !u.circuitDef.CanBuild(gantry)) return null;
+        const bool bankPaid = Front_GantryBankPaid(gantry);
+        if (FrontEcoLadder::On()) {
+            const int stage = FrontEcoLadder::Stage();
+            if (stage > FrontEcoLadder::S_GANTRY) return null;
+            if (stage < FrontEcoLadder::S_GANTRY && !bankPaid && Economy::GetMinMetalIncomeLast10s() < Front_GantryMetalIncome()) return null;
+        } else if (!Global::RoleSettings::Front::DirectGantry) return null;
         const int ours = UnitDefHelpers::SumUnitDefCounts(UnitHelpers::GetAllGantries());   // standing and framed
         if (ours > 0) return null;
         if (g_frontLadderGantryTask !is null) {
@@ -1220,7 +1230,7 @@ namespace RoleFront {
         if (ai.frame < g_frontLadderGantryRetry) return null;
         const float mi = Economy::GetMinMetalIncomeLast10s();
         const float ei = Economy::GetMinEnergyIncomeLast10s();   // owner 2026-11-09: energy held for 10 s too
-        if (mi < Front_GantryMetalIncome() || ei < Global::RoleSettings::Front::EnergyIncomeForGantry)
+        if (!bankPaid && (mi < Front_GantryMetalIncome() || ei < Global::RoleSettings::Front::EnergyIncomeForGantry))
             return Front_LadderGantryHeld("metal income +" + int(mi) + " of " + int(Front_GantryMetalIncome())
                 + ", energy income +" + int(ei) + " of " + int(Global::RoleSettings::Front::EnergyIncomeForGantry) + " (10 s min)"
                 + " | advanced fusions " + FrontEcoLadder::AdvFusions() + "/" + FrontEcoLadder::AdvFusionsTotal());
