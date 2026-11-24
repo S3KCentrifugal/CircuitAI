@@ -30,7 +30,7 @@
 // answers as well: every TECH with a finished gantry whose start is within
 // AirEmergencyDefenseTechRadius of the spot (TechTakes) sends its standing heavy
 // T3s once (SendHeavies: Thor, Titan, Juggernaut, Sol Invictus not already in a
-// squad, a held heavy wave, a heavy delivery, a retreat or a player order) and
+// squad, a heavy delivery, a retreat or a player order; held heavy-wave members leave the wave) and
 // keeps them, and the gantry products, on patrol like FRONT squads. TECH has no
 // hand-off: it never sends "airemg|pass". Heavies are tracked by id from
 // Military::AiUnitAdded (bounded by the heavies alive), so sending is O(heavies)
@@ -318,10 +318,6 @@ namespace AirEmergencyDefense {
         if (t !is null && (t.IsExternalControlled() || t.GetType() == int(Task::Type::PLAYER))) return "player order";
         if (t !is null && t.GetType() == int(Task::Type::RETREAT)) return "retreating";
         if (TechHeavyDelivery::deliveries.exists("" + u.id)) return "heavy delivery";
-        if (HeavyWave::active) {
-            const int m = HeavyWave::members.find(u.id);
-            if (m >= 0 && m < int(HeavyWave::departed.length()) && !HeavyWave::departed[m]) return "held heavy wave";
-        }
         return "";
     }
 
@@ -343,6 +339,9 @@ namespace AirEmergencyDefense {
             if (why == "" && (hd is null || !aiTerrainMgr.CanTraverse(hd, u.GetPos(ai.frame), e.site))) why = "cannot reach";
             if (why != "") { ++skipped; if (skipped <= 4) skips += (skips == "" ? "" : ", ") + u.circuitDef.GetName() + " " + u.id + " " + why; continue; }
             if (!aiMilitaryMgr.TransferUnit(u, task)) continue;
+            // a heavy held for a heavy wave leaves the wave: the wave stops waiting for it
+            // (HeavyWave::UnitRemoved lowers the power the gather waits for; no-op for non-members)
+            HeavyWave::UnitRemoved(u);
             s.members.insertLast(u.id);
             memberOf.set(keys[i], s.serial);
             if (!s.finalDone) ++s.joined;

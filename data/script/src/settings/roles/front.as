@@ -793,7 +793,7 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             bool AirEmergencyDefenseT3 = true;
             array<string> AirEmergencyDefenseT3Units = { "armraz", "cordemon", "legeshotgunmech" };
             array<string> AirEmergencyDefenseTechHeavies = { "armthor", "armbanth", "corkorg", "legeheatraymech" };
-            float AirEmergencyDefenseTechRadius = 8000.0f;
+            float AirEmergencyDefenseTechRadius = 0.0f;      // 0 = any distance (Flats and Forests: TECH 10.5k from AIR)
         }
 }
 }
