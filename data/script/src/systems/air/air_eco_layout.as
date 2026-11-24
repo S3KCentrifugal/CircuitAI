@@ -647,8 +647,6 @@ namespace AirEcoLayout {
         // reactors and converters use the old field ring search meanwhile.
         if (WindMode() == 1 && blocks.length() == 0 && !SiteGivenUp())
             return AirLayout::PlaceField(u, d, type, priority, AirBuild::IsReactor(d), 0.0f);
-        // Mode 3: the overlay block is tried before a side block is searched for.
-        if (WindMode() == 3 && blocks.length() == 0 && siteState < 2) PlanSite();
         CCircuitDef@ nano = BlockNano();
         const AIFloat3 anchor = u.GetPos(ai.frame);
         const uint count = blocks.length();
@@ -716,8 +714,11 @@ namespace AirEcoLayout {
         if (ai.frame - blockPlanFrame < 5 * SECOND) return;
         blockPlanFrame = ai.frame;
         const int mode = WindMode();
-        // Modes 0 and 2: the first block is held early, beside the T1 wind/converter field.
-        if (blocks.length() == 0 && (mode == 0 || mode == 2)) {
+        // Modes 0, 2 and 3: the first block is held early, beside the T1 wind/converter field.
+        // Played (Hera mode 3): with only the overlay block, winds covered all but 2 turret
+        // cells, no fusion fit, and nothing is reclaimed before the first reactor: 0 fusions
+        // in 43 minutes. The side block carries the first reactors; the overlay grows later.
+        if (blocks.length() == 0 && mode != 1) {
             if (ai.frame >= Global::RoleSettings::Air::EcoBlockFirstSeconds * SECOND) ReserveBlock();
             return;
         }
