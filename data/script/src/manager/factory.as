@@ -135,6 +135,9 @@ namespace Factory {
         IUnitTask@ home = TechBaseResponse::Produce(u);
         if (home !is null) return home;
 		GantryFallback::Arm(u);   // owner, 2026-10-26: T3 gantries repeat and rally to their edge lane
+		// owner, 2026-11-24: an air emergency this FRONT/TECH answers: its T3 gantries build Razorbacks/Demons/Praetorians first
+		IUnitTask@ t3emergency = AirEmergencyDefense::GantryMakeTask(u);
+		if (t3emergency !is null) return t3emergency;
         if(Global::AISettings::Role==AiRole::TECH && FrontlineEngineering::active
             && EngineeringReplacements::BaseEmergency()) return RoleTech::Tech_FactoryAiMakeTask(u);
         if(Global::AISettings::Role==AiRole::TECH) {

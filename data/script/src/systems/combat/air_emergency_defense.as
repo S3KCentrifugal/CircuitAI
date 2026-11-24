@@ -23,9 +23,27 @@
 // Null safety: every unit, def, task and roster entry is checked at use; a
 // role switch away from FRONT stops production at once (the role check is per
 // ask) and leaves the squads patrolling; a lost factory's owed count is pruned.
+//
+// T3 response (owner, 2026-11-24; AirEmergencyDefenseT3*). An answering AI's
+// finished land T3 gantries build Razorbacks / Demons / Praetorians
+// (GantryMakeTask, before the gantry's normal providers) for the squad. TECH
+// answers as well: every TECH with a finished gantry whose start is within
+// AirEmergencyDefenseTechRadius of the spot (TechTakes) sends its standing heavy
+// T3s once (SendHeavies: Thor, Titan, Juggernaut, Sol Invictus not already in a
+// squad, a held heavy wave, a heavy delivery, a retreat or a player order) and
+// keeps them, and the gantry products, on patrol like FRONT squads. TECH has no
+// hand-off: it never sends "airemg|pass". Heavies are tracked by id from
+// Military::AiUnitAdded (bounded by the heavies alive), so sending is O(heavies)
+// once per answered emergency.
 namespace AirEmergencyDefense {
     const string MSG = "airemg";
     const int RefreshSeconds = 3;
+
+    bool IsTech() { return Global::AISettings::Role == AiRole::TECH; }
+    string Tag() { return IsTech() ? "[TECH][AirEmergency]" : "[FRONT][AirEmergency]"; }
+    bool T3Enabled() { return Global::RoleSettings::Front::AirEmergencyDefenseT3; }
+    // The roles that answer an emergency: FRONT, and TECH when the T3 response is on.
+    bool Answers() { return Global::AISettings::Role == AiRole::FRONT || (IsTech() && T3Enabled()); }
 
     /************************************************************************
      AIR side
@@ -146,7 +164,7 @@ namespace AirEmergencyDefense {
                 if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
                 AddCooldown(e.site);   // counted from the end, also after a timeout
                 if (!e.timedOut)
-                    GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + e.airTeam + " emergency " + e.serial
+                    GenericHelpers::LogUtil(Tag() + " AIR team " + e.airTeam + " emergency " + e.serial
                         + " over: labs back to normal, squad " + (s is null ? 0 : int(s.members.length()))
                         + " units left on patrol at (" + int(e.site.x) + "," + int(e.site.z) + "), cooldown "
                         + Global::RoleSettings::Front::AirEmergencyDefenseCooldownSeconds + " s", 1);
@@ -158,7 +176,7 @@ namespace AirEmergencyDefense {
             e.timedOut = true;
             Squad@ s = SquadBySerial(e.serial);
             if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
-            GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + e.airTeam + " emergency " + e.serial
+            GenericHelpers::LogUtil(Tag() + " AIR team " + e.airTeam + " emergency " + e.serial
                 + " timed out after " + (ai.frame - e.started) / SECOND + " s: labs back to normal, squad "
                 + (s is null ? 0 : int(s.members.length())) + " units left on patrol at (" + int(e.site.x) + "," + int(e.site.z)
                 + "); no new response here until " + Global::RoleSettings::Front::AirEmergencyDefenseCooldownSeconds
@@ -228,15 +246,142 @@ namespace AirEmergencyDefense {
         // every FRONT on repeat scout pokes: 84 hand-offs in one Flats and Forests game)
         if (cooling > 0) {
             e.mine = false; e.handedOver = true;
-            GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + ": this FRONT is cooling down here ("
+            GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + (IsTech() ? ": this TECH" : ": this FRONT") + " is cooling down here ("
                 + cooling + " s left), not answering", 1);
             return;
         }
         string why;
+        if (IsTech()) { TechAnswer(e, takeover); return; }
         if (!CanHelp(e, why)) { Decline(e, why); return; }
-        GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + ": this FRONT's labs switch to fast defense"
-            + (takeover == "" ? "" : " (" + takeover + ")") + "; " + why, 1);
+        GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": this FRONT's labs switch to fast defense"
+            + (takeover == "" ? "" : " (" + takeover + ")") + "; " + why
+            + (T3Enabled() && StandingGantries() > 0 ? "; " + StandingGantries() + " T3 gantry(s) build the T3 response" : ""), 1);
         Join(e);
+    }
+
+    /************************************************************************
+     T3 response (owner, 2026-11-24)
+     ************************************************************************/
+    dictionary heavyIds;   // unit id string -> true: our standing heavy T3s (TECH), from Military::AiUnitAdded
+
+    bool StandingGantry(CCircuitUnit@ f)
+    {
+        return f !is null && f.circuitDef !is null && !Lifecycle::IsRetiring(f) && f.GetBuildProgress() >= 1.0f
+            && UnitHelpers::IsGantryLab(f.circuitDef.GetName());
+    }
+
+    // finished T3 gantries (land or water) of this AI: O(factories)
+    int StandingGantries()
+    {
+        int n = 0;
+        for (uint i = 0; i < Factory::factoryList.length(); ++i)
+            if (StandingGantry(Factory::factoryList[i])) ++n;
+        return n;
+    }
+
+    // TECH: answer when a gantry stands and the spot is near enough to this TECH's start.
+    bool TechTakes(const AIFloat3 &in site, string &out why)
+    {
+        why = "";
+        if (!IsTech() || !T3Enabled()) return false;
+        const int gantries = StandingGantries();
+        if (gantries == 0) { why = "no finished T3 gantry"; return false; }
+        const float r = Global::RoleSettings::Front::AirEmergencyDefenseTechRadius;
+        const float d = sqrt(MapHelpers::SqDist(site, Global::Map::StartPos));
+        if (r > 0.0f && d > r) { why = "spot " + int(d) + " elmo from our start (over " + int(r) + ")"; return false; }
+        why = gantries + " T3 gantry(s), spot " + int(d) + " elmo from our start";
+        return true;
+    }
+
+    void TechAnswer(Emergency@ e, const string &in takeover)
+    {
+        Squad@ s = Join(e);
+        if (s is null) return;
+        const int sent = SendHeavies(e, s);
+        GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": this TECH answers"
+            + (takeover == "" ? "" : " (" + takeover + ")") + "; " + sent + " heavy T3(s) sent, "
+            + StandingGantries() + " gantry(s) build the T3 response", 1);
+    }
+
+    // Military::AiUnitAdded (every role; only TECH records)
+    void UnitAdded(CCircuitUnit@ u)
+    {
+        if (!IsTech() || u is null || u.circuitDef is null) return;
+        if (Global::RoleSettings::Front::AirEmergencyDefenseTechHeavies.find(u.circuitDef.GetName()) >= 0)
+            heavyIds.set("" + u.id, true);
+    }
+
+    // A heavy another owner holds right now, or that must not be pulled.
+    string HeavyBusy(CCircuitUnit@ u)
+    {
+        IUnitTask@ t = u.task;
+        if (t !is null && (t.IsExternalControlled() || t.GetType() == int(Task::Type::PLAYER))) return "player order";
+        if (t !is null && t.GetType() == int(Task::Type::RETREAT)) return "retreating";
+        if (TechHeavyDelivery::deliveries.exists("" + u.id)) return "heavy delivery";
+        if (HeavyWave::active) {
+            const int m = HeavyWave::members.find(u.id);
+            if (m >= 0 && m < int(HeavyWave::departed.length()) && !HeavyWave::departed[m]) return "held heavy wave";
+        }
+        return "";
+    }
+
+    // Send this TECH's standing heavies (not in a squad yet) to the squad, once per answer.
+    int SendHeavies(Emergency@ e, Squad@ s)
+    {
+        if (heavyIds.getSize() == 0) return 0;
+        CRouteTask@ task = EnsureTask(s);
+        if (task is null) return 0;
+        int sent = 0, skipped = 0;
+        string skips = "";
+        array<string>@ keys = heavyIds.getKeys();
+        for (uint i = 0; i < keys.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(parseInt(keys[i]));
+            if (u is null || u.circuitDef is null) { heavyIds.delete(keys[i]); continue; }
+            if (memberOf.exists(keys[i])) continue;   // already patrolling an emergency spot: stays there
+            string why = HeavyBusy(u);
+            if (why == "" && !aiTerrainMgr.CanTraverse(u.circuitDef, u.GetPos(ai.frame), e.site)) why = "cannot reach";
+            if (why != "") { ++skipped; if (skipped <= 4) skips += (skips == "" ? "" : ", ") + u.circuitDef.GetName() + " " + u.id + " " + why; continue; }
+            if (!aiMilitaryMgr.TransferUnit(u, task)) continue;
+            s.members.insertLast(u.id);
+            memberOf.set(keys[i], s.serial);
+            if (!s.finalDone) ++s.joined;
+            u.SetFireState(2);
+            ++sent;
+            GenericHelpers::LogUtil(Tag() + " squad " + s.serial + ": heavy " + u.circuitDef.GetName() + " " + u.id
+                + " sent to (" + int(e.site.x) + "," + int(e.site.z) + ") (" + s.members.length() + ")", 1);
+        }
+        if (skipped > 0)
+            GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": " + skipped + " heavy(s) kept back: " + skips, 1);
+        return sent;
+    }
+
+    // Factory::AiMakeTask (FRONT and TECH, before the gantry's normal providers): a T3 recruit, or null.
+    IUnitTask@ GantryMakeTask(CCircuitUnit@ f)
+    {
+        if (!Enabled() || !T3Enabled() || !Answers() || emergencies.getSize() == 0) return null;
+        if (!StandingGantry(f)) return null;
+        Emergency@ e = ActiveFor(f.GetPos(ai.frame));
+        if (e is null) return null;
+        const array<string>@ names = @Global::RoleSettings::Front::AirEmergencyDefenseT3Units;
+        CCircuitDef@ def = null;
+        for (uint n = 0; n < names.length() && def is null; ++n) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[n]);
+            if (d is null || !f.circuitDef.CanBuild(d) || !d.IsAvailable(ai.frame)) continue;
+            if (!Reachable(e, f, d)) continue;
+            @def = d;
+        }
+        if (def is null) return null;
+        if (Join(e) is null) return null;
+        IUnitTask@ task = aiFactoryMgr.Enqueue(TaskS::Recruit(Task::RecruitType::FIREPOWER, Task::Priority::HIGH,
+            def, f.GetPos(ai.frame), 64.f), true);
+        if (task is null) return null;
+        const string key = "" + f.id;
+        int prior = -1, count = 0;
+        if (owed.get(key, prior) && prior == e.serial) owedCount.get(key, count); else count = 0;
+        owed.set(key, e.serial); owedCount.set(key, count + 1);
+        GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": gantry " + f.circuitDef.GetName() + " " + f.id
+            + " makes " + def.GetName(), 1);
+        return task;
     }
 
     // Stop answering and tell every FRONT; the next nearest one takes it.
@@ -246,9 +391,9 @@ namespace AirEmergencyDefense {
         if (e.passed.find(ai.teamId) < 0) e.passed.insertLast(ai.teamId);
         Squad@ s = SquadBySerial(e.serial);
         if (s !is null) { s.patrolOnly = true; if (s.endFrame < 0) s.endFrame = ai.frame; }
-        AiSendMessage(MSG + "|pass|" + e.airTeam + "|" + int(e.site.x) + "|" + int(e.site.z));
-        GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + " at (" + int(e.site.x) + "," + int(e.site.z)
-            + ") passed on: " + why + (s is null ? "" : "; squad " + s.members.length() + " units left on patrol"), 1);
+        if (!IsTech()) AiSendMessage(MSG + "|pass|" + e.airTeam + "|" + int(e.site.x) + "|" + int(e.site.z));   // FRONT hand-off only
+        GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + " at (" + int(e.site.x) + "," + int(e.site.z)
+            + (IsTech() ? ") dropped: " : ") passed on: ") + why + (s is null ? "" : "; squad " + s.members.length() + " units left on patrol"), 1);
     }
 
     // airemg|pass|<air team>|x|z from a FRONT that cannot answer
@@ -326,8 +471,8 @@ namespace AirEmergencyDefense {
     {
         array<string>@ p = msg.split("|");
         if (p.length() < 2 || p[0] != MSG) return false;
-        if (!Enabled() || Global::AISettings::Role != AiRole::FRONT) return true;
-        if (p[1] == "pass") { Passed(p, fromTeamId); return true; }
+        if (!Enabled() || !Answers()) return true;
+        if (p[1] == "pass") { if (!IsTech()) Passed(p, fromTeamId); return true; }
         const string key = "" + fromTeamId;
         Emergency@ e = null;
         emergencies.get(key, @e);
@@ -346,11 +491,11 @@ namespace AirEmergencyDefense {
             @e = Emergency();
             e.airTeam = fromTeamId; e.serial = nextSerial++; e.site = site; e.lastOn = ai.frame; e.started = ai.frame;
             string picked;
-            e.mine = Nearest(site, picked, e.passed);
+            e.mine = IsTech() ? TechTakes(site, picked) : Nearest(site, picked, e.passed);
             emergencies.set(key, @e);
-            GenericHelpers::LogUtil("[FRONT][AirEmergency] AIR team " + fromTeamId + " emergency " + e.serial + " at ("
-                + int(site.x) + "," + int(site.z) + "): nearest FRONTs " + picked
-                + (e.mine ? " - this FRONT answers" : " - not this FRONT"), 1);
+            GenericHelpers::LogUtil(Tag() + " AIR team " + fromTeamId + " emergency " + e.serial + " at ("
+                + int(site.x) + "," + int(site.z) + "): " + (IsTech() ? picked : "nearest FRONTs " + picked)
+                + (e.mine ? (IsTech() ? " - this TECH answers" : " - this FRONT answers") : (IsTech() ? " - not this TECH" : " - not this FRONT")), 1);
             if (e.mine) Answer(e, "");
             return true;
         }
@@ -374,7 +519,7 @@ namespace AirEmergencyDefense {
         for (uint i = 0; i < squads.length(); ++i) {
             Squad@ old = squads[i];
             if (old is null || MapHelpers::SqDist(old.site, e.site) > merge * merge) continue;
-            GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + " reuses squad " + old.serial
+            GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + " reuses squad " + old.serial
                 + " (" + old.members.length() + " units) patrolling (" + int(old.site.x) + "," + int(old.site.z) + ")", 1);
             if (!old.finalDone) Final(old);
             old.serial = e.serial; old.site = e.site; old.patrolOnly = false;
@@ -432,7 +577,7 @@ namespace AirEmergencyDefense {
         s.arrived = there;
         if (there > 0 && s.firstArrival < 0) {
             s.firstArrival = ai.frame;
-            GenericHelpers::LogUtil("[FRONT][AirEmergency][Report] squad " + s.serial + ": first unit at the spot +"
+            GenericHelpers::LogUtil(Tag() + "[Report] squad " + s.serial + ": first unit at the spot +"
                 + (ai.frame - s.startFrame) / SECOND + " s", 1);
         }
         s.enemyNow = EnemyMetal(s.site);
@@ -444,7 +589,7 @@ namespace AirEmergencyDefense {
         s.finalDone = true;
         const int end = s.endFrame >= 0 ? s.endFrame : ai.frame;
         const bool cleared = s.enemyNow <= AiMax(50.0f, s.enemyPeak * 0.1f);
-        GenericHelpers::LogUtil("[FRONT][AirEmergency][Report] final squad " + s.serial + " AIR team " + s.airTeam
+        GenericHelpers::LogUtil(Tag() + "[Report] final squad " + s.serial + " AIR team " + s.airTeam
             + " at (" + int(s.site.x) + "," + int(s.site.z) + "): emergency " + (end - s.startFrame) / SECOND + " s"
             + ", first arrival " + (s.firstArrival < 0 ? "never" : ("+" + (s.firstArrival - s.startFrame) / SECOND + " s"))
             + ", joined " + s.joined + ", lost " + s.lost + ", alive " + s.members.length() + ", at spot " + s.arrived
@@ -473,7 +618,8 @@ namespace AirEmergencyDefense {
             Sample(s);
             ReleaseGroup(s);
             // owner 2026-11-14: units out but none ever got to the spot (terrain the static test missed): pass it on
-            if (!s.patrolOnly && s.firstArrival < 0 && s.joined >= Global::RoleSettings::Front::AirEmergencyDefenseStuckUnits
+            // (not TECH: its heavies walk far and slowly, and TECH has no hand-off)
+            if (!IsTech() && !s.patrolOnly && s.firstArrival < 0 && s.joined >= Global::RoleSettings::Front::AirEmergencyDefenseStuckUnits
                 && ai.frame - s.startFrame >= AiMax(1, Global::RoleSettings::Front::AirEmergencyDefenseStuckSeconds) * SECOND) {
                 Emergency@ e = EmergencyBySerial(s.serial);
                 if (e !is null && e.mine && !e.over)
@@ -482,7 +628,7 @@ namespace AirEmergencyDefense {
             if (s.endFrame >= 0 && ai.frame - s.endFrame >= ReportAfterSeconds * SECOND) { Final(s); continue; }
             if (s.endFrame < 0 && ai.frame - s.lastReport >= ReportEverySeconds * SECOND) {
                 s.lastReport = ai.frame;
-                GenericHelpers::LogUtil("[FRONT][AirEmergency][Report] squad " + s.serial + " +" + (ai.frame - s.startFrame) / SECOND
+                GenericHelpers::LogUtil(Tag() + "[Report] squad " + s.serial + " +" + (ai.frame - s.startFrame) / SECOND
                     + " s: alive " + s.members.length() + ", at spot " + s.arrived + ", lost " + s.lost
                     + ", enemy metal near " + int(s.enemyNow) + " (peak " + int(s.enemyPeak) + ")", 1);
             }
@@ -625,7 +771,7 @@ namespace AirEmergencyDefense {
         int prior = -1, count = 0;
         if (owed.get(key, prior) && prior == e.serial) owedCount.get(key, count); else count = 0;
         owed.set(key, e.serial); owedCount.set(key, count + 1);
-        GenericHelpers::LogUtil("[FRONT][AirEmergency] emergency " + e.serial + ": " + fname + " " + f.id
+        GenericHelpers::LogUtil(Tag() + " emergency " + e.serial + ": " + fname + " " + f.id
             + " makes " + def.GetName(), 1);
         return task;
     }
@@ -642,7 +788,9 @@ namespace AirEmergencyDefense {
             const string fkey = "" + u.GetProducerId();
             int count = 0;
             if (!owed.get(fkey, serial) || !owedCount.get(fkey, count) || count <= 0) return null;
-            if (Global::RoleSettings::Front::AirEmergencyDefenseUnits.find(u.circuitDef.GetName()) < 0) return null;
+            const string uname = u.circuitDef.GetName();
+            if (Global::RoleSettings::Front::AirEmergencyDefenseUnits.find(uname) < 0
+                && Global::RoleSettings::Front::AirEmergencyDefenseT3Units.find(uname) < 0) return null;
             owedCount.set(fkey, count - 1);
             if (count - 1 <= 0) { owed.delete(fkey); owedCount.delete(fkey); }
             // a T2 squad or wave already claimed it: theirs
@@ -663,7 +811,7 @@ namespace AirEmergencyDefense {
                 if (s.waiting.length() == 0) s.waitSince = ai.frame;
                 s.waiting.insertLast(u.id);
             }
-            GenericHelpers::LogUtil("[FRONT][AirEmergency] squad " + s.serial + ": " + u.circuitDef.GetName() + " " + u.id
+            GenericHelpers::LogUtil(Tag() + " squad " + s.serial + ": " + u.circuitDef.GetName() + " " + u.id
                 + " joins (" + s.members.length() + ")" + (s.patrolOnly ? ", emergency over: straight to patrol"
                 : (rally !is null ? ", big attack (" + int(s.enemyPeak) + " metal): waits at the rally, " + s.waiting.length() + " waiting" : "")), 1);
         }
@@ -730,13 +878,14 @@ namespace AirEmergencyDefense {
         }
         s.waiting.resize(0); s.waitSince = -1;
         if (sent > 0) ++s.groups;
-        GenericHelpers::LogUtil("[FRONT][AirEmergency] squad " + s.serial + ": group " + s.groups + " of " + sent
+        GenericHelpers::LogUtil(Tag() + " squad " + s.serial + ": group " + s.groups + " of " + sent
             + " goes in (" + assembled + " at the rally, " + int(metal) + " metal vs enemy " + int(s.enemyNow)
             + ", waited " + age / SECOND + " s, " + why + ")", 1);
     }
 
     void UnitRemoved(CCircuitUnit@ u)
     {
+        if (u !is null && heavyIds.getSize() > 0) heavyIds.delete("" + u.id);
         if (u is null || memberOf.getSize() == 0) return;
         const string ukey = "" + u.id;
         int serial = -1;

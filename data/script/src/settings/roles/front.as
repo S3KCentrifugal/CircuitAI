@@ -781,6 +781,19 @@ int TacticalTradeDonorKeep = 1;            // a donor gives an idle T2 construct
             // Welder, Hoplite, Gladiator. Each lab makes the ones it can build, in turn.
             array<string> AirEmergencyDefenseUnits = { "corak", "armpw", "armflash", "corgator", "legcen", "leghades",
                 "corpyro", "correap", "armbull", "armmav", "armfast", "corban", "armzeus", "legstr", "legaskirmtank" };
+            // T3 response (owner, 2026-11-24). While an emergency this AI answers is on, its finished T3 gantries
+            // (FRONT and TECH) build AirEmergencyDefenseT3Units (Razorback, Demon, Praetorian: each gantry the one
+            // it can build), over their normal production; the units join the emergency's patrol squad.
+            // TECH answers too: every TECH with a finished T3 gantry whose start is within
+            // AirEmergencyDefenseTechRadius of the spot (0 = any distance) sends its standing heavy T3s
+            // (AirEmergencyDefenseTechHeavies: Thor, Titan, Juggernaut, Sol Invictus) to the spot once, when it
+            // answers, and its gantries build the T3 units above. Everything sent stays on patrol after the
+            // emergency ends (and through later emergencies elsewhere). TECH never passes an emergency on
+            // ("airemg|pass" is the FRONT hand-off). Log [TECH][AirEmergency].
+            bool AirEmergencyDefenseT3 = true;
+            array<string> AirEmergencyDefenseT3Units = { "armraz", "cordemon", "legeshotgunmech" };
+            array<string> AirEmergencyDefenseTechHeavies = { "armthor", "armbanth", "corkorg", "legeheatraymech" };
+            float AirEmergencyDefenseTechRadius = 8000.0f;
         }
 }
 }

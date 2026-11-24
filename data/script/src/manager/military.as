@@ -189,6 +189,7 @@ namespace Military {
 		GremlinEcoFire::UnitAdded(unit);  // Gremlins fire only at enemy economy
 		ThugFireAtWill::UnitAdded(unit);  // Thugs and Maces always fire at will (owner 2026-10-19)
 		HeavyWave::UnitAdded(unit);       // owner 2026-11-16: counts our gantry heavies, admits held wave members
+		AirEmergencyDefense::UnitAdded(unit);   // owner 2026-11-24: TECH heavy T3s an air emergency can send
 
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;
