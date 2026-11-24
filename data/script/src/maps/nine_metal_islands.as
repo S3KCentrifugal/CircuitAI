@@ -11,7 +11,7 @@ namespace NineMetalIslands {
 	// Start positions (2026-11-24): an 8v8 headless game with the map's default start boxes
 	// (team 1: x 0-35%, z 0-100%; team 2: x 65-100%, z 0-100%) and plain engine spawns (BAR's start-point guesser),
 	// kept as spawned (metal map: no mex spots to snap to).
-	// Roles: water spawns (ground below -10) are SEA; of the land spawns the one farthest from the
+	// Roles: spawns on open water (a water body over 3% of the map) are SEA; of the land spawns the one farthest from the
 	// enemy is TECH and the next AIR; the rest FRONT.
 	// landLocked: true where no enemy spawn shares the spawn's land mass (ground above -20 elmos,
 	// slopes ignored); a heuristic, not a path check.

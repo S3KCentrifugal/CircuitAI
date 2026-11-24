@@ -15,7 +15,7 @@ namespace WorldInFlames {
 	// number of mexes; each land spawn gets its own lane (the richest 2-3 mex cluster in the box), so the team owns mexes along
 	// the whole front instead of bunching where the engine put several AIs together. An engine spawn
 	// that already had a lane to itself stays in it; SEA spawns keep the engine spot.
-	// Roles: water spawns (ground below -10) are SEA; of the land spawns the one farthest from the
+	// Roles: spawns on open water (a water body over 3% of the map) are SEA; of the land spawns the one farthest from the
 	// enemy is TECH and the next AIR; the rest FRONT.
 	// landLocked: true where no enemy spawn shares the spawn's land mass (ground above -20 elmos,
 	// slopes ignored); a heuristic, not a path check.
