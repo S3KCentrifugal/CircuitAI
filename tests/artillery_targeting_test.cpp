@@ -96,9 +96,21 @@ static void PopupClosesUnderFire()
 	Check(!CloseUnderFire(Kind::Heavy, false), "a heavy aim keeps the gun open");
 }
 
+static void CounterBeforeEverything()
+{
+	// Owner 2026-11-23: an enemy counter-artillery gun (marked by the controller) outranks support.
+	const std::vector<Contact> c = {{3, Kind::Support, 0, 100}, {5, Kind::Counter, 1245, 900000}, {2, Kind::Heavy, 400, 50}};
+	Check(c[Choose(-1, c)].id == 5, "a counter gun is aimed before support, heavy and static");
+	Check(c[Choose(3, c)].id == 5, "a counter gun preempts a support aim");
+	Check(AimChangeAllowed(true, Kind::Support, Kind::Counter), "INV-265: support to counter is lawful");
+	Check(InReach({5, Kind::Counter, 1245, 1300.f * 1300.f}, 1380, .5f), "a counter gun counts at full range");
+	Check(!CloseUnderFire(Kind::Counter, false), "a counter aim keeps a pop-up open");
+}
+
 int main()
 {
 	SupportBeforeEverything();
+	CounterBeforeEverything();
 	HeavyOnlyWithinHalfRange();
 	SpamNeverChosen();
 	LongestRangeStaticFirst();

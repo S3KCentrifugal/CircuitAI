@@ -44,6 +44,7 @@ struct ArtilleryConfig {
 	float ghostFire = 0.f;        // owner 2026-11-19: 0 never aims at a structure out of LOS and radar (a ghost image)
 	float noShotSeconds = 10.f;   // an aim with no shot fired this long is released to the engine (0: off)
 	float skipSeconds = 60.f;     // ... and that target is not aimed at again for this long
+	float counterSnipe = 1.f;     // owner 2026-11-23: enemy counter-artillery guns in reach first (0: off)
 	float log = 1.f;              // aim, release and close lines
 };
 
@@ -84,11 +85,14 @@ private:
 		const springai::AIFloat3& pos, bool mobile, int frame);
 	void Release(CCircuitUnit* unit, control::ArtilleryState& s, const char* why);
 	artillery::DefFacts Facts(const CCircuitDef* def) const;
+	const std::vector<int>* CountersFor(const CCircuitDef* def);
 
 	CCircuitAI* ai;
 	std::vector<artillery::Contact> scratch;  // reused per decision
 	std::vector<springai::AIFloat3> scratchPos;
 	std::vector<char> scratchMobile;
+	bool countersBuilt = false;   // owner 2026-11-23: counter-artillery def ids (sorted)
+	std::vector<int> t1Ids, t2Ids, counterT1, counterT2;
 };
 
 } // namespace circuit

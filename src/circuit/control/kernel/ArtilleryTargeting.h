@@ -4,6 +4,10 @@
 // from the side's combat snapshot; tests/artillery_targeting_test.cpp names a
 // test after each rule.
 //
+// Owner 2026-11-23: first of all an enemy counter-artillery gun in height-aware
+// reach (counter): T1 guns snipe enemy Gauntlet/Agitator/Amputator, T2 guns those
+// and enemy Rattlesnake/Persecutor/Eviscerator. The controller marks them.
+//
 // Order: an enemy construction turret or resurrection bot in range (support),
 // then a heavy unit within a share of the range (heavy), then the known enemy
 // static weapon with the longest range (static). A static aim is kept until the
@@ -14,7 +18,7 @@
 
 namespace circuit::artillery {
 
-enum class Kind : int { None = 0, Static = 1, Heavy = 2, Support = 3 };
+enum class Kind : int { None = 0, Static = 1, Heavy = 2, Support = 3, Counter = 4 };
 
 // What the rules need of an enemy unit's definition.
 struct DefFacts {

@@ -11,6 +11,7 @@
 #include "unit/CircuitUnit.h"
 #include "unit/ally/AllyTeam.h"
 #include "unit/enemy/EnemyUnit.h"
+#include "terrain/BattleAnalysis.h"
 #include "spring/SpringUnit.h"
 #include "CircuitAI.h"
 #include "AISCommands.h"
@@ -47,13 +48,14 @@ const control::CConfigTable<ArtilleryConfig>& ArtilleryTable()
 		Lever<&AC::ghostFire>("ghost_fire", 0, 1),
 		Lever<&AC::noShotSeconds>("no_shot_seconds", 0, 120),
 		Lever<&AC::skipSeconds>("skip_seconds", 0, 600),
+		Lever<&AC::counterSnipe>("counter_snipe", 0, 1),
 		Lever<&AC::log>("log", 0, 1),
 	});
 	return table;
 }
 const char* KindName(Kind kind)
 {
-	return kind == Kind::Support ? "support" : kind == Kind::Heavy ? "heavy" : kind == Kind::Static ? "static" : "none";
+	return kind == Kind::Counter ? "counter" : kind == Kind::Support ? "support" : kind == Kind::Heavy ? "heavy" : kind == Kind::Static ? "static" : "none";
 }
 }
 
@@ -95,6 +97,31 @@ void CArtilleryController::OnPresetAssigned(int defId, int preset)
 		auto* unit = ai->GetTeamUnit(entry.id);
 		if (unit != nullptr && unit->GetCircuitDef()->GetId() == defId) entry.value->preset = preset;
 	}
+}
+
+/*
+ * Owner 2026-11-23: counter-artillery sniping. Our T1 guns (Gauntlet, Agitator,
+ * Amputator) give enemy T1 guns the top priority; our T2 guns (Rattlesnake,
+ * Persecutor, Eviscerator) enemy T1 and T2 guns. Def ids resolved once, sorted.
+ */
+const std::vector<int>* CArtilleryController::CountersFor(const CCircuitDef* def)
+{
+	if (!countersBuilt) {
+		countersBuilt = true;
+		static const char* t1[] = {"armguard", "corpun", "legcluster"};
+		static const char* t2[] = {"armamb", "cortoast", "legacluster"};
+		auto add = [&](std::vector<int>& v, const char* name) {
+			const CCircuitDef* d = ai->GetCircuitDef(name);
+			if (d != nullptr) v.push_back(d->GetId());
+		};
+		for (const char* n : t1) { add(t1Ids, n); add(counterT1, n); add(counterT2, n); }
+		for (const char* n : t2) { add(t2Ids, n); add(counterT2, n); }
+		for (auto* v : {&t1Ids, &t2Ids, &counterT1, &counterT2}) std::sort(v->begin(), v->end());
+	}
+	const int id = def->GetId();
+	if (std::binary_search(t1Ids.begin(), t1Ids.end(), id)) return &counterT1;
+	if (std::binary_search(t2Ids.begin(), t2Ids.end(), id)) return &counterT2;
+	return nullptr;
 }
 
 artillery::DefFacts CArtilleryController::Facts(const CCircuitDef* def) const
@@ -159,6 +186,7 @@ void CArtilleryController::Decide(CCircuitUnit* unit, control::ArtilleryState& s
 		return std::any_of(s.skip.begin(), s.skip.end(), [id](const std::pair<int, int>& k) { return k.first == id; });
 	};
 	scratch.clear(); scratchPos.clear(); scratchMobile.clear();
+	const std::vector<int>* counters = CountersFor(unit->GetCircuitDef());
 	bool threatInReach = false, threatOutOfReach = false;
 	snapshot.Query({at.x, at.z}, std::max(range, popup ? range * 2.f : range), [&](const CCombatSnapshot::Entry& e) {
 		const float dx = e.pos.x - at.x, dz = e.pos.z - at.z;
@@ -173,7 +201,14 @@ void CArtilleryController::Decide(CCircuitUnit* unit, control::ArtilleryState& s
 		// fired on only with ghost_fire (owner 2026-11-19: these guns never fire at ghosts).
 		if ((facts.mobile || cfg->ghostFire <= 0.f) && !(e.los || e.radar)) return;
 		if (!s.skip.empty() && skipped(e.id)) return;
-		const artillery::Contact c{e.id, artillery::Classify(facts, cfg->heavyCost), facts.range, distSq};
+		artillery::Contact c{e.id, artillery::Classify(facts, cfg->heavyCost), facts.range, distSq};
+		// Owner 2026-11-23: an enemy counter-artillery gun (our tier's list) in
+		// height-aware reach outranks everything: snipe it before it snipes us.
+		if (counters != nullptr && cfg->counterSnipe > 0.f && std::binary_search(counters->begin(), counters->end(), e.defId)) {
+			const AIFloat3 to(e.pos.x, e.elevation, e.pos.z);
+			const float reach = ai->GetBattle()->EffectiveRange(unit->GetCircuitDef(), at, to);
+			if (distSq <= reach * reach) c.kind = Kind::Counter;
+		}
 		if (!artillery::InReach(c, range, cfg->heavyShare)) return;
 		scratch.push_back(c);
 		scratchPos.push_back(AIFloat3(e.pos.x, e.elevation, e.pos.z));
