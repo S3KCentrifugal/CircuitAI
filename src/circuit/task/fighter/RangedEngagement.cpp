@@ -1342,8 +1342,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(!(reach>0.f)) continue;
         const float d=std::sqrt(pos.SqDistance2D(c.pos));
         if(d<=reach+c.radius) {
-            float s=std::max(1.f,c.cost)*(c.mobile?1.f:1.5f);
-            if(def->IsPriorityTarget(c.def) || policy.topTargetDefs.count(c.def->GetId())) s+=1e6f;
+            const float s=ai->GetMilitaryManager()->HighValueScore(def,c.def,c.cost,c.mobile);   // owner 2026-11-24: existing high-value lists
             if(s>fullScore) { fullScore=s; fullTarget=i; }
         } else if(c.mobile && d<=reach+c.radius+300.f && d<stepDist) { stepDist=d; stepTarget=i; }
     }
