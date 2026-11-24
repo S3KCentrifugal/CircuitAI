@@ -4,6 +4,18 @@
 //Maps
 #include "maps/default_map_config.as"
 #include "maps/swirly_rock.as"
+#include "maps/all_that_glitters_extended.as"
+#include "maps/the_barrier_reef_remake.as"
+#include "maps/crescent_bay.as"
+#include "maps/dworld.as"
+#include "maps/sailaway.as"
+#include "maps/why_did_i_let_ptaq.as"
+#include "maps/world_in_flames.as"
+#include "maps/jade_empress.as"
+#include "maps/nine_metal_islands.as"
+#include "maps/special_hotstepper.as"
+#include "maps/special_creek.as"
+#include "maps/special_reef.as"
 #include "maps/all_that_glitters.as"
 #include "maps/supreme_isthmus_v2_1.as"
 #include "maps/supreme_isthmus_v1_7.as"
@@ -97,6 +109,8 @@ namespace Maps {
 		mapManager.RegisterMapConfig(SupremeIsthmus::config);
 		mapManager.RegisterMapConfig(SupremeIsthmus17::config);
 		mapManager.RegisterMapConfig(PinewoodDerby::config);
+		// before AllThatGlitters: configs match by name prefix, first registered wins
+		mapManager.RegisterMapConfig(AllThatGlittersExtended::config);
 		mapManager.RegisterMapConfig(AllThatGlitters::config);
         mapManager.RegisterMapConfig(EightHorses::config);
         mapManager.RegisterMapConfig(FlatsAndForests::config);
@@ -173,6 +187,17 @@ namespace Maps {
         mapManager.RegisterMapConfig(TwinLakesParkRedux::config);
         mapManager.RegisterMapConfig(WhiteFireRemake::config);
         mapManager.RegisterMapConfig(TropicalAssault::config);
+        mapManager.RegisterMapConfig(BarrierReefRemake::config);
+        mapManager.RegisterMapConfig(CrescentBay::config);
+        mapManager.RegisterMapConfig(DWorld::config);
+        mapManager.RegisterMapConfig(SailAway::config);
+        mapManager.RegisterMapConfig(WhyDidILetPtaQ::config);
+        mapManager.RegisterMapConfig(WorldInFlames::config);
+        mapManager.RegisterMapConfig(JadeEmpress::config);
+        mapManager.RegisterMapConfig(NineMetalIslands::config);
+        mapManager.RegisterMapConfig(SpecialHotstepper::config);
+        mapManager.RegisterMapConfig(SpecialCreek::config);
+        mapManager.RegisterMapConfig(SpecialReef::config);
 
         GenericHelpers::LogUtil("Finished registering map configurations: " +
             mapManager.mapConfigs.length() + " map configs available.", 1);
