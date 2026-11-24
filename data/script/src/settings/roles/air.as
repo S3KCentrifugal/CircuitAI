@@ -35,7 +35,8 @@ float EcoBlockHaloElmos = 240.0f;   // packing ground around the turret block, i
 float EcoBlockMinGround = 0.6f;     // flat x buildable share of the block's zone
 int EcoBlockMax = 6;
 int EcoBlockTurretsInFlight = 2;    // turret orders at once per busy block
-int EcoBlockFirstSeconds = 90;      // the first block's ground is reserved this early (no T1 sprawl over it)
+float EcoBlockConverterDrawShare = 1.0f; // advanced converters' total draw stays under this share of energy income
+int EcoBlockFirstSeconds = 90;     // the first block's ground is reserved this early (no T1 sprawl over it)
 // Owner 2026-11-24: two ordinary fusions stand before the first advanced fusion
 // (the energy-income gate below still opens it earlier when reached); 0 = income gate only.
 int FusionsBeforeAfus = 2;

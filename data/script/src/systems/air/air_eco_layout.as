@@ -627,6 +627,13 @@ namespace AirEcoLayout {
     {
         const string side = UnitHelpers::GetSideForUnitName(d.GetName());
         const bool afus = d.GetName() == UnitHelpers::GetAdvFusionNameForSide(side);
+        // Played (Moonshine 11-24): blocks had room for every converter ask; 40 advanced
+        // converters stood at 5,600 E/s income (24,000 E/s of draw, most idle). Converters
+        // are held while their total draw passes EcoBlockConverterDrawShare of energy income.
+        if (d.GetName() == UnitHelpers::GetAdvEnergyConverterNameForSide(side)) {
+            const float draw = float(d.count + aiBuilderMgr.GetUnfinishedCount(d)) * AiMax(1.0f, aiEconomyMgr.GetEnergyUse(d));
+            if (draw >= AiMax(0.0f, Global::RoleSettings::Air::EcoBlockConverterDrawShare) * aiEconomyMgr.energy.income) return null;
+        }
         CCircuitDef@ nano = BlockNano();
         const AIFloat3 anchor = u.GetPos(ai.frame);
         const uint count = blocks.length();
