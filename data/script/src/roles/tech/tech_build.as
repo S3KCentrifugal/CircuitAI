@@ -516,10 +516,27 @@ namespace TechBuild {
         GenericHelpers::LogUtil("[TECH][Air] " + id + " drops " + bt.buildDef.GetName() + " for its role (D-108)", 1);
         aiBuilderMgr.AbortTask(u.task);
     }
+    // Held by another program that steers it outright (owner 2026-11-24: a dedicated builder taken away
+    // leaves its role vacant, so the T2 air plant makes a new one at once, as many times as needed;
+    // Bismuth Valley 11-24 team 8: the lolcannon storage crew took both and no AFUS followed for minutes)
+    bool TakenAway(int id)
+    {
+        return LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id) || TechGantryCrew::crewId == id || TechAirSquads::Owns(id)
+            || TechDefenceCrew::Owns(id) || EarlyMexUpgraders::IsClaimed(id);
+    }
+    int airRoleReplaced = 0;
     void RefillAirRoles()
     {
         if (airConvId >= 0 && ai.GetTeamUnit(airConvId) is null) { airConvId = -1; GenericHelpers::LogUtil("[TECH][Air] the converter builder is gone (D-108)", 1); }
         if (airAfusId >= 0 && ai.GetTeamUnit(airAfusId) is null) { airAfusId = -1; GenericHelpers::LogUtil("[TECH][Air] the advanced fusion builder is gone (D-108)", 1); }
+        if (airConvId >= 0 && TakenAway(airConvId)) {
+            GenericHelpers::LogUtil("[TECH][Air] the converter builder " + airConvId + " was taken by another program: role vacant, replacement #" + (++airRoleReplaced) + " (D-108)", 1);
+            airConvId = -1;
+        }
+        if (airAfusId >= 0 && TakenAway(airAfusId)) {
+            GenericHelpers::LogUtil("[TECH][Air] the advanced fusion builder " + airAfusId + " was taken by another program: role vacant, replacement #" + (++airRoleReplaced) + " (D-108)", 1);
+            airAfusId = -1;
+        }
         if (airConvId >= 0 && airAfusId >= 0) return;
         array<string>@ keys = airConsSeen.getKeys();
         for (uint i = 0; keys !is null && i < keys.length(); ++i) {
@@ -527,7 +544,7 @@ namespace TechBuild {
             CCircuitUnit@ cand = ai.GetTeamUnit(id);
             if (cand is null) { airConsSeen.delete(keys[i]); continue; }
             if (id == airConvId || id == airAfusId) continue;
-            if (LolCannon::IsCrew(id) || LrpcBlock::IsCrew(id)) continue;   // Bismuth 11-24: role went to a storage-crew legaca
+            if (TakenAway(id)) continue;   // Bismuth 11-24: role went to a storage-crew legaca
             // the advanced fusions first: the role that stalled the economy (D-108)
             if (airAfusId < 0) { airAfusId = id; GenericHelpers::LogUtil("[TECH][Air] " + id + " takes over the advanced fusions (D-108)", 1); DropOtherJob(id, 2); }
             else if (airConvId < 0) { airConvId = id; GenericHelpers::LogUtil("[TECH][Air] " + id + " takes over the converters (D-108)", 1); DropOtherJob(id, 1); }
@@ -552,7 +569,7 @@ namespace TechBuild {
         RefillAirRoles();
         if (u.id == airConvId) return 1;
         if (u.id == airAfusId) return 2;
-        if (LolCannon::IsCrew(u.id) || LrpcBlock::IsCrew(u.id)) return 0;
+        if (TakenAway(u.id)) return 0;
         if (airConvId < 0) {
             airConvId = u.id;
             GenericHelpers::LogUtil("[TECH][Air] " + u.circuitDef.GetName() + " " + u.id + " is dedicated to advanced energy converters (D-107)", 1);
