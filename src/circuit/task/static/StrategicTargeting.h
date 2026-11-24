@@ -100,6 +100,73 @@ public:
 private:
     std::vector<Claim> claims;
 };
+// Mobile antinuke memory (owner 2026-11-24). A mobile interceptor (Umbrella,
+// Saviour, Hera, antinuke ships and carriers) that drops out of radar and LOS
+// still covers the ground it was last seen on. Every sighting drops a spot, or
+// refreshes the unit's own spot within `merge` of it, so a parked one keeps a
+// single spot and a patrolling one a chain of spots along its route, each
+// refreshed as it passes again. A spot counts as cover for memoryFrames after
+// its last sighting, until our LOS sees the spot without the unit, or the
+// unit dies. Engine-free; capped per unit and in total.
+class MobileAntiMemory {
+public:
+    struct Spot { int id; Point pos; float radius; int first, seen; };
+    // A sighting of unit id at p (coverage radius). Returns true for a new spot.
+    bool Observe(int id, Point p, float radius, float merge, int frame)
+    {
+        if (!Valid(p) || radius <= 0.f) return false;
+        Spot* best = nullptr;
+        float bestSq = merge * merge;
+        int count = 0;
+        for (Spot& s : spots) {
+            if (s.id != id) continue;
+            ++count;
+            const float d = DistanceSq(s.pos, p);
+            if (d <= bestSq) { bestSq = d; best = &s; }
+        }
+        if (best != nullptr) { best->seen = frame; best->radius = radius; return false; }
+        if (count >= PER_UNIT) EraseOldest([id](const Spot& s) { return s.id == id; });
+        if (spots.size() >= TOTAL) EraseOldest([](const Spot&) { return true; });
+        spots.push_back({id, p, radius, frame, frame});
+        return true;
+    }
+    // Spots last seen before frame - memoryFrames go. fn(const Spot&) for each.
+    template<class F> void Expire(int frame, int memoryFrames, F&& fn)
+    {
+        EraseIf([&](const Spot& s) { return frame - s.seen > memoryFrames; }, fn);
+    }
+    // The unit is gone (destroyed, or no longer an enemy record).
+    template<class F> void Forget(int id, F&& fn) { EraseIf([id](const Spot& s) { return s.id == id; }, fn); }
+    // Scouted without the unit: pred(const Spot&) true drops it. fn(const Spot&) for each.
+    template<class P, class F> void Clear(P&& pred, F&& fn) { EraseIf(pred, fn); }
+    // fn(const Spot&) for the unit's spots seen at or after `since`.
+    template<class F> void ForEach(int id, int since, F&& fn) const
+    {
+        for (const Spot& s : spots) if (s.id == id && s.seen >= since) fn(s);
+    }
+    int Count(int id) const { return int(std::count_if(spots.begin(), spots.end(), [id](const Spot& s) { return s.id == id; })); }
+    const std::vector<Spot>& Spots() const { return spots; }
+    bool Empty() const { return spots.empty(); }
+    static constexpr int PER_UNIT = 12;
+    static constexpr size_t TOTAL = 256;
+private:
+    template<class P> void EraseOldest(P&& pred)
+    {
+        auto oldest = spots.end();
+        for (auto it = spots.begin(); it != spots.end(); ++it) {
+            if (pred(*it) && (oldest == spots.end() || it->seen < oldest->seen)) oldest = it;
+        }
+        if (oldest != spots.end()) spots.erase(oldest);
+    }
+    template<class P, class F> void EraseIf(P&& pred, F&& fn)
+    {
+        for (size_t i = 0; i < spots.size();) {
+            if (pred(spots[i])) { fn(spots[i]); spots.erase(spots.begin() + i); }
+            else ++i;
+        }
+    }
+    std::vector<Spot> spots;
+};
 // Nuke outcome (owner 2026-11-06). The engine adds experience to the silo for
 // every point of damage its missile deals (BAR modrules experienceMult; the
 // same experience raises its health and cuts its reload), so a launch is

@@ -333,6 +333,15 @@ public:
 		int strikeWindowFrames = 60 * FRAMES_PER_SEC;
 		float interceptPresumeRadius = 2000.f;  // 0 = off
 		int interceptPresumeFrames = 600 * FRAMES_PER_SEC;
+		// Mobile antinuke memory (owner 2026-11-24, CAllyTeam::UpdateMobileAntis): a scouted
+		// mobile interceptor out of radar and LOS still covers the spots it was seen on for
+		// mobileAntiMemoryFrames after its last sighting there (0 = off: only while in sight),
+		// until our LOS sees a spot without it. One in sight covers its position plus the spots
+		// it passed within mobileAntiPatrolFrames (a patrol route). Sightings within
+		// coverage x mobileAntiMerge of a spot refresh it instead of adding one.
+		int mobileAntiMemoryFrames = 360 * FRAMES_PER_SEC;
+		int mobileAntiPatrolFrames = 120 * FRAMES_PER_SEC;
+		float mobileAntiMerge = 0.30f;
 	};
 	const SNuclearInfo& GetNuclearInfo() const { return nuclearInfo; }
 	strategic::Overnuke& GetOvernuke();  // the ally team's (CAllyTeam::GetOvernuke)

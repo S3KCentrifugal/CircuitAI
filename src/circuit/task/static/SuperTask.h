@@ -169,12 +169,15 @@ private:
 	std::vector<bool> ChainFrom(unsigned seed, const std::vector<SChainUnit>& units);
 	std::unordered_map<const CCircuitDef*, SDeathBlast> deathBlasts;
 	std::unordered_map<ICoreUnit::Id, int> facings;  // enemy building facing, read once in LOS (buildings never turn)
-	// Known enemy interceptors (position, squared coverage + margin), and how many hold pos.
-	std::vector<std::pair<springai::AIFloat3, float>> KnownInterceptors();
-	static std::vector<springai::AIFloat3> CoverEdgeAims(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,
+	// Known enemy interceptors (position, squared coverage + margin, unit id; remembered:
+	// a mobile one's spot from CAllyTeam::GetMobileAntis), and how many units hold pos
+	// (one unit's several spots count once).
+	struct SInterceptor { springai::AIFloat3 pos; float sq; int id; bool remembered; };
+	std::vector<SInterceptor> KnownInterceptors();
+	static std::vector<springai::AIFloat3> CoverEdgeAims(const std::vector<SInterceptor>& interceptors,
 			const std::vector<springai::AIFloat3>& targets);
-	static int CountInterceptorCover(const std::vector<std::pair<springai::AIFloat3, float>>& interceptors,
-			const springai::AIFloat3& pos);
+	static int CountInterceptorCover(const std::vector<SInterceptor>& interceptors,
+			const springai::AIFloat3& pos, int* remembered = nullptr);
 	bool IsPulse(CCircuitDef* cdef) const;
 	bool SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef);
 	int CountNukeSilos() const;  // finished nuke silos of every allied BARb (one super task each)

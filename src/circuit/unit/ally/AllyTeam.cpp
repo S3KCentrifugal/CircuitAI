@@ -10,6 +10,8 @@
 #include "unit/FactoryData.h"
 #include "map/MapManager.h"
 #include "map/ThreatMap.h"
+#include "module/MilitaryManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "resource/MetalManager.h"
 #include "resource/EnergyManager.h"
 #include "resource/EnergyGrid.h"
@@ -373,12 +375,79 @@ void CAllyTeam::Update(CCircuitAI* ai)
 	if (combatSnapshot.Due(circuit->GetLastFrame())) {
 		combatSnapshot.Rebuild(circuit, circuit->GetLastFrame());  // D-389
 	}
+	if (circuit->GetLastFrame() % (FRAMES_PER_SEC * 2) == (uEnemyMark + 7) % (FRAMES_PER_SEC * 2)) {
+		UpdateMobileAntis();
+	}
 	if (circuit->GetLastFrame() % THREAT_UPDATE_RATE == uEnemyMark) {
 		EnqueueUpdate();
 	} else {
 		enemyManager->UpdateEnemyDatas(quadField);
 	}
 	++enemyRevision;  // D-462: enemy records (and hidden flags) changed this frame
+}
+
+/*
+ * Mobile antinuke memory (owner 2026-11-24). Every 2 s: each enemy mobile unit
+ * with an interceptor weapon in radar or LOS marks (or refreshes) its spot;
+ * spots seen by our LOS without the unit, of dead units, or older than
+ * nuclear.mobile_antinuke_memory_seconds go. CSuperTask::KnownInterceptors
+ * counts the spots of units out of radar and LOS as cover.
+ */
+void CAllyTeam::UpdateMobileAntis()
+{
+	CMilitaryManager* militaryMgr = circuit->GetMilitaryManager();
+	CBattleAnalysis* battle = circuit->GetBattle();
+	if ((militaryMgr == nullptr) || (battle == nullptr)) return;
+	const auto& policy = militaryMgr->GetNuclearInfo();
+	if (policy.mobileAntiMemoryFrames <= 0) return;
+	const int frame = circuit->GetLastFrame();
+	auto name = [](const CCircuitDef* d) { return (d != nullptr) ? d->GetDef()->GetName() : "?"; };
+	std::unordered_map<int, const CCircuitDef*> alive;  // mobile interceptors still on record
+	std::unordered_set<int> visible;
+	for (const auto* pool : {&enemyManager->GetHostileDatas(), &enemyManager->GetPeaceDatas()}) for (const SEnemyData& e : *pool) {
+		if (e.IsFake() || e.IsDead() || e.IsDying() || (e.cdef == nullptr) || !e.cdef->IsMobile()) continue;
+		auto it = mobileAntiCoverage.find(e.cdef);
+		if (it == mobileAntiCoverage.end()) {
+			it = mobileAntiCoverage.emplace(e.cdef, battle->InterceptorCoverage(e.cdef)).first;
+		}
+		if (it->second <= 0.f) continue;
+		alive.emplace(e.id, e.cdef);
+		if (!e.IsInRadarOrLOS()) continue;
+		visible.insert(e.id);
+		const bool added = mobileAntis.Observe(e.id, {e.pos.x, e.pos.z}, it->second,
+				it->second * policy.mobileAntiMerge, frame);
+		if (added) {
+			const int n = mobileAntis.Count(e.id);
+			circuit->LOG("MOBILE ANTINUKE: %s(%i) spot %i at (%.0f, %.0f) coverage %.0f (%s, %s)",
+					name(e.cdef), e.id, n, e.pos.x, e.pos.z, it->second, e.IsInLOS() ? "LOS" : "radar",
+					(n > 1) ? "moving" : "first sighting");
+		}
+	}
+	if (mobileAntis.Empty()) return;
+	std::vector<int> gone;
+	for (const auto& s : mobileAntis.Spots()) {
+		if ((alive.find(s.id) == alive.end()) && (std::find(gone.begin(), gone.end(), s.id) == gone.end())) gone.push_back(s.id);
+	}
+	for (int id : gone) {
+		int n = 0;
+		mobileAntis.Forget(id, [&n](const strategic::MobileAntiMemory::Spot&) { ++n; });
+		circuit->LOG("MOBILE ANTINUKE: unit %i gone (destroyed or no record): %i spots dropped", id, n);
+	}
+	mobileAntis.Expire(frame, policy.mobileAntiMemoryFrames, [&](const strategic::MobileAntiMemory::Spot& s) {
+		circuit->LOG("MOBILE ANTINUKE: %s(%i) spot (%.0f, %.0f) expired %.0f s after its last sighting",
+				name(alive[s.id]), s.id, s.pos.x, s.pos.z, float(frame - s.seen) / FRAMES_PER_SEC);
+	});
+	// scouted without it: the spot is in our LOS and this sample did not refresh it
+	CMap* map = circuit->GetMap();
+	mobileAntis.Clear([&](const strategic::MobileAntiMemory::Spot& s) {
+		if (s.seen == frame) return false;
+		const AIFloat3 p(s.pos.x, std::max(0.f, map->GetElevationAt(s.pos.x, s.pos.z)), s.pos.z);
+		return mapManager->IsInLOS(p);
+	}, [&](const strategic::MobileAntiMemory::Spot& s) {
+		circuit->LOG("MOBILE ANTINUKE: %s(%i) spot (%.0f, %.0f) scouted empty %.0f s after its last sighting (%s)",
+				name(alive[s.id]), s.id, s.pos.x, s.pos.z, float(frame - s.seen) / FRAMES_PER_SEC,
+				(visible.count(s.id) > 0) ? "seen elsewhere" : "unit not in sight");
+	});
 }
 
 void CAllyTeam::EnqueueUpdate()

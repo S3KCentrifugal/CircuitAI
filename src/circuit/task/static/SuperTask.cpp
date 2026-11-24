@@ -1021,12 +1021,14 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
 				return CoverEdgeAims(interceptors, targets);
 			}, policy.blastKill ? cdef->GetWeaponDef() : nullptr);
 		if (found) {
-			const int cover = CountInterceptorCover(interceptors, targetPos);
+			int recalled = 0;
+			const int cover = CountInterceptorCover(interceptors, targetPos, &recalled);
 			if (coverLogPos.SqDistance2D(targetPos) > SQUARE(1.f)) {  // once per new aim point
 			coverLogPos = targetPos;
-			circuit->LOG("NUCLEAR %s(%i): aim (%i,%i) antinukes covering=%i of %zu known, value x%.2f",
-					cdef->GetDef()->GetName(), unit->GetId(), int(targetPos.x), int(targetPos.z), cover,
-					interceptors.size(), (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(cover))));
+			const size_t spots = std::count_if(interceptors.begin(), interceptors.end(), [](const SInterceptor& ic) { return ic.remembered; });
+			circuit->LOG("NUCLEAR %s(%i): aim (%i,%i) antinukes covering=%i (%i remembered mobile) of %zu known (+%zu remembered spots), value x%.2f",
+					cdef->GetDef()->GetName(), unit->GetId(), int(targetPos.x), int(targetPos.z), cover, recalled,
+					interceptors.size() - spots, spots, (cover <= 0) ? 1.f : std::max(policy.antinukeFloor, std::pow(coverFactor, float(cover))));
 			}
 		}
 		// nuke rush scouting (team/nuke_recon.as) sends AIR to the latest aim
@@ -1118,25 +1120,47 @@ bool CSuperTask::SelectNuclearTarget(CCircuitUnit* unit, CCircuitDef* cdef)
  * known enemy units with an interceptor weapon (read from the def, not from a
  * role list, so Legion's Rampart - a geothermal with an antinuke - counts)
  * whose coverage holds it. Enemy stockpiles are unknown: every known
- * interceptor counts as armed. Mobile ones count only while in radar or LOS.
+ * interceptor counts as armed. Mobile ones count where they are while in radar
+ * or LOS, and on the spots they were scouted on (CAllyTeam::UpdateMobileAntis).
  * Each one multiplies the aim point's metal value by nuclear.antinuke_factor (SNuclearInfo).
  */
-std::vector<std::pair<AIFloat3, float>> CSuperTask::KnownInterceptors()
+std::vector<CSuperTask::SInterceptor> CSuperTask::KnownInterceptors()
 {
-	std::vector<std::pair<AIFloat3, float>> out;
+	std::vector<SInterceptor> out;
 	CCircuitAI* circuit = manager->GetCircuit();
 	CBattleAnalysis* battle = circuit->GetBattle();
 	if (battle == nullptr) return out;
-	const float margin = circuit->GetMilitaryManager()->GetNuclearInfo().coveredMargin;
+	const auto& policy = circuit->GetMilitaryManager()->GetNuclearInfo();
+	const float margin = policy.coveredMargin;
+	const int frame = circuit->GetLastFrame();
+	const strategic::MobileAntiMemory& memory = circuit->GetAllyTeam()->GetMobileAntis();
 	const auto* enemies = circuit->GetEnemyManager();
 	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) for (const SEnemyData& e : *pool) {
 		if (e.IsFake() || e.IsDead() || e.IsDying() || (e.cdef == nullptr)) continue;
-		if (e.cdef->IsMobile() && !e.IsInRadarOrLOS()) continue;  // a mobile antinuke's old position says little
 		auto it = interceptorCoverage.find(e.cdef);
 		if (it == interceptorCoverage.end()) {
 			it = interceptorCoverage.emplace(e.cdef, battle->InterceptorCoverage(e.cdef)).first;
 		}
-		if (it->second > 0.f) out.emplace_back(e.pos, SQUARE(it->second + margin));
+		if (it->second <= 0.f) continue;
+		const float sq = SQUARE(it->second + margin);
+		if (!e.cdef->IsMobile()) {
+			out.push_back({e.pos, sq, e.id, false});
+			continue;
+		}
+		// Mobile antinuke memory (owner 2026-11-24): one in sight covers where it is now
+		// and the patrol spots it passed recently; one out of sight, the spots it was seen
+		// on within the memory (scouted-empty spots are already gone).
+		int since = -1;
+		if (e.IsInRadarOrLOS()) {
+			out.push_back({e.pos, sq, e.id, false});
+			if (policy.mobileAntiPatrolFrames <= 0) continue;
+			since = frame - policy.mobileAntiPatrolFrames;
+		} else if (policy.mobileAntiMemoryFrames <= 0) {
+			continue;
+		}
+		memory.ForEach(e.id, since, [&](const strategic::MobileAntiMemory::Spot& s) {
+			out.push_back({AIFloat3(s.pos.x, 0.f, s.pos.z), sq, e.id, true});
+		});
 	}
 	return out;
 }
@@ -1150,20 +1174,20 @@ std::vector<std::pair<AIFloat3, float>> CSuperTask::KnownInterceptors()
  * own cover by the other interceptors included), so a two-antinuke area can
  * be hit from the edge where only one covers.
  */
-std::vector<AIFloat3> CSuperTask::CoverEdgeAims(const std::vector<std::pair<AIFloat3, float>>& interceptors,
+std::vector<AIFloat3> CSuperTask::CoverEdgeAims(const std::vector<SInterceptor>& interceptors,
 		const std::vector<AIFloat3>& targets)
 {
 	std::vector<AIFloat3> out;
 	for (const auto& ic : interceptors) {
-		const float r = std::sqrt(ic.second) + 8.f;  // ic.second: squared coverage incl. margin
+		const float r = std::sqrt(ic.sq) + 8.f;  // ic.sq: squared coverage incl. margin
 		std::vector<AIFloat3> mine;
 		for (const AIFloat3& t : targets) {
-			const float sq = t.SqDistance2D(ic.first);
-			if (sq >= ic.second) continue;
-			AIFloat3 dir(t.x - ic.first.x, 0.f, t.z - ic.first.z);
+			const float sq = t.SqDistance2D(ic.pos);
+			if (sq >= ic.sq) continue;
+			AIFloat3 dir(t.x - ic.pos.x, 0.f, t.z - ic.pos.z);
 			const float len = std::sqrt(sq);
 			if (len < 1.f) continue;  // the interceptor itself: no direction
-			const AIFloat3 p(ic.first.x + dir.x / len * r, 0.f, ic.first.z + dir.z / len * r);
+			const AIFloat3 p(ic.pos.x + dir.x / len * r, 0.f, ic.pos.z + dir.z / len * r);
 			bool dup = false;  // targets in one direction share an edge point
 			for (const AIFloat3& q : mine) if (q.SqDistance2D(p) < SQUARE(128.f)) { dup = true; break; }
 			if (!dup) mine.push_back(p);
@@ -1173,11 +1197,21 @@ std::vector<AIFloat3> CSuperTask::CoverEdgeAims(const std::vector<std::pair<AIFl
 	return out;
 }
 
-int CSuperTask::CountInterceptorCover(const std::vector<std::pair<AIFloat3, float>>& interceptors, const AIFloat3& pos)
+int CSuperTask::CountInterceptorCover(const std::vector<SInterceptor>& interceptors, const AIFloat3& pos, int* remembered)
 {
-	int count = 0;
-	for (const auto& ic : interceptors) if (pos.SqDistance2D(ic.first) < ic.second) ++count;
-	return count;
+	// one unit counts once however many of its spots hold pos; it counts as
+	// remembered only when no position in sight does
+	std::vector<std::pair<int, bool>> units;  // id, held only by remembered spots
+	for (const auto& ic : interceptors) {
+		if (pos.SqDistance2D(ic.pos) >= ic.sq) continue;
+		auto it = std::find_if(units.begin(), units.end(), [&ic](const std::pair<int, bool>& u) { return u.first == ic.id; });
+		if (it == units.end()) units.emplace_back(ic.id, ic.remembered);
+		else it->second = it->second && ic.remembered;
+	}
+	if (remembered != nullptr) {
+		*remembered = int(std::count_if(units.begin(), units.end(), [](const std::pair<int, bool>& u) { return u.second; }));
+	}
+	return int(units.size());
 }
 
 /*

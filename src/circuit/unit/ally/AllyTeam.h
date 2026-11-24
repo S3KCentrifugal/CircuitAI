@@ -162,6 +162,9 @@ public:
 	strategic::Ledger& GetNuclearHistory() { return nuclearHistory; }
 	// Nuke outcomes (owner 2026-11-06): every allied silo's pending launches, struck areas, presumed interceptors.
 	strategic::StrikeLedger& GetNuclearStrikes() { return nuclearStrikes; }
+	// Mobile antinuke memory (owner 2026-11-24): where scouted mobile interceptors were seen,
+	// sampled every 2 s by the authority AI (UpdateMobileAntis); nukes treat the spots as cover.
+	const strategic::MobileAntiMemory& GetMobileAntis() const { return mobileAntis; }
 	// Probing shots (owner 2026-11-03): spots a Juno probed, so no ally probes them again for a while.
 	strategic::Ledger& GetProbeHistory() { return probeHistory; }
 	// One overnuke per ally team (owner 2026-11-01): every allied BARb's silos, FRONT's
@@ -191,6 +194,9 @@ private:
 	strategic::Ledger pulseClaims, nuclearHistory, probeHistory;
 	strategic::Overnuke overnuke;
 	strategic::StrikeLedger nuclearStrikes;
+	strategic::MobileAntiMemory mobileAntis;
+	std::unordered_map<const CCircuitDef*, float> mobileAntiCoverage;  // def -> coverage, 0 none
+	void UpdateMobileAntis();
 	tier::BlastLedger lolBlasts;
 	allied_layout::Reservations layoutReservations;
 	metal_field::Claims metalClaims;

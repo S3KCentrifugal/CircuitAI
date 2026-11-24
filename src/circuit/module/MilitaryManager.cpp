@@ -625,6 +625,12 @@ void CMilitaryManager::ReadConfig()
 	nuclearInfo.interceptPresumeRadius = std::max(0.f, nuclear.get("intercept_presume_radius", 2000.f).asFloat());
 	nuclearInfo.interceptPresumeFrames = std::max(0, nuclear.get("intercept_presume_seconds", 600).asInt()) * FRAMES_PER_SEC;
 	nuclearInfo.volumeFactor = std::max(0.f, nuclear.get("blast_volume_factor", 0.86f).asFloat());
+	nuclearInfo.mobileAntiMemoryFrames = std::max(0, nuclear.get("mobile_antinuke_memory_seconds", 360).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.mobileAntiPatrolFrames = std::max(0, nuclear.get("mobile_antinuke_patrol_seconds", 120).asInt()) * FRAMES_PER_SEC;
+	nuclearInfo.mobileAntiMerge = std::min(1.f, std::max(0.05f, nuclear.get("mobile_antinuke_merge", 0.30f).asFloat()));
+	circuit->LOG("CONFIG %s: nuclear mobile antinuke memory=%is patrol=%is merge=%.2f",
+			cfgName.c_str(), nuclearInfo.mobileAntiMemoryFrames / FRAMES_PER_SEC,
+			nuclearInfo.mobileAntiPatrolFrames / FRAMES_PER_SEC, nuclearInfo.mobileAntiMerge);
 	circuit->LOG("CONFIG %s: nuclear antinuke factor=%.2f overnuke factor=%.2f (per covering antinuke) floor=%.2f margin=%.0f",
 			cfgName.c_str(), nuclearInfo.antinukeFactorOrdinary, nuclearInfo.antinukeFactorOvernuke,
 			nuclearInfo.antinukeFloor, nuclearInfo.coveredMargin);
