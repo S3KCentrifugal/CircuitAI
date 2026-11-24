@@ -23,6 +23,22 @@ namespace Air {
             // D-292: ordinary fusion is its own module kind (reactor + support bank), planned
             // only once the fusion era starts. Reservation, not a build order.
             int PlannedFusionModules = 2;
+// Owner 2026-11-24 (AIR scales like TECH): EcoBlocks replaces the module kinds above.
+// A block is a reserved home zone with a construction-turret block in its middle
+// (EcoBlockTurretColumns wide, EcoBlockTurretRows deep); fusions, advanced fusions and
+// advanced converters are packed flush against those turrets (native PackNearGroup, as
+// TECH packs around its turret rows). A new block is reserved when the last one is full.
+bool EcoBlocks = true;
+int EcoBlockTurretColumns = 4;
+int EcoBlockTurretRows = 2;
+float EcoBlockHaloElmos = 240.0f;   // packing ground around the turret block, inside a turret's reach
+float EcoBlockMinGround = 0.6f;     // flat x buildable share of the block's zone
+int EcoBlockMax = 6;
+int EcoBlockTurretsInFlight = 2;    // turret orders at once per busy block
+int EcoBlockFirstSeconds = 90;      // the first block's ground is reserved this early (no T1 sprawl over it)
+// Owner 2026-11-24: two ordinary fusions stand before the first advanced fusion
+// (the energy-income gate below still opens it earlier when reached); 0 = income gate only.
+int FusionsBeforeAfus = 2;
             int FusionSupportSlots = 6;
             int FusionModuleFallbackSeconds = 45; // continuous module failure before the logged ring-search fallback
             float EcoFactorySeparation = 384.0f; // districts may abut; native envelopes still exclude overlap

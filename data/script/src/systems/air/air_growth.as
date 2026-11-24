@@ -4,6 +4,7 @@
 namespace AirGrowth {
     int lastLog = -100000;
     int lastBlockedLog = -100000;
+    int lastAfusWhyLog = -100000;
     int afusGateLogged = -1;   // D-366: -1 unknown, else the last logged allowAdvancedFusion; one line per transition
     IUnitTask@ AssistReactor(CCircuitUnit@ u)
     {
@@ -48,14 +49,36 @@ namespace AirGrowth {
         // D-366 (owner): AIR scales like SUPPORT (D-359): ordinary fusions, converters
         // alongside, until the energy-income gate; the advanced fusion only after it.
         const float afusGate = Global::RoleSettings::Air::AdvancedFusionEnergyIncome;
-        s.allowAdvancedFusion = afusGate <= 0.0f || s.eIncome >= afusGate;
+        // Owner 2026-11-24: or FusionsBeforeAfus ordinary fusions stand (TECH-like scaling).
+        const int fusionsFirst = Global::RoleSettings::Air::FusionsBeforeAfus;
+        s.allowAdvancedFusion = afusGate <= 0.0f || s.eIncome >= afusGate
+            || (fusionsFirst > 0 && AirEconomy::CompletedFusions() >= fusionsFirst);
+        // Played (Hera / Starwatcher 11-24): the advanced fusion's cap stood at 0 for AIR
+        // (maxThisUnit=0, count=0), so the chooser never offered it once the gate opened and
+        // no AIR built one in 41 minutes. Open the next one, as TECH's LiftCapForRole does.
+        if (s.allowAdvancedFusion && s.builderIsT2) {
+            CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+            if (af !is null && af.IsBuildAllowed() && af.maxThisUnit <= af.count) {
+                af.maxThisUnit = af.count + 1;
+                GenericHelpers::LogUtil("[AIR][Eco] advanced fusion cap lifted to " + af.maxThisUnit, 1);
+            }
+        }
         if (s.builderIsT2 && (s.allowAdvancedFusion ? 1 : 0) != afusGateLogged) {
             afusGateLogged = s.allowAdvancedFusion ? 1 : 0;
             GenericHelpers::LogUtil("[AIR][Eco] advanced fusion " + (s.allowAdvancedFusion ? "allowed" : "withheld")
-                + ": energy income " + int(s.eIncome) + " against gate " + int(afusGate), 1);
+                + ": energy income " + int(s.eIncome) + " against gate " + int(afusGate)
+                + ", fusions " + AirEconomy::CompletedFusions() + "/" + fusionsFirst, 1);
         }
         string why;
         string key = EcoPlanner::Decide(s, why);
+        if (s.builderIsT2 && s.allowAdvancedFusion && key != "afus" && ai.frame - lastAfusWhyLog >= 30 * SECOND) {
+            lastAfusWhyLog = ai.frame;
+            CCircuitDef@ af = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(side));
+            if (af !is null)
+                GenericHelpers::LogUtil("[AIR][Eco] advanced fusion not chosen: key=" + key + " by=" + u.circuitDef.GetName()
+                    + " canBuild=" + u.circuitDef.CanBuild(af) + " available=" + af.IsAvailable(ai.frame) + " count=" + af.count
+                    + " max=" + af.maxThisUnit + " since=" + af.sinceFrame + " M=" + int(s.mIncome) + " reactors=" + s.allowReactors, 1);
+        }
         if (key == "afus" && !s.allowAdvancedFusion)
             Invariants::Violation("INV-241", "afus-gate", "AIR chose an advanced fusion under its energy-income gate");
         // The growth goal outranks a full bank's ordinary 'no more energy' answer,

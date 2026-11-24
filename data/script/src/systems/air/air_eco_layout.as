@@ -40,8 +40,10 @@ namespace AirEcoLayout {
     dictionary slotAskedUntil; // slot id -> frame the slot may be ordered again
     dictionary supportPositions;
     string PositionKey(const AIFloat3 &in pos) { return "" + int(pos.x / 8.0f + .5f) + ":" + int(pos.z / 8.0f + .5f); }
-    bool Owns(const AIFloat3 &in pos) { return supportPositions.exists(PositionKey(pos)); }
+    bool Owns(const AIFloat3 &in pos) { return supportPositions.exists(PositionKey(pos)) || blockPositions.exists(PositionKey(pos)); }
     int ReactorAt(const AIFloat3 &in pos) {
+        const int block = BlockOf(pos);
+        if (block >= 0) return ReactorAtBlock(block);
         int owner = -1;
         if (!supportPositions.get(PositionKey(pos), owner) || owner < 0 || owner >= int(modules.length())
             || modules[owner].slots.length() == 0) return -1;
@@ -93,9 +95,12 @@ namespace AirEcoLayout {
             modules.insertLast(m);
         }
         IndexSupport();
+        InitBlocks();
     }
     bool NearReactor(const AIFloat3 &in pos, float separation)
     {
+        for (uint i = 0; i < blocks.length(); ++i)
+            if (MapHelpers::SqDist(pos, blocks[i].centre) < separation * separation) return true;
         for (uint i = 0; i < modules.length(); ++i) {
             Module@ m = modules[i];
             if (m.slots.length() > 0 && aiTerrainMgr.GetReservationState(m.slots[0]) >= 0
@@ -256,6 +261,7 @@ namespace AirEcoLayout {
         if (!AirLayout::enabled || ai.frame - planFrame < SECOND) return;
         if (MetalEconomy::Active() && AirLayout::bays.length() == 0) return;
         planFrame = ai.frame;
+        if (Blocks()) { PlanBlocks(); AuditBlockReactors(); return; }
         // Counts are kept per kind so fusion modules never satisfy (or starve)
         // the AFUS plan. O(modules) per second; modules stay in single digits.
         array<int> active = {0, 0}, planned = {0, 0};
@@ -346,6 +352,7 @@ namespace AirEcoLayout {
         const string side = UnitHelpers::GetSideForUnitName(d.GetName());
         const bool fusion = d.GetName() == UnitHelpers::GetFusionNameForSide(side);
         const bool reactor = fusion || d.GetName() == UnitHelpers::GetAdvFusionNameForSide(side);
+        if (Blocks()) return PlaceBlocks(u, d, type, priority);
         const int kind = fusion ? KindFusion : KindAfus; // advanced converters live in AFUS modules
         // One extra module is allowed when all existing slots of this kind are occupied.
         const uint count = modules.length();
@@ -380,6 +387,7 @@ namespace AirEcoLayout {
     // once, without the workforce-shortage and funding tests; the nano's cost must be
     // banked. Moonshine 2026-11-13: both fusions finished with 0 nanos in reach.
     IUnitTask@ Nano(CCircuitUnit@ u, CCircuitDef@ nano, bool thinHome = false) {
+        if (Blocks()) return NanoBlocks(u, nano, thinHome);
         for (uint i = 0; i < modules.length(); ++i) {
             Module@ m = modules[i];
             if (m.slots.length() == 0) continue;
@@ -406,5 +414,309 @@ namespace AirEcoLayout {
         }
         return null;
     }
-    void Leave() { modules.resize(0); supportPositions.deleteAll(); slotAskedUntil.deleteAll(); retryAfter[0] = 0; retryAfter[1] = 0; planFrame = -100000; ResetFallback(); }
+    void Leave() { modules.resize(0); supportPositions.deleteAll(); slotAskedUntil.deleteAll(); retryAfter[0] = 0; retryAfter[1] = 0; planFrame = -100000; ResetFallback(); LeaveBlocks(); }
+
+    // ------------------------------------------------------------------------
+    // Owner 2026-11-24 (Air::EcoBlocks): TECH-style economy blocks for AIR.
+    // A block = one reserved zone in the home disc, a construction-turret block
+    // (EcoBlockTurretColumns x EcoBlockTurretRows) laid in its middle as one
+    // native group, and an advanced-fusion footprint held next to the turrets.
+    // Fusions, advanced fusions and advanced converters are packed flush
+    // against the turrets (PackNearGroup ranks cells by turret distance, standing
+    // or framed turrets first, as TECH packs around its turret rows). When no
+    // block has room a new one is reserved, nearest home first.
+    // Cost: Place is O(blocks) PackNearGroup asks (native cached per frame);
+    // PlanAhead once per 5 s asks CanPackNearGroup on the newest block only;
+    // Nano is O(blocks x turret slots), slots <= 8, blocks <= EcoBlockMax.
+    // Ownership: zone/group/afus ids live in the native layout and in named
+    // layout ints ("air.block.<i>.*"); work ids are this AI's own pinned orders.
+    // ------------------------------------------------------------------------
+    bool Blocks() { return Global::RoleSettings::Air::EcoBlocks; }
+    class Block {
+        string key;
+        int zone = 0;
+        int group = 0;
+        int facing = 0;
+        int afusSlot = -1;
+        AIFloat3 centre;
+        array<int> work;   // reservations this AI ordered here (economy), pruned as they finish
+    }
+    array<Block@> blocks;
+    dictionary blockPositions;   // turret slot position key -> block index
+    dictionary blockNoRoom;      // block key + def name -> frame a new pack may be asked
+    int blockRetry = 0;
+    int blockPlanFrame = -100000;
+    string BlockPrefix() { return aiEconomyMgr.IsMetalMap() ? "air.fieldBlock." : "air.block."; }
+    CCircuitDef@ BlockNano() { return ai.GetCircuitDef(UnitHelpers::GetT1NanoNameForSide(Global::AISettings::Side)); }
+    void LeaveBlocks() { blocks.resize(0); blockPositions.deleteAll(); blockNoRoom.deleteAll(); blockRetry = 0; blockPlanFrame = -100000; }
+    void BlockSlots(Block@ b, array<int>& out ids)
+    {
+        ids.resize(0);
+        CCircuitDef@ nano = BlockNano();
+        if (b is null || nano is null || b.zone <= 0 || b.group <= 0) return;
+        array<int> scoped;
+        aiTerrainMgr.GetScopedReservationIds(b.zone, b.group, nano, scoped);
+        for (uint i = 0; i < scoped.length(); ++i) if (aiTerrainMgr.GetReservationState(scoped[i]) >= 0) ids.insertLast(scoped[i]);
+    }
+    void IndexBlocks()
+    {
+        blockPositions.deleteAll();
+        array<int> ids;
+        for (uint i = 0; i < blocks.length(); ++i) {
+            BlockSlots(blocks[i], ids);
+            for (uint s = 0; s < ids.length(); ++s) blockPositions.set(PositionKey(aiTerrainMgr.GetReservationPos(ids[s])), int(i));
+        }
+    }
+    void SaveBlock(Block@ b)
+    {
+        aiTerrainMgr.SetLayoutInt(BlockPrefix() + "count", int(blocks.length()));
+        aiTerrainMgr.SetLayoutInt(b.key + ".zone", b.zone);
+        aiTerrainMgr.SetLayoutInt(b.key + ".group", b.group);
+        aiTerrainMgr.SetLayoutInt(b.key + ".facing", b.facing);
+        aiTerrainMgr.SetLayoutInt(b.key + ".afus", b.afusSlot);
+        aiTerrainMgr.SetLayoutInt(b.key + ".x", int(b.centre.x));
+        aiTerrainMgr.SetLayoutInt(b.key + ".z", int(b.centre.z));
+    }
+    void InitBlocks()
+    {
+        LeaveBlocks();
+        const int count = aiTerrainMgr.GetLayoutInt(BlockPrefix() + "count", 0);
+        for (int i = 0; i < count; ++i) {
+            Block b;
+            b.key = BlockPrefix() + i;
+            b.zone = aiTerrainMgr.GetLayoutInt(b.key + ".zone", 0);
+            b.group = aiTerrainMgr.GetLayoutInt(b.key + ".group", 0);
+            b.facing = aiTerrainMgr.GetLayoutInt(b.key + ".facing", AirLayout::facing);
+            b.afusSlot = aiTerrainMgr.GetLayoutInt(b.key + ".afus", -1);
+            b.centre = AIFloat3(float(aiTerrainMgr.GetLayoutInt(b.key + ".x", -1)), 0.0f, float(aiTerrainMgr.GetLayoutInt(b.key + ".z", -1)));
+            blocks.insertLast(b);
+        }
+        IndexBlocks();
+    }
+    int BlockOf(const AIFloat3 &in pos)
+    {
+        int b = -1;
+        if (!blockPositions.get(PositionKey(pos), b) || b < 0 || b >= int(blocks.length())) return -1;
+        return b;
+    }
+    // Reserve one block: a spiral of candidate centres behind the start, inside the
+    // home disc, clear of production bays and of the other blocks. Whole block or nothing.
+    // Played (All That Glitters 11-24): the T1 wind/converter field had covered the
+    // home disc by the fusion era and no full-size block fit for 25 minutes. Smaller
+    // shapes are tried after the configured one: less halo, then one turret row.
+    Block@ ReserveBlock()
+    {
+        if (!AirLayout::enabled || ai.frame < blockRetry || int(blocks.length()) >= Global::RoleSettings::Air::EcoBlockMax) return null;
+        blockRetry = ai.frame + 10 * SECOND;
+        const int cols = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretColumns);
+        const int rows = AiMax(1, Global::RoleSettings::Air::EcoBlockTurretRows);
+        const float halo = AiMax(64.0f, Global::RoleSettings::Air::EcoBlockHaloElmos);
+        Block@ b = ReserveBlockShape(cols, rows, halo);
+        if (b is null) @b = ReserveBlockShape(cols, rows, AiMax(64.0f, halo * 0.6f));
+        if (b is null && rows > 1) @b = ReserveBlockShape(cols, 1, AiMax(64.0f, halo * 0.5f));
+        if (b is null) blockRetry = ai.frame + 20 * SECOND;
+        return b;
+    }
+    Block@ ReserveBlockShape(int cols, int rows, float halo)
+    {
+        CCircuitDef@ nano = BlockNano();
+        if (nano is null) return null;
+        const int f = AirLayout::facing;
+        const float nanoSize = float(AiMax(nano.GetFootprintX(), nano.GetFootprintZ())) * SQUARE_SIZE * 2.0f;
+        const float blockHalfAcross = float(cols) * nanoSize * 0.5f;
+        const float blockHalfAlong = float(rows) * nanoSize * 0.5f;
+        const float halfAcross = blockHalfAcross + halo;
+        const float halfAlong = blockHalfAlong + halo;
+        const float spacing = 2.0f * AiMax(halfAcross, halfAlong);
+        const float step = 128.0f;
+        const AIFloat3 anchor = AirLayout::Offset(Global::Map::StartPos, f, 0.0f, -500.0f);
+        const int rings = 1 + int((Global::RoleSettings::Air::HomeEconomyRadius + 500.0f) / step);
+        const float sep = Global::RoleSettings::Air::EcoFactorySeparation + AiMax(halfAcross, halfAlong);
+        int tested = 0, ground = 0, failed = 0, area = 0;
+        for (int ring = 0; ring <= rings; ++ring) {
+            const int width = 2 * ring + 1;
+            for (int cell = 0; cell < width * width; ++cell) {
+                const int x = cell % width - ring, z = cell / width - ring;
+                if (ring > 0 && x > -ring && x < ring && z > -ring && z < ring) continue;
+                const AIFloat3 at = AirLayout::Offset(anchor, f, float(x) * step, float(z) * step);
+                if (!AirLayout::Inside(at, AiMax(halfAcross, halfAlong))) continue;
+                bool home = true;
+                for (int corner = 0; corner < 4 && home; ++corner)
+                    if (!AirHome::EconomySite(AirLayout::Offset(at, f, corner % 2 == 0 ? -halfAcross : halfAcross,
+                        corner < 2 ? -halfAlong : halfAlong))) home = false;
+                if (!home || aiTerrainMgr.IsZoneAlly(at)) continue;
+                bool near = MapHelpers::SqDist(at, Global::Map::StartPos) < 256.0f * 256.0f;
+                for (uint b = 0; b < AirLayout::bays.length() && !near; ++b)
+                    if (AirLayout::bays[b].slot >= 0 && MapHelpers::SqDist(at, AirLayout::bays[b].centre) < sep * sep) near = true;
+                for (uint b = 0; b < blocks.length() && !near; ++b)
+                    if (MapHelpers::SqDist(at, blocks[b].centre) < spacing * spacing) near = true;
+                for (uint m = 0; m < modules.length() && !near; ++m)
+                    if (modules[m].slots.length() > 0 && aiTerrainMgr.GetReservationState(modules[m].slots[0]) >= 0
+                        && MapHelpers::SqDist(at, aiTerrainMgr.GetReservationPos(modules[m].slots[0])) < spacing * spacing) near = true;
+                if (near) continue;
+                if (++tested > 400) break;
+                if (!aiTerrainMgr.CanReserveArea(at, f, blockHalfAcross + 8.0f, blockHalfAlong + 8.0f)) { ++area; continue; }
+                const float score = aiTerrainMgr.FlatFraction(at, f, halfAcross, halfAlong, Global::RoleSettings::Tech::LayoutBoxMaxSlope)
+                    * aiTerrainMgr.BuildableFraction(nano, at, halfAcross, halfAlong, f);
+                if (score < Global::RoleSettings::Air::EcoBlockMinGround) { ++ground; continue; }
+                const int zone = aiTerrainMgr.ReserveZone(at, f, halfAcross, halfAlong, false);
+                if (zone <= 0) { ++failed; continue; }
+                const AIFloat3 front = AirLayout::Offset(at, f, 0.0f, blockHalfAlong);
+                const int group = aiTerrainMgr.LayBand(zone, nano, front, f, cols, rows, 0, false, true, false, 0);
+                if (group <= 0 || aiTerrainMgr.GetGroupCount(group, false) < cols) {
+                    if (group > 0) aiTerrainMgr.ReleaseGroup(group);
+                    aiTerrainMgr.ReleaseZone(zone);
+                    ++failed;
+                    continue;
+                }
+                Block b;
+                b.key = BlockPrefix() + blocks.length();
+                b.zone = zone; b.group = group; b.facing = f; b.centre = at;
+                // Hold the advanced fusion's ground beside the turrets before converters
+                // can take it (TECH D-108: converters filled the box and no AFUS fit).
+                CCircuitDef@ afus = ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(Global::AISettings::Side));
+                if (afus !is null) b.afusSlot = aiTerrainMgr.PackNearGroup(zone, afus, group, f, at, 0.0f, 0.0f, 0);
+                blocks.insertLast(b);
+                SaveBlock(b);
+                IndexBlocks();
+                blockRetry = 0;
+                GenericHelpers::LogUtil("[AIR][EcoBlock] reserved " + cols + "x" + rows + " halo " + int(halo) + " " + b.key + " at " + int(at.x) + "," + int(at.z)
+                    + " zone=" + zone + " turrets=" + aiTerrainMgr.GetGroupCount(group, false) + " afusSlot=" + b.afusSlot
+                    + " ground=" + int(score * 100.0f) + "%", 1);
+                return b;
+            }
+            if (tested > 400) break;
+        }
+        GenericHelpers::LogUtil("[AIR][EcoBlock] no block site " + cols + "x" + rows + " halo " + int(halo) + ": tested=" + tested + " area=" + area + " lowGround=" + ground + " failed=" + failed
+            + " blocks=" + blocks.length(), 1);
+        return null;
+    }
+    // Prune finished, dead or released orders; true while one is claimed or framed.
+    bool BlockBusy(Block@ b)
+    {
+        for (int i = int(b.work.length()) - 1; i >= 0; --i) {
+            const int st = aiTerrainMgr.GetReservationState(b.work[i]);
+            if (st != 1 && st != 2) b.work.removeAt(i);
+        }
+        return b.work.length() > 0;
+    }
+    int BlockTurrets(Block@ b, int &out inFlight, int &out free)
+    {
+        array<int> ids;
+        BlockSlots(b, ids);
+        int built = 0; inFlight = 0; free = 0;
+        for (uint i = 0; i < ids.length(); ++i) {
+            const int st = aiTerrainMgr.GetReservationState(ids[i]);
+            if (st == 3) ++built;
+            else if (st == 1 || st == 2) ++inFlight;
+            else if (st == 0) ++free;
+        }
+        return built;
+    }
+    IUnitTask@ BlockTurret(CCircuitUnit@ u, Block@ b, CCircuitDef@ nano)
+    {
+        if (nano is null || !u.circuitDef.CanBuild(nano) || aiEconomyMgr.metal.current < nano.costM) return null;
+        const int slot = aiTerrainMgr.NextSlotAny(b.group, u.GetPos(ai.frame));
+        if (slot < 0 || aiTerrainMgr.GetReservationState(slot) != 0 || !aiTerrainMgr.IsReservationBuildable(slot)) return null;
+        if (!aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(slot), u.circuitDef.GetBuildDistance())) return null;
+        IUnitTask@ t = AirLayout::Pinned(Task::BuildType::NANO, Task::Priority::HIGH, nano, slot);
+        if (t !is null) GenericHelpers::LogUtil("[AIR][EcoBlock] turret in " + b.key + " slot=" + slot, 2);
+        return t;
+    }
+    IUnitTask@ PlaceBlocks(CCircuitUnit@ u, CCircuitDef@ d, Task::BuildType type, Task::Priority priority)
+    {
+        const string side = UnitHelpers::GetSideForUnitName(d.GetName());
+        const bool afus = d.GetName() == UnitHelpers::GetAdvFusionNameForSide(side);
+        CCircuitDef@ nano = BlockNano();
+        const AIFloat3 anchor = u.GetPos(ai.frame);
+        const uint count = blocks.length();
+        for (uint i = 0; i <= count; ++i) {
+            Block@ b = i == count ? ReserveBlock() : blocks[i];
+            if (b is null || b.zone <= 0 || b.group <= 0) continue;
+            // TECH PrepareEconomySupport: a block's first turret before its first project.
+            int inFlight = 0, free = 0;
+            if (BlockTurrets(b, inFlight, free) == 0 && inFlight == 0) {
+                IUnitTask@ first = BlockTurret(u, b, nano);
+                if (first !is null) return first;
+            }
+            int id = -1;
+            if (afus && b.afusSlot >= 0 && aiTerrainMgr.GetReservationState(b.afusSlot) == 0
+                && aiTerrainMgr.IsReservationBuildable(b.afusSlot)) id = b.afusSlot;
+            const string noRoomKey = b.key + "." + d.GetName();
+            int until = 0;
+            if (id < 0 && blockNoRoom.get(noRoomKey, until) && ai.frame < until) continue;
+            const bool held = id >= 0;
+            if (id < 0) id = aiTerrainMgr.PackNearGroup(b.zone, d, b.group, b.facing, anchor, 0.0f, 0.0f, 0);
+            if (id < 0) { blockNoRoom.set(noRoomKey, ai.frame + 20 * SECOND); continue; }
+            if (!aiTerrainMgr.CanReachAt(u, aiTerrainMgr.GetReservationPos(id), u.circuitDef.GetBuildDistance())) {
+                if (!held) aiTerrainMgr.ReleaseReservation(id);
+                continue;
+            }
+            IUnitTask@ task = AirLayout::Pinned(type, priority, d, id);
+            if (task is null) { if (!held) aiTerrainMgr.ReleaseReservation(id); continue; }
+            if (held) { b.afusSlot = -1; SaveBlock(b); }
+            b.work.insertLast(id);
+            if (IsFusion(d)) fusionFailSince = -1;
+            GenericHelpers::LogUtil("[AIR][EcoBlock] place " + d.GetName() + " in " + b.key + " slot=" + id
+                + (held ? " (held afus ground)" : ""), 1);
+            return task;
+        }
+        return null;
+    }
+    // Support for a block with a project under way: funded turrets, a few at a time.
+    IUnitTask@ NanoBlocks(CCircuitUnit@ u, CCircuitDef@ nano, bool thinHome)
+    {
+        if (nano is null || aiEconomyMgr.isEnergyStalling) return null;
+        for (uint i = 0; i < blocks.length(); ++i) {
+            Block@ b = blocks[i];
+            if (!BlockBusy(b)) continue;
+            int inFlight = 0, free = 0;
+            BlockTurrets(b, inFlight, free);
+            if (free == 0 || inFlight >= AiMax(1, Global::RoleSettings::Air::EcoBlockTurretsInFlight)) continue;
+            IUnitTask@ t = BlockTurret(u, b, nano);
+            if (t !is null) return t;
+        }
+        return null;
+    }
+    int ReactorAtBlock(int index)
+    {
+        Block@ b = blocks[index];
+        BlockBusy(b);
+        for (uint i = 0; i < b.work.length(); ++i) {
+            CCircuitUnit@ r = aiTerrainMgr.GetReservationUnit(b.work[i]);
+            if (r !is null && r.GetBuildProgress() < 1.0f && AirBuild::IsReactor(r.circuitDef)) return r.id;
+        }
+        return -1;
+    }
+    void PlanBlocks()
+    {
+        if (ai.frame - blockPlanFrame < 5 * SECOND) return;
+        blockPlanFrame = ai.frame;
+        // The first block is held early, before the T1 wind/converter field covers the home disc.
+        if (blocks.length() == 0) { if (ai.frame >= Global::RoleSettings::Air::EcoBlockFirstSeconds * SECOND) ReserveBlock(); return; }
+        if (!(AirEconomy::PreparingFusion() || AirEconomy::HasReactor())) return;
+        // Plan the next block before the newest one is full (converters ask often).
+        Block@ last = blocks[blocks.length() - 1];
+        CCircuitDef@ conv = ai.GetCircuitDef(UnitHelpers::GetAdvEnergyConverterNameForSide(Global::AISettings::Side));
+        if (conv !is null && !aiTerrainMgr.CanPackNearGroup(last.zone, conv, last.group, last.facing, 0.0f, 0.0f)) ReserveBlock();
+    }
+    void AuditBlockReactors()
+    {
+        CCircuitDef@ nano = BlockNano();
+        if (nano is null) return;
+        for (int i = int(fallbackTasks.length()) - 1; i >= 0; --i)
+            if (fallbackTasks[i] is null || fallbackTasks[i].IsDead()) fallbackTasks.removeAt(i);
+        for (uint i = 0; i < AirBuild::projects.length(); ++i) {
+            IBuilderTask@ t = cast<IBuilderTask>(AirBuild::projects[i]);
+            if (t is null || t.IsDead() || t.target !is null || t.buildDef is null
+                || t.GetBuildType() != int(Task::BuildType::ENERGY) || !AirBuild::IsReactor(t.buildDef)) continue;
+            if (fallbackTasks.findByRef(AirBuild::projects[i]) >= 0) continue;
+            const AIFloat3 at = t.GetBuildPos();
+            bool supported = false;
+            for (uint b = 0; b < blocks.length() && !supported; ++b)
+                supported = aiTerrainMgr.CountGroupSlotsWithin(blocks[b].group, at, nano.GetBuildDistance()) > 0;
+            if (!supported) Invariants::Violation("INV-203", t.buildDef.GetName(),
+                "AIR reactor order is not within turret reach of an economy block");
+        }
+    }
 }

@@ -87,6 +87,17 @@ namespace AirEconomy {
         }
         return false;
     }
+    // Completed ordinary fusions (not advanced), from the cached owned list.
+    int CompletedFusions()
+    {
+        const string fusion = UnitHelpers::GetFusionNameForSide(Global::AISettings::Side);
+        int count = 0;
+        for (uint i = 0; i < owned.length(); ++i) {
+            CCircuitUnit@ u = ai.GetTeamUnit(owned[i]);
+            if (u !is null && u.GetBuildProgress() >= 1.0f && u.circuitDef.GetName() == fusion) ++count;
+        }
+        return count;
+    }
     bool PreparingFusion()
     {
         return !HasReactor() && ProductionMath::PreparationDue(ai.frame / SECOND,
