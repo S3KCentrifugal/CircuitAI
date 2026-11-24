@@ -43,7 +43,7 @@ private:
     struct LostCommander { int id; springai::AIFloat3 pos; float range; int seen; };
     std::vector<LostCommander> lostCommanders;
     CRangedWorld::Contact lostContact;   // the one escaped from this decision (closing points at it)
-    void UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& near,int frame);
+    void UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& close,int frame);
     float LostCommanderReach(const LostCommander& l,int frame) const;
     bool LostCommanderBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,bool escape) const;
     // Owner 2026-11-16 (Catapults, Daedalus, Myrmidons idle at the gantry): with no

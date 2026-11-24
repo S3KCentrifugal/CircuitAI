@@ -263,12 +263,12 @@ bool CRangedEngagement::UnknownStaticBlocks(CCircuitUnit* unit,const AIFloat3& f
 static constexpr float LOST_COMMANDER_SECONDS = 20.f;
 static constexpr float LOST_COMMANDER_SPEED = 40.f;    // elmos/s it may have walked unseen
 static constexpr float LOST_COMMANDER_GROWTH = 160.f;  // most added to its reach
-void CRangedEngagement::UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& near,int frame)
+void CRangedEngagement::UpdateLostCommanders(CCircuitUnit* unit,const std::vector<int>& close,int frame)
 {
     const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
     if(p.coordinated || p.commanderReachMargin<0.f) return;
     const auto& contacts=world.Contacts();
-    for(int i:near) {
+    for(int i:close) {
         const auto& c=contacts[i];
         if(!CRangedWorld::CommanderContact(c) || !c.armed) continue;
         auto it=std::find_if(lostCommanders.begin(),lostCommanders.end(),[&](const LostCommander& l){return l.id==c.id;});
