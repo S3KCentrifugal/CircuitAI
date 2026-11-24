@@ -2407,6 +2407,15 @@ void CMilitaryManager::UpdateSpamFireHold()
 		// The ranged controller (ARTY task of a ranged hull) owns its fire state.
 		if (task->GetType() == IUnitTask::Type::FIGHTER
 			&& static_cast<IFighterTask*>(task)->GetFightType() == IFighterTask::FightType::ARTY) continue;
+		// Owner 2026-11-24 (Baryon AI 8 Catapult 4770): never hold fire while retreating (only
+		// commanders may): a held retreat skipped shots at a Titan in range. Def fire state.
+		if (task->GetType() == IUnitTask::Type::RETREAT) {
+			if (unit->GetRequestedFireState() != cdef->GetFireState()) {
+				circuit->LOG("SPAMHOLD: %s %d default fire state (retreat)", cdef->GetDef()->GetName(), unit->GetId());
+				unit->TrySetFireState(cdef->GetFireState());
+			}
+			continue;
+		}
 		auto world = GetRangedWorld();
 		if (!refreshed) { world->Refresh(); refreshed = true; }
 		const AIFloat3& pos = unit->GetPos(frame);
