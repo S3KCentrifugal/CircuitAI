@@ -21,4 +21,12 @@ namespace Global { namespace StartPick {
 	// FootMaxSlope (engine slope 1 - cos; commanders climb 54 degrees = 0.41).
 	float FootHalf = 32.0f;
 	float FootMaxSlope = 0.3f;
+	// Ally teams larger than the map config's spots (11v11, 12v12): generate extra spots,
+	// one per empty lane, from in-box mex clusters (start_pick.as ExtraSpots). Off = the game
+	// guesses those starts, as before.
+	bool ExtraSpots = true;
+	// Mex spots within this distance form one cluster (the middle of 2-3 mexes).
+	float ClusterRadius = 450.0f;
+	// An extra spot keeps this far from every spot already taken by the team.
+	float ExtraSpacing = 900.0f;
 }}

@@ -44,6 +44,100 @@ namespace StartPick {
 	// The spot this AI sent (setupMap uses it when the game start is the sent point)
 	int pickedIdx = -1;
 	AIFloat3 pickedPos;
+	// This AI took a generated extra spot (more AIs than configured spots); its role is FRONT
+	bool pickedExtra = false;
+
+	// Extra start spots for ally teams larger than the map config (11v11, 12v12; owner 2026-11-24).
+	// Lanes across the attack axis (our box centre to the nearest enemy box centre), one per AI
+	// of the team, each holding an equal share of the map's mex spots. Every lane no configured
+	// spot of ours occupies gets the richest 2-3 mex cluster inside our box in that lane; when
+	// lanes run out, the richest cluster anywhere in the box. Each extra keeps ExtraSpacing from
+	// every spot already taken. Deterministic: every ally computes the same list.
+	// Cost: once per AI at start; O(M^2) over the map's M mex spots (M is a few hundred).
+	array<AIFloat3>@ ExtraSpots(const array<AIFloat3>& in taken, uint want, uint lanes) {
+		array<AIFloat3> out;
+		const int M = ai.GetMetalSpotCount();
+		if (M <= 0 || want == 0 || lanes == 0 || !HasOwnPoly()) return out;
+		// attack axis
+		float ox = 0, oz = 0, ex = 0, ez = 0;
+		const array<AIFloat3>@ own = StartBoxes::boxes[ai.allyTeamId];
+		for (uint i = 0; i < own.length(); ++i) { ox += own[i].x; oz += own[i].z; }
+		ox /= float(own.length()); oz /= float(own.length());
+		float best = 1e30f;
+		for (uint k = 0; k < StartBoxes::boxes.length(); ++k) {
+			if (int(k) == ai.allyTeamId || StartBoxes::boxes[k].length() == 0) continue;
+			float cx = 0, cz = 0;
+			for (uint i = 0; i < StartBoxes::boxes[k].length(); ++i) { cx += StartBoxes::boxes[k][i].x; cz += StartBoxes::boxes[k][i].z; }
+			cx /= float(StartBoxes::boxes[k].length()); cz /= float(StartBoxes::boxes[k].length());
+			const float d = (cx - ox) * (cx - ox) + (cz - oz) * (cz - oz);
+			if (d < best) { best = d; ex = cx; ez = cz; }
+		}
+		float ux = ex - ox, uz = ez - oz;
+		const float ul = sqrt(ux * ux + uz * uz);
+		if (ul < 1.0f) return out;
+		const float vx = -uz / ul, vz = ux / ul;  // across the attack axis
+		// lane cuts: equal mex counts by projection on v
+		array<float> pv(M);
+		array<AIFloat3> mex(M);
+		for (int i = 0; i < M; ++i) { mex[i] = ai.GetMetalSpot(i); pv[i] = mex[i].x * vx + mex[i].z * vz; }
+		array<float> sorted = pv;
+		sorted.sortAsc();
+		array<float> cuts;
+		for (uint k = 1; k < lanes; ++k) cuts.insertLast(sorted[(uint(M) * k) / lanes]);
+		// clusters: each in-box mex with its (up to) 2 nearest neighbours within ClusterRadius
+		const float r2 = Global::StartPick::ClusterRadius * Global::StartPick::ClusterRadius;
+		array<AIFloat3> cpos; array<int> ccount; array<uint> clane;
+		for (int i = 0; i < M; ++i) {
+			if (!InOwnBox(mex[i])) continue;
+			float d1 = 1e30f, d2 = 1e30f; int n1 = -1, n2 = -1;
+			for (int j = 0; j < M; ++j) {
+				if (j == i) continue;
+				const float d = SqDist2(mex[i], mex[j]);
+				if (d >= r2) continue;
+				if (d < d1) { d2 = d1; n2 = n1; d1 = d; n1 = j; } else if (d < d2) { d2 = d; n2 = j; }
+			}
+			float sx = mex[i].x, sz = mex[i].z; int c = 1;
+			if (n1 >= 0) { sx += mex[n1].x; sz += mex[n1].z; ++c; }
+			if (n2 >= 0) { sx += mex[n2].x; sz += mex[n2].z; ++c; }
+			AIFloat3 p(sx / float(c), 0, sz / float(c));
+			if (!InOwnBox(p)) continue;
+			if (aiTerrainMgr.FlatFraction(p, 0, Global::StartPick::FootHalf, Global::StartPick::FootHalf, Global::StartPick::FootMaxSlope) < 1.0f) continue;
+			uint ln = 0;
+			const float q = p.x * vx + p.z * vz;
+			while (ln < cuts.length() && q >= cuts[ln]) ++ln;
+			cpos.insertLast(p); ccount.insertLast(c); clane.insertLast(ln);
+		}
+		array<AIFloat3> all = taken;
+		array<bool> laneUsed(lanes, false);
+		for (uint i = 0; i < taken.length(); ++i) {
+			uint ln = 0;
+			const float q = taken[i].x * vx + taken[i].z * vz;
+			while (ln < cuts.length() && q >= cuts[ln]) ++ln;
+			laneUsed[ln] = true;
+		}
+		const float sp2 = Global::StartPick::ExtraSpacing * Global::StartPick::ExtraSpacing;
+		for (int pass = 0; pass < 2 && out.length() < want; ++pass) {
+			for (uint ln = 0; ln < lanes && out.length() < want; ++ln) {
+				if (pass == 0 && laneUsed[ln]) continue;
+				int pick = -1;
+				for (uint c = 0; c < cpos.length(); ++c) {
+					if (pass == 0 && clane[c] != ln) continue;
+					bool crowded = false;
+					for (uint o = 0; o < all.length() && !crowded; ++o) crowded = SqDist2(cpos[c], all[o]) < sp2;
+					if (crowded) continue;
+					// most mexes; ties to the front of the box (toward the enemy)
+					if (pick < 0 || ccount[c] > ccount[pick]
+						|| (ccount[c] == ccount[pick] && cpos[c].x * ux + cpos[c].z * uz > cpos[pick].x * ux + cpos[pick].z * uz)) pick = int(c);
+				}
+				if (pick < 0) continue;
+				if (pass == 0) laneUsed[ln] = true;
+				out.insertLast(cpos[pick]);
+				all.insertLast(cpos[pick]);
+			}
+		}
+		Log("extra spots: " + out.length() + " of " + want + " wanted (" + lanes + " lanes, " + cpos.length() + " in-box clusters)");
+		return out;
+	}
 
 	int RolePriority(AiRole r) {
 		switch (r) {
@@ -145,6 +239,12 @@ namespace StartPick {
 	// too close to another start): the picks of an ally team are distinct, so the
 	// roles stay distinct (one AIR per team) wherever the game put the commander.
 	StartSpot@ PickedSpot(const AIFloat3& in startPos, StartSpot@[]@ spots) {
+		if (pickedExtra) {
+			Log("start (" + int(startPos.x) + "," + int(startPos.z) + ") is " + int(sqrt(SqDist2(startPos, pickedPos)))
+				+ " elmos from the extra spot sent; role FRONT");
+			StartSpot@ extraSpot = StartSpot(pickedPos, AiRole::FRONT, false);
+			return extraSpot;
+		}
 		if (pickedIdx < 0 || spots is null || uint(pickedIdx) >= spots.length()) return null;
 		Log("start (" + int(startPos.x) + "," + int(startPos.z) + ") is " + int(sqrt(SqDist2(startPos, pickedPos)))
 			+ " elmos from the point sent for P" + (pickedIdx + 1));
@@ -273,6 +373,22 @@ namespace StartPick {
 		for (uint i = 0; i < cand.length(); ++i) spotsStr += (i > 0 ? "," : "") + "P" + (cand[i] + 1);
 		Log("map='" + ai.GetMapName() + "' allyTeam=" + ai.allyTeamId + " aiTeams=[" + order
 			+ "] rank=" + rank + " spotsInBox=[" + spotsStr + "]");
+		if (rank >= 0 && uint(rank) >= cand.length() && Global::StartPick::ExtraSpots) {
+			// More AIs on this ally team than the map config has spots for it (11v11, 12v12):
+			// every ally builds the same extra list from the same data, the k-th AI beyond the
+			// configured spots takes the k-th extra spot.
+			array<AIFloat3> taken2;
+			for (uint i = 0; i < cand.length(); ++i) taken2.insertLast(at[cand[i]]);
+			array<AIFloat3>@ extra = ExtraSpots(taken2, teams.length() - cand.length(), teams.length());
+			const uint k = uint(rank) - cand.length();
+			if (k < extra.length()) {
+				const bool sent = aiSetupMgr.SendStartPos(extra[k]);
+				if (sent) { pickedIdx = -1; pickedExtra = true; pickedPos = extra[k]; }
+				Log("team " + ai.teamId + " takes extra spot E" + (k + 1) + " of " + extra.length() + " (FRONT) at ("
+					+ int(extra[k].x) + "," + int(extra[k].z) + ") sent=" + sent);
+				return;
+			}
+		}
 		if (rank < 0 || uint(rank) >= cand.length()) {
 			Log("no spot for this AI (rank " + rank + " of " + cand.length() + " spots); game guesses the start");
 			return;
