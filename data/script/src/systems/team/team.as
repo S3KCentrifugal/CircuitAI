@@ -19,6 +19,7 @@
 #include "../production/rez_replenish.as"
 #include "engineering_lanes.as"
 #include "catalyst_trade.as"
+#include "../combat/mobile_antinuke.as"
 #include "../construction/silo_antinukes.as"
 
 namespace Team {
@@ -69,6 +70,7 @@ namespace Team {
         if (ScoutRaid::HandleMessage(msg, fromTeamId)) return;    // owner, 2026-11-07: allied scout pile-up pins and rush calls
         if (AirEmergencyDefense::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-12: AIR base emergency -> nearest FRONTs
         if (CatalystTrade::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-13: Legion FRONT asks a Cortex FRONT for a T2 constructor
+        if (MobileAntiNuke::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-24: FRONT without the lab asks for a mobile antinuke
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim

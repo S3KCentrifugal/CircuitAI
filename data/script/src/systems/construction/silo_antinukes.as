@@ -123,6 +123,8 @@ namespace SiloAntiNukes {
         if (!antiReady) {
             antiReady = true;
             array<string> names = UnitHelpers::GetAllAntiNukes();
+            // owner 2026-11-24: FRONT mobile antinukes' interceptions count too (mobile_antinuke.as)
+            names.insertLast("armscab"); names.insertLast("cormabm"); names.insertLast("legavantinuke");
             for (uint i = 0; i < names.length(); ++i) {
                 CCircuitDef@ d = ai.GetCircuitDef(names[i]);
                 if (d !is null) antiIds.insertLast(d.id);
@@ -212,11 +214,15 @@ namespace SiloAntiNukes {
     // warning is one launch here, also from silos never scouted. No warnings without a human
     // player hosting the AIs (the widget ignores spectators), so interceptions stay the fallback.
     array<int> warnings;
+    int warningsEver = 0;
+    // Enemy launches seen so far, either signal (MobileAntiNuke: the first launch starts FRONT's mobile antinukes)
+    int LaunchesEver() { return AiMax(warningsEver, launchesSeen); }
     void Warning()
     {
         if (!Global::SiloAntiNukes::Enabled || !Global::SiloAntiNukes::InferFromLaunches) return;
         if (warnings.length() > 0 && warnings[warnings.length() - 1] == ai.frame) return;   // the widget relays once per frame
         warnings.insertLast(ai.frame);
+        ++warningsEver;
         GenericHelpers::LogUtil(Tag() + "[SiloAntiNuke] enemy nuke launch warning; " + warnings.length() + " in the window", 1);
     }
 

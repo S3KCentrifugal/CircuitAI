@@ -97,6 +97,8 @@ namespace Military {
 	IUnitTask@ AiMakeTask(CCircuitUnit@ u)
 	{
         if(u !is null && CommanderGroup::Owns(u.id)) return CommanderGroup::Work(u);
+        IUnitTask@ mabm = MobileAntiNuke::MilitaryMakeTask(u);   // owner, 2026-11-24: FRONT mobile antinukes cover our artillery behind our porc
+        if (mabm !is null) return mabm;
         IUnitTask@ emergency = AirEmergencyDefense::MilitaryMakeTask(u);   // owner, 2026-11-12: FRONT air-emergency squads
         if (emergency !is null) return emergency;
 		// A transport is never spam and never subject to a role's military
@@ -190,6 +192,7 @@ namespace Military {
 		ThugFireAtWill::UnitAdded(unit);  // Thugs and Maces always fire at will (owner 2026-10-19)
 		HeavyWave::UnitAdded(unit);       // owner 2026-11-16: counts our gantry heavies, admits held wave members
 		AirEmergencyDefense::UnitAdded(unit);   // owner 2026-11-24: TECH heavy T3s an air emergency can send
+		MobileAntiNuke::UnitAdded(unit);        // owner 2026-11-24: the FRONT mobile antinuke we ordered (ours or an ally's)
 
 		// Delegate to role-specific handler if registered
 		RoleConfig@ cfg = (Global::profileController is null) ? null : Global::profileController.RoleCfg;

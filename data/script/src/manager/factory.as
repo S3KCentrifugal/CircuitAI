@@ -148,6 +148,9 @@ namespace Factory {
             // owner, 2026-11-12: an allied AIR's base emergency near us: fast defense first
             IUnitTask@ emergency=AirEmergencyDefense::FactoryMakeTask(u);
             if(emergency !is null) return emergency;
+            // owner, 2026-11-24: enemy nukes seen -> mobile antinukes for us or an allied FRONT without the lab
+            IUnitTask@ mabm=MobileAntiNuke::FactoryMakeTask(u);
+            if(mabm !is null) return mabm;
             // owner, 2026-11-13: the first T2 factory builds the dedicated mex upgraders first
             IUnitTask@ mexUp=EarlyMexUpgraders::FactoryMakeTask(u);
             if(mexUp !is null) return mexUp;
