@@ -427,13 +427,23 @@ namespace TechBuild {
     // armacks, no lab for 10 minutes): after RecoverAdvancedLabWaitSeconds without an
     // advanced lab frame the T1 lab is built anyway
     int recoverWaitSince = -1;
+    // D-102b-1 (owner 2026-11-23, Hera Planum): the game start looks like a raided base
+    // (commander only, no lab, no constructor), so the opening took the recovery path:
+    // the planned opening slot was skipped and no lab stood for 12 minutes. Recovery
+    // only counts once this AI has had a lab (standing or a frame) at least once.
+    bool hadLab = false;
     bool RecoverT1Lab()
     {
         const string side = Global::AISettings::Side;
         CCircuitDef@ t1 = ai.GetCircuitDef(UnitHelpers::GetT1BotLabForSide(side));
         CCircuitDef@ t2 = ai.GetCircuitDef(UnitHelpers::GetT2BotLabForSide(side));
         if ((t1 !is null && (t1.count > 0 || aiBuilderMgr.GetUnfinishedCount(t1) > 0))
-            || (t2 !is null && (t2.count > 0 || aiBuilderMgr.GetUnfinishedCount(t2) > 0)) || T1Cons() > 0) {
+            || (t2 !is null && (t2.count > 0 || aiBuilderMgr.GetUnfinishedCount(t2) > 0))) {
+            hadLab = true;
+            recoverWaitSince = -1;
+            return false;
+        }
+        if (!hadLab || T1Cons() > 0) {
             recoverWaitSince = -1;
             return false;
         }
