@@ -106,9 +106,19 @@ namespace StealthScout {
         float MinTargetCost = 100.0f;
         float HeavyRange = 900.0f;          // a target structure with this reach (heavy porc) scores x HeavyFactor
         float HeavyFactor = 2.0f;
-        // Post: PostDistances from the target (spy sight 550, Gremlin 494), on the
+        // Post: just inside sight of the target (PostSightMargins below), on the
         // side of our artillery, PostBearingsDeg either side of that bearing.
-        array<float> PostDistances = {470.0f, 430.0f, 510.0f, 390.0f};
+        // Owner 2026-11-24: just barely in sight of the target, away from the
+        // fighting's splash: post distance = the spotter's sight radius minus
+        // one of these, tried in order (spy 550 -> 510/480/450/420).
+        array<float> PostSightMargins = {40.0f, 70.0f, 100.0f, 130.0f};
+        // Owner 2026-11-24: posts keep SpamLaneGap from our spam lanes (their
+        // waypoint polylines, refreshed every SpamLaneSeconds) and skip sectors
+        // with EnemyLaneDensity or more observed enemy ground contacts (3x3
+        // weighted, the enemy's spam streams).
+        float SpamLaneGap = 450.0f;
+        int SpamLaneSeconds = 15;
+        float EnemyLaneDensity = 6.0f;
         // Owner 2026-11-24: posts stay outside light porc (seen or ghost static
         // weapons of reach up to LightPorcMaxRange, LLT ~430) by LightPorcMargin.
         // Heavier porc out-ranges spy sight (550) and cannot be avoided.

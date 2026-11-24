@@ -434,17 +434,20 @@ namespace StealthScout {
     // second while this AI has scouts (O(G)); hotUntil[]: sectors where one of
     // our scouts was hit, avoided by routes and targets for HotSeconds.
     array<int> density;
+    array<int> mobileDensity;   // the same, mobile contacts only (enemy spam streams)
     array<int> hotUntil;
 
     void RebuildDensity()
     {
         const int n = cols * rows;
-        if (int(density.length()) != n) { density.resize(n); hotUntil.resize(n); for (int i = 0; i < n; ++i) hotUntil[i] = 0; }
-        for (int i = 0; i < n; ++i) density[i] = 0;
+        if (int(density.length()) != n) { density.resize(n); mobileDensity.resize(n); hotUntil.resize(n); for (int i = 0; i < n; ++i) hotUntil[i] = 0; }
+        for (int i = 0; i < n; ++i) { density[i] = 0; mobileDensity[i] = 0; }
         const int g = aiBattle.GetGroundContactCount();
         for (int i = 0; i < g; ++i) {
             const int s = SectorAt(aiBattle.GetGroundContactPos(i));
-            if (s >= 0) ++density[s];
+            if (s < 0) continue;
+            ++density[s];
+            if (!IsStaticDef(aiBattle.GetGroundContactDefId(i))) ++mobileDensity[s];
         }
     }
 
@@ -462,6 +465,21 @@ namespace StealthScout {
             if (ai.frame < hotUntil[k]) r += (dx == 0 && dz == 0) ? 20.0f : 6.0f;
         }
         if (aiBattle.GroundHazard(p, 0.0f) > 0.0f) r += 2.0f;
+        return r;
+    }
+
+    // Observed enemy mobile contacts round p, 3x3 sectors weighted like CellRisk.
+    float MobileCrowd(const AIFloat3& in p)
+    {
+        const int s = SectorAt(p);
+        if (s < 0 || int(mobileDensity.length()) != cols * rows) return 0.0f;
+        const int x = s % cols, z = s / cols;
+        float r = 0.0f;
+        for (int dz = -1; dz <= 1; ++dz) for (int dx = -1; dx <= 1; ++dx) {
+            const int xx = x + dx, zz = z + dz;
+            if (xx < 0 || zz < 0 || xx >= cols || zz >= rows) continue;
+            r += float(mobileDensity[zz * cols + xx]) * ((dx == 0 && dz == 0) ? 1.0f : 0.35f);
+        }
         return r;
     }
 
@@ -677,7 +695,7 @@ namespace StealthScout {
     }
 
     // ---------------- spotter squad (owner 2026-11-23) ----------------
-    // A spotter parks still and cloaked PostDistances from an enemy structure
+    // A spotter parks still and cloaked just inside its sight radius (PostSightMargins) of an enemy structure
     // that our artillery can reach but nobody sees (a ghost: out of radar and
     // LOS; or a radar-only structure). Its LOS turns that target live for the
     // whole ally team (engine-shared LOS), so artillery fires aimed volleys
@@ -859,8 +877,37 @@ namespace StealthScout {
         return s >= 0 && int(hotUntil.length()) == cols * rows && ai.frame < hotUntil[s];
     }
 
+    // Our spam lanes as polylines, from Spam's live route tasks. Refreshed every
+    // SpamLaneSeconds: O(lanes * waypoints); a post check is O(segments).
+    array<AIFloat3> laneA, laneB;
+    int laneFrame = -100000;
+    bool NearSpamLane(const AIFloat3& in q)
+    {
+        if (ai.frame - laneFrame >= Global::StealthScout::SpamLaneSeconds * SECOND) {
+            laneFrame = ai.frame;
+            laneA.resize(0); laneB.resize(0);
+            array<string>@ keys = Spam::routeByFactory.getKeys();
+            for (uint i = 0; i < keys.length(); ++i) {
+                CRouteTask@ t = null;
+                if (!Spam::routeByFactory.get(keys[i], @t) || t is null || t.IsDead()) continue;
+                array<AIFloat3>@ pts = t.GetRoutePoints();
+                for (uint k = 1; k < pts.length(); ++k) { laneA.insertLast(pts[k - 1]); laneB.insertLast(pts[k]); }
+            }
+        }
+        const float g = Global::StealthScout::SpamLaneGap;
+        for (uint i = 0; i < laneA.length(); ++i) {
+            AIFloat3 ab = laneB[i] - laneA[i]; ab.y = 0.0f;
+            const float l2 = ab.x * ab.x + ab.z * ab.z;
+            float t = 0.0f;
+            if (l2 > 1.0f) t = AiMax(0.0f, AiMin(1.0f, ((q.x - laneA[i].x) * ab.x + (q.z - laneA[i].z) * ab.z) / l2));
+            const AIFloat3 c = laneA[i] + ab * t;
+            if ((q.x - c.x) * (q.x - c.x) + (q.z - c.z) * (q.z - c.z) < g * g) return true;
+        }
+        return false;
+    }
+
     // Post on our artillery's side of the target: PostBearingsDeg round the
-    // bearing to the artillery in reach (else to our start), PostDistances out.
+    // bearing to the artillery in reach (else to our start), sight radius minus PostSightMargins out.
     bool FindPost(CCircuitUnit@ u, const AIFloat3& in target, AIFloat3& out post)
     {
         post = target;
@@ -869,10 +916,12 @@ namespace StealthScout {
         const float base = atan2(toward.z - target.z, toward.x - target.x);
         for (uint b = 0; b < Global::StealthScout::PostBearingsDeg.length(); ++b) {
             const float a = base + Global::StealthScout::PostBearingsDeg[b] * 0.0174533f;
-            for (uint k = 0; k < Global::StealthScout::PostDistances.length(); ++k) {
-                AIFloat3 q = target + AIFloat3(cos(a), 0.0f, sin(a)) * Global::StealthScout::PostDistances[k];
+            for (uint k = 0; k < Global::StealthScout::PostSightMargins.length(); ++k) {
+                const float dist = AiMax(200.0f, u.circuitDef.GetLosRadius() - Global::StealthScout::PostSightMargins[k]);
+                AIFloat3 q = target + AIFloat3(cos(a), 0.0f, sin(a)) * dist;
                 if (!InMap(q) || Hot(q) || !aiTerrainMgr.CanMoveTo(u, q) || !PostClear(q)) continue;
                 if (aiBattle.EnemyStaticCovering(q, Global::StealthScout::LightPorcMargin, Global::StealthScout::LightPorcMaxRange) >= 0) continue;
+                if (NearSpamLane(q) || MobileCrowd(q) >= Global::StealthScout::EnemyLaneDensity) continue;
                 q.y = aiBattle.Height(q);
                 post = q;
                 return true;

@@ -145,6 +145,17 @@ static CScriptArray* CBattleAnalysis_GetLaneRoute(CBattleAnalysis* battle, int l
 	return array;
 }
 
+// 2026-11-24: a route task's waypoints, copied (spotters keep off our spam lanes). O(route size).
+static CScriptArray* CRouteTask_GetRoutePoints(const CRouteTask* task)
+{
+	asIScriptEngine* engine = asGetActiveContext()->GetEngine();
+	auto* cache = static_cast<CScriptManager::STypeInfoCache*>(engine->GetUserData());
+	const auto& points = task->GetRoute();
+	CScriptArray* array = CScriptArray::Create(cache->vec3Array, static_cast<asUINT>(points.size()));
+	for (asUINT i = 0; i < array->GetSize(); ++i) *static_cast<AIFloat3*>(array->At(i)) = points[i];
+	return array;
+}
+
 static bool CFerryTask_SetCargoRoute(CFerryTask* task, int id, const CScriptArray* array,
         float surfaceThreat, float airThreat, float padding, float blockedSeconds)
 {
@@ -2097,6 +2108,7 @@ void CInitScript::RegisterCRouteTask(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("CRouteTask", "bool SetUnitRoute(CCircuitUnit@, const array<AIFloat3>@+, float)", asFUNCTION(CRouteTask_SetUnitRoute), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "int GetRouteVersion() const", asMETHOD(CRouteTask, GetRouteVersion), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "uint GetRouteSize() const", asMETHOD(CRouteTask, GetRouteSize), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CRouteTask", "array<AIFloat3>@ GetRoutePoints() const", asFUNCTION(CRouteTask_GetRoutePoints), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "bool IsAtEnd(CCircuitUnit@) const", asMETHOD(CRouteTask, IsAtEnd), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "void SetLanes(int, float, float)", asMETHOD(CRouteTask, SetLanes), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CRouteTask", "void SetTraversal(bool, float, bool)", asMETHOD(CRouteTask, SetTraversal), asCALL_THISCALL); ASSERT(r >= 0);

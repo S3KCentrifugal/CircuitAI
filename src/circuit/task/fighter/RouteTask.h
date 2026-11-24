@@ -90,6 +90,7 @@ public:
 	bool IsSpam() const { return spam; }
 	int GetRouteVersion() const { return version; }
 	unsigned int GetRouteSize() const { return route.size(); }
+	const std::vector<springai::AIFloat3>& GetRoute() const { return route; }  // 2026-11-24: spotters keep off spam lanes
 	bool IsAtEnd(CCircuitUnit* unit) const;
 
 private:
