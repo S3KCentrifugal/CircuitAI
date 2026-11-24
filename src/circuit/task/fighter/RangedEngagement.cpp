@@ -1343,7 +1343,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // Owner 2026-11-24 (Centurion D-gunned walking at a charging commander): with commander_reach_margin a
         // commander's closing speed counts our own approach too (relative velocity), so the hull turns away in time.
         const bool cmdRel=world.CommanderReach() && CRangedWorld::CommanderContact(c);
-        const float closingSpeed=ranged::ClosingSpeed(P(pos),P(c.pos),P(cmdRel ? c.velocity-ownVelocity : c.velocity));
+        const float closingSpeed=ranged::ClosingSpeed(P(pos),P(c.pos),cmdRel ? P(AIFloat3(c.velocity.x-ownVelocity.x,0.f,c.velocity.z-ownVelocity.z)) : P(c.velocity));
         const float reach=hazard+(c.mobile?policy.safetyMargin:StaticMargin(policy))+closingSpeed*escapeSeconds;
         if(d<reach && reach-d>urgency) { closing=&c; urgency=reach-d; }
     }
