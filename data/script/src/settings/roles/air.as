@@ -318,6 +318,16 @@ namespace Air {
             float StrikeEdgeInset = 480.0f;
             bool StrikeSynchronize = true;
             int T1RaidMinimum = 3;
+            // Owner 2026-11-24: T1 raids leave a mex/wind run for a visible fusion, T1 energy converter,
+            // lab (or anything of higher strike priority) within StrikeImmediateRadius they can kill in one pass.
+            float T1ImmediatePriority = 1.0f; // fusion 1, lab 2, adv converter 3, AFUS 4
+            float T1ConverterPriority = 1.0f; // T1 energy converters join the in-flight handoff at this priority
+            // Owner 2026-11-24: a frontline T2 wave (no affordable economy target) needs at least this many
+            // bombers, and before the economy opening has flown at least the opening draw.
+            int FrontlineMinBombers = 8;
+            // Owner 2026-11-24: an offensive bomber operation that ends with no bomb released excludes its
+            // launch and final aims from target picks for this long (StrikeFailedRegionRadius around each).
+            int NoBombRaidExcludeSeconds = 300;
             int StrikeWaveCap = 80;
             int StrikeCadenceSeconds = 4 * 60;
             float StrikeBudgetShare = 0.35f;

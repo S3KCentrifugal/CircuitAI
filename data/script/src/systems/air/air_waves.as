@@ -408,6 +408,7 @@ namespace AirWaves {
                     failedRaidUntil.removeAt(i); failedRaidAims.removeAt(i);
                 } else wt.ExcludeStrikeRegion(failedRaidAims[i], Global::RoleSettings::Air::StrikeFailedRegionRadius);
             }
+            AirOperations::ExcludeFailed(wt); // aims of recent operations that released no bomb (owner 2026-11-24)
             // Defend a nearby T3 first; otherwise seek reachable backline economy.
             // Frontline static is the fallback when no backline target qualifies.
             AirOperations::Configure(wt, false, 6);
@@ -442,16 +443,28 @@ namespace AirWaves {
                 ai.GetCircuitDef(UnitHelpers::GetT2WaveBomberForSide(Global::AISettings::Side)), heldBombers, bombers);
             // The opening-sized pick can fail only because the wave is too small for the finished fusions/AFUS
             // that outrank an unfinished frame (owner 2026-11-23): retry it with every held bomber first.
-            if (plannedFront && !wt.PickStrikeTarget(Global::Map::StartPos, preference, Global::RoleSettings::Air::StrikeMinTargetMetal, false)
-                && !wt.PickOperationTarget(Global::Map::StartPos, 0.0f, false)) {
-                targetMinimum = wt.GetRequiredBombers();
-                raw.Abort();
-                if (ai.frame - lastNoTargetLog >= 30 * SECOND) {
-                    lastNoTargetLog = ai.frame;
-                    GenericHelpers::LogUtil("[AIR][Waves] held: no feasible known target; defensive minimum="
-                        + defensiveMinimum + " available=" + bombers + "; request fresh reconnaissance", 1);
+            if (plannedFront && !wt.PickStrikeTarget(Global::Map::StartPos, preference, Global::RoleSettings::Air::StrikeMinTargetMetal, false)) {
+                // A true frontline fallback (defences, other eco, heavies, any static). Owner 2026-11-24:
+                // 3-bomber packs flew at AA launchers and died without a bomb (8 games 11-23: 19 of 36 waves).
+                // Hold until FrontlineMinBombers, and until the opening draw while the opening has not flown.
+                const int frontFloor = OpeningDone() ? Global::RoleSettings::Air::FrontlineMinBombers
+                    : AiMax(Global::RoleSettings::Air::FrontlineMinBombers, OpeningSize());
+                if (bombers < frontFloor) {
+                    targetMinimum = frontFloor;
+                    HoldReason("frontline floor", bombers, frontFloor);
+                    raw.Abort();
+                    return null;
                 }
-                return null;
+                if (!wt.PickOperationTarget(Global::Map::StartPos, 0.0f, false)) {
+                    targetMinimum = wt.GetRequiredBombers();
+                    raw.Abort();
+                    if (ai.frame - lastNoTargetLog >= 30 * SECOND) {
+                        lastNoTargetLog = ai.frame;
+                        GenericHelpers::LogUtil("[AIR][Waves] held: no feasible known target; defensive minimum="
+                            + defensiveMinimum + " available=" + bombers + "; request fresh reconnaissance", 1);
+                    }
+                    return null;
+                }
             }
             targetMinimum = wt.GetRequiredBombers();
             for (uint i = 0; i < failedRaidAims.length(); ++i)

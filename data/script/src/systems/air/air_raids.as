@@ -76,6 +76,19 @@ namespace AirRaids {
             Global::RoleSettings::Air::StrikeRiskScale, Global::RoleSettings::Air::StrikeArmyReserve,
             Global::RoleSettings::Air::StrikeLocalAaReserve, false);
         AirOperations::Configure(wave, true, 2);
+        // Owner 2026-11-24: in flight, a visible fusion, T1 energy converter or lab (or higher priority)
+        // within StrikeImmediateRadius takes over the mex/wind run, but only when this pack kills it in one pass.
+        {
+            const array<string> sides = {"armada", "cortex", "legion"};
+            for (uint i = 0; i < sides.length(); ++i) {
+                wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetEnergyConverterNameForSide(sides[i])), Global::RoleSettings::Air::T1ConverterPriority);
+                wave.AllowStrikeDef(ai.GetCircuitDef(UnitHelpers::GetNavalEnergyConverterNameForSide(sides[i])), Global::RoleSettings::Air::T1ConverterPriority);
+            }
+        }
+        wave.SetAttackHandoffPolicy(Global::RoleSettings::Air::StrikeEarlyAttack, Global::RoleSettings::Air::T1ImmediatePriority,
+            Global::RoleSettings::Air::StrikeImmediateRadius);
+        wave.SetImmediateKillGate(true);
+        AirOperations::ExcludeFailed(wave); // aims of recent operations that released no bomb
         // T1 raids only (owner 2026-11-02): T2 waves never treat wind grids as override targets.
         wave.SetWindGridPolicy(Global::RoleSettings::Air::WindGridMinimum, Global::RoleSettings::Air::WindGridDepth,
             Global::RoleSettings::Air::WindGridLink, Global::RoleSettings::Air::WindGridPriority);

@@ -77,6 +77,9 @@ public:
     void ExcludeStrikeRegion(const springai::AIFloat3& centre, float radius);
     void SetOperationPolicy(bool offensive, int preference, const springai::AIFloat3& assembly, float lead, float routeCeiling, float localRadius);
     void SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority, float immediateRadius);
+    // Owner 2026-11-24: an in-flight handoff only to a target the living bombers
+    // can kill in one pass (health * margin <= bombers * pass damage).
+    void SetImmediateKillGate(bool gate) { immediateKillGate = gate; }
     /*
      * Wind grids: minimum touching winds (0 disables), minimum depth in winds
      * both ways, link distance between neighbours, and the strike priority a
@@ -91,6 +94,8 @@ public:
     int GetBomberCount() const;
     int GetTargetsDestroyed() const { return targetsDestroyed; }
     float GetDamageDealt() const { return operationDamage; }
+    // Bomb releases by operation bombers over the task's life (one per bomber per target attack).
+    int GetReleasedCount() const { return releasedTotal; }
     int GetRequiredBombers() const { return requiredBombers; }
 	int GetState() const { return int(state_); }
 	int GetMode() const { return int(mode); }
@@ -212,6 +217,8 @@ private:
     bool earlyAttackApproach = false;
     float immediateStrikePriority = 0.f;
     float immediateStrikeRadius = 0.f;
+    bool immediateKillGate = false;
+    int releasedTotal = 0;
     int windGridMinimum = 0;
     int windGridDepth = 3;
     float windGridLink = 72.f;

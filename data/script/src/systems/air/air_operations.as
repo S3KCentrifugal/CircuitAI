@@ -10,6 +10,11 @@ namespace AirOperations {
     // whether the operation was ever seen ATTACKING (departed from assembly).
     array<array<int>@> launched;
     array<bool> struck;
+    array<AIFloat3> launchAim; // parallel to operations: the aim at launch
+    // Owner 2026-11-24: aims of offensive operations whose bombers all died without releasing a bomb.
+    // At most 8 kept; each new T1 raid and T2 wave excludes them (StrikeFailedRegionRadius) until expiry.
+    array<AIFloat3> noBombAims;
+    array<int> noBombUntil;
     dictionary escorts; // unit ID -> owning wave (kept until the last bomber dies)
     dictionary bombers; // all live cohorts, not only AirWaves' newest operation
     void TrackBombers(IUnitTask@ owner, const dictionary &in cohort) {
@@ -63,6 +68,7 @@ namespace AirOperations {
     {
         operations.insertLast(wave); offensive.insertLast(attack);
         launched.insertLast(array<int>()); struck.insertLast(false);
+        launchAim.insertLast(wave is null ? AIFloat3(-1.0f, 0.0f, -1.0f) : wave.GetAim());
         return AttachAvailableFighters(wave, limit);
     }
     // Shared ownership for bomber operations and defensive naval relief. The
@@ -151,6 +157,22 @@ namespace AirOperations {
         for (uint i = 0; i < starts.length(); ++i) wave.AddSearchPoint(starts[i]);
         if (starts.length() == 0) wave.AddSearchPoint(AirScreen::Enemy(Global::Map::StartPos));
     }
+    void MarkNoBomb(const AIFloat3 &in aim)
+    {
+        if (aim.x < 0.0f || aim.z < 0.0f) return;
+        if (noBombAims.length() >= 8) { noBombAims.removeAt(0); noBombUntil.removeAt(0); }
+        noBombAims.insertLast(aim);
+        noBombUntil.insertLast(ai.frame + AiMax(0, Global::RoleSettings::Air::NoBombRaidExcludeSeconds) * SECOND);
+    }
+    // Called on every new offensive wave before its target pick. O(8).
+    void ExcludeFailed(CAirWaveTask@ wave)
+    {
+        if (wave is null) return;
+        for (int i = int(noBombAims.length()) - 1; i >= 0; --i) {
+            if (ai.frame >= noBombUntil[i]) { noBombAims.removeAt(i); noBombUntil.removeAt(i); }
+            else wave.ExcludeStrikeRegion(noBombAims[i], Global::RoleSettings::Air::StrikeFailedRegionRadius);
+        }
+    }
     void Tick()
     {
         // Prune once per policy tick even when factories stop requesting new
@@ -158,7 +180,7 @@ namespace AirOperations {
         BomberCount("");
         for (int i = int(operations.length())-1; i >= 0; --i) {
             if (operations[i] is null || operations[i].IsDead()) {
-                operations.removeAt(i); offensive.removeAt(i); launched.removeAt(i); struck.removeAt(i);
+                operations.removeAt(i); offensive.removeAt(i); launched.removeAt(i); struck.removeAt(i); launchAim.removeAt(i);
                 continue;
             }
             const int state = operations[i].GetState();
@@ -189,7 +211,8 @@ namespace AirOperations {
         for (uint i = 0; i < operations.length(); ++i)
             if (operations[i] !is null && !operations[i].IsDead() && tasks.findByRef(operations[i]) < 0) tasks.insertLast(operations[i]);
         escorts.deleteAll(); bombers.deleteAll(); operations.resize(0); offensive.resize(0);
-        launched.resize(0); struck.resize(0);
+        launched.resize(0); struck.resize(0); launchAim.resize(0);
+        noBombAims.resize(0); noBombUntil.resize(0);
         for (uint i = 0; i < tasks.length(); ++i) tasks[i].Abort();
         AirEscortScout::Reset();
     }
@@ -216,6 +239,15 @@ namespace AirOperations {
         for (uint b = 0; b < launched[i].length(); ++b) {
             CCircuitUnit@ bomber = ai.GetTeamUnit(launched[i][b]);
             if (bomber !is null && bomber.task is task) return; // a bomber is still flying the run
+        }
+        if (wave.GetReleasedCount() == 0) {
+            // Owner 2026-11-24 (#3): the whole cohort died without a bomb; keep the next waves off it.
+            MarkNoBomb(launchAim[i]);
+            if (MapHelpers::SqDist(launchAim[i], wave.GetAim()) > Global::RoleSettings::Air::StrikeFailedRegionRadius
+                * Global::RoleSettings::Air::StrikeFailedRegionRadius) MarkNoBomb(wave.GetAim());
+            GenericHelpers::LogUtil("[AIR][NoBomb] op=" + i + " bombers=" + launched[i].length() + " released 0; excluded launch aim="
+                + int(launchAim[i].x) + "," + int(launchAim[i].z) + " final aim=" + int(wave.GetAim().x) + "," + int(wave.GetAim().z)
+                + " for " + Global::RoleSettings::Air::NoBombRaidExcludeSeconds + " s", 1);
         }
         array<CCircuitUnit@>@ members = task.GetUnits();
         array<int> fighters;

@@ -154,6 +154,8 @@ void CAirWaveTask::OnWeaponFired(CCircuitUnit* unit, int weaponDefId)
     CWeaponDef* weapon = manager->GetCircuit()->GetWeaponDef(weaponDefId);
     if (weapon == nullptr || weapon->IsParalyzer() || weapon->GetDamage() <= 0.f) return;
     releasedAt[unit] = manager->GetCircuit()->GetLastFrame();
+    // Escorts fire too; only a bomber's release counts as a bombing run.
+    if (!operationPolicy || IsOperationBomber(unit)) ++releasedTotal;
     manager->GetCircuit()->LOG("WAVE: released unit=%i weapon=%i", unit->GetId(), weaponDefId);
 }
 
@@ -1155,6 +1157,8 @@ bool CAirWaveTask::TryImmediateStrike()
     const AIFloat3 centre = OperationCentre();
     CEnemyInfo* best = nullptr;
     float bestPriority = 0.f, bestDistance = 0.f;
+    // Kill gate: the whole pack's pass damage, computed once per scan.
+    const float packDamage = immediateKillGate ? passDamage * float(GetBomberCount()) : 0.f;
     // The live per-AI contact set includes peaceful economy, without the
     // asynchronous threat snapshot's visibility delay. One scan; no route/AA
     // planner or aircraft-by-enemy loop on this reactive path.
@@ -1182,6 +1186,7 @@ bool CAirWaveTask::TryImmediateStrike()
             enemy->IsInLOS(), stationary, distance, immediateStrikeRadius)
             || (finishedOnly && priority->second * def->GetCostM() < finishedFloor)
             || pos.y < -SQUARE_SIZE * 5) continue;
+        if (immediateKillGate && (data->health <= 0.f || packDamage < data->health * damageMargin)) continue;
         if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&pos](const auto& region) {
             return pos.SqDistance2D(region.first) <= SQUARE(region.second);
         })) continue;
