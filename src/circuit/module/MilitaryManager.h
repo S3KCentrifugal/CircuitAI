@@ -854,6 +854,8 @@ public:
 	int GetStealthDodgeUntil(CCircuitUnit* unit) const;
 	void SetStealthDodgeParams(float step, int holdFrames, float staticRadius);
 	int GetStealthDodgeCount() const { return stealthDodgeCount; }
+	// where the last dodge's strongest contact stood (-1,0,-1 when none)
+	springai::AIFloat3 GetStealthDodgeFrom(CCircuitUnit* unit) const;
 
 private:
 	std::shared_ptr<CRangedWorld> rangedWorld;
@@ -863,6 +865,7 @@ private:
 		int until = 0;           // dodge holds until this frame
 		int lastCmd = -1000;
 		springai::AIFloat3 dir;  // last dodge direction (unit length)
+		springai::AIFloat3 from = springai::AIFloat3(-1.f, 0.f, -1.f);
 	};
 	std::unordered_map<ICoreUnit::Id, SStealthDodge> stealthDodge;
 	float stealthDodgeStep = 240.f;

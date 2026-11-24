@@ -97,6 +97,7 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetStealthDodgeUntil(CCircuitUnit@) const", asMETHOD(CMilitaryManager, GetStealthDodgeUntil), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "void SetStealthDodgeParams(float, int, float)", asMETHOD(CMilitaryManager, SetStealthDodgeParams), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int GetStealthDodgeCount() const", asMETHOD(CMilitaryManager, GetStealthDodgeCount), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetStealthDodgeFrom(CCircuitUnit@) const", asMETHOD(CMilitaryManager, GetStealthDodgeFrom), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ Enqueue(const SFightTask& in)", asMETHODPR(CMilitaryManager, Enqueue, (const TaskF::SFightTask&), IFighterTask*), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "IUnitTask@+ EnqueueGather(const SFightTask& in, const AIFloat3& in, int)", asMETHOD(CMilitaryManager, EnqueueGather), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "bool SetGatherPower(IUnitTask@, float)", asMETHOD(CMilitaryManager, SetGatherPower), asCALL_THISCALL); ASSERT(r >= 0);

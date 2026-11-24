@@ -62,6 +62,8 @@ namespace StealthScout {
         float spotScore = 0.0f;
         int parkedFrame = 0, lastUseful = 0, lastSpotCheck = 0, losSince = -1, goneChecks = 0, closeTries = 0;
         bool dodging = false;       // native dodge owns the unit (NativeDodge)
+        AIFloat3 avoidPos;          // last dodge contact: the way back goes round it
+        int avoidUntil = 0;
     }
 
     array<Scout@> scouts;
@@ -542,6 +544,34 @@ namespace StealthScout {
         return path;
     }
 
+    // pos -> via -> goal with via AvoidElmos off the pos-goal line beside the
+    // avoid point, when that line passes closer than AvoidElmos; null otherwise.
+    array<AIFloat3>@ AvoidRoute(CCircuitUnit@ u, const AIFloat3& in pos, const AIFloat3& in goal, const AIFloat3& in avoid)
+    {
+        const float r = Global::StealthScout::AvoidElmos;
+        AIFloat3 seg = goal - pos; seg.y = 0.0f;
+        const float len = seg.Length2D();
+        if (len < 1.0f) return null;
+        const AIFloat3 dir = seg * (1.0f / len);
+        const float t = AiMax(0.0f, AiMin(len, (avoid.x - pos.x) * dir.x + (avoid.z - pos.z) * dir.z));
+        const AIFloat3 close = pos + dir * t;
+        if (close.distance2D(avoid) >= r) return null;
+        const AIFloat3 perp(-dir.z, 0.0f, dir.x);
+        const float sideNow = (pos.x - avoid.x) * perp.x + (pos.z - avoid.z) * perp.z;
+        for (int k = 0; k < 2; ++k) {
+            const float sgn = ((sideNow >= 0.0f) == (k == 0)) ? 1.0f : -1.0f;   // our side first
+            AIFloat3 via = avoid + perp * (sgn * r);
+            if (!InMap(via) || !aiTerrainMgr.CanMoveTo(u, via)) continue;
+            via.y = aiBattle.Height(via);
+            array<AIFloat3>@ a = aiBattle.GetUnitRaidRoute(u.circuitDef, pos, via, Global::StealthScout::HazardMargin, Global::StealthScout::HazardWeight, false);
+            array<AIFloat3>@ b = aiBattle.GetUnitRaidRoute(u.circuitDef, via, goal, Global::StealthScout::HazardMargin, Global::StealthScout::HazardWeight, false);
+            if (a is null || b is null || a.length() < 2 || b.length() < 2) continue;
+            for (uint i = 1; i < b.length(); ++i) a.insertLast(b[i]);
+            return a;
+        }
+        return null;
+    }
+
     void MarkHot(const AIFloat3& in p, int seconds)
     {
         const int s = SectorAt(p);
@@ -619,6 +649,11 @@ namespace StealthScout {
             soft = true;
         }
         why += " via=" + via;
+        // After a native dodge: go round the contact's spot (owner 2026-11-24).
+        if (path !is null && ai.frame < s.avoidUntil) {
+            array<AIFloat3>@ round = AvoidRoute(u, pos, goal, s.avoidPos);
+            if (round !is null) { @path = round; why += " round-dodge"; }
+        }
         if (path is null || path.length() < 2) {
             ++s.routeFailures;
             if (s.sector >= 0) unreachableUntil[s.sector] = ai.frame + Global::StealthScout::UnreachableForgetSeconds * SECOND;
@@ -837,6 +872,7 @@ namespace StealthScout {
             for (uint k = 0; k < Global::StealthScout::PostDistances.length(); ++k) {
                 AIFloat3 q = target + AIFloat3(cos(a), 0.0f, sin(a)) * Global::StealthScout::PostDistances[k];
                 if (!InMap(q) || Hot(q) || !aiTerrainMgr.CanMoveTo(u, q) || !PostClear(q)) continue;
+                if (aiBattle.EnemyStaticCovering(q, Global::StealthScout::LightPorcMargin, Global::StealthScout::LightPorcMaxRange) >= 0) continue;
                 q.y = aiBattle.Height(q);
                 post = q;
                 return true;
@@ -1126,7 +1162,16 @@ namespace StealthScout {
                     s.lastMove = ai.frame;
                     continue;
                 }
-                if (s.dodging) { s.dodging = false; s.escaping = false; Queue(s); continue; }
+                if (s.dodging) {
+                    s.dodging = false; s.escaping = false;
+                    const AIFloat3 from = aiMilitaryMgr.GetStealthDodgeFrom(u);
+                    if (from.x >= 0.0f) {
+                        s.avoidPos = from; s.avoidUntil = ai.frame + Global::StealthScout::AvoidSeconds * SECOND;
+                        MarkHot(from, Global::StealthScout::EvadeHotSeconds);
+                    }
+                    Queue(s);
+                    continue;
+                }
             }
             if (ai.frame - s.lastRisk >= 20 * SECOND && NearContact(pos, Global::StealthScout::DecloakRisk)) {
                 s.lastRisk = ai.frame; ++risks;

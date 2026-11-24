@@ -2482,6 +2482,13 @@ int CMilitaryManager::GetStealthDodgeUntil(CCircuitUnit* unit) const
 	return it == stealthDodge.end() ? 0 : it->second.until;
 }
 
+AIFloat3 CMilitaryManager::GetStealthDodgeFrom(CCircuitUnit* unit) const
+{
+	if (unit == nullptr) return AIFloat3(-1.f, 0.f, -1.f);
+	auto it = stealthDodge.find(unit->GetId());
+	return it == stealthDodge.end() ? AIFloat3(-1.f, 0.f, -1.f) : it->second.from;
+}
+
 void CMilitaryManager::SetStealthDodgeParams(float step, int holdFrames, float staticRadius)
 {
 	stealthDodgeStep = std::max(64.f, step);
@@ -2506,19 +2513,34 @@ void CMilitaryManager::UpdateStealthDodge()
 		const AIFloat3 pos = unit->GetPos(frame);
 		const std::vector<int>& ids = circuit->GetCallback()->GetEnemyUnitIdsIn(pos, d.radius, false);
 		AIFloat3 push(0.f, 0.f, 0.f);
-		float nearest = d.radius;
+		float nearest = d.radius, strongest = 0.f;
+		const float mySpeed = unit->GetCircuitDef()->GetSpeed();  // elmos/s
 		for (int id : ids) {
 			const CEnemyUnit* e = enemyMgr->GetEnemyUnit(id);
 			if (e == nullptr) continue;
 			const CCircuitDef* edef = e->GetCircuitDef();
-			if (edef != nullptr && edef->IsAbleToFly()) continue;  // planes pass in a moment
+			// planes count too (owner 2026-11-24): a low pass decloaks like any unit
 			AIFloat3 away = pos - e->GetPos();
 			away.y = 0.f;
 			const float dist = std::max(1.f, away.Length2D());
 			// a structure cannot walk into a cloaked unit: only very close ones count
 			if (edef != nullptr && !edef->IsMobile() && dist > stealthDodgeStatic) continue;
 			nearest = std::min(nearest, dist);
-			push += away * ((d.radius - dist) / (dist * d.radius) + 0.05f / dist);
+			const float w = (d.radius - dist) / d.radius + 0.05f;
+			AIFloat3 step = away / dist;
+			// Sidestep (owner 2026-11-24): a contact faster than us that heads our
+			// way cannot be outrun; step off its line of travel instead.
+			AIFloat3 vel = e->GetVel();
+			vel.y = 0.f;
+			const float vlen = vel.Length2D();
+			if (vlen * FRAMES_PER_SEC > mySpeed * 1.1f && vel.x * away.x + vel.z * away.z > 0.5f * vlen * dist) {
+				const AIFloat3 v = vel / vlen;
+				AIFloat3 side(-v.z, 0.f, v.x);
+				if (side.x * away.x + side.z * away.z < 0.f) side = side * -1.f;  // the side we already are on
+				step = side;
+			}
+			push += step * w;
+			if (w > strongest) { strongest = w; d.from = e->GetPos(); }
 		}
 		const float plen = push.Length2D();
 		if (plen < 1e-4f) { ++it; continue; }

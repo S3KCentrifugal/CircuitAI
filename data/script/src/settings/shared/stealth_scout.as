@@ -108,7 +108,16 @@ namespace StealthScout {
         float HeavyFactor = 2.0f;
         // Post: PostDistances from the target (spy sight 550, Gremlin 494), on the
         // side of our artillery, PostBearingsDeg either side of that bearing.
-        array<float> PostDistances = {430.0f, 390.0f, 470.0f, 350.0f};
+        array<float> PostDistances = {470.0f, 430.0f, 510.0f, 390.0f};
+        // Owner 2026-11-24: posts stay outside light porc (seen or ghost static
+        // weapons of reach up to LightPorcMaxRange, LLT ~430) by LightPorcMargin.
+        // Heavier porc out-ranges spy sight (550) and cannot be avoided.
+        float LightPorcMaxRange = 600.0f;
+        float LightPorcMargin = 40.0f;
+        // Owner 2026-11-24: after a native dodge the way back passes at least
+        // AvoidElmos from where the contact was, for AvoidSeconds.
+        float AvoidElmos = 600.0f;
+        int AvoidSeconds = 60;
         array<float> PostBearingsDeg = {0.0f, 25.0f, -25.0f, 50.0f, -50.0f, 75.0f, -75.0f};
         // A parked spotter is still and cloaked: a structure can never walk into
         // it, so structures only need StaticGap; mobile contacts keep ProxRadius.
