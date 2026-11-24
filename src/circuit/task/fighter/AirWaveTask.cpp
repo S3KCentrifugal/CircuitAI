@@ -1186,7 +1186,7 @@ bool CAirWaveTask::TryImmediateStrike()
             enemy->IsInLOS(), stationary, distance, immediateStrikeRadius)
             || (finishedOnly && priority->second * def->GetCostM() < finishedFloor)
             || pos.y < -SQUARE_SIZE * 5) continue;
-        if (immediateKillGate && (data->health <= 0.f || packDamage < data->health * damageMargin)) continue;
+        if (immediateKillGate && (data->GetHealth() <= 0.f || packDamage < data->GetHealth() * damageMargin)) continue;
         if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&pos](const auto& region) {
             return pos.SqDistance2D(region.first) <= SQUARE(region.second);
         })) continue;
