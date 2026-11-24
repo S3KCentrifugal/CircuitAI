@@ -1644,7 +1644,8 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 
 	const bool byArea = (tierAreaMax > 1);
 	const bool shieldsOn = (tierShieldMax > 0) || !tierDwellByDef.empty() || tierChain;
-	const bool collect = byArea || shieldsOn;
+	const bool arcOn = (tierArcPenalty > 0);
+	const bool collect = byArea || shieldsOn || arcOn;
 	std::vector<tier::Candidate> candidates;
 	std::vector<const SEnemyData*> candidateDatas;
 	CCircuitDef* cdef = unit->GetCircuitDef();
@@ -1697,6 +1698,9 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 				bestData = &e;
 			}
 		}
+	}
+	if (arcOn) {
+		ArcScan(unit, candidates, candidateDatas);
 	}
 	if (shieldsOn) {
 		ShieldScan(unit, candidates, candidateDatas);
@@ -1785,6 +1789,57 @@ void CSuperTask::SetTierShields(int maxShields, int penalty, int dwellAreas, flo
 	tierShieldAreas = std::max(0, dwellAreas);
 	tierShieldMuzzle = std::max(0.f, muzzle);
 	tierShieldHigh = high;
+}
+
+void CSuperTask::SetTierArc(int penalty, float muzzle, float step)
+{
+	tierArcPenalty = std::max(0, penalty);
+	tierArcMuzzle = std::max(0.f, muzzle);
+	tierArcStep = std::max(8.f, step);
+	if (tierArcPenalty == 0) tierArcLogged.clear();
+}
+
+/*
+ * Terrain on the fire arc (owner 2026-11-23). The site search keeps a site
+ * whose arcs to the enemy start and its two best roster targets are clear
+ * (LolCannon::ArcOk, 2 of 3), but the targets fired at later were never
+ * tested: a Calamity on Baryon Tar Lake opened on an AFUS cluster behind a
+ * ridge 650-850 elmos in front of it and spent its first 40 s on the hill.
+ * Each candidate now gets the same CBattleAnalysis::CannonArcBlock test (the
+ * engine's low root, rising half, every tierArcStep): blocked, it falls
+ * tierArcPenalty tiers and adds no metal to its area; out of reach for its
+ * height (< 0) it is left as it is, as in the site vote. Cost per scan:
+ * candidates x (apex / step) height reads, every tierRetargetFrames.
+ */
+void CSuperTask::ArcScan(CCircuitUnit* unit, std::vector<tier::Candidate>& cands, const std::vector<const SEnemyData*>& datas)
+{
+	CCircuitAI* circuit = manager->GetCircuit();
+	CBattleAnalysis* battle = circuit->GetBattle();
+	if (battle == nullptr) return;
+	CCircuitDef* cdef = unit->GetCircuitDef();
+	for (size_t i = 0; i < cands.size(); ++i) {
+		const SEnemyData& e = *datas[i];
+		const float r = battle->CannonArcBlock(cdef, position, e.pos, tierArcMuzzle, tierArcStep);
+		if (r == -2.f) return;   // not a cannon: nothing to test
+		const int at = (r > 0.f) ? std::max(1, int(r)) : 0;
+		const auto logged = tierArcLogged.find(e.id);
+		if (at > 0) {
+			const int before = cands[i].tier;
+			cands[i].tier += tierArcPenalty;
+			cands[i].cost = 0.f;
+			if ((logged == tierArcLogged.end()) || (logged->second == 0)) {
+				circuit->LOG("TIER: team=%i %s(%i): %s(%i) at (%i,%i), %.0f away: arc blocked by terrain %i out: tier %i -> %i",
+						circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
+						int(e.pos.x), int(e.pos.z), std::sqrt(cands[i].sqDist), at, before, cands[i].tier);
+			}
+			tierArcLogged[e.id] = at;
+		} else if ((logged != tierArcLogged.end()) && (logged->second > 0)) {
+			circuit->LOG("TIER: team=%i %s(%i): %s(%i) at (%i,%i): arc clear again",
+					circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
+					int(e.pos.x), int(e.pos.z));
+			logged->second = 0;
+		}
+	}
 }
 
 void CSuperTask::SetTierDwell(const CCircuitDef* edef, float base, float perShield)

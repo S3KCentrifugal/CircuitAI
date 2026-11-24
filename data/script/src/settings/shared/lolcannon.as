@@ -76,6 +76,11 @@ namespace LolCannon {
     float ArcMuzzleCalamity = 118.0f;   // corbuzz.s3o spindle (its six flares turn round it, 59..177)
     int ArcCacheSeconds = 120;
     int ArcTargetsKept = 128;           // roster targets ranked per site search
+    // owner 2026-11-23 (Baryon Tar Lake: a Calamity opened on an AFUS behind a ridge): the
+    // same arc test rates every fire target too (CSuperTask::SetTierArc); a target whose
+    // arc is blocked falls ArcFireTierPenalty tiers (below every live tier, above likely
+    // killed) and adds no metal to its area. 0 = off. Needs ArcCheck.
+    int ArcFireTierPenalty = 7;
     // owner 2026-11-15 (TECH Calamity sited under scouted Bastions): the whole layout - the
     // cannon footprint's corners, every turret slot and every storage slot - is checked, every
     // second, and a hit moves the site in the same tick. A cannon frame already down is

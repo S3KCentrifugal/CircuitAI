@@ -2388,6 +2388,9 @@ namespace LolCannon {
         const float muzzle = star ? Global::LolCannon::StarfallMuzzle : (cal ? Global::LolCannon::CalamityMuzzle : Global::LolCannon::RagnarokMuzzle);
         st.SetTierShields(Global::LolCannon::ShieldMax, Global::LolCannon::ShieldTierPenalty, Global::LolCannon::ShieldDwellAreas, muzzle, star);
         st.SetTierChain(Global::LolCannon::ShieldChain);
+        // owner 2026-11-23: fire targets get the site search's arc test (ArcMuzzle < 0: Starfall, or ArcCheck off)
+        const float arcMuzzle = ArcMuzzle(u.circuitDef);
+        st.SetTierArc(arcMuzzle >= 0.0f ? AiMax(0, Global::LolCannon::ArcFireTierPenalty) : 0, AiMax(0.0f, arcMuzzle), Global::LolCannon::ArcStep);
         if (Global::LolCannon::ShieldMax <= 0) return;
         // seconds become frames for Ragnarok and Calamity; Starfall volleys stay shots
         const float unit = star ? 1.0f : float(SECOND);

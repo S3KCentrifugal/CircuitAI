@@ -91,6 +91,11 @@ public:
 	// at through a lesser-protected roster target whose death blasts reach it
 	// (the nuke ChainKill rule): that target takes the protected one's tier.
 	void SetTierChain(bool on) { tierChain = on; }
+	// Terrain on the fire arc (owner 2026-11-23, Baryon: a Calamity opened on an AFUS behind a ridge):
+	// each candidate's low arc is tested with CBattleAnalysis::CannonArcBlock, the same test the
+	// script's site search (LolCannon::ArcOk) uses; a blocked one falls `penalty` tiers and adds no
+	// metal to its area. penalty 0: off (the Starfall's high arc is not tested).
+	void SetTierArc(int penalty, float muzzle, float step);
 	int GetTierAreaShields(int i) const { return ValidArea(i) ? tierAreaShields[i] : -1; }
 
 private:
@@ -269,6 +274,12 @@ private:
 	float tierShieldMuzzle = 120.f;
 	bool tierShieldHigh = false;
 	bool tierChain = false;
+	// Terrain on the fire arc: see SetTierArc.
+	int tierArcPenalty = 0;            // off until the script sets it
+	float tierArcMuzzle = 120.f;
+	float tierArcStep = 48.f;
+	std::unordered_map<int, int> tierArcLogged;           // candidate id -> blocked distance last logged (0 clear)
+	void ArcScan(CCircuitUnit* unit, std::vector<tier::Candidate>& cands, const std::vector<const SEnemyData*>& datas);
 	std::unordered_map<int, tier::Dwell> tierDwellByDef;   // def id -> dwell line
 	std::vector<tier::Sphere> tierSpheres;                 // this scan's shields (reused)
 	std::unordered_map<int, int> tierShieldsOf;            // candidate id -> shields its shot passes, this scan
