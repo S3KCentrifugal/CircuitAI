@@ -376,6 +376,15 @@ int FusionsBeforeAfus = 2;
             // Owner 2026-11-24: a frontline T2 wave (no affordable economy target) needs at least this many
             // bombers, and before the economy opening has flown at least the opening draw.
             int FrontlineMinBombers = 8;
+            // Owner 2026-11-25 (fix A): a T2 run on a target of no tier (frontline defence, fallback) takes any
+            // tier structure within StrikeImmediateRadius it kills within this many passes; 0 = old rule (AFUS only).
+            float FrontHandoffKillPasses = 3.0f;
+            // Owner 2026-11-25 (fix D, preference): committed re-picks divide a target's score by
+            // 1 + RepickPassPenalty * (passes - 1) up to RepickMaxPasses passes, and multiply it by
+            // RepickOverPassScale beyond; passes = health * margin / (survivors * pass damage). 0 max = off.
+            float RepickMaxPasses = 4.0f;
+            float RepickPassPenalty = 0.25f;
+            float RepickOverPassScale = 0.1f;
             // Owner 2026-11-24: an offensive bomber operation that ends with no bomb released excludes its
             // launch and final aims from target picks for this long (StrikeFailedRegionRadius around each).
             int NoBombRaidExcludeSeconds = 300;

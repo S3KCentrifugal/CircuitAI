@@ -563,6 +563,9 @@ bool CAirWaveTask::PickStrikeTarget(const AIFloat3& from, int preference, float 
             if (local) score *= 8.f;
         }
         if (preference != 1) score *= air_geometry::UnfinishedStrikeScale(e.isBeingBuilt, isStatic);
+        if (committed && repickMaxPasses > 0.f && passDamage > 0.f && preference != 1)
+            score *= air_geometry::RepickPassScale(e.health * damageMargin / (passDamage * float(std::max(1, expectedCount))),
+                repickMaxPasses, repickPassPenalty, repickOverScale);
         if (forceShort) {
             // Too strong for this wave. A finished structure here still keeps
             // every lower-scored unfinished frame from being picked instead
@@ -989,6 +992,19 @@ void CAirWaveTask::SetAttackHandoffPolicy(bool earlyApproach, float priority, fl
     immediateStrikeRadius = std::clamp(radius, 0.f, 10000.f);
 }
 
+void CAirWaveTask::SetImmediateKillPasses(float passes)
+{
+    immediateKillPasses = std::isfinite(passes) ? std::clamp(passes, 0.f, 100.f) : 0.f;
+}
+
+void CAirWaveTask::SetRepickPolicy(float maxPasses, float passPenalty, float overScale)
+{
+    if (!std::isfinite(maxPasses) || !std::isfinite(passPenalty) || !std::isfinite(overScale)) return;
+    repickMaxPasses = std::clamp(maxPasses, 0.f, 100.f);
+    repickPassPenalty = std::clamp(passPenalty, 0.f, 10.f);
+    repickOverScale = std::clamp(overScale, 0.f, 1.f);
+}
+
 void CAirWaveTask::SetWindGridPolicy(int minimum, int depth, float link, float priority)
 {
     if (!std::isfinite(link) || !std::isfinite(priority)) return;
@@ -1158,7 +1174,7 @@ bool CAirWaveTask::TryImmediateStrike()
     CEnemyInfo* best = nullptr;
     float bestPriority = 0.f, bestDistance = 0.f;
     // Kill gate: the whole pack's pass damage, computed once per scan.
-    const float packDamage = immediateKillGate ? passDamage * float(GetBomberCount()) : 0.f;
+    const float packDamage = immediateKillPasses > 0.f ? passDamage * float(GetBomberCount()) * immediateKillPasses : 0.f;
     // The live per-AI contact set includes peaceful economy, without the
     // asynchronous threat snapshot's visibility delay. One scan; no route/AA
     // planner or aircraft-by-enemy loop on this reactive path.
@@ -1186,7 +1202,7 @@ bool CAirWaveTask::TryImmediateStrike()
             enemy->IsInLOS(), stationary, distance, immediateStrikeRadius)
             || (finishedOnly && priority->second * def->GetCostM() < finishedFloor)
             || pos.y < -SQUARE_SIZE * 5) continue;
-        if (immediateKillGate && (data->GetHealth() <= 0.f || packDamage < data->GetHealth() * damageMargin)) continue;
+        if (immediateKillPasses > 0.f && (data->GetHealth() <= 0.f || packDamage < data->GetHealth() * damageMargin)) continue;
         if (std::any_of(excludedStrikeRegions.begin(), excludedStrikeRegions.end(), [&pos](const auto& region) {
             return pos.SqDistance2D(region.first) <= SQUARE(region.second);
         })) continue;

@@ -79,7 +79,13 @@ public:
     void SetAttackHandoffPolicy(bool earlyApproach, float immediatePriority, float immediateRadius);
     // Owner 2026-11-24: an in-flight handoff only to a target the living bombers
     // can kill in one pass (health * margin <= bombers * pass damage).
-    void SetImmediateKillGate(bool gate) { immediateKillGate = gate; }
+    void SetImmediateKillGate(bool gate) { immediateKillPasses = gate ? 1.f : 0.f; }
+    // Owner 2026-11-25: the same gate in passes (0 = off): a handoff target the pack kills within this many passes.
+    void SetImmediateKillPasses(float passes);
+    // Owner 2026-11-25 (fix D): a committed re-pick prefers what the surviving bombers kill. A target needing
+    // up to maxPasses passes keeps its score divided by 1 + passPenalty * (passes - 1); one needing more is
+    // multiplied by overScale. A preference, never a filter. maxPasses <= 0 turns it off.
+    void SetRepickPolicy(float maxPasses, float passPenalty, float overScale);
     /*
      * Wind grids: minimum touching winds (0 disables), minimum depth in winds
      * both ways, link distance between neighbours, and the strike priority a
@@ -217,7 +223,10 @@ private:
     bool earlyAttackApproach = false;
     float immediateStrikePriority = 0.f;
     float immediateStrikeRadius = 0.f;
-    bool immediateKillGate = false;
+    float immediateKillPasses = 0.f;
+    float repickMaxPasses = 0.f;
+    float repickPassPenalty = 0.f;
+    float repickOverScale = 1.f;
     int releasedTotal = 0;
     int windGridMinimum = 0;
     int windGridDepth = 3;

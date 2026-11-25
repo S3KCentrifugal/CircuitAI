@@ -35,6 +35,14 @@ inline float UnfinishedStrikeScale(bool beingBuilt, bool stationary)
 {
     return beingBuilt && stationary ? UNFINISHED_STRIKE_SCALE : 1.f;
 }
+// Owner 2026-11-25 (fix D): passes = health * margin / pack pass damage. Up to maxPasses the score is
+// divided by 1 + penalty * (ceil(passes) - 1); past it, multiplied by overScale. Never zero: a preference.
+inline float RepickPassScale(float passes, float maxPasses, float penalty, float overScale)
+{
+    if (!std::isfinite(passes) || passes <= 0.f || maxPasses <= 0.f) return 1.f;
+    if (passes > maxPasses) return std::max(overScale, 1e-4f);
+    return 1.f / (1.f + std::max(0.f, penalty) * std::max(0.f, std::ceil(passes) - 1.f));
+}
 inline bool PreferDistrictTarget(bool committed, bool local, bool bestLocal, float score, float bestScore)
 {
     if (committed && local != bestLocal) return local;

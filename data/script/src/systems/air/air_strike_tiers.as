@@ -101,6 +101,13 @@ namespace AirStrikeTiers {
             for (int t = tier - 1; t >= 1; --t) if (tierMin[t] > 0.0f) return tierMin[t];
             return tierMin[tier] > 0.0f ? tierMin[tier] : 1.0f;
         }
+        // The lowest static weight of any tier: every roster structure reaches it.
+        float LowestThreshold()
+        {
+            float low = 0.0f;
+            for (int t = 1; t <= tiers; ++t) if (tierMin[t] > 0.0f && (low <= 0.0f || tierMin[t] < low)) low = tierMin[t];
+            return low > 0.0f ? low : 1.0f;
+        }
     }
 
     array<Roster@> active;   // rosters fed by Remember
@@ -165,12 +172,22 @@ namespace AirBomberTargets {
         if (!Enabled() || wt is null) return;
         InitRoster();
         roster.Allow(wt);
-        _SetHandoff(wt, 0);
+        _SetHandoff(wt, 0, false);
     }
-    void _SetHandoff(CAirWaveTask@ wt, int tier)
+    // Owner 2026-11-25 (fix A): a run on a target of no tier (a frontline defence or other fallback)
+    // hands off in flight to ANY roster structure within StrikeImmediateRadius the pack kills within
+    // FrontHandoffKillPasses passes; a run on a tier target keeps the strictly-higher-tier rule.
+    float HandoffThreshold(int tier, bool inFlight)
     {
-        wt.SetAttackHandoffPolicy(Global::RoleSettings::Air::StrikeEarlyAttack, roster.Threshold(tier),
+        return inFlight && tier <= 0 && Global::RoleSettings::Air::FrontHandoffKillPasses > 0.0f
+            ? roster.LowestThreshold() : roster.Threshold(tier);
+    }
+    void _SetHandoff(CAirWaveTask@ wt, int tier, bool inFlight = true)
+    {
+        const bool front = inFlight && tier <= 0 && Global::RoleSettings::Air::FrontHandoffKillPasses > 0.0f;
+        wt.SetAttackHandoffPolicy(Global::RoleSettings::Air::StrikeEarlyAttack, HandoffThreshold(tier, inFlight),
             Global::RoleSettings::Air::StrikeImmediateRadius);
+        wt.SetImmediateKillPasses(front ? Global::RoleSettings::Air::FrontHandoffKillPasses : 0.0f);
     }
 
     void Launched(CAirWaveTask@ wt)
@@ -195,7 +212,7 @@ namespace AirBomberTargets {
             if (target * 8 + tier == runTarget[r]) continue;
             runTarget[r] = target * 8 + tier;
             GenericHelpers::LogUtil("[AIR][Bomber] run target=" + target + " tier=" + tier
-                + " handoff=" + roster.Threshold(tier), 1);
+                + " handoff=" + HandoffThreshold(tier, true), 1);
         }
     }
 }  // namespace AirBomberTargets
