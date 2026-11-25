@@ -888,6 +888,8 @@ void CMilitaryManager::ReadConfig()
 		artySnipeInfo.syncHoldBand = std::max(0.f, snipeArtyCfg.get("sync_hold_band", 150.f).asFloat());
 		artySnipeInfo.callRadius = std::max(0.f, snipeArtyCfg.get("call_radius", 3500.f).asFloat());
 		readDefs("direct_threats", artySnipeInfo.directThreats);
+		readDefs("ghost_mid", artySnipeInfo.ghostMid);  // owner 2026-11-25
+		artySnipeInfo.ghostVolleysMid = std::max(1, snipeArtyCfg.get("ghost_volleys_mid", 2).asInt());
 		readDefs("porc", artySnipeInfo.porc);
 		artySnipeInfo.avoidOtherPorc = snipeArtyCfg.get("avoid_other_porc", true).asBool();
 		artySnipeInfo.threatMargin = std::max(0.f, snipeArtyCfg.get("threat_margin", 100.f).asFloat());

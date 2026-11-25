@@ -100,6 +100,9 @@ static int GhostNeedFor(const CMilitaryManager::SArtySnipeInfo& si, const CCircu
 	const std::string ln = (launcher != nullptr) ? launcher->GetDef()->GetName() : std::string();
 	if (IsTimedGhostLauncher(ln)) return FRAMES_PER_SEC * (heavy ? 105 : 45);
 	if (ln == "armvang") return heavy ? 5 : 1;
+	// Owner 2026-11-25: Gauntlet / Agitator / Amputator ghosts get ghost_volleys_mid from the snipe launchers.
+	if (!heavy && (d != nullptr) && (launcher != nullptr) && (si.defs.count(launcher->GetId()) > 0)
+		&& (si.ghostMid.count(d->GetId()) > 0)) return si.ghostVolleysMid;
 	return heavy ? si.volleys : si.ghostVolleysOther;
 }
 // 2026-11-07: a unit that gives ghost structures blind fire in its default pick:

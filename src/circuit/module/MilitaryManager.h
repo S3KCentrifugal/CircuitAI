@@ -583,6 +583,10 @@ public:
 		// Owner 2026-11-04 05:45Z: blind volleys per unit at a ghost that is not a
 		// heavy (threats + direct threats get `volleys`).
 		int ghostVolleysOther = 1;
+		// owner 2026-11-25: ghost_mid (Gauntlet, Agitator, Amputator) get ghost_volleys_mid blind volleys
+		// from the snipe launchers (Ambassador, Negotiator, Boreas)
+		std::unordered_set<CCircuitDef::Id> ghostMid;
+		int ghostVolleysMid = 2;
 		bool spamRetreat = true;           // 2026-11-06: Ambassador/Negotiator/Boreas back off from spam
 		float spamRetreatDistance = 500.f;
 		int spamRetreatQuietFrames = 120;  // 4 s
