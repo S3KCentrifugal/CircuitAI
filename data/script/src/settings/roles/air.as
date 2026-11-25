@@ -278,7 +278,8 @@ int FusionsBeforeAfus = 2;
             float RadarPicketPatrolRadius = 180.0f;
             float RadarPicketMetal = 30.0f;
             float RadarPicketEnergy = 1000.0f;
-            int RadarPicketScanSeconds = 12;        // every lane's front refreshed this often
+            int RadarPicketScanSeconds = 12;
+            int RadarPicketUnderFireEvery = 3;      // under base ground contact: every 3rd T2 plant order        // every lane's front refreshed this often
             // Mixed sweeps supersede the old continuous twenty-radar controller.
             bool ScoutSweepEnabled = true;
             int ScoutSweepT1Count = 10;

@@ -243,6 +243,13 @@ namespace AirRadarPickets {
         if (t !is null) GenericHelpers::LogUtil("[AIR][Picket] order def=" + def.GetName() + " plant=" + plant.id + " lanesNeeding=" + needed, 1);
         return t;
     }
+    // under base ground contact (not an air emergency): every Nth plant order
+    int underFireTurn = 0;
+    IUnitTask@ ProduceUnderFire(CCircuitUnit@ plant) {
+        if (!Active() || Needed() <= 0 || plant is null || !UnitHelpers::IsT2AircraftPlant(plant.circuitDef.GetName())) return null;
+        if ((underFireTurn++ % AiMax(1, Global::RoleSettings::Air::RadarPicketUnderFireEvery)) != 0) return null;
+        return Produce(plant);
+    }
     bool Free(CCircuitUnit@ u) {
         if (u is null || u.GetBuildProgress() < 1.0f || !AirRecon::Controlled(u) || AirScoutSweep::Flying(u.id)) return false;
         IUnitTask@ task = u.task;

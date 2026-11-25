@@ -163,6 +163,12 @@ namespace AirProduction {
             // every other order of the plant, or it is never built before the launch
             @t = AirScoutSweep::ProduceUnderFire(u);
             if (t !is null) return t;
+            // a ground contact that never ends (headless Glitters 2026-11-24: the whole game)
+            // must not leave the lanes blind: every RadarPicketUnderFireEvery-th order
+            if (!airEmergency) {
+                @t = AirRadarPickets::ProduceUnderFire(u);
+                if (t !is null) return t;
+            }
         }
         CCircuitDef@ builder = ai.GetCircuitDef(cons);
         const int constructors = AirEconomy::ConstructorTarget(builder, advanced);
