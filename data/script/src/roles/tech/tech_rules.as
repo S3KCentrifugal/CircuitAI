@@ -331,7 +331,15 @@ namespace TechRules {
     IUnitTask@ DoRecovery(Ctx@ c)       { return TechBuild::RecoverEconomy(c.u); }
     IUnitTask@ DoAirConvertAssist(Ctx@ c) { return TechConverterAssist::Work(c.u); }
     IUnitTask@ DoEcoFlak(Ctx@ c)        { return EcoFlak::Work(c.u); }
-    IUnitTask@ DoAntiNuke(Ctx@ c) { return FirstAntiNuke(c.u, c.mi, c.ei, false); }
+    // Owner 2026-11-24 (Baryon Tar Lake): the AFUS and converter seats never leave for Pinpointers or
+    // antinukes, and while the defence crew lives it alone builds them (one T2 constructor each job)
+    bool DefenceWorkBarred(CCircuitUnit@ u)
+    {
+        if (TechGrowth::Dedicated(u) || TechBuild::IsDedicatedAirCon(u)) return true;
+        if (!Global::RoleSettings::Tech::DefenceWorkCrewOnly || TechDefenceCrew::crewId < 0 || TechDefenceCrew::Owns(u.id)) return false;
+        return ai.GetTeamUnit(TechDefenceCrew::crewId) !is null;
+    }
+    IUnitTask@ DoAntiNuke(Ctx@ c) { return DefenceWorkBarred(c.u) ? null : FirstAntiNuke(c.u, c.mi, c.ei, false); }
     // The first antinuke for constructor u: assist its frame, else order it. anyDistance (the defence crew,
     // owner 2026-11-23) skips the first-minute AntiNukeOrderRadius gate.
     IUnitTask@ FirstAntiNuke(CCircuitUnit@ u, float mi, float ei, bool anyDistance)
@@ -369,6 +377,7 @@ namespace TechRules {
     // Owner 2026-11-15: after the first antinuke, one more per scouted enemy silo at the base periphery.
     IUnitTask@ DoAntiNukeExtra(Ctx@ c)
     {
+        if (DefenceWorkBarred(c.u)) return null;
         return SiloAntiNukes::PeripheryWork(c.u, c.mi, c.ei, Global::RoleSettings::Tech::FirstAntiNukeMetalIncome,
             Global::RoleSettings::Tech::FirstAntiNukeEnergyIncome, Global::SiloAntiNukes::TechPeripheryMaxRadius,
             Global::SiloAntiNukes::TechCoreRadius);
@@ -442,7 +451,7 @@ namespace TechRules {
     IUnitTask@ DoRushBootstrap(Ctx@ c) { return RushBootstrap::TravelTask(c.u); }
     IUnitTask@ DoClusterBatch(Ctx@ c) { return EconomyCluster::BatchWork(c.u); }
     IUnitTask@ DoSeatTurret(Ctx@ c) { return TechSurplusSeats::TurretWork(c.u); }        // D-489
-    IUnitTask@ DoPinpointer(Ctx@ c) { return TechPinpointers::Work(c.u); }               // D-492
+    IUnitTask@ DoPinpointer(Ctx@ c) { return DefenceWorkBarred(c.u) ? null : TechPinpointers::Work(c.u); }               // D-492
     IUnitTask@ DoSeatConverter(Ctx@ c) { return TechSurplusSeats::ConverterWork(c.u); }  // D-489
     IUnitTask@ DoConverter(Ctx@ c)
     {

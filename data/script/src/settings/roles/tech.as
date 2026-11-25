@@ -11,6 +11,8 @@ namespace Tech {
             int RushBootstrapRetrySeconds = 5;
             int RushBootstrapStallSeconds = 30;
             bool GrowthEnabled = true;
+            bool GrowthT2SeatsAfterMexUpgrade = true;   // owner 2026-11-24: AFUS + T2 converter seats open once our own mexes are T2
+            bool DefenceWorkCrewOnly = true;            // owner 2026-11-24: with a defence crew alive, only it builds Pinpointers and antinukes
             // D-489 (owner, 2026-11-07): surplus seats. While metal floats, one T1
             // constructor at base only builds construction turrets on free economy
             // slots; while energy floats, one T2 constructor at base only builds

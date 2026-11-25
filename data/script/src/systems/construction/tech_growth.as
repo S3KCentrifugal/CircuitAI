@@ -3,6 +3,22 @@
 // air replacement releases a bot without interrupting its paid construction.
 namespace TechGrowth {
     bool active=false;
+    // Owner 2026-11-24 (Baryon Tar Lake): once our own mexes are upgraded to T2 the T2 constructors
+    // split at once: one AFUS seat, one T2 converter seat (the defence crew keeps Pinpointers and the
+    // antinuke). Before this the two T2 seats waited for T1 energy reclaim (~14 min there), and the
+    // Pinpointers took both T2 constructors for 2 min after the second AFUS. Latched: a new T1 mex
+    // later does not drop the seats.
+    bool t2Seats=false;
+    bool T2SeatsOn() {
+        if(t2Seats || !Global::RoleSettings::Tech::GrowthT2SeatsAfterMexUpgrade) return t2Seats;
+        if(Economy::MexTracker::myMexes.length()==0 || EarlyMexUpgraders::UpgradedCount()==0
+            || EarlyMexUpgraders::OpenCount()>0) return false;
+        t2Seats=true;
+        GenericHelpers::LogUtil("[TECH][Growth] own mexes upgraded ("+EarlyMexUpgraders::UpgradedCount()
+            +"): T2 AFUS and converter seats open",1);
+        return true;
+    }
+    bool SeatsOn() { return active || T2SeatsOn(); }
     bool reclaimMarked=false;
     int lastTick=-SECOND;
     int nanoId=-1, afusId=-1, converterId=-1;
@@ -17,7 +33,7 @@ namespace TechGrowth {
         if(TechAirFoundry::Owns(u.id) || Team::Ferry::IsGift(u.id) || Team::Recovery::IsGift(u.id)
             || UnitHelpers::IsCommander(u.circuitDef) || SeaConstructor::IsT1(u.circuitDef)
             || SeaConstructor::IsT2(u.circuitDef) || TechHarbour::IsHoverConstructor(u.circuitDef)
-            || FrontlineEngineering::members.exists(""+u.id) || TechDefenceCrew::Owns(u.id)
+            || FrontlineEngineering::members.exists(""+u.id) || TechDefenceCrew::Owns(u.id) || EarlyMexUpgraders::IsClaimed(u.id)
             || LolCannon::IsCrew(u.id) || LrpcBlock::IsCrew(u.id)) return false;
         return u.task is null || (!u.task.IsExternalControlled() && !u.task.IsEnemyReclaim()
             && u.task.GetType()!=int(Task::Type::PLAYER) && u.task.GetType()!=int(Task::Type::RETREAT));
@@ -43,10 +59,10 @@ namespace TechGrowth {
         if(!Alive(nanoId)) nanoId=-1;
         if(!Alive(afusId)) afusId=-1;
         if(!Alive(converterId)) converterId=-1;
-        if(active && Alive(TechBuild::airAfusId)) afusId=TechBuild::airAfusId;
-        if(active && Alive(TechBuild::airConvId)) converterId=TechBuild::airConvId;
+        if(SeatsOn() && Alive(TechBuild::airAfusId)) afusId=TechBuild::airAfusId;
+        if(SeatsOn() && Alive(TechBuild::airConvId)) converterId=TechBuild::airConvId;
     }
-    bool Dedicated(CCircuitUnit@ u) {return active && u !is null && (u.id==nanoId || u.id==afusId || u.id==converterId);}
+    bool Dedicated(CCircuitUnit@ u) {return u !is null && ((active && u.id==nanoId) || (SeatsOn() && (u.id==afusId || u.id==converterId)));}
     void Recruit() {
         // Once on mode entry, not per tick: reuse the revision-owned constructor
         // subset. Wake only the three seats; do not abandon paid construction.
@@ -71,10 +87,10 @@ namespace TechGrowth {
     }
     int Claim(CCircuitUnit@ u) {
         Tick();
-        if(!active || !Available(u)) return 0;
+        if(!SeatsOn() || !Available(u)) return 0;
         const string side=Global::AISettings::Side;
         const int tier=UnitHelpers::GetConstructorTier(u.circuitDef);
-        if(tier==1 && CanBuild(u,UnitHelpers::GetT1NanoNameForSide(side))) {
+        if(active && tier==1 && CanBuild(u,UnitHelpers::GetT1NanoNameForSide(side))) {
             CCircuitUnit@ current=ai.GetTeamUnit(nanoId);
             if(nanoId<0 || (UnitHelpers::IsAirConstructor(u.circuitDef) && current !is null
                 && !UnitHelpers::IsAirConstructor(current.circuitDef))) nanoId=u.id;
