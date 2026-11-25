@@ -6,7 +6,7 @@ namespace Global { namespace MobileAntiNuke {
         bool Enabled = true;
         // Wanted: none until the first enemy nuke launch is seen (BAR launch warning or an interception),
         // then one per enemy silo (SiloAntiNukes::Silos: the higher of scouted and inferred from the
-        // launch frequency), at least 1. Two or more scouted / inferred silos also start it with no launch.
+        // launch frequency), at least 1. One scouted silo (any faction, finished or a frame) also starts it.
         int Max = 4;
         int UpdateSeconds = 2;
 

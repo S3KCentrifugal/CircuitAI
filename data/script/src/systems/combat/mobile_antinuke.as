@@ -27,8 +27,8 @@
 //
 // Wanted (FRONT): 0 until the first enemy launch (SiloAntiNukes: a BAR launch warning, or an interception by
 // any of our or an allied BARb's antinukes, these mobile ones included); then max(1, silos), silos = the
-// higher of scouted and inferred from the launch frequency (SiloAntiNukes::Silos). Two or more silos start it
-// without a launch. At most Max. Owned = every finished mobile antinuke of ours (built by us, traded to us, or
+// higher of scouted and inferred from the launch frequency (SiloAntiNukes::Silos). One scouted silo (any faction, finished or a
+// frame) starts it too. At most Max. Owned = every finished mobile antinuke of ours (built by us, traded to us, or
 // a native factory-weight one), all driven here.
 //
 // Post (every UpdateSeconds per antinuke): our artillery (Ambassador / Negotiator / Boreas, finished) is split
@@ -118,8 +118,8 @@ namespace MobileAntiNuke {
         if (!Active()) return 0;
         const int silos = SiloAntiNukes::Silos();
         int n = 0;
-        if (SiloAntiNukes::LaunchesEver() > 0) n = AiMax(1, silos);
-        else if (silos >= 2) n = silos;
+        // owner 2026-11-25: a launch, an interception or one scouted silo (armsilo / corsilo / legsilo, finished or a frame) starts it
+        if (SiloAntiNukes::LaunchesEver() > 0 || silos > 0) n = AiMax(1, silos);
         n = AiMin(Global::MobileAntiNuke::Max, n);
         if (n != wantLogged) {
             Log("wanted " + n + " (enemy launches seen " + SiloAntiNukes::LaunchesEver() + ", silos " + SiloAntiNukes::SiloNote() + "); own " + antis.length());
