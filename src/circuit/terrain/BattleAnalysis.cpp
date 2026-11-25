@@ -390,6 +390,7 @@ const CBattleAnalysis::ShotModel& CBattleAnalysis::MainShotModel(CCircuitDef* cd
 	bool lobs = cdef->IsAbleToFly();
 	float bestRange = 0.f;
 	std::string bestType;
+	bool bestHigh = false;
 	for (WeaponMount* raw : cdef->GetDef()->GetWeaponMounts()) {
 		const std::unique_ptr<WeaponMount> mount(raw);
 		const std::unique_ptr<WeaponDef> wd(mount->GetWeaponDef());
@@ -400,11 +401,14 @@ const CBattleAnalysis::ShotModel& CBattleAnalysis::MainShotModel(CCircuitDef* cd
 		if ((name.find("dummy") != std::string::npos) || (name.find("controller") != std::string::npos)
 			|| (wd->GetInterceptor() != 0) || wd->IsShield()) continue;
 		const std::string type = wd->GetType();
-		if ((type == "Cannon") && (wd->GetHighTrajectory() != 0)) lobs = true;
+		const int high = (type == "Cannon") ? wd->GetHighTrajectory() : 0;
+		if (high == 2) lobs = true;   // switchable: may lob when the low arc is blocked
 		const float range = wd->GetRange();
-		if (range <= bestRange) continue;
+		if (range <= bestRange) { if (high == 1) lobs = true; continue; }   // another mount lobs
+		if (bestHigh) lobs = true;   // the high mount we kept so far is not the main one after all
 		bestRange = range;
 		bestType = type;
+		bestHigh = (high == 1);
 		m.aoe = wd->GetAreaOfEffect();
 		m.b = weapon_reach::Ballistics();
 		m.b.range = range;
@@ -420,7 +424,7 @@ const CBattleAnalysis::ShotModel& CBattleAnalysis::MainShotModel(CCircuitDef* cd
 	}
 	if (!lobs && (bestRange > 0.f)) {
 		if ((bestType == "Cannon") && (m.b.speed > 0.f) && (m.b.gravity > 0.f)) {
-			m.mode = ShotMode::ARC;
+			m.mode = bestHigh ? ShotMode::HIGH_ARC : ShotMode::ARC;   // owner 2026-11-25: fixed high arc (Perdition)
 		} else if ((bestType == "LaserCannon") || (bestType == "BeamLaser") || (bestType == "LightningCannon")
 			|| (bestType == "EmgCannon") || (bestType == "Rifle") || (bestType == "Flame") || (bestType == "DGun"))
 		{
@@ -441,13 +445,14 @@ bool CBattleAnalysis::ShotClear(CCircuitDef* cdef, const AIFloat3& from, float f
 	const float ux = dx / dist, uz = dz / dist;
 	const float dy = toY - fromY;
 	constexpr float STEP = 8.f;   // the heightmap's own square
-	if (m.mode == ShotMode::ARC) {
+	if ((m.mode == ShotMode::ARC) || (m.mode == ShotMode::HIGH_ARC)) {
 		// CCannon::HaveFreeLineOfFire: the low root of g x^2 (1 + t^2) / (2 v^2) - x t + dy = 0,
 		// the ground tested over the first 15/16 of the flight
 		const float v2 = m.b.speed * m.b.speed, g = m.b.gravity;
 		const float disc = v2 * v2 - g * (g * dist * dist + 2.f * dy * v2);
 		if (disc < 0.f) return false;
-		const float tanA = (v2 - std::sqrt(disc)) / (g * dist);
+		// the high root for a fixed high-trajectory cannon (CCannon::CalcWantedDir highTrajectory)
+		const float tanA = ((m.mode == ShotMode::HIGH_ARC) ? (v2 + std::sqrt(disc)) : (v2 - std::sqrt(disc))) / (g * dist);
 		const float k = g * (1.f + tanA * tanA) / (2.f * v2);
 		const float end = std::max(10.f, 0.9375f * dist);
 		for (float x = STEP; x < end; x += STEP) {

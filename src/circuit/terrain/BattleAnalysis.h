@@ -114,8 +114,9 @@ public:
 	// aim point (CWeapon::HaveFreeLineOfFire: a ground hit within the AoE of the target counts).
 	// HEIGHT = no stand reaches at that height (a shell that can't climb the cliff), TERRAIN =
 	// stands reach but every shot hits the ground (cliff lip), NOSTAND = the reaching stands are
-	// all ground it can't stand on / get to. High arcs, missiles, starbursts, aircraft, carriers:
-	// range only. UNKNOWN = no data or the per-frame budget is spent: treat as reachable.
+	// all ground it can't stand on / get to. A fixed high-trajectory main cannon (highTrajectory 1)
+	// gets the same test on its high root. Switchable cannons, another high mount, missiles,
+	// starbursts, aircraft, carriers: range only. UNKNOWN = no data or the per-frame budget is spent: treat as reachable.
 	// Cached per def, area and 32-elmo target cell for 30 s; at most 8 fresh tests a frame.
 	enum class ShotReach : int { OK = 0, HEIGHT, TERRAIN, NOSTAND, UNKNOWN };
 	static const char* ShotReachName(ShotReach r);
@@ -459,7 +460,7 @@ private:
 	CWeaponDef* MainWeapon(const CCircuitDef* cdef) const;
 	mutable std::unordered_map<int, CWeaponDef*> mainWeapon;   // def id -> its longest-range weapon
 	// Owner 2026-11-24: CanEverHit's per-def shot model and its result cache
-	enum class ShotMode : int { RANGE_ONLY = 0, ARC, LINE };
+	enum class ShotMode : int { RANGE_ONLY = 0, ARC, HIGH_ARC, LINE };   // HIGH_ARC: a fixed high-trajectory main cannon
 	struct ShotModel { ShotMode mode = ShotMode::RANGE_ONLY; float aimFrom = 16.f; float aoe = 0.f; weapon_reach::Ballistics b; };
 	const ShotModel& MainShotModel(CCircuitDef* cdef);
 	std::unordered_map<int, ShotModel> shotModels;
