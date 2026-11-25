@@ -39,6 +39,9 @@ int EcoBlockTurretsInFlight = 2;    // turret orders at once per busy block
 // first, then the block there; 2 block beside, then a second block re-reserved on the
 // cleared site; 3 block over the field at once, turrets added as the winds are reclaimed.
 int EcoBlockWindMode = 3;     // A/B 11-24: mode 3 led on Glitters/Hera/Starwatcher; mode 1 trailed
+// Owner 2026-11-24: past the first completed reactor AIR reclaims all its winds, solars,
+// advanced solars AND T1 converters (under the energy margin) to free space for the blocks.
+bool ReclaimT1ConvertersAfterFusion = true;
 int EcoBlockSiteWaitSeconds = 600;  // modes 1-3: reserve anyway (or give up) this long after the first reactor
 int EcoBlockSiteLeftover = 2;       // modes 1-2: the site counts as clear with this many T1 energy structures left
 int EcoBlockSiteReclaimConcurrent = 4; // reclaim jobs at once while a site is clearing

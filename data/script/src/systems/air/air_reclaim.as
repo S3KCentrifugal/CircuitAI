@@ -57,10 +57,14 @@ namespace AirReclaim {
         if (AirThinHome::T1ConvertersRetired() && AirThinHome::replaceCredit >= Global::RoleSettings::Air::ConverterDraw
             && AirEconomy::bankE >= aiEconomyMgr.energy.storage * Global::RoleSettings::Air::ThinHomeConverterReclaimBank)
             names.insertLast(UnitHelpers::GetEnergyConverterNameForSide(side));
-        // Air::EcoBlockWindMode: T1 converters standing on the eco-block site go too
-        // (only those on the site), and site structures are taken before any others.
-        const bool siteOnlyConverters = AirEcoLayout::SiteClearing() && names.length() == 3;
-        if (siteOnlyConverters) names.insertLast(UnitHelpers::GetEnergyConverterNameForSide(side));
+        // Owner 2026-11-24 (space for the eco blocks): past the first reactor every T1
+        // converter is reclaimed too, not only those an advanced converter has replaced.
+        // A converter makes no energy, so only the metal-storage refund test applies.
+        const bool siteOnlyConverters = false;
+        if (Global::RoleSettings::Air::ReclaimT1ConvertersAfterFusion && names.length() == 3)
+            names.insertLast(UnitHelpers::GetEnergyConverterNameForSide(side));
+        const bool creditedConverters = names.length() == 4 && AirThinHome::T1ConvertersRetired()
+            && AirThinHome::replaceCredit >= Global::RoleSettings::Air::ConverterDraw;
         array<Id>@ ids = ai.GetOwnedUnitIds();
         // Two passes while an eco-block site is clearing: its structures first, any tier.
         for (uint pass = AirEcoLayout::SiteClearing() ? 0 : 1; pass < 2; ++pass)
@@ -90,7 +94,7 @@ namespace AirReclaim {
                     if (aiTerrainMgr.GetReservationUnit(AirLayout::windClusters[c].slots[s]) is best)
                         job.slot = AirLayout::windClusters[c].slots[s];
             jobs.insertLast(job);
-            if (tier == 3 && !siteOnlyConverters) AirThinHome::replaceCredit -= Global::RoleSettings::Air::ConverterDraw;
+            if (tier == 3 && creditedConverters) AirThinHome::replaceCredit -= Global::RoleSettings::Air::ConverterDraw;
             Lifecycle::Retire(best, tier == 3 ? "AIR T1 converter retired past the first fusion (thin home)" : "AIR low-tier energy replaced by completed reactor");
             if (!AirEconomy::HasReactor()) Invariants::Violation("INV-110", "AIR", "low-tier energy reclaim without completed reactor");
             GenericHelpers::LogUtil("[AIR][Reclaim] " + names[tier] + " id=" + best.id + " worker=" + worker.id, 1);
