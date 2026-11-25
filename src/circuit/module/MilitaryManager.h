@@ -441,6 +441,9 @@ public:
 		// targets after commanders, when moving at most `heavy_speed_fraction`
 		// of their own top speed. Value: that speed limit, (elmos/frame)^2.
 		std::unordered_map<CCircuitDef::Id, float> heavyMaxSqSpeed;
+		// Owner 2026-11-24: "porc_first" (Pulsar, Bulwark, Bastion) in range come right
+		// after commanders and before the heavy units.
+		std::unordered_set<CCircuitDef::Id> porcFirstDefs;
 		// Owner 2026-11-02: "ghost_units" fire on a ghost image of enemy porc
 		// (armed structure out of radar and LOS, spot not seen empty) already
 		// in weapon range, with nothing else to shoot, once they have not fired
@@ -560,7 +563,11 @@ public:
 		bool isEnabled = false;
 		std::unordered_set<CCircuitDef::Id> defs;     // the artillery that snipes
 		std::unordered_set<CCircuitDef::Id> threats;  // what it snipes
-		std::unordered_map<CCircuitDef::Id, int> threatRank;  // position in "threats": earlier goes first
+		std::unordered_map<CCircuitDef::Id, int> threatRank;  // fallback tier ("fallback_tiers", else position in "threats"): lower goes first
+		float syncHoldBand = 150.f;  // synced volley: wait this far outside own range (owner 2026-11-24)
+		// Owner 2026-11-24 23:38Z: "join me in attacking this target". A launcher on a snipe (stage 2+)
+		// calls every artillery within this radius of it onto its threat (see ArtySnipeStep / FindTarget).
+		float callRadius = 3500.f;
 		// Owner 2026-11-03 01:36Z: Pulsar, Bulwark, Bastion. No prep porc: attacked
 		// from snipe_range_fraction (seen: until dead, at most visible_max_volleys;
 		// ghost: "volleys", then "volleys" more if seen alive).
@@ -632,6 +639,8 @@ public:
 		int lastCall = -1;
 		int nextScan = -1;      // stage 0: threat scans at most every 0.5 s per unit
 		int recruitScan = -1;   // stage 2 gathering: recruitment scans at most every 0.5 s
+		int callScan = -1;      // owner 2026-11-24: join-a-call scan at most every 0.5 s
+		int callLogged = -1;    // owner 2026-11-24: last called threat logged by FindTarget
 		int lockId = -1;        // owner 2026-11-04 16:58Z: locked target (enemy id), -1 none
 		int lockOrderUntil = -1;  // next re-issue of the lock's attack / step-in order
 		int lockLastHold = -1;  // last frame the lock drove the unit (resume log after a pause)

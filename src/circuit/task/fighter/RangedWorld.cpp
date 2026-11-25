@@ -48,6 +48,12 @@ bool CRangedWorld::PeerSeesCommander(const Contact& contact,CCircuitDef* def,con
     });
     return seen;
 }
+bool CRangedWorld::Called(int contact,const AIFloat3& shooter) const
+{
+    const float radius=circuit->GetMilitaryManager()->GetArtySnipeInfo().callRadius;
+    if(radius<=0.f) return false;
+    return circuit->GetAllyTeam()->ArtyCallers(contact,shooter.x,shooter.z,radius,circuit->GetLastFrame(),FRAMES_PER_SEC*10)>0;
+}
 CRangedWorld::CRangedWorld(CCircuitAI* circuit)
     : circuit(circuit), observation(circuit->GetAllyTeam()->GetRangedObservation(circuit)),
       contacts(observation->Contacts()), objectives(observation->Objectives()),

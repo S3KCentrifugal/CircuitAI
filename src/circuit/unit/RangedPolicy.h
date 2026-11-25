@@ -205,6 +205,11 @@ struct RangedPolicy {
     // Owner 2026-10-27: named spam ("spam_units", def ids resolved at load),
     // in addition to spamMaxCost. Same rules: mobile, never a commander.
     std::unordered_set<int> spamDefs;
+    // Owner 2026-11-24: target tiers above every score: commanders in range first (commander_first),
+    // then porc_first defs in range (Pulsar, Bulwark, Bastion), then the normal order.
+    bool commanderFirst = false;
+    bool joinCalls = false;  // owner 2026-11-24: a called snipe threat in range (Ambassador/Negotiator/Boreas call) goes first after commanders
+    std::unordered_set<int> porcFirstDefs;
     // Owner 2026-11-06 (Astraeus): an unidentified ground radar dot counts as
     // spam too: never our priority target, and fire is held while one is in
     // reach (engine autofire took dots, which were mostly fast T1 swarms).

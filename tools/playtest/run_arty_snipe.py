@@ -65,6 +65,7 @@ def main():
     p.add_argument('--hold-fire', action='store_true', help='volley count test: the host porc is set to hold fire, so the artillery lives to fire every volley')
     p.add_argument('--host-blind', action='store_true', help='volley count test: the host gets no global LOS, so its porc cannot see (and shoot) the artillery; count volleys from the AI log')
     p.add_argument('--stage-only', action='store_true')
+    p.add_argument('--second-ai', action='store_true', help='ally test (owner 2026-11-23): a second BARb (team 2, same ally team, same DLL); --ai-extra "def,x,z,2" gives it units')
     p.add_argument('--speed', type=float, default=10)
     p.add_argument('--bonus', default='', help='handicap percent for the AI under test (standing headless rule: 50)')
     p.add_argument('--scout-withdraw', action='store_true', help='Real scout reveals the target then withdraws before artillery arrives')
@@ -99,6 +100,10 @@ def main():
                    r'\g<1>StartPosX=%d; StartPosZ=%d;' % HOST_START, s)
     if n != 1:
         raise ValueError('host team line changed in script.txt')
+    if a.second_ai:
+        hcap = ('Handicap=%s; ' % a.bonus) if a.bonus else ''
+        s = s[:s.rfind('}')] + ('\t[TEAM2] { AllyTeam=0; TeamLeader=0; Side=armada; RgbColor=0.9 0.6 0.1; StartPosX=2600; StartPosZ=768; %s}\n'
+             '\t[AI1] { ShortName=BARbTest; Version=test; Name=BARbTest-front-1; Team=2; Host=0; IsFromDemo=0; [OPTIONS] { profile=experimental_balanced; } }\n}\n') % hcap
     if a.scout_withdraw:
         s = s[:s.rfind('}')] + '\n[TEAM2] { TeamLeader=0; AllyTeam=0; Side=armada; RgbColor=0.2 0.8 0.8; StartPosX=64; StartPosZ=64; }\n}\n'
     script.write_text(s, encoding='utf-8')
@@ -124,7 +129,7 @@ def main():
             'hostBlind=%s, holdFire=%s, radarAt=%s, radarOffAt=%s, losOnAt=%s, extraMove=%s, extraAt=%s, revealAt=%s, protect=%s, killAt=%s, losAgainAt=%s, aiRadar=%s, aiExtra=%s, extra=%s, extraDefs=%s, damage=%s, %stimeoutMin=%d, afterKill=60}\n') % (
         a.mode, CLUSTER[0], CLUSTER[1], at[0], at[1], lua(porc), lua(arty), defs, a.los_off * 30 + 60 if ghost else 360, 'true' if a.host_blind else 'false', 'true' if a.hold_fire else 'false', (a.radar_at * 30) if a.radar_at else 'nil', (a.radar_off * 30) if a.radar_off else 'nil', '-1' if a.no_los else '60', ('{%s}' % a.extra_move) if a.extra_move else 'nil', (a.extra_at * 30) if a.extra_at else 'nil', (a.reveal_at * 30) if a.reveal_at else 'nil', 'true' if a.protect else 'false', (a.kill_at * 30) if a.kill_at else 'nil', (a.los_again * 30) if a.los_again else 'nil',
         ('{%d,%d}' % (CLUSTER[0] - 1202, CLUSTER[1] - 1202)) if a.radar else 'nil',
-        lua([tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.ai_extra.split(';') if e]), lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
+        ('{' + ','.join(('{"%s",%d,%d,%d}' if len(r) == 4 else '{"%s",%d,%d}') % r for r in [tuple(int(v) if i else v for i, v in enumerate(e.split(','))) for e in a.ai_extra.split(';') if e]) + '}'), lua(extra), '{' + ''.join('%s=true,' % e[0] for e in extra) + '}',
         '{' + ''.join('%s=%s,' % tuple(kv.split(':')) for kv in a.damage.split(',') if kv) + '}',
         ('losOffAt=%d, ' % (a.los_off * 30)) if a.mode == 'ghost' else '', int(minutes))
     if a.scout_withdraw:

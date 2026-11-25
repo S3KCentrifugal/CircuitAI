@@ -183,7 +183,44 @@ public:
 		if (first) it = teamRolls.emplace(key, (float(rand()) / (float(RAND_MAX) + 1.f)) < chance).first;
 		return it->second;
 	}
+	// Owner 2026-11-23 (Smolders: AI 12's Ambassador idle next to AI 10's group on a
+	// Pulsar): artillery snipe launchers of every allied BARb, written by
+	// ArtySnipeStep each call (the state of the unit's previous call), so the
+	// double-heavy count of 3 and the synced volley span the whole ally team.
+	struct SAllySnipe {
+		int team = -1;
+		int threat = -1;
+		int stage = 0;
+		bool go = false;
+		bool syncWait = false;
+		bool atSpot = false;
+		int goFrame = -1;
+		int hitFrame = -1;
+		int lastCall = -1;
+		float x = 0.f, z = 0.f;
+		std::map<int, int> skip;  // threat id: frame it is skipped until (given up for repeat_seconds)
+	};
+	std::map<int, SAllySnipe>& GetAllySnipes() { return allySnipes; }  // launcher unit id: state
+	// threat id: (release frame, goFrame of the released group)
+	std::map<int, std::pair<int, int>>& GetAllySnipeReleases() { return allySnipeReleases; }
+	int& AllySnipePruneFrame() { return allySnipePrune; }
+	// Owner 2026-11-24 23:38Z ("join me in attacking this target"): a launcher on a
+	// snipe (stage 2+, published within staleFrames) calls on its threat. Callers on
+	// `threat` within `radius` of (x, z); exclude: a launcher not counted. O(registry).
+	int ArtyCallers(int threat, float x, float z, float radius, int frame, int staleFrames, int exclude = -1) const {
+		int n = 0;
+		for (const auto& kv : allySnipes) {
+			const SAllySnipe& a = kv.second;
+			if ((kv.first == exclude) || (a.threat != threat) || (a.stage < 2) || (frame - a.lastCall > staleFrames)) continue;
+			const float dx = a.x - x, dz = a.z - z;
+			if (dx * dx + dz * dz <= radius * radius) ++n;
+		}
+		return n;
+	}
 private:
+	std::map<int, SAllySnipe> allySnipes;
+	std::map<int, std::pair<int, int>> allySnipeReleases;
+	int allySnipePrune = -1;
 	std::map<std::string, bool> teamRolls;
     commander::ShotClaims commanderShots;
     CCombatSnapshot combatSnapshot;

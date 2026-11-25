@@ -273,8 +273,12 @@
 			"units": ["armmerl", "corvroc", "legavroc",   // Ambassador, Negotiator, Boreas
 				"corhrk", "leghrk",                       // Arbiter, Thanatos (T2 rocket bots)
 				"armmship", "cormship",                   // Longbow, Messenger (rocket ships)
-				"cortrem"],                               // Tremor (owner 2026-11-07: Ambassador rules)
+				"cortrem",                                // Tremor (owner 2026-11-07: Ambassador rules)
+				"armvang"],                               // Vanguard (owner 2026-11-24: commanders, then porc_first)
 			"max_speed": 12,
+			// Owner 2026-11-24: right after commanders and before the heavy units, these porc in range, nearest first
+			// (also the Ambassador/Negotiator/Boreas live pick and the target lock).
+			"porc_first": ["armanni", "cordoom", "legbastion"],   // Pulsar, Bulwark, Bastion
 			// Owner 2026-11-01: next after a slow commander (and before any building), these
 			// heavy units in range when moving at most heavy_speed_fraction of their own top
 			// speed: Incinerator, Fatboy, Tzar, Starlight, Razorback, Mammoth, Demon, Prometheus
@@ -366,6 +370,10 @@
 			// Order matters: a threat whose snipe spot is outside every other threat's reach goes first, else the earliest here.
 			"threats": ["cortoast", "armamb", "legacluster", "armanni"],        // Persecutor, Rattlesnake, Eviscerator, Pulsar
 			"direct_threats": ["cordoom", "legbastion"],                        // Bulwark, Bastion
+			// Owner 2026-11-24 (Bismuth): with no clear firing spot, tier order, nearest first inside a tier (was "threats" order).
+			"fallback_tiers": [["armanni", "cordoom", "legbastion"], ["cortoast", "armamb", "legacluster"]],   // Pulsar = Bulwark = Bastion, then Persecutor = Rattlesnake = Eviscerator
+			"sync_hold_band": 150,        // synced volley: one attack command, waiting units stop this far outside own range until the release
+			"call_radius": 3500,          // owner 2026-11-24: "join me in attacking this target": a launcher on a snipe calls free Ambassadors/Negotiators/Boreas (and gathering ones on a worse or smaller group) within this radius, and every artillery with join_calls / artillery task takes the called threat when in range (after commanders)
 			"porc": ["armanni", "cordoom", "legbastion",          // Pulsar, Bulwark, Bastion
 				"armhlt", "corhlt", "corhllt", "armbeamer", "legmg",   // Overwatch, Warden, Twin Guard, Beamer, Cacophony
 				"armflak", "corflak", "legflak",                   // Arbalest, Birdshot, Pluto (T2 flak)
@@ -404,7 +412,7 @@
 			// It starts when 3 Boreas/Negotiators/Ambassadors are within recruit_radius of the triggering unit or of the
 			// threat; all of them go in at once with the synced volley, later ones join it (or fire on arrival after the
 			// release). hold_margin / group_* levers now apply only outside the double-heavy case.
-			"recruit_radius": 2000,       // 2026-11-19: was 1200 (larger search). Boreas/Negotiator/Ambassador this close to the triggering unit or the threat count for the 3 and join, FRONT squads included
+			"recruit_radius": 2000,       // 2026-11-19: was 1200 (larger search). Boreas/Negotiator/Ambassador this close to the triggering unit or the threat count for the 3 and join, FRONT squads included; 2026-11-23: also the start distance for a double heavy (was reach + trigger_distance only), and allied BARbs' launchers count for the 3 and join their synced volley
 			"double_heavy_overlap": 0.5,   // owner 2026-11-03: weapon-range half-discs of the aimed heavy and another (facing the hold point) sharing more than this of the smaller: go in only with 3+ gathered, together
 			"close_in_min_range": 1290,   // owner option 2026-11-03: below this range (Thanatos 1200, Arbiter 1210) prep porc
 			                              // only, no close-in on a threat that outranges the snipe spot
@@ -1919,7 +1927,7 @@
 				// static porc (live or ghost) counts its reach + 16, mobiles + 48. Ghost images (last seen / radar ghosts) get at most 3 blind volleys each, heavy or not, only when nothing seen or on radar is in range; then it leaves that ghost until seen again.
 				// Owner 2026-11-15: buildings before commanders (too weak to hurt a commander's health pool): commander_priority 0.01 (was 100). Owner 2026-11-15 later: buildings before any unit in range that is not moving quickly (structures_over_slow 12: slow = at most min(25% of its top speed, 12) elmos/s); quick movers keep the normal score. Both keys need the DLL from these changes (older DLLs clamp 0.01 to 1 and skip the new key).
 				// owner 2026-11-24: screen_poke: with an allied combat unit between it and outranging porc, step in for a shot while loaded, back out while reloading.
-				"ranged": {"screen_poke": true, "ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "structures_over_slow": 12, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				"ranged": {"join_calls": true, "screen_poke": true, "ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "structures_over_slow": 12, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"attribute": ["siege", "ranged"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -1975,7 +1983,7 @@
 				"fire_state": 2,
 				"role": ["artillery"],
 				"attribute": ["siege", "ranged"],
-				"ranged": {"target_mode": "bombardment", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"join_calls": true, "target_mode": "bombardment", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2339,7 +2347,7 @@
 			"cormort": {
 				"role": ["artillery"],
 				"attribute":["skirmish", "siege", "ranged"],
-				"ranged": {"target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "max_waypoints": 4, "move_floor_seconds": 1},
+				"ranged": {"join_calls": true, "target_mode": "skirmish", "range_fraction": 0.94, "spacing": 96, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "max_waypoints": 4, "move_floor_seconds": 1},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2439,7 +2447,7 @@
 				// scouted spam as their set target. Spam (Rover, Rascal, Blitz, Alaris, Incisor, Goblin, Wheelie,
 				// Tick, Grunt, Pawn, and moving unidentified ground dots) is never a picked target; fire at will
 				// opens only while a non-spam target is in reach and no spam is (the pick still fires on hold).
-				"ranged": {"ghost_volleys": 1, "ghost_volleys_heavy": 3, "porc_hazards": ["armllt", "armbeamer", "armhlt", "armguard", "armpb", "armclaw", "armamb", "armanni", "corllt", "corhllt", "corhlt", "corpun", "cormaw", "corvipe", "corexp", "cormexp", "cortoast", "cordoom", "leglht", "legmg", "legdtr", "legbombard", "legcluster", "legapopupdef", "legbastion", "legacluster"], "heavy_porc": ["armanni", "cordoom", "legbastion", "cortoast", "armamb", "legacluster"], "assault_min_group": 3, "assault_max_wait": 45, "target_mode": "bombardment", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "spam_radar_dots": true},
+				"ranged": {"join_calls": true, "commander_first": true, "porc_first": ["armanni", "cordoom", "legbastion"], "ghost_volleys": 1, "ghost_volleys_heavy": 3, "porc_hazards": ["armllt", "armbeamer", "armhlt", "armguard", "armpb", "armclaw", "armamb", "armanni", "corllt", "corhllt", "corhlt", "corpun", "cormaw", "corvipe", "corexp", "cormexp", "cortoast", "cordoom", "leglht", "legmg", "legdtr", "legbombard", "legcluster", "legapopupdef", "legbastion", "legacluster"], "heavy_porc": ["armanni", "cordoom", "legbastion", "cortoast", "armamb", "legacluster"], "assault_min_group": 3, "assault_max_wait": 45, "target_mode": "bombardment", "advance_unknown_radar": false, "range_fraction": 0.94, "spacing": 192, "safety_margin": 48, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "fire_at_will": true, "spam_units": ["armfav", "corfav", "armflash", "leghades", "corgator", "leggob", "legscout", "armflea", "corak", "armpw"], "spam_radar_dots": true},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},
@@ -2500,7 +2508,7 @@
 				// static porc (live or ghost) counts its reach + 16, mobiles + 48. Ghost images (last seen / radar ghosts) get at most 3 blind volleys each, heavy or not, only when nothing seen or on radar is in range; then it leaves that ghost until seen again.
 				// Owner 2026-11-15: buildings before commanders (too weak to hurt a commander's health pool): commander_priority 0.01 (was 100). Owner 2026-11-15 later: buildings before any unit in range that is not moving quickly (structures_over_slow 12: slow = at most min(25% of its top speed, 12) elmos/s); quick movers keep the normal score. Both keys need the DLL from these changes (older DLLs clamp 0.01 to 1 and skip the new key).
 				// owner 2026-11-24: screen_poke: with an allied combat unit between it and outranging porc, step in for a shot while loaded, back out while reloading.
-				"ranged": {"screen_poke": true, "ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "structures_over_slow": 12, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
+				"ranged": {"join_calls": true, "screen_poke": true, "ghost_volleys": 3, "always_fire_at_will": true, "commander_priority": 0.01, "structures_over_slow": 12, "target_mode": "precision", "advance_unknown_radar": true, "range_fraction": 0.99, "spacing": 112, "safety_margin": 48, "static_margin": 16, "direct_move_radius": 300, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "max_waypoints": 2, "move_floor_seconds": 0.5},
 				"attribute": ["siege", "ranged"],
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
@@ -2545,7 +2553,7 @@
 				"fire_state": 2,
 				"role": ["artillery"],
 				"attribute": ["ranged"],
-				"ranged": {"target_mode": "bombardment", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
+				"ranged": {"join_calls": true, "target_mode": "bombardment", "range_fraction": 0.97, "spacing": 128, "safety_margin": 64, "reaction_seconds": 1.0, "move_min_seconds": 1, "target_min_seconds": 1, "prefer_heavy": false, "advance_unknown_radar": false, "low_trajectory": true, "move_floor_seconds": 1, "max_waypoints": 4},
 				"threat": {"air": 0.0, "surf": 0.0, "water": 0.0, "default": 0.0},
 				"power": 1.0
 			},

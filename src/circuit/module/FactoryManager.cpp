@@ -699,6 +699,18 @@ void CFactoryManager::ReadConfig()
 				}
 			}
 			boolean("spam_radar_dots", policy.spamRadarDots);
+			boolean("commander_first", policy.commanderFirst);   // owner 2026-11-24
+			boolean("join_calls", policy.joinCalls);   // owner 2026-11-24 23:38Z
+			{
+				const auto& pf = settings["porc_first"];
+				if (!pf.isNull() && !pf.isArray()) valid = false;
+				else for (const auto& name : pf) {
+					if (!name.isString()) { valid = false; continue; }
+					CCircuitDef* d = circuit->GetCircuitDef(name.asCString());
+					if (d == nullptr) circuit->LOG("CONFIG %s: %s porc_first has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
+					else policy.porcFirstDefs.insert(d->GetId());
+				}
+			}
 			number("spam_dot_speed", policy.spamDotSpeed, 0.f, 200.f);
             number("commander_priority", policy.commanderPriority, 0.001f, 100.f);   // owner 2026-11-15: below 1 = commanders after buildings (Wolverine/Shellshocker 0.01)
             number("structures_over_slow", policy.structuresOverSlow, 0.f, 200.f);   // owner 2026-11-15 (Wolverine/Shellshocker 12)

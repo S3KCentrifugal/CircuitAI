@@ -39,6 +39,18 @@ constexpr float PRIORITY_TIER_OFFSET = 1.e6f;
 // units sit one tier above slow or parked units (commanders included) when both are in range; inside
 // a tier the normal score decides. Below PRIORITY_TIER_OFFSET, above any score.
 constexpr float STRUCTURE_TIER_OFFSET = 1.e5f;
+// Owner 2026-11-24: commander_first / porc_first tiers, above PRIORITY_TIER_OFFSET.
+constexpr float PORC_FIRST_OFFSET = 1.e7f;
+constexpr float COMMANDER_FIRST_OFFSET = 2.e7f;
+// Owner 2026-11-24 23:38Z (join_calls): a threat an allied Ambassador/Negotiator/Boreas is
+// sniping within call_radius, in range: after commander_first, above porc_first.
+constexpr float CALL_OFFSET = 1.5e7f;
+template<class C> float FirstTier(const RangedPolicy& p, const C& c) {
+    if(!c.def) return 0.f;
+    if(p.commanderFirst && c.def->IsEnemyRoleAny(CCircuitDef::COMM)) return COMMANDER_FIRST_OFFSET;
+    if(p.porcFirstDefs.count(c.def->GetId())>0) return PORC_FIRST_OFFSET;
+    return 0.f;
+}
 // Slow = moving at most min(25% of its own top speed, cap) elmos/s (the Ambassador rule).
 template<class C> bool SlowMobile(const C& c, float cap) {
     if(!c.mobile || !c.def) return false;
@@ -1064,6 +1076,8 @@ void CRangedEngagement::UpdateCohort(CCircuitUnit* unit)
             if(c.def->IsEnemyRoleAny(CCircuitDef::COMM)) s*=policy.commanderPriority;
             if(def->IsPriorityTarget(c.def)) s+=PRIORITY_TIER_OFFSET;  // owner 2026-11-07, see Update
             if(policy.structuresOverSlow>0.f && !SlowMobile(c,policy.structuresOverSlow)) s+=STRUCTURE_TIER_OFFSET;  // owner 2026-11-15
+            s+=FirstTier(policy,c);  // owner 2026-11-24
+            if(policy.joinCalls && world.Called(c.id,pos)) s+=CALL_OFFSET;  // owner 2026-11-24 23:38Z
             if(c.id==target && (heldScoreFrame!=frame || s>heldScore)) { heldScore=s; heldScoreFrame=frame; }
             // Commander focus is a tier, not a multiplier defeated by low HP
             // repairers or existing shot reservations. Geometry still vetoes.
@@ -1581,6 +1595,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             if(c.def && policy.topTargetDefs.count(c.def->GetId())) value+=4.f*PRIORITY_TIER_OFFSET;
             // Owner 2026-11-15: structures_over_slow (see STRUCTURE_TIER_OFFSET); unidentified dots stay below.
             if(c.def && policy.structuresOverSlow>0.f && !SlowMobile(c,policy.structuresOverSlow)) value+=STRUCTURE_TIER_OFFSET;
+            value+=FirstTier(policy,c);  // owner 2026-11-24: commanders, then Pulsar/Bulwark/Bastion
+            if(c.def && policy.joinCalls && world.Called(c.id,pos)) value+=CALL_OFFSET;  // owner 2026-11-24 23:38Z: join a call
             if(c.id==target && (heldScoreFrame!=frame || value>heldScore)) { heldScore=value; heldScoreFrame=frame; }
             if(value>bestScore || (value==bestScore && (best<0 || c.id<contacts[best].id))) {
                 best=i; bestWeapon=int(wi); bestScore=value; bestDamage=damage;

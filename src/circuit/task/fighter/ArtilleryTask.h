@@ -78,6 +78,7 @@ private:
 	void ApplySafePos(const CQueryPathMulti* query);
 	void Fallback(CCircuitUnit* unit, bool proceed);
 	std::unordered_map<int, SGhostFire> ghostFire;  // see GhostFireStep
+	int callPick = -1;  // owner 2026-11-24 23:38Z: FindTarget's last pick was a called snipe threat (enemy id)
 	// Unit def id -> radar/jammer/shield structure (owner: counts as porc).
 	std::unordered_map<int, bool> ghostSupport;
 	bool FireAtGhost(CCircuitUnit* unit, const springai::AIFloat3& pos, int frame);

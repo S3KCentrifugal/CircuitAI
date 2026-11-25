@@ -5,6 +5,7 @@
  *      Author: rlcevg
  */
 
+#include <climits>
 #include "task/fighter/ArtilleryTask.h"
 #include "task/fighter/RouteTask.h"
 #include "task/fighter/RangedEngagement.h"
@@ -22,6 +23,7 @@
 #include "unit/enemy/EnemyManager.h"
 #include "map/MapManager.h"
 #include "unit/CircuitUnit.h"
+#include "unit/ally/AllyTeam.h"
 #include "CircuitAI.h"
 #include "util/Utils.h"
 
@@ -282,7 +284,9 @@ void CArtilleryTask::Execute(CCircuitUnit* unit)
 		float lockDist = 0.f;
 		CEnemyInfo* locked = ArtyLockGet(circuit, unit, frame, lockDist);
 		const CMilitaryManager::SArtyCommInfo& lockInfo = circuit->GetMilitaryManager()->GetArtyCommInfo();
-		const bool pickPriority = (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS() && LockPriority(lockInfo, bestTarget);
+		// Owner 2026-11-24 23:38Z: a called snipe threat (FindTarget) breaks the lock too.
+		const bool pickPriority = (bestTarget != nullptr) && bestTarget->IsInRadarOrLOS()
+				&& (LockPriority(lockInfo, bestTarget) || (bestTarget->GetId() == callPick));
 		const bool safeHere = !ArtyUnsafeHere(circuit, unit, pos, frame);
 		if ((locked != nullptr) && safeHere && !(pickPriority && (bestTarget != locked) && !LockPriority(lockInfo, locked))) {
 			if (ArtyLockDrive(circuit, unit, frame, locked, lockDist)) return;
@@ -555,19 +559,40 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 		const CCircuitDef* rdef = r->GetCircuitDef();
 		if ((rdef == nullptr) || (info.defs.count(rdef->GetId()) == 0)
 			|| (rdef->GetMaxRange(CCircuitDef::RangeType::LAND) < info.closeMinRange)) continue;
-		IUnitTask* task = r->GetTask();
-		if (task == nullptr) continue;
-		const bool inRoute = (dynamic_cast<CRouteTask*>(task) != nullptr);
-		if (!inRoute && (dynamic_cast<CArtilleryTask*>(task) == nullptr)) continue;  // retreat, builder, ...: not ours
-		auto sit = military->GetArtySnipeStates().find(r->GetId());
-		if ((sit != military->GetArtySnipeStates().end()) && (sit->second.stage != 0)
-			&& (frame - sit->second.lastCall <= FRAMES_PER_SEC * 10)) continue;  // on a snipe already
 		const AIFloat3 rp = r->GetPos(frame);
 		bool close = false;
 		for (const AIFloat3& a : anchors) {
 			if (rp.SqDistance2D(a) <= SQUARE(info.recruitRadius)) { close = true; break; }
 		}
 		if (!close) continue;
+		// Owner 2026-11-23 (Smolders, Ambassador 8801 left out 1526 from the Pulsar):
+		// a launcher in the area that is not taken says why (only when recruiting).
+		IUnitTask* task = r->GetTask();
+		const bool inRoute = (task != nullptr) && (dynamic_cast<CRouteTask*>(task) != nullptr);
+		const char* why = nullptr;
+		int whyThreat = -1, whyStage = 0;
+		if (task == nullptr) {
+			why = "no task";
+		} else if (!inRoute && (dynamic_cast<CArtilleryTask*>(task) == nullptr)) {
+			why = (task->GetType() == IUnitTask::Type::RETREAT) ? "retreat task" : "another task";  // builder, defend, ...: not ours
+		} else {
+			auto sit = military->GetArtySnipeStates().find(r->GetId());
+			if ((sit != military->GetArtySnipeStates().end()) && (sit->second.stage != 0)
+				&& (frame - sit->second.lastCall <= FRAMES_PER_SEC * 10))
+			{
+				why = "on a snipe already";
+				whyThreat = sit->second.threat;
+				whyStage = sit->second.stage;
+			}
+		}
+		if (why != nullptr) {
+			if (apply && (whyThreat != threatId)) {  // already on this threat: no news
+				circuit->LOG("SNIPE: recruit for %i skips %s %i at %.0f from it: %s (task type %i, snipe %i stage %i)", threatId,
+						rdef->GetDef()->GetName(), r->GetId(), std::sqrt(rp.SqDistance2D(anchors.back())), why,
+						(task != nullptr) ? int(task->GetType()) : -1, whyThreat, whyStage);
+			}
+			continue;
+		}
 		ids.push_back(r->GetId());
 		if (inRoute) ++squad;
 	}
@@ -601,6 +626,82 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 }
 
 /*
+ * Owner 2026-11-23 (Smolders: AI 12's Ambassador 14739 idle 1540 from a Pulsar
+ * while AI 10's group of 6 went in on it): every allied BARb's artillery snipe
+ * launchers, from the ally-team registry (CAllyTeam::GetAllySnipes, written
+ * by ArtySnipeStep). Other teams only, alive, called within 10 s: free ones
+ * (stage 0) within `radius` of an anchor, ones on `threatId`, of those the
+ * ones going in, and the goFrame of a group still holding fire. O(allied
+ * launchers).
+ */
+struct SAllySnipeCount {
+	int freeNear = 0;
+	int onIt = 0;
+	int going = 0;
+	int syncGo = -1;
+};
+static SAllySnipeCount AllySnipeCount(CCircuitAI* circuit, int threatId, const std::vector<AIFloat3>& anchors, float radius, int frame)
+{
+	SAllySnipeCount c;
+	const int me = circuit->GetTeamId();
+	CAllyTeam* allyTeam = circuit->GetAllyTeam();
+	for (const auto& kv : allyTeam->GetAllySnipes()) {
+		const CAllyTeam::SAllySnipe& a = kv.second;
+		if ((a.team == me) || (frame - a.lastCall > FRAMES_PER_SEC * 10) || (allyTeam->GetFriendlyUnit(kv.first) == nullptr)) continue;
+		if (a.stage != 0) {
+			if (a.threat != threatId) continue;
+			++c.onIt;
+			if ((a.stage >= 2) && a.go) {
+				++c.going;
+				if ((a.stage == 2) && a.syncWait) c.syncGo = std::max(c.syncGo, a.goFrame);
+			}
+			continue;
+		}
+		auto sk = a.skip.find(threatId);
+		if ((sk != a.skip.end()) && (frame < sk->second)) continue;  // it gave this threat up: it will not join
+		const AIFloat3 p(a.x, 0.f, a.z);
+		for (const AIFloat3& an : anchors) {
+			if (p.SqDistance2D(an) <= SQUARE(radius)) { ++c.freeNear; break; }
+		}
+	}
+	return c;
+}
+
+// The unit's snipe state into the ally-team registry; stale entries (30 s) and
+// releases (60 s) pruned every 10 s.
+static void AllySnipePublish(CCircuitAI* circuit, const CCircuitUnit* unit, const CMilitaryManager::SArtySnipeState& st,
+		const AIFloat3& pos, int frame)
+{
+	CAllyTeam* allyTeam = circuit->GetAllyTeam();
+	auto& reg = allyTeam->GetAllySnipes();
+	CAllyTeam::SAllySnipe& a = reg[unit->GetId()];
+	a.team = circuit->GetTeamId();
+	a.threat = st.threat;
+	a.stage = st.stage;
+	a.go = st.go;
+	a.syncWait = st.syncWait;
+	a.atSpot = st.atSpot;
+	a.goFrame = st.goFrame;
+	a.hitFrame = st.hitFrame;
+	a.lastCall = frame;
+	a.x = pos.x;
+	a.z = pos.z;
+	a.skip.clear();
+	a.skip.insert(st.skipUntil.begin(), st.skipUntil.end());
+	int& pruned = allyTeam->AllySnipePruneFrame();
+	if (frame - pruned >= FRAMES_PER_SEC * 10) {
+		pruned = frame;
+		for (auto it = reg.begin(); it != reg.end(); ) {
+			if (frame - it->second.lastCall > FRAMES_PER_SEC * 30) it = reg.erase(it); else ++it;
+		}
+		auto& rel = allyTeam->GetAllySnipeReleases();
+		for (auto it = rel.begin(); it != rel.end(); ) {
+			if (frame - it->second.first > FRAMES_PER_SEC * 60) it = rel.erase(it); else ++it;
+		}
+	}
+}
+
+/*
  * Owner 2026-11-04 16:58Z: target lock (artillery_commander lock*). Returns
  * the unit's locked enemy while it is alive and identified (LOS or radar) and
  * worth keeping, else drops the lock (logged) and returns nullptr. `dist`: 2D
@@ -610,7 +711,8 @@ static int RecruitArtillery(CCircuitAI* circuit, const std::vector<AIFloat3>& an
 static bool LockPriority(const CMilitaryManager::SArtyCommInfo& info, const CEnemyInfo* e)
 {
 	const CCircuitDef* edef = (e != nullptr) ? e->GetCircuitDef() : nullptr;
-	return (edef != nullptr) && (edef->IsRoleComm() || (info.heavyMaxSqSpeed.count(edef->GetId()) > 0));
+	return (edef != nullptr) && (edef->IsRoleComm() || (info.porcFirstDefs.count(edef->GetId()) > 0)
+		|| (info.heavyMaxSqSpeed.count(edef->GetId()) > 0));
 }
 
 CEnemyInfo* ArtyLockGet(CCircuitAI* circuit, CCircuitUnit* unit, int frame, float& dist)
@@ -1582,6 +1684,7 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 	const CMilitaryManager::SArtyCommInfo& comm = military->GetArtyCommInfo();
 	CEnemyInfo* hv = nullptr;
 	bool hvComm = false;
+	int hvTier = 3;  // owner 2026-11-24: 0 commander, 1 porc_first (Pulsar/Bulwark/Bastion), 2 heavy unit
 	float hvSq = std::numeric_limits<float>::max();
 	if (comm.isEnabled && (comm.defs.count(cdef->GetId()) > 0)) {
 		const int canTargetCat = cdef->GetTargetCategory();
@@ -1595,16 +1698,19 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 			if (sq > sqRange) continue;
 			const float v = e->GetVel().SqLength2D();
 			const bool isComm = edef->IsRoleComm() && (v <= comm.maxSqSpeed);
+			const bool isPorc = !isComm && (comm.porcFirstDefs.count(edef->GetId()) > 0) && !e->IsBeingBuilt();
 			bool isHeavy = false;
-			if (!isComm) {
+			if (!isComm && !isPorc) {
 				auto it = comm.heavyMaxSqSpeed.find(edef->GetId());
 				isHeavy = (it != comm.heavyMaxSqSpeed.end()) && (v <= it->second);
 			}
-			if ((!isComm && !isHeavy) || (hvComm && !isComm)) continue;
-			if ((sq < hvSq) || (isComm && !hvComm)) {
+			const int tier = isComm ? 0 : (isPorc ? 1 : (isHeavy ? 2 : 3));
+			if ((tier == 3) || (tier > hvTier)) continue;
+			if ((tier < hvTier) || (sq < hvSq)) {
 				hv = e;
 				hvSq = sq;
 				hvComm = isComm;
+				hvTier = tier;
 			}
 		}
 	}
@@ -1621,7 +1727,7 @@ bool ArtyPriorityStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame, CMilit
 		if ((st.orderKey != key) || (frame >= st.orderUntil)) {
 			if (st.orderKey != key) {
 				circuit->LOG("PRIORITY: %s %i shoots %s %s %i in range%s", cdef->GetDef()->GetName(), unit->GetId(),
-						hvComm ? "commander" : "heavy unit", hv->GetCircuitDef()->GetDef()->GetName(), hv->GetId(),
+						hvComm ? "commander" : ((hvTier == 1) ? "porc" : "heavy unit"), hv->GetCircuitDef()->GetDef()->GetName(), hv->GetId(),
 						(st.stage != 0) ? " (snipe waits)" : "");
 			}
 			st.orderKey = key;
@@ -1672,6 +1778,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	// artillery control (retreat, another task): every artillery update lands here.
 	if ((st.lockId >= 0) && (st.lockSeen >= 0) && (frame - st.lockSeen <= FRAMES_PER_SEC * 30)) st.lockSeen = frame;
 	st.lastCall = frame;
+	const bool allyListed = isSnipe && (range >= info.closeMinRange);  // owner 2026-11-23: in the ally-team registry
+	if (allyListed) AllySnipePublish(circuit, unit, st, unit->GetPos(frame), frame);
 
 	// Volleys: a rising main-weapon reload frame or the engine's weapon-fired
 	// event; anything within half a reload of the last counted one is the same
@@ -1746,6 +1854,125 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 	}
 	// Owner 2026-11-19: a launcher in a double-heavy group (stage 2+) keeps the
 	// group's target: no slow-launcher live pick, no commander / heavy priority.
+	// Owner 2026-11-23 (headless two-BARb test): a free launcher of another team
+	// stood on the slow-launcher live pick (a Bulwark in range) while the allied
+	// group went in, so it never reached the stage 0 scan. An allied group going
+	// in on a threat within recruit_radius takes it, as own-team recruitment does.
+	// Every 0.5 s (recruitScan is unused in stage 0); O(allied launchers).
+	// Owner 2026-11-24 23:38Z: "join me in attacking this target". Any launcher on a
+	// snipe (stage 2+, this AI's or an ally's) calls the free launchers within
+	// call_radius of it, and gathering ones (stage 2, not going in yet) on another
+	// threat when the call's threat ranks better (fallback_tiers) or, same rank, its
+	// group is bigger (no ping-pong between equal groups). An enemy commander in
+	// range keeps a free launcher (commanders first). O(registry) per 0.5 s.
+	const bool callable = (st.stage == 0) || ((st.stage == 2) && !st.go && !st.syncWait);
+	if (allyListed && callable && (frame >= st.callScan)) {
+		st.callScan = frame + FRAMES_PER_SEC / 2;
+		CAllyTeam* allyTeam = circuit->GetAllyTeam();
+		auto& reg = allyTeam->GetAllySnipes();
+		auto rankOf = [&](const CEnemyUnit* t) {
+			if ((t == nullptr) || (t->GetCircuitDef() == nullptr)) return INT_MAX;
+			auto r = info.threatRank.find(t->GetCircuitDef()->GetId());
+			return (r != info.threatRank.end()) ? r->second : INT_MAX;
+		};
+		auto groupOf = [&](int threat) {  // launchers on it, all teams
+			int n = 0;
+			for (const auto& g : reg) {
+				if ((g.second.threat == threat) && (g.second.stage >= 2) && (frame - g.second.lastCall <= FRAMES_PER_SEC * 10)) ++n;
+			}
+			return n;
+		};
+		const CEnemyUnit* mine = (st.stage == 2) ? enemyMgr->GetEnemyUnit(st.threat) : nullptr;
+		const int myRank = rankOf(mine);
+		const int myGroup = (st.stage == 2) ? groupOf(st.threat) : 0;
+		int join = -1, joinTeam = -1, joinCaller = -1;
+		float joinCallDist = 0.f;
+		int joinRank = INT_MAX, joinGroup = 0;
+		for (const auto& kv : reg) {
+			const CAllyTeam::SAllySnipe& a = kv.second;
+			if ((kv.first == unit->GetId()) || (a.stage < 2) || (a.threat < 0) || ((st.stage == 2) && (a.threat == st.threat))
+				|| (frame - a.lastCall > FRAMES_PER_SEC * 10) || (allyTeam->GetFriendlyUnit(kv.first) == nullptr)) continue;
+			auto sk = st.skipUntil.find(a.threat);
+			if ((sk != st.skipUntil.end()) && (frame < sk->second)) continue;
+			const float callSq = SQUARE(a.x - pos.x) + SQUARE(a.z - pos.z);
+			const CEnemyUnit* t = enemyMgr->GetEnemyUnit(a.threat);
+			if (!SnipeAlive(t)) continue;
+			// the old rule (an ally going in within recruit_radius of its threat) or the call radius
+			const bool inCall = (callSq <= SQUARE(info.callRadius))
+					|| (a.go && (a.team != circuit->GetTeamId()) && (pos.SqDistance2D(t->GetPos()) <= SQUARE(info.recruitRadius)));
+			if (!inCall) continue;
+			const int rank = rankOf(t);
+			if (join >= 0) {
+				if ((rank > joinRank) || ((rank == joinRank) && (callSq >= SQUARE(joinCallDist)))) continue;  // best rank, nearest caller
+			}
+			int grp = 0;
+			if (st.stage == 2) {
+				grp = groupOf(a.threat);
+				if (!((rank < myRank) || ((rank == myRank) && (grp > myGroup)))) continue;  // stays with its own group
+			}
+			join = a.threat;
+			joinTeam = a.team;
+			joinCaller = kv.first;
+			joinCallDist = std::sqrt(callSq);
+			joinRank = rank;
+			joinGroup = grp;
+		}
+		if ((join >= 0) && (st.stage == 0)) {
+			// commanders first: an identified enemy commander in this launcher's range keeps it
+			for (const auto& ekv : circuit->GetEnemyInfos()) {
+				const CEnemyInfo* e = ekv.second;
+				const CCircuitDef* ed = (e != nullptr) ? e->GetCircuitDef() : nullptr;
+				if ((ed != nullptr) && ed->IsRoleComm() && e->IsInRadarOrLOS() && !e->IsHidden()
+					&& (pos.SqDistance2D(e->GetPos()) <= SQUARE(range)))
+				{
+					join = -1;
+					break;
+				}
+			}
+		}
+		if (join >= 0) {
+			if (st.stage == 2) {
+				circuit->LOG("CALL: %s %i leaves its group on %i (rank %i, %i launchers) for the call on %i (rank %i, %i launchers)",
+						cdef->GetDef()->GetName(), unit->GetId(), st.threat, (myRank == INT_MAX) ? -1 : myRank, myGroup,
+						join, (joinRank == INT_MAX) ? -1 : joinRank, joinGroup);
+				if (st.fireHeld) {
+					st.fireHeld = false;
+					unit->TrySetFireState(cdef->GetFireState());
+				}
+			}
+			circuit->LOG("CALL: %s %i answers %i's call (team %i, %.0f away) on %i", cdef->GetDef()->GetName(), unit->GetId(),
+					joinCaller, joinTeam, joinCallDist, join);
+			const CEnemyUnit* t = enemyMgr->GetEnemyUnit(join);
+			st.stage = 2;
+			st.threat = join;
+			st.direct = (info.threats.count(t->GetCircuitDef()->GetId()) == 0);
+			st.target = -1;
+			st.volleys = 0;
+			st.stageFrame = frame;
+			st.orderKey = -1;
+			st.go = false;
+			st.goFrame = -1;
+			st.syncWait = false;
+			st.atHold = false;
+			st.holdSince = -1;
+			st.gatherStart = -1;
+			st.hitFrame = -1;
+			st.lastHp = -1.f;
+			st.hasSnipeSpot = false;
+			st.spotFor = -1;
+			st.holding = false;
+			st.ghostAim = -1;
+			st.ghostShots = 0;
+			st.recruited = true;
+			if (st.missileTarget >= 0) {
+				st.missileTarget = -1;
+				st.missileOrderUntil = -1;
+			}
+			circuit->LOG("SNIPE: %s %i joins team %i's group on %s %i, %.0f away", cdef->GetDef()->GetName(), unit->GetId(),
+					joinTeam, SnipeName(t), join, std::sqrt(pos.SqDistance2D(t->GetPos())));
+			AllySnipePublish(circuit, unit, st, pos, frame);
+		}
+	}
 	const bool groupOwns = isSnipe && (st.stage >= 2);
     if (IsSlowMissileLauncher(cdef->GetDef()->GetName()) && !groupOwns) {
         unit->TrySetFireState(CCircuitDef::FireType::HOLD);
@@ -1759,9 +1986,13 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
         }
         CEnemyInfo* best = nullptr;
         float bestSq = SQUARE(range);
-        // 2026-11-07 (@Barscrewl): 0 known (LOS or identified radar contact, one
-        // tier: nearest first), 1 unidentified radar dot. Was LOS > radar > dot.
-        int bestTier = 2;
+        // 2026-11-07 (@Barscrewl): known (LOS or identified radar contact, nearest
+        // first), then an unidentified radar dot. Was LOS > radar > dot.
+        // Owner 2026-11-24: among known ones, commanders first, then porc_first
+        // (Pulsar, Bulwark, Bastion), then heavy units, then the rest; nearest
+        // inside a tier.
+        const CMilitaryManager::SArtyCommInfo& pickInfo = military->GetArtyCommInfo();
+        int bestTier = 5;
         for (const auto& kv : circuit->GetEnemyInfos()) {
             CEnemyInfo* e = kv.second;
             if (e->IsHidden() || !e->IsInRadarOrLOS() || e->GetData()->IsDead() || e->GetData()->IsDying()
@@ -1773,12 +2004,21 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
             if (!edef && ep.y > std::max(0.f, circuit->GetMap()->GetElevationAt(ep.x, ep.z)) + 100.f) continue;
             const float sq = pos.SqDistance2D(ep);
             if (sq >= SQUARE(range)) continue;
-            const int tier = (e->IsInLOS() || (edef != nullptr)) ? 0 : 1;
+            int tier = 4;  // unidentified dot
+            if (e->IsInLOS() || (edef != nullptr)) {
+                tier = 3;
+                if (edef != nullptr) {
+                    if (edef->IsRoleComm()) tier = 0;
+                    else if ((pickInfo.porcFirstDefs.count(edef->GetId()) > 0) && !e->IsBeingBuilt()) tier = 1;
+                    else if (pickInfo.heavyMaxSqSpeed.count(edef->GetId()) > 0) tier = 2;
+                }
+            }
             if ((tier < bestTier) || ((tier == bestTier) && (sq < bestSq))) { best = e; bestSq = sq; bestTier = tier; }
         }
         if (best && (st.missileTarget != best->GetId())) {
             circuit->LOG("ARTYPICK: %s %i tier %s target %i (%s)", cdef->GetDef()->GetName(), unit->GetId(),
-                    (bestTier == 0) ? "known" : "dot", best->GetId(), best->IsInLOS() ? "LOS" : "radar");
+                    (bestTier == 0) ? "commander" : ((bestTier == 1) ? "porc" : ((bestTier == 2) ? "heavy" : ((bestTier == 3) ? "known" : "dot"))),
+                    best->GetId(), best->IsInLOS() ? "LOS" : "radar");
         }
         if (best) {
             if (st.missileTarget != best->GetId() || frame >= st.missileOrderUntil) {
@@ -1899,10 +2139,24 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// through a pair above double_heavy_overlap (checked below); a single
 			// one is left to the default target choice.
 			if (!e->IsInRadarOrLOS() && GhostDoneHas(st, e)) continue;  // its ghost already had the volleys
-			if (direct && !bestDirect && (best != nullptr)) continue;  // outranging threats first
+			// Owner 2026-11-24 (Bismuth): direct threats compete in the fallback tiers
+			// (Pulsar = Bulwark = Bastion before Persecutor = Rattlesnake = Eviscerator).
 			float sq = pos.SqDistance2D(e->GetPos());
 			const float trigger = reachOf(e->GetCircuitDef()) + info.triggerDistance;
-			if ((sq >= SQUARE(trigger)) && (direct || !nearTriggered(e->GetPos()))) continue;
+			if ((sq >= SQUARE(trigger)) && (direct || !nearTriggered(e->GetPos()))) {
+				// Owner 2026-11-23 (Smolders): 6 Ambassadors stood idle 1640-1730 from a
+				// Pulsar + Rattlesnake for 3 min, outside the 1500 trigger (reach + 0).
+				// A double heavy, or a threat an allied group is going in on, now
+				// starts from recruit_radius (2000); a single heavy still does not.
+				if (direct || (sq >= SQUARE(std::max(trigger, info.recruitRadius)))) continue;
+			}
+			// Only a threat that can start (a double heavy, or one an allied group is
+			// going in on) is a candidate, so a nearer single heavy cannot block it.
+			if (AllySnipeCount(circuit, e->GetId(), {}, 0.f, frame).going == 0) {
+				const CEnemyUnit* w = nullptr;
+				const float sh = DoubleHeavyShare(military, enemyMgr, e, pos, frame, w);
+				if ((w == nullptr) || (sh <= info.doubleHeavyOverlap)) continue;
+			}
 			// A threat other units already work on comes first among equals, so
 			// the group is not split (O(snipe states), only for threats in range).
 			for (const auto& kv2 : military->GetArtySnipeStates()) {
@@ -1912,19 +2166,17 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				}
 			}
 			if (skipped(e->GetId())) continue;
-			bool better;
-			bool clear = false;
+			// The fallback tier first (fallback_tiers, owner 2026-11-24: Pulsar/Bulwark/
+			// Bastion, then Persecutor/Rattlesnake/Eviscerator; Ambassadors walked through
+			// closer Pulsars to a Rattlesnake); inside a tier a clear firing spot, then the
+			// nearest. Headless 11-24: clear-spot-first still took a Persecutor over a Bulwark.
+			const bool clear = clearSpot(e);
 			int rank = std::numeric_limits<int>::max();
-			if (direct) {
-				better = bestDirect && (sq < bestSq);
-			} else {
-				clear = clearSpot(e);
-				auto rit = info.threatRank.find(e->GetCircuitDef()->GetId());
-				if (rit != info.threatRank.end()) rank = rit->second;
-				better = (best == nullptr) || bestDirect
-					|| (clear && !bestClear)
-					|| ((clear == bestClear) && ((rank < bestRank) || ((rank == bestRank) && (sq < bestSq))));
-			}
+			auto rit = info.threatRank.find(e->GetCircuitDef()->GetId());
+			if (rit != info.threatRank.end()) rank = rit->second;
+			const bool better = (best == nullptr)
+				|| (rank < bestRank)
+				|| ((rank == bestRank) && ((clear && !bestClear) || ((clear == bestClear) && (sq < bestSq))));
 			if (better) {
 				bestSq = sq;
 				best = e;
@@ -1940,7 +2192,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		// baseline (a single ghost is one of its targets); only a heavy, live or
 		// ghost, sharing more than double_heavy_overlap with another live or
 		// ghost heavy starts a sequence, straight to the gather (no prep porc).
-		{
+		// Owner 2026-11-23: allied BARb launchers (other teams) count too; a threat
+		// an allied group is already going in on is joined without the checks.
+		const SAllySnipeCount ally = AllySnipeCount(circuit, best->GetId(), {pos, best->GetPos()}, info.recruitRadius, frame);
+		if (ally.going == 0) {
 			const CEnemyUnit* with = nullptr;
 			const float share = DoubleHeavyShare(military, enemyMgr, best, pos, frame, with);
 			if ((with == nullptr) || (share <= info.doubleHeavyOverlap)) {
@@ -1960,18 +2215,28 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				if ((kv.first != unit->GetId()) && (o.threat == best->GetId()) && (o.stage != 0)
 					&& (frame - o.lastCall <= FRAMES_PER_SEC * 10)) ++area;
 			}
-			if (area < 3) {
+			const int allyArea = ally.freeNear + ally.onIt;
+			if ((ally.going == 0) && (area + allyArea < 3)) {
 				if ((st.areaWaitFor != best->GetId()) || (frame - st.areaWaitLog >= FRAMES_PER_SEC * 10)) {
 					st.areaWaitFor = best->GetId();
 					st.areaWaitLog = frame;
-					circuit->LOG("SNIPE: %s %i waits on double heavy %s %i: %i of 3 launchers in the area",
-							cdef->GetDef()->GetName(), unit->GetId(), SnipeName(best), best->GetId(), area);
+					circuit->LOG("SNIPE: %s %i waits on double heavy %s %i: %i of 3 launchers in the area (%i allied), %.0f away",
+							cdef->GetDef()->GetName(), unit->GetId(), SnipeName(best), best->GetId(), area + allyArea, allyArea,
+							std::sqrt(pos.SqDistance2D(best->GetPos())));
 				}
 				return false;
+			}
+			if (ally.going > 0) {
+				circuit->LOG("SNIPE: %s %i joins the allied group on %s %i: %i allied going in, %i of ours in the area",
+						cdef->GetDef()->GetName(), unit->GetId(), SnipeName(best), best->GetId(), ally.going, area);
+			} else if (allyArea > 0) {
+				circuit->LOG("SNIPE: %s %i counts %i allied launchers on %s %i (%i of ours)",
+						cdef->GetDef()->GetName(), unit->GetId(), allyArea, SnipeName(best), best->GetId(), area);
 			}
 		}
 		st.stage = 2;
 		st.recruited = false;  // triggered itself
+		st.recruitScan = -1;   // 2026-11-23: the stage 0 ally scan reuses it; recruit on this call
 		st.direct = bestDirect;
 		st.go = false;
 		st.atHold = false;
@@ -1988,7 +2253,8 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 		circuit->LOG("SNIPE: %s %i starts on %s%s %i (%s) at (%.0f, %.0f), %.0f away, its reach %.0f, own range %.0f",
 				cdef->GetDef()->GetName(), unit->GetId(), bestDirect ? "porc " : "", SnipeName(best), best->GetId(),
 				best->IsInRadarOrLOS() ? "visible" : "ghost", best->GetPos().x, best->GetPos().z,
-				std::sqrt(bestSq), reachOf(best->GetCircuitDef()), range);
+				std::sqrt(pos.SqDistance2D(best->GetPos())), reachOf(best->GetCircuitDef()), range);
+		if (allyListed) AllySnipePublish(circuit, unit, st, pos, frame);
 	}
 
 	const CEnemyUnit* threat = enemyMgr->GetEnemyUnit(st.threat);
@@ -2005,6 +2271,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			st.fireHeld = false;
 			unit->TrySetFireState(cdef->GetFireState());
 		}
+		if (allyListed) AllySnipePublish(circuit, unit, st, pos, frame);  // allies see the give-up at once
 		return false;  // the ordinary controller takes over on this same call
 	};
 	const char* threatGone = !SnipeAlive(threat) ? "dead"
@@ -2382,8 +2649,14 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					if ((o.stage == 2) && o.syncWait) syncGo = std::max(syncGo, o.goFrame);
 				}
 			}
+			// Owner 2026-11-23: allied BARb launchers on it (and, for the first in,
+			// free allied ones in the area, which start themselves) count too.
+			const SAllySnipeCount ally = AllySnipeCount(circuit, st.threat, {pos, threat->GetPos()}, info.recruitRadius, frame);
+			members += ally.onIt;
+			going += ally.going;
+			syncGo = std::max(syncGo, ally.syncGo);
 			const int doubleMin = 3;
-			if ((going == 0) && (members < doubleMin)) {
+			if ((going == 0) && (members + ally.freeNear < doubleMin)) {
 				// Recruits not yet called count as members; fewer than 3 left (deaths,
 				// spam retreat): the threat is given up for repeat_seconds.
 				return finish("double heavy, fewer than 3 in the area");
@@ -2445,7 +2718,12 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			// 20 s, or when any of them is hit, so the shells land together.
 			// Group = units on this threat released within 10 s of each other.
 			// O(snipe states) per waiting unit per call.
-			st.atSpot = !move;
+			// Owner 2026-11-24 (Bismuth): one attack command, no move order; the
+			// engine walks it to its maximum range. While the group waits, a unit
+			// stops sync_hold_band outside its own range, so no one fires early;
+			// the release attack walks them all the last stretch together.
+			const bool nearHold = pos.SqDistance2D(threat->GetPos()) <= SQUARE(range + info.syncHoldBand);
+			st.atSpot = nearHold;
 			const float hp = unit->GetHealthPercent();
 			if ((st.lastHp >= 0.f) && (hp < st.lastHp - 0.001f)) st.hitFrame = frame;
 			st.lastHp = hp;
@@ -2459,27 +2737,53 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				allIn = allIn && o.atSpot;
 				hit = hit || (o.hitFrame >= o.goFrame);
 			}
-			if (!allIn && !hit && (frame - st.goFrame < FRAMES_PER_SEC * 20)) {
+			// Owner 2026-11-23: allied BARb launchers of the same group (goFrame
+			// within 10 s) count for "all in" / "hit", and a release by any of them
+			// releases this group too. O(allied launchers).
+			if (allyListed) {
+				AllySnipePublish(circuit, unit, st, pos, frame);
+				const int me = circuit->GetTeamId();
+				CAllyTeam* allyTeam = circuit->GetAllyTeam();
+				for (const auto& kv : allyTeam->GetAllySnipes()) {
+					const CAllyTeam::SAllySnipe& a = kv.second;
+					if ((a.team == me) || (a.threat != st.threat) || (a.stage != 2) || !a.syncWait
+						|| (frame - a.lastCall > FRAMES_PER_SEC * 10) || (std::abs(a.goFrame - st.goFrame) > FRAMES_PER_SEC * 10)
+						|| (allyTeam->GetFriendlyUnit(kv.first) == nullptr)) continue;
+					++n;
+					allIn = allIn && a.atSpot;
+					hit = hit || (a.hitFrame >= a.goFrame);
+				}
+			}
+			bool allyReleased = false;
+			{
+				const auto& rel = circuit->GetAllyTeam()->GetAllySnipeReleases();
+				auto rit = rel.find(st.threat);
+				allyReleased = (rit != rel.end()) && (rit->second.first >= st.goFrame)
+						&& (std::abs(rit->second.second - st.goFrame) <= FRAMES_PER_SEC * 10);
+			}
+			if (!allIn && !hit && !allyReleased && (frame - st.goFrame < FRAMES_PER_SEC * 20)) {
 				if (!st.fireHeld) {
 					st.fireHeld = true;
 					unit->TrySetFireState(CCircuitDef::FireType::HOLD);
 				}
-				const int key = move ? (-8 - st.threat) : (-9 - st.threat);
-				if ((st.orderKey != key) || (move && (frame >= st.orderUntil))) {
+				const int key = !nearHold ? (-8 - st.threat) : (-9 - st.threat);
+				if ((st.orderKey != key) || (!nearHold && (frame >= st.orderUntil))) {
 					st.orderKey = key;
 					st.orderUntil = frame + FRAMES_PER_SEC * 8;
 					if (unit->GetTravelAct() != nullptr) unit->GetTravelAct()->StateWait();
 					TRY_UNIT(circuit, unit,
-						if (move) unit->CmdMoveTo(st.spot, 0, frame + FRAMES_PER_SEC * 12);
-						else unit->CmdStop();
+						if (nearHold) unit->CmdStop();
+						else if (threatSeen && (threat->GetUnit() != nullptr)) unit->GetUnit()->Attack(threat->GetUnit(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 12);
+						else unit->CmdAttackGround(threat->GetPos(), UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY, frame + FRAMES_PER_SEC * 12);
 					)
 				}
 				return true;
 			}
 			// Release: every unit of the group fires in this frame.
 			circuit->LOG("SNIPE: %s %i synced volley on %s %i: %i units%s", cdef->GetDef()->GetName(), unit->GetId(),
-					SnipeName(threat), st.threat, n, hit ? " (one was hit)" : (allIn ? "" : " (20 s)"));
+					SnipeName(threat), st.threat, n, hit ? " (one was hit)" : (allIn ? "" : (allyReleased ? " (an ally released)" : " (20 s)")));
 			const int goGroup = st.goFrame;
+			circuit->GetAllyTeam()->GetAllySnipeReleases()[st.threat] = {frame, goGroup};
 			// Ids first: GetArtySnipeState may prune the map being iterated.
 			std::vector<int> members;
 			for (const auto& kv : military->GetArtySnipeStates()) {
@@ -2499,15 +2803,10 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 					os.fireHeld = false;
 					u->TrySetFireState(u->GetCircuitDef()->GetFireState());
 				}
-				const bool uMove = !os.atSpot;
 				const int timeout = frame + FRAMES_PER_SEC * 12;
 				if (u->GetTravelAct() != nullptr) u->GetTravelAct()->StateWait();
 				TRY_UNIT(circuit, u,
-					short opts = UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY;
-					if (uMove) {
-						u->CmdMoveTo(os.spot, 0, timeout);
-						opts |= UNIT_COMMAND_OPTION_SHIFT_KEY;
-					}
+					const short opts = UNIT_COMMAND_OPTION_RIGHT_MOUSE_KEY;  // owner 2026-11-24: attack only
 					if (threatSeen && (threat->GetUnit() != nullptr)) {
 						u->GetUnit()->Attack(threat->GetUnit(), opts, timeout);
 					} else {
@@ -2522,7 +2821,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 				unit->TrySetFireState(cdef->GetFireState());
 			}
 		}
-		issue(threat, !threatSeen, move, -2 - st.threat);
+		issue(threat, !threatSeen, false, -2 - st.threat);  // owner 2026-11-24: one attack command, engine walks to max range
 		return true;
 	}
 	if (st.stage == 3) {
@@ -2568,7 +2867,7 @@ bool ArtySnipeStep(CCircuitAI* circuit, CCircuitUnit* unit, int frame)
 			if (st.hasSnipeSpot) st.spot = st.snipeSpot;
 			else findSpot(threat->GetPos(), snipeRange, threat->GetId(), false, st.spot, rangeOf(threat, snipeRange));
 		}
-		issue(threat, !threatSeen, move, key);
+		issue(threat, !threatSeen, false, key);  // owner 2026-11-24: one attack command
 		return true;
 	}
 	return false;
@@ -2615,6 +2914,28 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		// own top speed, still ahead of every structure.
 		CEnemyInfo* heavyTarget = nullptr;
 		float heavySqDist = SQUARE(range);
+		// Owner 2026-11-24: Pulsar, Bulwark, Bastion ("porc_first") in range come
+		// between the commanders and the heavy units, nearest first.
+		CEnemyInfo* porcTarget = nullptr;
+		float porcSqDist = SQUARE(range);
+		// Owner 2026-11-24 23:38Z: "join me in attacking this target". A threat an
+		// Ambassador/Negotiator/Boreas of the ally team is sniping (stage 2+, within
+		// 10 s) from within call_radius of this unit, in range: after the commanders,
+		// before everything else, nearest first. O(registry) once, then a set lookup.
+		callPick = -1;
+		CEnemyInfo* callTarget = nullptr;
+		float callSqDist = SQUARE(range);
+		std::vector<int> called;
+		{
+			const int cframe = circuit->GetLastFrame();
+			const float cr = circuit->GetMilitaryManager()->GetArtySnipeInfo().callRadius;
+			for (const auto& kv : circuit->GetAllyTeam()->GetAllySnipes()) {
+				const CAllyTeam::SAllySnipe& a = kv.second;
+				if ((kv.first == unit->GetId()) || (a.stage < 2) || (a.threat < 0) || (cframe - a.lastCall > FRAMES_PER_SEC * 10)) continue;
+				if (SQUARE(a.x - pos.x) + SQUARE(a.z - pos.z) > SQUARE(cr)) continue;
+				if (std::find(called.begin(), called.end(), a.threat) == called.end()) called.push_back(a.threat);
+			}
+		}
 		// Owner 2026-11-03 21:36Z: for the artillery_snipe units of at least
 		// close_in_min_range (Boreas, Negotiator, Ambassador) ghost images of
 		// structures are targets too, in the same order as everything else; each
@@ -2630,7 +2951,8 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		// never beats a known target by builder role or power). O(2 x enemies).
 		for (int pass = 0; pass < 2; ++pass) {
 		if ((pass == 1) && ((ghostSt == nullptr) || (bestTarget != nullptr) || (commTarget != nullptr)
-			|| (heavyTarget != nullptr) || (mediumTarget != nullptr) || (worstTarget != nullptr))) break;
+			|| (porcTarget != nullptr) || (heavyTarget != nullptr) || (mediumTarget != nullptr) || (worstTarget != nullptr)
+			|| (callTarget != nullptr))) break;
 		for (auto& kv : enemies) {
 			CEnemyInfo* enemy = kv.second;
 			if ((pass == 0) && (ghostSt != nullptr) && enemy->IsInRadarOrLOS()) {
@@ -2649,6 +2971,17 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 			}
 
 			CCircuitDef* edef = enemy->GetCircuitDef();
+			if (!ghost && !called.empty() && (edef != nullptr) && ((edef->GetCategory() & canTargetCat) != 0)
+				&& !(commTargets && edef->IsRoleComm())
+				&& (std::find(called.begin(), called.end(), enemy->GetId()) != called.end()))
+			{
+				const float sqDist = pos.SqDistance2D(enemy->GetPos());
+				if (sqDist < callSqDist) {
+					callTarget = enemy;
+					callSqDist = sqDist;
+				}
+				continue;
+			}
 			if (commTargets && (edef != nullptr) && edef->IsRoleComm()
 				&& ((edef->GetCategory() & canTargetCat) != 0)
 				&& (enemy->GetVel().SqLength2D() <= artyComm.maxSqSpeed))
@@ -2657,6 +2990,17 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 				if (sqDist < commSqDist) {
 					commTarget = enemy;
 					commSqDist = sqDist;
+				}
+				continue;
+			}
+			if (commTargets && (edef != nullptr) && ((edef->GetCategory() & canTargetCat) != 0)
+				&& (artyComm.porcFirstDefs.count(edef->GetId()) > 0) && !enemy->GetData()->IsBeingBuilt()
+				&& !(ghost && GhostGone(circuit, enemy->GetId())))
+			{
+				const float sqDist = pos.SqDistance2D(enemy->GetPos());
+				if (sqDist < porcSqDist) {
+					porcTarget = enemy;
+					porcSqDist = sqDist;
 				}
 				continue;
 			}
@@ -2718,6 +3062,20 @@ CEnemyInfo* CArtilleryTask::FindTarget(CCircuitUnit* unit, const AIFloat3& pos)
 		}  // pass
 		if (commTarget != nullptr) {
 			bestTarget = commTarget;
+		} else if (callTarget != nullptr) {
+			bestTarget = callTarget;
+			callPick = callTarget->GetId();
+			if (unit->GetTask() == this) {
+				CMilitaryManager::SArtySnipeState& cs = circuit->GetMilitaryManager()->GetArtySnipeState(unit->GetId(), circuit->GetLastFrame());
+				if (cs.callLogged != callPick) {
+					cs.callLogged = callPick;
+					circuit->LOG("CALL: %s %i joins the call on %s %i, %.0f away", cdef->GetDef()->GetName(), unit->GetId(),
+							(callTarget->GetCircuitDef() != nullptr) ? callTarget->GetCircuitDef()->GetDef()->GetName() : "?",
+							callPick, std::sqrt(callSqDist));
+				}
+			}
+		} else if (porcTarget != nullptr) {
+			bestTarget = porcTarget;
 		} else if (heavyTarget != nullptr) {
 			bestTarget = heavyTarget;
 		} else if (bestTarget == nullptr) {

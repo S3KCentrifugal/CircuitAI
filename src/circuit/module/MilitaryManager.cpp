@@ -725,6 +725,7 @@ void CMilitaryManager::ReadConfig()
 	artyCommInfo.isEnabled = false;
 	artyCommInfo.defs.clear();
 	artyCommInfo.heavyMaxSqSpeed.clear();
+	artyCommInfo.porcFirstDefs.clear();
 	artyCommInfo.ghostDefs.clear();
 	if (!artyCommCfg.isNull() && artyCommCfg.get("enabled", true).asBool()) {
 		std::set<std::string> names;
@@ -736,6 +737,13 @@ void CMilitaryManager::ReadConfig()
 		artyCommInfo.maxSqSpeed = SQUARE(maxSpeed);
 		// "heavy_units": enemy defs shot after commanders and before structures,
 		// when moving at most "heavy_speed_fraction" of their own top speed.
+		{
+			std::set<std::string> porcNames;
+			for (const auto& name : artyCommCfg["porc_first"]) porcNames.insert(name.asString());
+			for (CCircuitDef& d : circuit->GetCircuitDefs()) {
+				if (porcNames.count(d.GetDef()->GetName()) > 0) artyCommInfo.porcFirstDefs.insert(d.GetId());
+			}
+		}
 		std::set<std::string> heavyNames;
 		for (const auto& name : artyCommCfg["heavy_units"]) heavyNames.insert(name.asString());
 		const float heavyFrac = utils::clamp(artyCommCfg.get("heavy_speed_fraction", 0.25f).asFloat(), 0.f, 1.f);
@@ -864,6 +872,21 @@ void CMilitaryManager::ReadConfig()
 				++rank;
 			}
 		}
+		// Owner 2026-11-24: equal tiers, nearest first inside a tier
+		// (Pulsar = Bulwark = Bastion, then Persecutor = Rattlesnake = Eviscerator).
+		if (snipeArtyCfg["fallback_tiers"].isArray()) {
+			artySnipeInfo.threatRank.clear();
+			int tier = 0;
+			for (const auto& names : snipeArtyCfg["fallback_tiers"]) {
+				for (const auto& name : names) {
+					CCircuitDef* d = circuit->GetCircuitDef(name.asCString());
+					if (d != nullptr) artySnipeInfo.threatRank[d->GetId()] = tier;
+				}
+				++tier;
+			}
+		}
+		artySnipeInfo.syncHoldBand = std::max(0.f, snipeArtyCfg.get("sync_hold_band", 150.f).asFloat());
+		artySnipeInfo.callRadius = std::max(0.f, snipeArtyCfg.get("call_radius", 3500.f).asFloat());
 		readDefs("direct_threats", artySnipeInfo.directThreats);
 		readDefs("porc", artySnipeInfo.porc);
 		artySnipeInfo.avoidOtherPorc = snipeArtyCfg.get("avoid_other_porc", true).asBool();

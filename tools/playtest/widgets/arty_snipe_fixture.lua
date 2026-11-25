@@ -132,7 +132,7 @@ local function gameFrame(f)
     if f==(cfg.artyAt or 360) then
         for _,e in ipairs(cfg.arty) do give(e[1],A,cfg.ax+e[2],cfg.az+e[3]) end
         if cfg.aiRadar and not cfg.radarAt then give("armrad",A,cfg.aiRadar[1],cfg.aiRadar[2]); echo(string.format("AI radar tower at (%d,%d)",cfg.aiRadar[1],cfg.aiRadar[2])) end
-        for _,e in ipairs(cfg.aiExtra or {}) do give(e[1],A,e[2],e[3]) end
+        for _,e in ipairs(cfg.aiExtra or {}) do give(e[1],e[4] or A,e[2],e[3]) end  -- e[4]: an allied AI team (--second-ai)
         if cfg.aiExtra and #cfg.aiExtra>0 then echo(string.format("AI extra units: %d",#cfg.aiExtra)) end
         echo(string.format("artillery at (%d,%d): %d units",cfg.ax,cfg.az,#cfg.arty))
     end
