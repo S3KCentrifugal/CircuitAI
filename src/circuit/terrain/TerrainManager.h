@@ -761,6 +761,9 @@ public:
 	// stand on within radius (toward `from` on ties). No flood fill. True if moved.
 	bool SnapSteepGoal(CCircuitUnit* unit, const springai::AIFloat3& from, springai::AIFloat3& to, float radius);
 	void MarkGroundGoalBad(CCircuitUnit* unit, const springai::AIFloat3& to);
+	// Owner 2026-11-24: one 16-elmo slope-map cell test with the def's own move type (steep,
+	// too deep, too high). Air / no move type / no slope map: true. O(1).
+	bool CanStandAt(const CCircuitDef* cdef, const springai::AIFloat3& pos) const;
 	bool IsGroundGoalBad(CCircuitUnit* unit, const springai::AIFloat3& to);
 private:
 	bool GroundCellOk(const terrain::SMobileType* mt, int cx, int cz) const;

@@ -340,6 +340,14 @@ void CAttackTask::FindTarget()
 			}
 
 			const float sqOEDist = group.vagueMetric * pos.SqDistance2D(ePos) * scale;  // Own to Enemy distance
+			// Owner 2026-11-24 (Swirly Rock AI 8 Tzars vs a cliff-top Persecutor): a target no stand
+			// we can reach can shoot (shell can't climb that high, cliff lip in the way) is skipped
+			// before it is picked. Only tested for a candidate that would win; cached per def/cell.
+			if ((minSqDist > sqOEDist || sqOEDist < preferredMetric) && !cdef->IsAbleToFly()
+				&& circuit->GetBattle()->CannotEverHit(cdef, area, ePos, (edef != nullptr) ? edef->GetHeight() * 0.5f : 16.f))
+			{
+				continue;
+			}
             // Fold preference into this existing eligibility scan: no extra
             // enemy traversal, callbacks or allocation for fortress targeting.
             if (edef != nullptr && targeting::Preferred(minimumCost, edef->GetCostM(),

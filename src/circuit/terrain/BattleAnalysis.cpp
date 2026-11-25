@@ -33,6 +33,8 @@
 #include <queue>
 #include <string>
 #include <cstdlib>
+#include <memory>
+#include <map>
 
 namespace circuit {
 
@@ -359,6 +361,178 @@ float CBattleAnalysis::CannonArcBlock(const CCircuitDef* cdef, const AIFloat3& f
 		if (ground > y0 + x * (tanA - k * x)) return x;
 	}
 	return 0.f;
+}
+
+// ---------------------------------------------------------------- predictive reachability
+
+const char* CBattleAnalysis::ShotReachName(ShotReach r)
+{
+	switch (r) {
+		case ShotReach::OK:      return "ok";
+		case ShotReach::HEIGHT:  return "height";
+		case ShotReach::TERRAIN: return "terrain";
+		case ShotReach::NOSTAND: return "nostand";
+		default:                 return "unknown";
+	}
+}
+
+// Owner 2026-11-24: the weapon a unit fights with (longest range; dummies, drone
+// controllers, interceptors and shields left out) and how the engine tests its line
+// of fire. A unit with any high-arc (or switchable) cannon or a carrier mount lobs
+// over cliffs or sends drones over them: range only, no prediction.
+const CBattleAnalysis::ShotModel& CBattleAnalysis::MainShotModel(CCircuitDef* cdef)
+{
+	static const ShotModel none;
+	if ((cdef == nullptr) || (cdef->GetDef() == nullptr)) return none;
+	auto it = shotModels.find(cdef->GetId());
+	if (it != shotModels.end()) return it->second;
+	ShotModel m;
+	bool lobs = cdef->IsAbleToFly();
+	float bestRange = 0.f;
+	std::string bestType;
+	for (WeaponMount* raw : cdef->GetDef()->GetWeaponMounts()) {
+		const std::unique_ptr<WeaponMount> mount(raw);
+		const std::unique_ptr<WeaponDef> wd(mount->GetWeaponDef());
+		if (wd == nullptr) continue;
+		const std::string name = wd->GetName();
+		const std::map<std::string, std::string> cp = wd->GetCustomParams();
+		if (cp.count("carried_unit") > 0) { lobs = true; continue; }
+		if ((name.find("dummy") != std::string::npos) || (name.find("controller") != std::string::npos)
+			|| (wd->GetInterceptor() != 0) || wd->IsShield()) continue;
+		const std::string type = wd->GetType();
+		if ((type == "Cannon") && (wd->GetHighTrajectory() != 0)) lobs = true;
+		const float range = wd->GetRange();
+		if (range <= bestRange) continue;
+		bestRange = range;
+		bestType = type;
+		m.aoe = wd->GetAreaOfEffect();
+		m.b = weapon_reach::Ballistics();
+		m.b.range = range;
+		m.b.heightMod = wd->GetHeightMod();
+		m.b.cylinder = wd->GetCylinderTargetting();
+		if (type == "Cannon") {
+			m.b.kind = weapon_reach::Kind::CANNON;
+			m.b.speed = wd->GetProjectileSpeed();   // elmos per frame
+			const float g = wd->GetMyGravity();
+			m.b.gravity = (g > 0.f) ? g : -circuit->GetMap()->GetGravity();
+			m.b.heightBoost = wd->GetHeightBoostFactor();
+		}
+	}
+	if (!lobs && (bestRange > 0.f)) {
+		if ((bestType == "Cannon") && (m.b.speed > 0.f) && (m.b.gravity > 0.f)) {
+			m.mode = ShotMode::ARC;
+		} else if ((bestType == "LaserCannon") || (bestType == "BeamLaser") || (bestType == "LightningCannon")
+			|| (bestType == "EmgCannon") || (bestType == "Rifle") || (bestType == "Flame") || (bestType == "DGun"))
+		{
+			m.mode = ShotMode::LINE;
+		}
+	}
+	// the aim point (aimfrom piece) of a ground hull: about half its model height
+	m.aimFrom = std::clamp(cdef->GetHeight() * 0.5f, 8.f, 48.f);
+	return shotModels.emplace(cdef->GetId(), m).first->second;
+}
+
+bool CBattleAnalysis::ShotClear(CCircuitDef* cdef, const AIFloat3& from, float fromY, const AIFloat3& to, float toY)
+{
+	const ShotModel& m = MainShotModel(cdef);
+	const float dx = to.x - from.x, dz = to.z - from.z;
+	const float dist = std::sqrt(dx * dx + dz * dz);
+	if ((dist < 1.f) || (m.mode == ShotMode::RANGE_ONLY)) return true;
+	const float ux = dx / dist, uz = dz / dist;
+	const float dy = toY - fromY;
+	constexpr float STEP = 8.f;   // the heightmap's own square
+	if (m.mode == ShotMode::ARC) {
+		// CCannon::HaveFreeLineOfFire: the low root of g x^2 (1 + t^2) / (2 v^2) - x t + dy = 0,
+		// the ground tested over the first 15/16 of the flight
+		const float v2 = m.b.speed * m.b.speed, g = m.b.gravity;
+		const float disc = v2 * v2 - g * (g * dist * dist + 2.f * dy * v2);
+		if (disc < 0.f) return false;
+		const float tanA = (v2 - std::sqrt(disc)) / (g * dist);
+		const float k = g * (1.f + tanA * tanA) / (2.f * v2);
+		const float end = std::max(10.f, 0.9375f * dist);
+		for (float x = STEP; x < end; x += STEP) {
+			if (Height(AIFloat3(from.x + ux * x, 0.f, from.z + uz * x)) > fromY + x * (tanA - k * x)) return false;
+		}
+		return true;
+	}
+	// CWeapon::HaveFreeLineOfFire: the ray from the aim point; ground that stops it within
+	// the AoE of the target still counts (the blast reaches)
+	const float len3 = std::sqrt(dist * dist + dy * dy);
+	const float aoe = std::max(8.f, m.aoe);
+	for (float x = STEP; x < dist; x += STEP) {
+		const float y = fromY + dy * (x / dist);
+		if (Height(AIFloat3(from.x + ux * x, 0.f, from.z + uz * x)) > y) {
+			return len3 * (1.f - x / dist) <= aoe;
+		}
+	}
+	return true;
+}
+
+bool CBattleAnalysis::CanHitFrom(CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& target, float targetAim, float fraction)
+{
+	const ShotModel& m = MainShotModel(cdef);
+	if (m.mode == ShotMode::RANGE_ONLY) return true;
+	const float fromY = std::max(0.f, Height(from)) + m.aimFrom;
+	const float aimY = std::max(0.f, Height(target)) + std::max(0.f, targetAim);
+	if (from.SqDistance2D(target) > SQUARE(weapon_reach::Reach2D(m.b, fromY, aimY) * fraction)) return false;
+	return ShotClear(cdef, from, fromY, target, aimY);
+}
+
+CBattleAnalysis::ShotReach CBattleAnalysis::CanEverHit(CCircuitDef* cdef, terrain::SArea* area, const AIFloat3& target,
+	float targetAim, float fraction)
+{
+	if ((cdef == nullptr) || !std::isfinite(target.x) || !std::isfinite(target.z)) return ShotReach::UNKNOWN;
+	const ShotModel& m = MainShotModel(cdef);
+	if (m.mode == ShotMode::RANGE_ONLY) return ShotReach::OK;
+	const int frame = circuit->GetLastFrame();
+	const int cx = std::max(0, int(target.x) / 32), cz = std::max(0, int(target.z) / 32);
+	const std::uint64_t key = (std::uint64_t(std::uint32_t(cdef->GetId())) << 44)
+		^ (std::uint64_t(reinterpret_cast<std::uintptr_t>(area) & 0xFFFFF) << 24)
+		^ (std::uint64_t(cz & 0xFFF) << 12) ^ std::uint64_t(cx & 0xFFF);
+	auto it = shotReachCache.find(key);
+	if ((it != shotReachCache.end()) && (it->second.first > frame)) return it->second.second;
+	if (frame != shotReachFrame) { shotReachFrame = frame; shotReachFresh = 0; }
+	if (++shotReachFresh > 8) return ShotReach::UNKNOWN;
+	if (frame - shotReachPurge > FRAMES_PER_SEC * 30) {
+		shotReachPurge = frame;
+		for (auto i = shotReachCache.begin(); i != shotReachCache.end(); ) i = (i->second.first <= frame) ? shotReachCache.erase(i) : std::next(i);
+	}
+
+	CTerrainManager* terrainMgr = circuit->GetTerrainManager();
+	const terrain::SMobileType* mt = terrainMgr->GetMobileTypeById(cdef->GetMobileId());
+	const bool surface = (mt != nullptr) && (mt->canHover || mt->canFloat);
+	const float aimY = std::max(0.f, Height(target)) + std::max(0.f, targetAim);
+	const float W = float(CTerrainManager::GetTerrainWidth() - 1), H = float(CTerrainManager::GetTerrainHeight() - 1);
+	// rings from 125% (a hilltop cannon's boost) in to 20% of the flat range; 12 to 32 bearings,
+	// every other ring turned half a step
+	static constexpr float rings[] = {1.25f, 1.1f, 1.f, .9f, .78f, .65f, .5f, .35f, .2f};
+	int reached = 0, stood = 0;
+	ShotReach result = ShotReach::HEIGHT;
+	for (int ri = 0; (ri < int(sizeof(rings) / sizeof(rings[0]))) && (result != ShotReach::OK); ++ri) {
+		const float r = m.b.range * fraction * rings[ri];
+		if (r < 48.f) continue;
+		const int bearings = std::clamp(int(2.f * float(M_PI) * r / 160.f), 12, 32);
+		for (int i = 0; i < bearings; ++i) {
+			const float a = (float(i) + ((ri & 1) ? .5f : 0.f)) * 2.f * float(M_PI) / bearings;
+			const AIFloat3 stand(std::clamp(target.x + std::cos(a) * r, 0.f, W), 0.f, std::clamp(target.z + std::sin(a) * r, 0.f, H));
+			float ground = Height(stand);
+			if (surface) ground = std::max(0.f, ground);
+			const float fromY = ground + m.aimFrom;
+			const float d = std::sqrt(stand.SqDistance2D(target));
+			if (d > weapon_reach::Reach2D(m.b, fromY, aimY) * fraction) continue;
+			++reached;
+			if (!terrainMgr->CanStandAt(cdef, stand) || ((area != nullptr) && !terrainMgr->CanMoveToPos(area, stand))) continue;
+			++stood;
+			if (ShotClear(cdef, stand, fromY, target, aimY)) { result = ShotReach::OK; break; }
+		}
+	}
+	if (result != ShotReach::OK) result = (reached == 0) ? ShotReach::HEIGHT : (stood == 0) ? ShotReach::NOSTAND : ShotReach::TERRAIN;
+	shotReachCache[key] = {frame + FRAMES_PER_SEC * 30, result};
+	if (result != ShotReach::OK) {   // once per def and cell per 30 s (cached)
+		circuit->LOG("SHOTREACH: %s cannot hit (%.0f, %.0f) ground %.0f aim %.0f why=%s reach=%.0f stands reaching=%d standable=%d",
+			cdef->GetDef()->GetName(), target.x, target.z, Height(target), aimY, ShotReachName(result), m.b.range, reached, stood);
+	}
+	return result;
 }
 
 // ---------------------------------------------------------------- routes

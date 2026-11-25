@@ -670,7 +670,11 @@ bool CRangedWorld::Trajectory(const Weapon& w,const AIFloat3& from,const AIFloat
 {
     if(w.fake || w.high) return true; // starburst/carrier requires actual firing fixture
     const float distance=std::sqrt(from.SqDistance2D(to));
-    const int steps=std::max(1,int(distance/32.f));
+    // Owner 2026-11-24 (cliff-top Persecutor: the engine refused shots this called clear): 16-elmo
+    // samples (32 stepped over cliff lips); as the engine, a cannon's last 1/16 is not tested and a
+    // straight shot stopped by the ground within its AoE of the target still lands.
+    const int steps=std::max(1,int(distance/16.f));
+    const int last=w.ballistic ? std::max(1,int(steps*.9375f)) : steps;
     float tangent=0.f;
     if(w.ballistic && w.speed>0.f && w.gravity>0.f) {
         const float v2=w.speed*w.speed;
@@ -679,11 +683,15 @@ bool CRangedWorld::Trajectory(const Weapon& w,const AIFloat3& from,const AIFloat
         tangent=(v2-std::sqrt(disc))/std::max(1.f,w.gravity*distance);
     }
     const auto* area=circuit->GetTerrainManager()->GetAreaData();
-    for(int i=1;i<steps;++i) {
+    for(int i=1;i<last;++i) {
         const float t=float(i)/steps, x=distance*t;
         const float y=w.ballistic && w.speed>0.f ? from.y+24.f+x*tangent-w.gravity*x*x*(1.f+tangent*tangent)/(2.f*w.speed*w.speed)
             : from.y+24.f+(to.y-from.y)*t;
-        if(area->GetElevationAt(from.x+(to.x-from.x)*t,from.z+(to.z-from.z)*t)>y) return false;
+        if(area->GetElevationAt(from.x+(to.x-from.x)*t,from.z+(to.z-from.z)*t)>y) {
+            if(w.ballistic) return false;
+            const float rest=distance-x, dy=to.y-y;
+            return rest*rest+dy*dy<=std::max(64.f,w.splash*w.splash);
+        }
     }
     return true;
 }

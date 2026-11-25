@@ -124,6 +124,11 @@ private:
     bool Shunned(int contact) const;
     void SetMarchObjective(int contact) { if(contact!=marchObjective) { marchObjective=contact; marchObjectiveHalts=0; } }
     void Shun(int contact,const char* why);
+    // Owner 2026-11-24 (Swirly Rock: Daedalus kept going for a cliff-top Persecutor): predictive
+    // reachability before a contact becomes the objective or the assault target
+    // (CBattleAnalysis::CanEverHit), unless the hull has a shot at it from where it stands.
+    bool CannotEverHit(CCircuitUnit* unit,const springai::AIFloat3& pos,const CRangedWorld::Contact& c);
+    std::vector<int> unhittableLogged;   // contacts already logged as unhittable for this hull
 };
 }
 #endif

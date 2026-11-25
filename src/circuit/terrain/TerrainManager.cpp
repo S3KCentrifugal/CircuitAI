@@ -7174,6 +7174,14 @@ bool CTerrainManager::GroundCellOk(const SMobileType* mt, int cx, int cz) const
 	return slope[cz * sx + cx] <= mt->maxSlope;
 }
 
+bool CTerrainManager::CanStandAt(const CCircuitDef* cdef, const AIFloat3& pos) const
+{
+	if ((cdef == nullptr) || cdef->IsAbleToFly()) return true;
+	const SMobileType* mt = GetMobileTypeById(cdef->GetMobileId());
+	if ((mt == nullptr) || terrainData->GetSlopeMap().empty()) return true;
+	return GroundCellOk(mt, int(pos.x) / GR_CELL, int(pos.z) / GR_CELL);
+}
+
 bool CTerrainManager::GroundReachBudget()
 {
 	const int frame = circuit->GetLastFrame();

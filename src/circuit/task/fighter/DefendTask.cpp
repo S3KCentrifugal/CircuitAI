@@ -13,6 +13,7 @@
 #include "module/MilitaryManager.h"
 #include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "terrain/path/PathFinder.h"
 #include "terrain/path/QueryPathSingle.h"
 #include "terrain/path/QueryPathMulti.h"
@@ -340,6 +341,10 @@ bool CDefendTask::FindTarget()
 		}
 
 		float sqDist = pos.SqDistance2D(ePos);
+		// Owner 2026-11-24: never pick a target no stand we can reach can shoot (cached per def/cell)
+		if (!cdef->IsAbleToFly() && circuit->GetBattle()->CannotEverHit(cdef, area, ePos, (edef != nullptr) ? edef->GetHeight() * 0.5f : 16.f)) {
+			continue;
+		}
             // Fold preference into this existing eligibility scan: no extra
             // enemy traversal, callbacks or allocation for fortress targeting.
             if (edef != nullptr && targeting::Preferred(minimumCost, edef->GetCostM(),

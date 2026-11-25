@@ -5,6 +5,7 @@
 #include "module/EconomyManager.h"
 #include "setup/SetupManager.h"
 #include "terrain/TerrainManager.h"
+#include "terrain/BattleAnalysis.h"
 #include "terrain/path/PathFinder.h"
 #include "terrain/path/QueryPathSingle.h"
 #include "terrain/path/QueryLineMap.h"
@@ -336,6 +337,22 @@ bool CRangedEngagement::HeavyArmyAt(const AIFloat3& at,const RangedPolicy& p,con
 // so a Fatboy held a target it never fired at; and the nearest plateau contact,
 // with no firing site and the march halted, stayed the objective for minutes.
 // Such a contact is left alone for shun_seconds; the next one is taken. O(shunned).
+bool CRangedEngagement::CannotEverHit(CCircuitUnit* unit,const AIFloat3& pos,const CRangedWorld::Contact& c)
+{
+    CCircuitDef* def=unit->GetCircuitDef();
+    if(def->IsAbleToFly() || c.airDot || (c.def && c.def->IsAbleToFly())) return false;
+    auto* battle=ai->GetBattle();
+    const float aim=c.def ? c.def->GetHeight()*.5f : 16.f;
+    if(!battle->CannotEverHit(def,unit->GetArea(),c.pos,aim)) return false;
+    if(battle->CanHitFrom(def,pos,c.pos,aim)) return false;   // ring sampling missed the spot it stands on
+    if(std::find(unhittableLogged.begin(),unhittableLogged.end(),c.id)==unhittableLogged.end()) {
+        if(unhittableLogged.size()>=32) unhittableLogged.erase(unhittableLogged.begin());
+        unhittableLogged.push_back(c.id);
+        ai->LOG("RANGED: unhittable unit=%d target=%d (%s) at=%.0f,%.0f skipped before picking",id,c.id,
+            c.def ? c.def->GetDef()->GetName() : "dot",c.pos.x,c.pos.z);
+    }
+    return true;
+}
 bool CRangedEngagement::Shunned(int contact) const
 {
     if(contact<0) return false;
@@ -500,6 +517,7 @@ void CRangedEngagement::UpdateAssault(CCircuitUnit* unit,const AIFloat3& pos,int
         const float reach=std::max(2000.f,c.hazardRadius+StaticMargin(p)+600.f);   // owner 22:56Z: all artillery within 2000 focus it
         const float d2=pos.SqDistance2D(c.pos);
         if(d2>reach*reach || d2>=best) return;
+        if(CannotEverHit(unit,pos,c)) return;   // owner 2026-11-24: a cliff-top porc we can't hit is not ours to assault
         best=d2; bestId=c.id; bestPos=c.pos; bestGhost=ghost;
     };
     for(const auto& c:world.Contacts()) consider(c,false);
@@ -1743,6 +1761,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         // firing site round it (already in reach: stand), fire held, for minutes.
         if((policy.fireAtWill || policy.alwaysFireAtWill) && Spam(policy,c)) return;
         if(!shunned.empty() && Shunned(c.id)) return;   // owner 2026-11-23: refused shot / no firing site
+        if(CannotEverHit(unit,pos,c)) return;   // owner 2026-11-24: no stand we can reach has a shot
         // D-294: never approach an identified avoided contact. Unidentified
         // dots stay approachable (advance_unknown_radar owns that): approach
         // is the only way to identify them; the blind SHOT is what is refused.
@@ -1796,6 +1815,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
         if(!shunned.empty() && Shunned(c.id)) continue;   // owner 2026-11-23
         if(((c.mobile && !stillStructure)?!policy.allowMobile:!policy.allowStatic) || (c.def && !(c.def->GetCategory()&def->GetTargetCategory()))) continue;
         if(c.def && (c.def->GetCategory()&policy.avoidCategory)) continue; // D-294 (unknown dots approachable, see above)
+        if(CannotEverHit(unit,pos,c)) continue;   // owner 2026-11-24
         const float distance=pos.SqDistance2D(c.pos);
         if(kiteFilter && world.KiteIgnored(c)) { if(distance<nearestIgnored) { nearestIgnored=distance; ignoredObjective=i; } continue; }
         const float rank=(c.def && policy.topTargetDefs.count(c.def->GetId())) ? distance*1e-4f : distance;   // owner 2026-11-23

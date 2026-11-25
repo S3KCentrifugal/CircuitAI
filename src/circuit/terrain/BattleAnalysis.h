@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <vector>
 #include <unordered_map>
@@ -37,6 +38,8 @@
 #include <chrono>
 #include <memory>
 #include "terrain/RangedGeometry.h"
+
+namespace terrain { struct SArea; }
 
 namespace circuit {
 
@@ -102,6 +105,33 @@ public:
 	float CannonArcBlock(const CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& to,
 		float muzzle, float step) const;
 	float HeightAbove(const springai::AIFloat3& pos, float radius) const;  // height minus the ring's mean at radius
+	// Owner 2026-11-24 (Swirly Rock: AI 8 Tzars and Daedalus kept going for a Persecutor on a
+	// high cliff their shots can't reach): predictive reachability, asked BEFORE a target is
+	// picked. OK when some stand the def can stand on (its move type on the 16-elmo slope map;
+	// in `area` when given) within `fraction` of its main weapon's height-aware reach has a clear
+	// shot to the target's aim point (target ground + targetAim): a low Cannon arc against the
+	// ground over its first 15/16 (CCannon::HaveFreeLineOfFire), a straight weapon's ray from its
+	// aim point (CWeapon::HaveFreeLineOfFire: a ground hit within the AoE of the target counts).
+	// HEIGHT = no stand reaches at that height (a shell that can't climb the cliff), TERRAIN =
+	// stands reach but every shot hits the ground (cliff lip), NOSTAND = the reaching stands are
+	// all ground it can't stand on / get to. High arcs, missiles, starbursts, aircraft, carriers:
+	// range only. UNKNOWN = no data or the per-frame budget is spent: treat as reachable.
+	// Cached per def, area and 32-elmo target cell for 30 s; at most 8 fresh tests a frame.
+	enum class ShotReach : int { OK = 0, HEIGHT, TERRAIN, NOSTAND, UNKNOWN };
+	static const char* ShotReachName(ShotReach r);
+	ShotReach CanEverHit(CCircuitDef* cdef, terrain::SArea* area, const springai::AIFloat3& target,
+		float targetAim, float fraction = 0.98f);
+	bool CannotEverHit(CCircuitDef* cdef, terrain::SArea* area, const springai::AIFloat3& target, float targetAim) {
+		const ShotReach r = CanEverHit(cdef, area, target, targetAim);
+		return (r != ShotReach::OK) && (r != ShotReach::UNKNOWN);
+	}
+	// The straight / low-arc shot test used above, from a stand's aim point to the target's
+	// aim point (absolute heights). True when clear. O(distance / 8) heightmap reads.
+	bool ShotClear(CCircuitDef* cdef, const springai::AIFloat3& from, float fromY,
+		const springai::AIFloat3& to, float toY);
+	// The same test from one stand on the ground (its height-aware reach x fraction, then the shot).
+	bool CanHitFrom(CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& target,
+		float targetAim, float fraction = 1.f);
 
 	// --- routes and chokes
 	void ClearSources() { sources.clear(); }
@@ -428,6 +458,13 @@ private:
         float highGroundRise, float highGroundDetour, int highGroundRoutes);
 	CWeaponDef* MainWeapon(const CCircuitDef* cdef) const;
 	mutable std::unordered_map<int, CWeaponDef*> mainWeapon;   // def id -> its longest-range weapon
+	// Owner 2026-11-24: CanEverHit's per-def shot model and its result cache
+	enum class ShotMode : int { RANGE_ONLY = 0, ARC, LINE };
+	struct ShotModel { ShotMode mode = ShotMode::RANGE_ONLY; float aimFrom = 16.f; float aoe = 0.f; weapon_reach::Ballistics b; };
+	const ShotModel& MainShotModel(CCircuitDef* cdef);
+	std::unordered_map<int, ShotModel> shotModels;
+	std::unordered_map<std::uint64_t, std::pair<int, ShotReach>> shotReachCache;   // key -> (until frame, result)
+	int shotReachFrame = -1, shotReachFresh = 0, shotReachPurge = 0;
 	mutable std::unordered_map<int, weapon_reach::Ballistics> mainBallistics;   // def id -> its main weapon's range constants (immutable defs)
 
 	void EnsureGrid();
