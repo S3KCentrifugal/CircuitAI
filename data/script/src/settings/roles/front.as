@@ -381,6 +381,8 @@ namespace Front {
             // moved every WaveEscortUpdateSeconds to the wave's safe centre (its tanks' centroid, WaveEscortBehind
             // back toward our start) once that moves WaveEscortRepath. Off here (systems/production/front_wave_escort.as).
             bool VehicleT2WaveEscorts = false;
+            // Owner (2026-11-24): the T2 tank wave with its escorts is one native battle squad (template t2_heavy).
+            bool VehicleT2WaveBattleSquads = true;
             float WaveEscortBehind = 150.0f;   // owner (2026-10-20): close behind, moving with the group
             int WaveEscortUpdateSeconds = 2;
             float WaveEscortRepath = 120.0f;

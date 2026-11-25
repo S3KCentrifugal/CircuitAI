@@ -10,6 +10,10 @@
 // last tank dies the route is aborted and the escorts go back to ordinary military orders.
 // Hooks: FrontTankMass::Roll (Begin), Front military UnitAdded/MakeTask/UnitRemoved/TaskRemoved,
 // AiUpdate (Update, throttled). Log [FRONT][WaveEscort].
+// Owner (2026-11-24): with VehicleT2WaveBattleSquads and the behaviour.json template t2_heavy, the wave (tanks and
+// escorts) is one native battle squad instead (control/group/BattleSquads.h, systems/combat/battle_squads.as): it
+// holds at a rally off the plant until every tank and escort is out or the gather deadline, then the native
+// controller puts the tanks in front and the jammer/radar/flak behind them, and orders, merges or sends it home.
 namespace FrontWaveEscort {
     class Wave {
         int id;
@@ -28,6 +32,8 @@ namespace FrontWaveEscort {
         bool routed;
         bool hadTank;
         int nextMoveLog;   // throttles the escort move line to one per 20 s
+        int native;        // owner 2026-11-24: the native battle squad (-1: the escort route below)
+        bool launched;
     }
     array<Wave@> waves;
     int nextWaveId = 1;
@@ -47,7 +53,7 @@ namespace FrontWaveEscort {
     IUnitTask@ Begin(CCircuitUnit@ u, const string &in side, CCircuitDef@ tankDef, int count, int gatherSeconds) {
         if (!Enabled() || u is null || tankDef is null) return null;
         Wave@ w = Wave();
-        w.routed = false; w.hadTank = false; w.nextMoveLog = 0;
+        w.routed = false; w.hadTank = false; w.nextMoveLog = 0; w.native = -1; w.launched = false;
         w.id = nextWaveId++;
         w.factoryId = u.id; w.tankDefId = tankDef.id; w.expected = count;
         w.started = ai.frame;
@@ -70,6 +76,11 @@ namespace FrontWaveEscort {
             queued += (queued == "" ? "" : ", ") + names[i];
         }
         waves.insertLast(w);
+        if (Global::RoleSettings::Front::VehicleT2WaveBattleSquads && BattleSquads::Has("t2_heavy")) {
+            const AIFloat3 rally = BattleSquads::RallyFrom(w.target, Global::RoleSettings::Front::ArtySquadRallyOffset);
+            w.native = aiMilitaryMgr.BattleSquadCreate("t2_heavy", "tank wave " + w.id, rally);
+            if (w.native >= 0) GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + " is battle squad " + w.native, 1);
+        }
         GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + ": " + count + " x " + tankDef.GetName()
             + " at factory " + u.id + ", escorts queued: " + (queued == "" ? "none" : queued), 1);
         return first;
@@ -97,6 +108,7 @@ namespace FrontWaveEscort {
             if (defId == w.tankDefId && unit.GetProducerId() == w.factoryId && Produced(unit, w)
                 && int(w.tanks.length()) < w.expected) {
                 w.tanks.insertLast(unit.id); w.hadTank = true;
+                if (w.native >= 0) aiMilitaryMgr.BattleSquadAdd(w.native, unit);
                 GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + ": tank " + w.tanks.length() + "/" + w.expected
                     + " " + unit.circuitDef.GetName() + " " + unit.id, 1);
                 return;
@@ -105,6 +117,7 @@ namespace FrontWaveEscort {
             if (slot >= 0 && Produced(unit, w)) {
                 w.escortDefs.removeAt(slot);
                 w.escorts.insertLast(unit.id);
+                if (w.native >= 0) aiMilitaryMgr.BattleSquadAdd(w.native, unit);
                 GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + ": escort " + unit.circuitDef.GetName() + " " + unit.id
                     + " assigned" + (w.escortDefs.length() == 0 ? "; all escorts out, the wave may depart" : ""), 1);
                 if (w.escortDefs.length() == 0) FrontOpener::RefreshPower();
@@ -124,6 +137,7 @@ namespace FrontWaveEscort {
         if (unit is null) return null;
         Wave@ w = EscortWave(unit.id);
         if (w is null) return null;
+        if (w.native >= 0) return aiMilitaryMgr.BattleSquadTask(unit);   // owner 2026-11-24
         if (w.route is null || w.route.IsDead()) {
             @w.route = cast<CRouteTask>(cast<IFighterTask>(aiMilitaryMgr.Enqueue(TaskF::Route())));
             if (w.route is null) return null;
@@ -143,8 +157,30 @@ namespace FrontWaveEscort {
         waves.removeAt(index);   // before Abort: its idle escorts must not find the wave again
         GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + " " + why + ": " + w.escorts.length()
             + " escort(s) back to normal orders", 1);
+        if (w.native >= 0 && !w.launched) aiMilitaryMgr.BattleSquadRelease(w.native);   // owner 2026-11-24
         if (w.route !is null && !w.route.IsDead()) w.route.Abort();
         @w.route = null;
+    }
+
+    // Owner (2026-11-24): a battle squad wave launches once every tank and escort is out (or at the gather
+    // deadline); the tank batch's FrontOpener hold closes with it, and the record goes once the squad is gone.
+    void NativeStep(uint index, Wave@ w) {
+        if (!w.launched) {
+            const bool full = int(w.tanks.length()) >= w.expected && w.escortDefs.length() == 0;
+            if (!full && ai.frame < w.deadline) return;
+            if (aiMilitaryMgr.BattleSquadSize(w.native) <= 0) { Release(index, "had no unit by its deadline"); return; }
+            w.launched = true;
+            aiMilitaryMgr.BattleSquadLaunch(w.native);
+            BattleSquads::Track(w.native, w.target);
+            if (!FrontOpener::closed && FrontOpener::started == w.started) FrontOpener::Close();
+            GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + " departs as battle squad " + w.native + ": "
+                + w.tanks.length() + "/" + w.expected + " tank(s), " + w.escorts.length() + " escort(s)" + (full ? "" : " (gather deadline)"), 1);
+            return;
+        }
+        if (aiMilitaryMgr.BattleSquadSize(w.native) < 0) {
+            GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + ": battle squad " + w.native + " ended (merged, home or destroyed)", 1);
+            waves.removeAt(index);
+        }
     }
 
     void UnitRemoved(CCircuitUnit@ unit) {
@@ -215,6 +251,7 @@ namespace FrontWaveEscort {
         const float repath = Global::RoleSettings::Front::WaveEscortRepath;
         for (int i = int(waves.length()) - 1; i >= 0; --i) {
             Wave@ w = waves[i];
+            if (w.native >= 0) { NativeStep(uint(i), w); continue; }   // owner 2026-11-24: the native squad moves it
             // Departed (its gather closed) with slots still open: stop claiming, a later wave's escort is not ours
             if (w.hadTank && w.escortDefs.length() > 0 && (FrontOpener::closed || FrontOpener::started != w.started)) {
                 GenericHelpers::LogUtil("[FRONT][WaveEscort] wave " + w.id + " departed without " + w.escortDefs.length()
