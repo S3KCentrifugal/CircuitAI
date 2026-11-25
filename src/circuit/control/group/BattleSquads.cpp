@@ -256,6 +256,56 @@ int CBattleSquads::OrderOf(int squad) const
     return it == squads.end() ? -1 : int(it->second.order);
 }
 
+float CBattleSquads::Value(int squad) const
+{
+    const auto it = squads.find(squad);
+    return it == squads.end() ? -1.f : it->second.own;
+}
+
+float CBattleSquads::PathEnemy(const std::vector<AIFloat3>& path, float width, float staticWeight)
+{
+    if (path.empty() || width <= 0.f) return 0.f;
+    auto world = military->GetRangedWorld();
+    world->Refresh();  // idempotent per frame
+    const auto& contacts = world->Contacts();
+    counted.clear();
+    float total = 0.f;
+    const float w2 = width * width;
+    for (const AIFloat3& p : path) {
+        world->Nearby(p, width, nearby);
+        for (int i : nearby) {
+            const auto& c = contacts[i];
+            if (c.def == nullptr || !c.armed || c.def->IsAbleToFly() || c.pos.y < -20.f) continue;
+            if (c.pos.SqDistance2D(p) > w2) continue;
+            if (std::find(counted.begin(), counted.end(), c.id) != counted.end()) continue;
+            counted.push_back(c.id);
+            const float health = c.def->GetHealth() > 0.f ? std::clamp(c.health / c.def->GetHealth(), 0.f, 1.f) : 1.f;
+            total += c.cost * health * (c.mobile ? 1.f : staticWeight);
+        }
+    }
+    // Ghost porc (structures out of sight, their spot not seen empty) counts at full health.
+    for (const auto& g : world->Ghosts()) {
+        if (g.def == nullptr || !g.armed) continue;
+        for (const AIFloat3& p : path) {
+            if (g.pos.SqDistance2D(p) <= w2) { total += g.cost * staticWeight; break; }
+        }
+    }
+    return total;
+}
+
+float CBattleSquads::PathFriends(const std::vector<AIFloat3>& path, float width, int exceptSquad) const
+{
+    float total = 0.f;
+    const float w2 = width * width;
+    for (const auto& [id, s] : squads) {
+        if (id == exceptSquad || !s.launched || s.homeward || !Valid(s.anchor)) continue;
+        for (const AIFloat3& p : path) {
+            if (s.anchor.SqDistance2D(p) <= w2) { total += s.own; break; }
+        }
+    }
+    return total;
+}
+
 CRouteTask* CBattleSquads::EnsureRoute(Squad& s)
 {
     if (s.route != nullptr && !s.route->IsDead()) return s.route;

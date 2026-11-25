@@ -126,6 +126,29 @@ static int CMilitaryManager_BattleSquadArmed(CMilitaryManager* mgr, int squad)
 	CBattleSquads* squads = mgr->GetBattleSquads();
 	return squads != nullptr ? squads->Armed(squad) : -1;
 }
+static std::vector<AIFloat3> BattleSquadPath(const CScriptArray* array)
+{
+	std::vector<AIFloat3> path;
+	if (array == nullptr) return path;
+	path.reserve(array->GetSize());
+	for (asUINT i = 0; i < array->GetSize(); ++i) path.push_back(*static_cast<const AIFloat3*>(array->At(i)));
+	return path;
+}
+static float CMilitaryManager_BattleSquadValue(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->Value(squad) : -1.f;
+}
+static float CMilitaryManager_BattleSquadPathEnemy(CMilitaryManager* mgr, const CScriptArray* path, float width, float staticWeight)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->PathEnemy(BattleSquadPath(path), width, staticWeight) : 0.f;
+}
+static float CMilitaryManager_BattleSquadPathFriends(CMilitaryManager* mgr, const CScriptArray* path, float width, int exceptSquad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->PathFriends(BattleSquadPath(path), width, exceptSquad) : 0.f;
+}
 static int CMilitaryManager_BattleSquadMember(CMilitaryManager* mgr, int squad)
 {
 	CBattleSquads* squads = mgr->GetBattleSquads();
@@ -181,6 +204,9 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadSize(int)", asFUNCTION(CMilitaryManager_BattleSquadSize), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadArmed(int)", asFUNCTION(CMilitaryManager_BattleSquadArmed), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadMember(int)", asFUNCTION(CMilitaryManager_BattleSquadMember), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "float BattleSquadValue(int)", asFUNCTION(CMilitaryManager_BattleSquadValue), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "float BattleSquadPathEnemy(const array<AIFloat3>& in, float, float)", asFUNCTION(CMilitaryManager_BattleSquadPathEnemy), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "float BattleSquadPathFriends(const array<AIFloat3>& in, float, int)", asFUNCTION(CMilitaryManager_BattleSquadPathFriends), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadOrder(int)", asFUNCTION(CMilitaryManager_BattleSquadOrder), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "void DefaultMakeDefence(int, const AIFloat3& in)", asMETHOD(CMilitaryManager, DefaultMakeDefence), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "AIFloat3 GetCombatFocusPos() const", asMETHOD(CMilitaryManager, GetCombatFocusPos), asCALL_THISCALL); ASSERT(r >= 0);

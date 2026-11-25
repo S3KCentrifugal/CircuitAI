@@ -102,6 +102,14 @@ public:
     int AnyMember(int squad) const;
     // The order (battle_group::Order as int), -1 when the squad no longer exists.
     int OrderOf(int squad) const;
+    // Owner 2026-11-25: lane choice (script systems/combat/battle_squads.as). The squad's armed
+    // metal x health at its last decision (-1: gone); the armed enemy metal x health within
+    // `width` of a lane path (seen mobiles x1, seen and ghost structures x staticWeight: the
+    // land porc plus the army on it); our other launched squads' value within `width` of it.
+    // O(P x K_p) for P path points and K_p contacts near each, deduplicated; O(P x S) for squads.
+    float Value(int squad) const;
+    float PathEnemy(const std::vector<springai::AIFloat3>& path, float width, float staticWeight);
+    float PathFriends(const std::vector<springai::AIFloat3>& path, float width, int exceptSquad) const;
 
     // Manager hooks.
     void Update();
@@ -157,6 +165,7 @@ private:
     std::map<int, Squad> squads;              // id order: deterministic
     std::unordered_map<int, int> squadOf;     // member id -> squad id
     std::vector<int> nearby;                  // reused contact buffer
+    std::vector<int> counted;                 // reused: contact ids already summed by PathEnemy
     std::vector<std::pair<int, std::string>> releases;  // applied after the update loop
     int nextId = 1;
 };

@@ -21,6 +21,7 @@
 #include "shared/lrpc_block.as"
 #include "shared/rez_replenish.as"
 #include "shared/heavy_wave.as"
+#include "shared/battle_squads.as"
 #include "roles/tech.as"
 #include "roles/air.as"
 #include "roles/front.as"
