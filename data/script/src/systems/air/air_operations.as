@@ -130,6 +130,12 @@ namespace AirOperations {
         // Owner 2026-11-25 (fix D): committed re-picks prefer what the survivors kill, as a preference.
         wave.SetRepickPolicy(offensive ? Global::RoleSettings::Air::RepickMaxPasses : 0.0f,
             Global::RoleSettings::Air::RepickPassPenalty, Global::RoleSettings::Air::RepickOverPassScale);
+        // Owner 2026-11-25 (fix E): a run on an AFUS flies its route as one queued path.
+        if (offensive && Global::RoleSettings::Air::QueuedRouteAfus) {
+            const array<string> afusSides = {"armada", "cortex", "legion"};
+            for (uint i = 0; i < afusSides.length(); ++i)
+                wave.AddQueuedRouteDef(ai.GetCircuitDef(UnitHelpers::GetAdvFusionNameForSide(afusSides[i])));
+        }
         if (offensive) {
             // A committed wave exhausts each class before descending. This also
             // lets new waves finish a defeated base after its named targets die.

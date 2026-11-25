@@ -385,6 +385,9 @@ int FusionsBeforeAfus = 2;
             float RepickMaxPasses = 4.0f;
             float RepickPassPenalty = 0.25f;
             float RepickOverPassScale = 0.1f;
+            // Owner 2026-11-25 (fix E): a committed run on an AFUS flies its whole route as one queued path
+            // (no stop-and-go legs); the in-flight AFUS handoff still overrides it.
+            bool QueuedRouteAfus = true;
             // Owner 2026-11-24: an offensive bomber operation that ends with no bomb released excludes its
             // launch and final aims from target picks for this long (StrikeFailedRegionRadius around each).
             int NoBombRaidExcludeSeconds = 300;

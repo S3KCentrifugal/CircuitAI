@@ -2165,6 +2165,7 @@ void CInitScript::RegisterCAirWaveTask(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetImmediateKillGate(bool)", asMETHOD(CAirWaveTask, SetImmediateKillGate), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetImmediateKillPasses(float)", asMETHOD(CAirWaveTask, SetImmediateKillPasses), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CAirWaveTask", "void SetRepickPolicy(float, float, float)", asMETHOD(CAirWaveTask, SetRepickPolicy), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CAirWaveTask", "void AddQueuedRouteDef(CCircuitDef@)", asMETHOD(CAirWaveTask, AddQueuedRouteDef), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "int GetState() const", asMETHOD(CAirWaveTask, GetState), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "int GetMode() const", asMETHOD(CAirWaveTask, GetMode), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CAirWaveTask", "AIFloat3 GetAim() const", asFUNCTION(CAirWaveTask_GetAim), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);

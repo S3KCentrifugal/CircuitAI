@@ -997,6 +997,11 @@ void CAirWaveTask::SetImmediateKillPasses(float passes)
     immediateKillPasses = std::isfinite(passes) ? std::clamp(passes, 0.f, 100.f) : 0.f;
 }
 
+void CAirWaveTask::AddQueuedRouteDef(CCircuitDef* def)
+{
+    if (def != nullptr) queuedRouteDefs.insert(def->GetId());
+}
+
 void CAirWaveTask::SetRepickPolicy(float maxPasses, float passPenalty, float overScale)
 {
     if (!std::isfinite(maxPasses) || !std::isfinite(passPenalty) || !std::isfinite(overScale)) return;
@@ -1332,6 +1337,23 @@ void CAirWaveTask::IssueOperationLeg()
     if (air_geometry::FinalAttackLeg(earlyAttackApproach, operationPhase, operationLeg, int(operationRoute.size()))
         && BeginOperationAttack("final-approach")) return;
     const int frame = circuit->GetLastFrame();
+    if (operationPhase == 1 && operationLeg == 0) {
+        CEnemyInfo* target = GetStrikeTarget();
+        const CCircuitDef* def = target == nullptr ? nullptr : target->GetCircuitDef();
+        queuedRoute = def != nullptr && queuedRouteDefs.count(def->GetId()) != 0;
+    } else if (operationPhase != 1) {
+        queuedRoute = false;
+    }
+    if (queuedRoute) {
+        // Fix E: one burst of orders for the whole remaining path (legs operationLeg..QueuedRouteLastLeg()).
+        // Total orders equal the stop-and-go legs; arrival is still tracked per leg for the final handoff.
+        operationDestinations.clear(); operationArrived.clear(); operationIdle.clear(); operationReask.clear();
+        for (auto* unit : units) IssueQueuedRoute(unit, frame);
+        operationIssuedFrame = frame;
+        circuit->LOG("WAVE: queued route legs=%i-%i/%zu bombers=%i aircraft=%zu target=%i", operationLeg, QueuedRouteLastLeg(),
+            operationRoute.size(), GetBomberCount(), units.size(), strikeTargetId);
+        return;
+    }
     const AIFloat3 from = OperationCentre();
     const AIFloat3 goal = operationRoute[operationLeg];
     AIFloat3 dir(goal.x-from.x, 0.f, goal.z-from.z);
@@ -1354,6 +1376,40 @@ void CAirWaveTask::IssueOperationLeg()
     operationIssuedFrame = frame;
     circuit->LOG("WAVE: operation leg=%i/%zu bombers=%i aircraft=%zu offensive=%i", operationLeg,
         operationRoute.size(), GetBomberCount(), units.size(), offensive);
+}
+
+int CAirWaveTask::QueuedRouteLastLeg() const
+{
+    // With the early attack the last point is never flown as a MOVE: the attack is issued instead.
+    return int(operationRoute.size()) - (earlyAttackApproach ? 2 : 1);
+}
+
+AIFloat3 CAirWaveTask::OperationLegPoint(CCircuitUnit* unit, int leg) const
+{
+    const AIFloat3 goal = operationRoute[leg];
+    const AIFloat3 from = leg > 0 ? operationRoute[leg - 1] : OperationCentre();
+    AIFloat3 dir(goal.x-from.x, 0.f, goal.z-from.z);
+    const float length = std::sqrt(dir.SqLength2D());
+    dir = length > 1.f ? dir / length : AIFloat3(0.f,0.f,1.f);
+    const auto it = slots.find(unit);
+    const auto slot = air_geometry::FormationSlot(it == slots.end() ? 0 : it->second, maxWidth, spacing, rankSpacing);
+    const float forward = IsOperationBomber(unit) ? -std::min(slot.behind, 600.f) : escortLead - std::min(slot.behind, escortLead * .5f);
+    AIFloat3 p(goal.x-dir.z*slot.lateral+dir.x*forward, 0.f, goal.z+dir.x*slot.lateral+dir.z*forward);
+    CTerrainManager::CorrectPosition(p);
+    return p;
+}
+
+void CAirWaveTask::IssueQueuedRoute(CCircuitUnit* unit, int frame)
+{
+    const int last = QueuedRouteLastLeg();
+    if (operationLeg > last || operationLeg >= int(operationRoute.size())) return;
+    auto* circuit = manager->GetCircuit();
+    operationDestinations[unit] = OperationLegPoint(unit, operationLeg);
+    TRY_UNIT(circuit, unit,
+        for (int leg = operationLeg; leg <= last; ++leg)
+            unit->CmdMoveTo(OperationLegPoint(unit, leg), leg == operationLeg ? 0 : UNIT_COMMAND_OPTION_SHIFT_KEY,
+                frame + FRAMES_PER_SEC * 3600);
+    )
 }
 
 bool CAirWaveTask::NextOperationTarget()
@@ -1429,7 +1485,10 @@ void CAirWaveTask::UpdateOperation()
                     operationReask[unit] = frame + OPERATION_REASK_FRAMES;
                     auto* api = circuit->GetUnitAPI();
                     const int count = api->GetCMDQueueSize(unit->GetId());
-                    if (count <= 0 || !api->LastMoveAt(unit->GetId(), count, dest->second.x, dest->second.z, 16.f)) {
+                    if (queuedRoute && operationPhase == 1) {
+                        // The queue ends at the route end, not at this leg: repair only an emptied queue.
+                        if (count <= 0) { IssueQueuedRoute(unit, frame); if (!idle) ++operationReasks; }
+                    } else if (count <= 0 || !api->LastMoveAt(unit->GetId(), count, dest->second.x, dest->second.z, 16.f)) {
                         TRY_UNIT(circuit, unit, unit->CmdMoveTo(dest->second, 0, frame + FRAMES_PER_SEC * 3600);)
                         if (!idle) ++operationReasks;
                     }
@@ -1454,6 +1513,13 @@ void CAirWaveTask::UpdateOperation()
             PrepareOperationRoute();
             operationLeg = 0; operationPhase = 1;
             EnterState(EState::ATTACKING); IssueOperationLeg(); return;
+        }
+        if (queuedRoute && operationPhase == 1 && operationLeg + 1 <= QueuedRouteLastLeg()) {
+            // Fix E: the next leg is already queued; move the arrival disc on, emit nothing.
+            ++operationLeg;
+            operationArrived.clear(); operationIdle.clear(); operationReask.clear();
+            for (auto* unit : units) operationDestinations[unit] = OperationLegPoint(unit, operationLeg);
+            return;
         }
         if (++operationLeg < int(operationRoute.size())) { IssueOperationLeg(); return; }
         if (operationPhase == 3) {

@@ -86,6 +86,9 @@ public:
     // up to maxPasses passes keeps its score divided by 1 + passPenalty * (passes - 1); one needing more is
     // multiplied by overScale. A preference, never a filter. maxPasses <= 0 turns it off.
     void SetRepickPolicy(float maxPasses, float passPenalty, float overScale);
+    // Owner 2026-11-25 (fix E): a committed run on a target of these defs gets its whole route as one
+    // queued path (no stop-and-go legs). The in-flight handoff still overrides it at any point.
+    void AddQueuedRouteDef(CCircuitDef* def);
     /*
      * Wind grids: minimum touching winds (0 disables), minimum depth in winds
      * both ways, link distance between neighbours, and the strike priority a
@@ -113,6 +116,9 @@ public:
 private:
     void UpdateOperation();
     void IssueOperationLeg();
+    void IssueQueuedRoute(CCircuitUnit* unit, int frame);
+    springai::AIFloat3 OperationLegPoint(CCircuitUnit* unit, int leg) const;
+    int QueuedRouteLastLeg() const;
     bool BeginOperationAttack(const char* reason);
     bool TryImmediateStrike();
     bool TryWindGridStrike(CEnemyInfo* current);
@@ -224,6 +230,8 @@ private:
     float immediateStrikePriority = 0.f;
     float immediateStrikeRadius = 0.f;
     float immediateKillPasses = 0.f;
+    std::set<int> queuedRouteDefs;
+    bool queuedRoute = false;  // the current phase-1 route is one queued path
     float repickMaxPasses = 0.f;
     float repickPassPenalty = 0.f;
     float repickOverScale = 1.f;
