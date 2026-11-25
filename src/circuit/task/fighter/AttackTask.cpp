@@ -344,7 +344,7 @@ void CAttackTask::FindTarget()
 			// we can reach can shoot (shell can't climb that high, cliff lip in the way) is skipped
 			// before it is picked. Only tested for a candidate that would win; cached per def/cell.
 			if ((minSqDist > sqOEDist || sqOEDist < preferredMetric) && !cdef->IsAbleToFly()
-				&& circuit->GetBattle()->CannotEverHit(cdef, area, ePos, (edef != nullptr) ? edef->GetHeight() * 0.5f : 16.f))
+				&& circuit->GetBattle()->CannotEverHit(cdef, area, pos, ePos, (edef != nullptr) ? edef->GetHeight() * 0.5f : 16.f))
 			{
 				continue;
 			}

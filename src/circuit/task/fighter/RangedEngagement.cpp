@@ -343,7 +343,7 @@ bool CRangedEngagement::CannotEverHit(CCircuitUnit* unit,const AIFloat3& pos,con
     if(def->IsAbleToFly() || c.airDot || (c.def && c.def->IsAbleToFly())) return false;
     auto* battle=ai->GetBattle();
     const float aim=c.def ? c.def->GetHeight()*.5f : 16.f;
-    if(!battle->CannotEverHit(def,unit->GetArea(),c.pos,aim)) return false;
+    if(!battle->CannotEverHit(def,unit->GetArea(),pos,c.pos,aim)) return false;
     if(battle->CanHitFrom(def,pos,c.pos,aim)) return false;   // ring sampling missed the spot it stands on
     if(std::find(unhittableLogged.begin(),unhittableLogged.end(),c.id)==unhittableLogged.end()) {
         if(unhittableLogged.size()>=32) unhittableLogged.erase(unhittableLogged.begin());

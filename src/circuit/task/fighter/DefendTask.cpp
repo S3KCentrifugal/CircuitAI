@@ -342,7 +342,7 @@ bool CDefendTask::FindTarget()
 
 		float sqDist = pos.SqDistance2D(ePos);
 		// Owner 2026-11-24: never pick a target no stand we can reach can shoot (cached per def/cell)
-		if (!cdef->IsAbleToFly() && circuit->GetBattle()->CannotEverHit(cdef, area, ePos, (edef != nullptr) ? edef->GetHeight() * 0.5f : 16.f)) {
+		if (!cdef->IsAbleToFly() && circuit->GetBattle()->CannotEverHit(cdef, area, pos, ePos, (edef != nullptr) ? edef->GetHeight() * 0.5f : 16.f)) {
 			continue;
 		}
             // Fold preference into this existing eligibility scan: no extra

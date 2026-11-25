@@ -764,6 +764,13 @@ public:
 	// Owner 2026-11-24: one 16-elmo slope-map cell test with the def's own move type (steep,
 	// too deep, too high). Air / no move type / no slope map: true. O(1).
 	bool CanStandAt(const CCircuitDef* cdef, const springai::AIFloat3& pos) const;
+	// Owner 2026-11-24 (Swirly Rock: the cliff-top Persecutor's plateau is walkable, but only by a
+	// ~6,000-elmo drive round through the enemy side): flood fill on the 16-elmo slope map with the
+	// def's move type, inside the square window centre +- radius only, from `from` (or, when it is
+	// outside, from the window edge on its side). FloodReached(pos) then says whether that local
+	// ground reaches pos. False when no walkable seed is found (caller falls back). O(window cells).
+	bool GroundFlood(const CCircuitDef* cdef, const springai::AIFloat3& from, const springai::AIFloat3& centre, float radius);
+	bool FloodReached(const springai::AIFloat3& pos) const;
 	bool IsGroundGoalBad(CCircuitUnit* unit, const springai::AIFloat3& to);
 private:
 	bool GroundCellOk(const terrain::SMobileType* mt, int cx, int cz) const;
@@ -777,6 +784,7 @@ private:
 	std::unordered_map<std::uint64_t, int> groundBadGoals;  // key -> expire frame
 	std::vector<std::uint32_t> groundBfsMark;  // visit stamps, window-sized
 	std::vector<int> groundBfsQueue;
+	std::vector<int> floodMark, floodQueue; int floodStamp = 0, floodX0 = 0, floodZ0 = 0, floodW = 0, floodH = 0;
 	std::uint32_t groundBfsStamp = 0;
 	int groundBudgetFrame = -1;
 	int groundBudgetUsed = 0;

@@ -117,13 +117,18 @@ public:
 	// all ground it can't stand on / get to. A fixed high-trajectory main cannon (highTrajectory 1)
 	// gets the same test on its high root. Switchable cannons, another high mount, missiles,
 	// starbursts, aircraft, carriers: range only. UNKNOWN = no data or the per-frame budget is spent: treat as reachable.
-	// Cached per def, area and 32-elmo target cell for 30 s; at most 8 fresh tests a frame.
+	// Owner 2026-11-24 (Swirly Rock probe: the cliff top is walkable, but only by a 6,000-elmo
+	// drive round through the enemy side): a stand counts only when the shooter's local ground
+	// reaches it, a flood fill from `from` (or the window edge on its side) inside the rings'
+	// window (CTerrainManager::GroundFlood). Cached per def, area, 32-elmo target cell and
+	// 512-elmo approach cell for 30 s; at most 3 fresh tests a frame.
 	enum class ShotReach : int { OK = 0, HEIGHT, TERRAIN, NOSTAND, UNKNOWN };
 	static const char* ShotReachName(ShotReach r);
-	ShotReach CanEverHit(CCircuitDef* cdef, terrain::SArea* area, const springai::AIFloat3& target,
-		float targetAim, float fraction = 0.98f);
-	bool CannotEverHit(CCircuitDef* cdef, terrain::SArea* area, const springai::AIFloat3& target, float targetAim) {
-		const ShotReach r = CanEverHit(cdef, area, target, targetAim);
+	ShotReach CanEverHit(CCircuitDef* cdef, terrain::SArea* area, const springai::AIFloat3& from,
+		const springai::AIFloat3& target, float targetAim, float fraction = 0.98f);
+	bool CannotEverHit(CCircuitDef* cdef, terrain::SArea* area, const springai::AIFloat3& from,
+		const springai::AIFloat3& target, float targetAim) {
+		const ShotReach r = CanEverHit(cdef, area, from, target, targetAim);
 		return (r != ShotReach::OK) && (r != ShotReach::UNKNOWN);
 	}
 	// The straight / low-arc shot test used above, from a stand's aim point to the target's

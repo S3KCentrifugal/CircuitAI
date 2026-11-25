@@ -7182,6 +7182,70 @@ bool CTerrainManager::CanStandAt(const CCircuitDef* cdef, const AIFloat3& pos) c
 	return GroundCellOk(mt, int(pos.x) / GR_CELL, int(pos.z) / GR_CELL);
 }
 
+bool CTerrainManager::GroundFlood(const CCircuitDef* cdef, const AIFloat3& from, const AIFloat3& centre, float radius)
+{
+	floodW = floodH = 0;
+	if ((cdef == nullptr) || cdef->IsAbleToFly()) return false;
+	const SMobileType* mt = GetMobileTypeById(cdef->GetMobileId());
+	const int mapX = terrainData->GetSlopeMapXSize();
+	if ((mt == nullptr) || (mapX <= 0) || terrainData->GetSlopeMap().empty()) return false;
+	const int mapZ = int(terrainData->GetSlopeMap().size()) / mapX;
+	const int cx = int(centre.x) / GR_CELL, cz = int(centre.z) / GR_CELL, r = std::max(2, int(radius) / GR_CELL);
+	const int x0 = std::max(0, cx - r), z0 = std::max(0, cz - r);
+	const int x1 = std::min(mapX - 1, cx + r), z1 = std::min(mapZ - 1, cz + r);
+	if ((x1 < x0) || (z1 < z0)) return false;
+	// the seed: our own cell, or where the line from the centre to us leaves the window
+	AIFloat3 seed = from;
+	const float dx = from.x - centre.x, dz = from.z - centre.z, d = std::sqrt(dx * dx + dz * dz);
+	const float inner = float(r - 1) * GR_CELL;
+	if ((std::fabs(dx) > inner) || (std::fabs(dz) > inner)) {
+		const float k = inner / std::max(std::fabs(dx), std::fabs(dz));
+		seed = AIFloat3(centre.x + dx * k, 0.f, centre.z + dz * k);
+	}
+	(void)d;
+	int sx = std::clamp(int(seed.x) / GR_CELL, x0, x1), sz = std::clamp(int(seed.z) / GR_CELL, z0, z1);
+	bool found = GroundCellOk(mt, sx, sz);
+	for (int rr = 1; (rr <= 4) && !found; ++rr) {
+		for (int oz = -rr; (oz <= rr) && !found; ++oz) {
+			for (int ox = -rr; (ox <= rr) && !found; ++ox) {
+				const int nx = sx + ox, nz = sz + oz;
+				if ((nx < x0) || (nx > x1) || (nz < z0) || (nz > z1)) continue;
+				if (GroundCellOk(mt, nx, nz)) { sx = nx; sz = nz; found = true; }
+			}
+		}
+	}
+	if (!found) return false;
+	floodX0 = x0; floodZ0 = z0; floodW = x1 - x0 + 1; floodH = z1 - z0 + 1;
+	if (floodMark.size() < size_t(floodW * floodH)) floodMark.assign(floodW * floodH, 0);
+	if (++floodStamp >= (1 << 30)) { std::fill(floodMark.begin(), floodMark.end(), 0); floodStamp = 1; }
+	floodQueue.clear();
+	auto push = [&](int x, int z) {
+		const int i = (z - floodZ0) * floodW + (x - floodX0);
+		if ((floodMark[i] == floodStamp) || (floodMark[i] == -floodStamp)) return;
+		if (!GroundCellOk(mt, x, z)) { floodMark[i] = -floodStamp; return; }
+		floodMark[i] = floodStamp;
+		floodQueue.push_back(i);
+	};
+	push(sx, sz);
+	for (size_t q = 0; q < floodQueue.size(); ++q) {
+		const int i = floodQueue[q];
+		const int x = floodX0 + i % floodW, z = floodZ0 + i / floodW;
+		if (x > x0) push(x - 1, z);
+		if (x < x1) push(x + 1, z);
+		if (z > z0) push(x, z - 1);
+		if (z < z1) push(x, z + 1);
+	}
+	return true;
+}
+
+bool CTerrainManager::FloodReached(const AIFloat3& pos) const
+{
+	if ((floodW <= 0) || (floodH <= 0)) return false;
+	const int x = int(pos.x) / GR_CELL - floodX0, z = int(pos.z) / GR_CELL - floodZ0;
+	if ((x < 0) || (z < 0) || (x >= floodW) || (z >= floodH)) return false;
+	return floodMark[z * floodW + x] == floodStamp;
+}
+
 bool CTerrainManager::GroundReachBudget()
 {
 	const int frame = circuit->GetLastFrame();

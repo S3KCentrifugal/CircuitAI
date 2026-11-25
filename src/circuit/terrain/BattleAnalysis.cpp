@@ -483,8 +483,8 @@ bool CBattleAnalysis::CanHitFrom(CCircuitDef* cdef, const AIFloat3& from, const 
 	return ShotClear(cdef, from, fromY, target, aimY);
 }
 
-CBattleAnalysis::ShotReach CBattleAnalysis::CanEverHit(CCircuitDef* cdef, terrain::SArea* area, const AIFloat3& target,
-	float targetAim, float fraction)
+CBattleAnalysis::ShotReach CBattleAnalysis::CanEverHit(CCircuitDef* cdef, terrain::SArea* area, const AIFloat3& from,
+	const AIFloat3& target, float targetAim, float fraction)
 {
 	if ((cdef == nullptr) || !std::isfinite(target.x) || !std::isfinite(target.z)) return ShotReach::UNKNOWN;
 	const ShotModel& m = MainShotModel(cdef);
@@ -493,11 +493,12 @@ CBattleAnalysis::ShotReach CBattleAnalysis::CanEverHit(CCircuitDef* cdef, terrai
 	const int cx = std::max(0, int(target.x) / 32), cz = std::max(0, int(target.z) / 32);
 	const std::uint64_t key = (std::uint64_t(std::uint32_t(cdef->GetId())) << 44)
 		^ (std::uint64_t(reinterpret_cast<std::uintptr_t>(area) & 0xFFFFF) << 24)
-		^ (std::uint64_t(cz & 0xFFF) << 12) ^ std::uint64_t(cx & 0xFFF);
+		^ (std::uint64_t(cz & 0xFFF) << 12) ^ std::uint64_t(cx & 0xFFF)
+		^ (std::uint64_t((int(std::max(0.f, from.x)) / 512) & 0x3F) << 50) ^ (std::uint64_t((int(std::max(0.f, from.z)) / 512) & 0x3F) << 56);
 	auto it = shotReachCache.find(key);
 	if ((it != shotReachCache.end()) && (it->second.first > frame)) return it->second.second;
 	if (frame != shotReachFrame) { shotReachFrame = frame; shotReachFresh = 0; }
-	if (++shotReachFresh > 8) return ShotReach::UNKNOWN;
+	if (++shotReachFresh > 3) return ShotReach::UNKNOWN;
 	if (frame - shotReachPurge > FRAMES_PER_SEC * 30) {
 		shotReachPurge = frame;
 		for (auto i = shotReachCache.begin(); i != shotReachCache.end(); ) i = (i->second.first <= frame) ? shotReachCache.erase(i) : std::next(i);
@@ -511,6 +512,8 @@ CBattleAnalysis::ShotReach CBattleAnalysis::CanEverHit(CCircuitDef* cdef, terrai
 	// rings from 125% (a hilltop cannon's boost) in to 20% of the flat range; 12 to 32 bearings,
 	// every other ring turned half a step
 	static constexpr float rings[] = {1.25f, 1.1f, 1.f, .9f, .78f, .65f, .5f, .35f, .2f};
+	// the shooter's local ground round the target (a plateau reached only the long way round is not ours)
+	const bool flooded = terrainMgr->GroundFlood(cdef, from, target, m.b.range * fraction * rings[0] + 48.f);
 	int reached = 0, stood = 0;
 	ShotReach result = ShotReach::HEIGHT;
 	for (int ri = 0; (ri < int(sizeof(rings) / sizeof(rings[0]))) && (result != ShotReach::OK); ++ri) {
@@ -526,16 +529,23 @@ CBattleAnalysis::ShotReach CBattleAnalysis::CanEverHit(CCircuitDef* cdef, terrai
 			const float d = std::sqrt(stand.SqDistance2D(target));
 			if (d > weapon_reach::Reach2D(m.b, fromY, aimY) * fraction) continue;
 			++reached;
-			if (!terrainMgr->CanStandAt(cdef, stand) || ((area != nullptr) && !terrainMgr->CanMoveToPos(area, stand))) continue;
+			if (flooded ? !terrainMgr->FloodReached(stand)
+				: (!terrainMgr->CanStandAt(cdef, stand) || ((area != nullptr) && !terrainMgr->CanMoveToPos(area, stand)))) continue;
 			++stood;
-			if (ShotClear(cdef, stand, fromY, target, aimY)) { result = ShotReach::OK; break; }
+			if (ShotClear(cdef, stand, fromY, target, aimY)) {
+				result = ShotReach::OK;
+				static const bool trace = std::getenv("CIRCUIT_RANGED_TRACE") != nullptr;   // test kits only
+				if (trace) circuit->LOG("SHOTREACH: %s can hit (%.0f, %.0f) aim %.0f from stand (%.0f, %.0f) ground %.0f d=%.0f",
+					cdef->GetDef()->GetName(), target.x, target.z, aimY, stand.x, stand.z, ground, d);
+				break;
+			}
 		}
 	}
 	if (result != ShotReach::OK) result = (reached == 0) ? ShotReach::HEIGHT : (stood == 0) ? ShotReach::NOSTAND : ShotReach::TERRAIN;
 	shotReachCache[key] = {frame + FRAMES_PER_SEC * 30, result};
 	if (result != ShotReach::OK) {   // once per def and cell per 30 s (cached)
-		circuit->LOG("SHOTREACH: %s cannot hit (%.0f, %.0f) ground %.0f aim %.0f why=%s reach=%.0f stands reaching=%d standable=%d",
-			cdef->GetDef()->GetName(), target.x, target.z, Height(target), aimY, ShotReachName(result), m.b.range, reached, stood);
+		circuit->LOG("SHOTREACH: %s from (%.0f, %.0f) cannot hit (%.0f, %.0f) ground %.0f aim %.0f why=%s reach=%.0f stands reaching=%d on our ground=%d flood=%d",
+			cdef->GetDef()->GetName(), from.x, from.z, target.x, target.z, Height(target), aimY, ShotReachName(result), m.b.range, reached, stood, int(flooded));
 	}
 	return result;
 }
