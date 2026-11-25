@@ -337,7 +337,7 @@ namespace MobileAntiNuke {
             const int inc = incoming.find(u.id);
             if (inc >= 0) { incoming.removeAt(uint(inc)); incomingAt.removeAt(uint(inc)); }
             Log("admit " + u.circuitDef.GetName() + " " + u.id + " at " + XY(u.GetPos(ai.frame)) + " coverage " + int(Coverage(u.circuitDef))
-                + (inc >= 0 ? " (traded to us)" : "") + "; own " + antis.length());
+                + (inc >= 0 ? (u.GetProducerId() == orderFactory || ai.GetTeamUnit(u.GetProducerId()) !is null ? "" : " (traded to us)") : "") + "; own " + antis.length());
         }
         return task;
     }
@@ -473,7 +473,12 @@ namespace MobileAntiNuke {
         if (orderFor >= 0) {
             for (uint i = 0; i < owed.length(); ++i)
                 if (owed[i].team == orderFor && owed[i].gift < 0) { owed[i].gift = unit.id; Log("built " + unit.circuitDef.GetName() + " " + unit.id + " for team " + orderFor); break; }
-        } else Log("built " + unit.circuitDef.GetName() + " " + unit.id + " for us");
+        } else {
+            // counted until Military::AiMakeTask admits it: the lab asks for its next task first
+            // (headless 11-25: a second one was ordered for us in the same frame)
+            if (incoming.find(unit.id) < 0 && FindAnti(unit.id) < 0) { incoming.insertLast(unit.id); incomingAt.insertLast(ai.frame); }
+            Log("built " + unit.circuitDef.GetName() + " " + unit.id + " for us");
+        }
         ClearOrder();
     }
 
