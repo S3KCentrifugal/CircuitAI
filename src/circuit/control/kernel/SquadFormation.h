@@ -94,6 +94,26 @@ inline battle_group::Order Decide(const Balance& b, battle_group::Order current,
     return current == Order::ATTACK ? Order::ATTACK : Order::HOLD;
 }
 
+// Owner 2026-11-25 (A/B: 586 attack->withdraw and 260 withdraw->attack flips in six games, the
+// squads walked in and out of range): settle the wanted order with hysteresis.
+//   - attack -> withdraw only after `confirm` decisions in a row wanted it (one radar blip or a
+//     tower coming into view is not a retreat);
+//   - a withdrawal holds at least `holdFrames`, and turns back to attack only once the ratio
+//     reaches enter x reenter (clearly ahead again, not just past the line it fled at).
+// `streak` counts consecutive withdraw wishes (caller-owned, per squad). O(1).
+struct Hysteresis { int confirm = 2; int holdFrames = 300; float reenter = 1.25f; };
+inline battle_group::Order Settle(battle_group::Order current, battle_group::Order wanted, int heldFrames,
+                                  float ratio, float enter, float entryScale, const Hysteresis& h, int& streak) {
+    using battle_group::Order;
+    streak = wanted == Order::WITHDRAW ? streak + 1 : 0;
+    if (current == Order::ATTACK && wanted == Order::WITHDRAW && streak < std::max(1, h.confirm)) return Order::ATTACK;
+    if (current == Order::WITHDRAW && wanted != Order::WITHDRAW) {
+        if (heldFrames < h.holdFrames) return Order::WITHDRAW;
+        if (wanted == Order::ATTACK && ratio < enter * entryScale * std::max(1.f, h.reenter)) return Order::HOLD;
+    }
+    return wanted;
+}
+
 // The anchor's next step while advancing: `step` toward the goal, never past
 // it, and none while a member lags more than `tolerance` behind its place
 // (the squad keeps its slowest member's pace) unless the wait ran out.

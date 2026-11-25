@@ -72,6 +72,17 @@ int main() {
         assert(Near(f.x, 1.f) && Near(f.z, 0.f));
         assert(SlotOf(Rank::SCREEN) == battle_group::Slot::SCREEN && SlotOf(Rank::ARTILLERY) == battle_group::Slot::REAR);
     }
+    {  // Hysteresis (owner 2026-11-25): no single-decision retreat, a held withdrawal, a clear re-entry.
+        Hysteresis h; int streak = 0;
+        assert(Settle(Order::ATTACK, Order::WITHDRAW, 100, .5f, 1.2f, 1.f, h, streak) == Order::ATTACK && streak == 1);
+        assert(Settle(Order::ATTACK, Order::WITHDRAW, 130, .5f, 1.2f, 1.f, h, streak) == Order::WITHDRAW && streak == 2);
+        streak = 0;
+        assert(Settle(Order::WITHDRAW, Order::ATTACK, 100, 2.f, 1.2f, 1.f, h, streak) == Order::WITHDRAW);  // still holding
+        assert(Settle(Order::WITHDRAW, Order::ATTACK, 400, 1.3f, 1.2f, 1.f, h, streak) == Order::HOLD);     // 1.3 < 1.5
+        assert(Settle(Order::WITHDRAW, Order::ATTACK, 400, 1.6f, 1.2f, 1.f, h, streak) == Order::ATTACK);
+        assert(Settle(Order::WITHDRAW, Order::ADVANCE, 400, 0.f, 1.2f, 1.f, h, streak) == Order::ADVANCE);
+        assert(Settle(Order::HOLD, Order::WITHDRAW, 0, .5f, 1.2f, 1.f, h, streak) == Order::WITHDRAW);       // only attack waits
+    }
     std::puts("squad_formation_test: ok");
     return 0;
 }

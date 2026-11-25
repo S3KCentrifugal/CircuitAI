@@ -51,6 +51,9 @@ const Lever LEVERS[] = {
     {"advance_rear_delay", &BattleSquadTemplate::advanceRearDelay, -1.f, 20.f},
     {"attack_rear_delay", &BattleSquadTemplate::attackRearDelay, -1.f, 20.f},
     {"order_min_seconds", &BattleSquadTemplate::orderMinSeconds, 0.f, 60.f},
+    {"withdraw_confirm", &BattleSquadTemplate::withdrawConfirm, 1.f, 10.f},
+    {"withdraw_hold_seconds", &BattleSquadTemplate::withdrawHoldSeconds, 0.f, 120.f},
+    {"reenter_factor", &BattleSquadTemplate::reenterFactor, 1.f, 3.f},
     {"momentum_prior", &BattleSquadTemplate::momentumPrior, 1.f, 20000.f},
     {"momentum_half_life", &BattleSquadTemplate::momentumHalfLife, 1.f, 1800.f},
     {"momentum_press", &BattleSquadTemplate::momentumPress, 0.f, 2.f},
@@ -494,6 +497,11 @@ void CBattleSquads::Decide(Squad& s, int frame)
     squad_formation::Balance balance{own, hostile, hostile > 0.f};
     Order wanted = squad_formation::Decide(balance, s.order, t.advantageEnter, t.advantageExit, entryScale, fallBack);
     if (wanted == Order::ADVANCE && targetIndex >= 0) wanted = Order::ATTACK;  // an unarmed structure in reach
+    if (!s.homeward && s.order != Order::NONE) {
+        const squad_formation::Hysteresis h{int(t.withdrawConfirm), int(t.withdrawHoldSeconds * FRAMES_PER_SEC), t.reenterFactor};
+        const float ratio = hostile > 0.f ? own / hostile : 1e6f;
+        wanted = squad_formation::Settle(s.order, wanted, frame - s.orderFrame, ratio, t.advantageEnter, entryScale, h, s.withdrawStreak);
+    }
     if (s.homeward) wanted = Order::WITHDRAW;
     if (s.order == Order::NONE || battle_group::Replace(s.order, wanted, frame - s.orderFrame, int(t.orderMinSeconds * FRAMES_PER_SEC))) {
         if (wanted != s.order) {

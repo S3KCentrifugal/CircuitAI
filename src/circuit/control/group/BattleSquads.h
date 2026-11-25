@@ -65,6 +65,8 @@ struct BattleSquadTemplate {
     // Routing (seconds), as the battle group template
     float withdrawScreenDelay = 2.f, withdrawRearDelay = 0.f, advanceRearDelay = 0.f, attackRearDelay = 0.f;
     float orderMinSeconds = 4.f;
+    // Owner 2026-11-25: order hysteresis (kernel/SquadFormation.h Settle)
+    float withdrawConfirm = 2.f, withdrawHoldSeconds = 10.f, reenterFactor = 1.25f;
     // Trade momentum
     float momentumPrior = 600.f, momentumHalfLife = 120.f, momentumPress = 0.5f, momentumCaution = 0.5f, momentumFallBack = 0.4f;
     // Membership
@@ -134,6 +136,7 @@ private:
         trade::Ledger trades;
         float momentum = 0.f, own = 0.f, hostile = 0.f;
         int created = 0;
+        int withdrawStreak = 0;  // consecutive withdraw wishes (Settle)
     };
 
     int TemplateIndex(const std::string& name) const;
