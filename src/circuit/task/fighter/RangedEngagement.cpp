@@ -311,6 +311,26 @@ bool CRangedEngagement::LostCommanderBlocks(CCircuitUnit* unit,const AIFloat3& f
     }
     return false;
 }
+// Owner 2026-11-24 (Flats and Forests, ~31 idle Centurions): march_heavy_army. O(contacts within the radius).
+bool CRangedEngagement::HeavyArmyAt(const AIFloat3& at,const RangedPolicy& p,const char** why)
+{
+    world.Nearby(at,std::max(p.marchArmyRadius,600.f),armyProbe);
+    const auto& contacts=world.Contacts();
+    float metal=0.f;
+    const float r2=p.marchArmyRadius*p.marchArmyRadius;
+    for(int i:armyProbe) {
+        const auto& c=contacts[i];
+        if(c.def==nullptr || c.ghost || !c.mobile || !c.armed || c.airDot || c.def->IsAbleToFly()) continue;
+        if(CRangedWorld::CommanderContact(c)) {
+            const float r=world.Hz(c,p.pressStatic)+p.safetyMargin;
+            if(at.SqDistance2D(c.pos)<r*r) { if(why) *why="commander"; return true; }
+            continue;
+        }
+        if(at.SqDistance2D(c.pos)<=r2) metal+=c.def->GetCostM();
+    }
+    if(metal>=p.marchHeavyArmy) { if(why) *why="heavy_army"; return true; }
+    return false;
+}
 // Owner 2026-11-23 (Salt Reef replay: AI 11 Fatboys below a 200-elmo plateau).
 // Our Trajectory said "clear" where the engine's line of fire hit the cliff lip,
 // so a Fatboy held a target it never fired at; and the nearest plateau contact,
@@ -595,9 +615,16 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         // point inside coverage, and a whole-leg test then halted the march at
         // the gantry. Walk each leg in 64-elmo samples and keep the last safe
         // one, so the march always reaches the coverage edge.
+        // Owner 2026-11-24: which check refused the march (logged on every halt, not only with the trace).
+        const char* refused="";
         const auto safeAt=[&](const AIFloat3& a,const AIFloat3& b) {
-            return SafeMove(unit,a,b,StaticMargin(p),true)
-                && world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))<=0;
+            if(!SafeMove(unit,a,b,StaticMargin(p),true)) {
+                refused=LostCommanderBlocks(unit,a,b,true)?"lost_commander":"porc";
+                return false;
+            }
+            if(p.marchHeavyArmy>0.f) return !HeavyArmyAt(b,p,&refused);   // owner 2026-11-24 (Centurion)
+            if(world.DangerSign(b,p.safetyMargin,p.pressStatic,GhostRange(p),StaticDanger(p))>0) { refused="danger"; return false; }
+            return true;
         };
         std::string why;   // trace only (2026-11-21 Daedalus idle): which check cut the leg
         for(const auto& q:points) {
@@ -653,8 +680,9 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
             marching=false; marchRetryFrame=now+FRAMES_PER_SEC*5;
             if(points.empty()) ++failures;
             else TimingFront(unit,"halt");
-            if(trace || !points.empty()) ai->LOG("RANGED: march halt unit=%d points=%u legal=%u cut=%d goal=%.0f,%.0f",
-                id,unsigned(points.size()),unsigned(legal.size()),int(cut),marchGoal.x,marchGoal.z);
+            if(trace || !points.empty()) ai->LOG("RANGED: march halt unit=%d points=%u legal=%u cut=%d goal=%.0f,%.0f at=%.0f,%.0f by=%s",
+                id,unsigned(points.size()),unsigned(legal.size()),int(cut),marchGoal.x,marchGoal.z,current.x,current.z,
+                points.empty()?"no_path":(*refused?refused:"short"));
             if(trace) ai->LOG("RANGEDTRACE: halt unit=%d at=%.0f,%.0f%s",id,current.x,current.z,why.c_str());
             // Owner 2026-11-23 (Salt Reef): no firing site was found and the path to this
             // objective comes back as one point (no way up the plateau), again and again:

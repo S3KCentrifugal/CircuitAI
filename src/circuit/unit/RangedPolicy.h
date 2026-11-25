@@ -229,6 +229,13 @@ struct RangedPolicy {
     // retreats. Its blast no longer blocks the shot (own or friendly splash).
     // Individual controller only.
     float commanderReachMargin = -1.f;
+    // Owner 2026-11-24 (Flats and Forests: ~31 Centurions idle with nothing opposing them): 0 = off. With
+    // nothing to shoot, a march leg is refused only by listed porc (live), a live commander's reach, a lost
+    // commander, or a heavy army: at least this much metal of armed, identified enemy mobiles within
+    // march_army_radius of the leg's end. Lone mobiles, scouts and radar dots no longer stop the march (the
+    // normal target pick and kite take them on). Individual controller only.
+    float marchHeavyArmy = 0.f;
+    float marchArmyRadius = 800.f;
     bool HasSpam() const { return spamMaxCost>0.f || !spamDefs.empty() || spamRadarDots; }
     // Owner 2026-11-02: "stay out of weapon range of ghost images that are
     // porc and wait for other units to give LOS". 0 = off. An armed structure

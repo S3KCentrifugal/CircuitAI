@@ -756,6 +756,9 @@ void CFactoryManager::ReadConfig()
             boolean("kite_ignore_fast_dots", policy.kiteIgnoreFastDots);
             number("commander_reach_margin", policy.commanderReachMargin, 0.f, 512.f);   // owner 2026-11-23 (Centurion)
             if (policy.commanderReachMargin >= 0.f && policy.coordinated) valid = false;
+            number("march_heavy_army", policy.marchHeavyArmy, 0.f, 100000.f);   // owner 2026-11-24 (Centurion)
+            number("march_army_radius", policy.marchArmyRadius, 100.f, 3000.f);
+            if (policy.marchHeavyArmy > 0.f && policy.coordinated) valid = false;
             if ((policy.kiteMinTech > 0.f || policy.kiteIgnoreFastDots) && policy.coordinated) valid = false;
             // The cohort controller has its own static admission (assault list).
             if (policy.pressStatic > 0.f && policy.coordinated) valid = false;

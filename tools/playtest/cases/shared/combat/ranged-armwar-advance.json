@@ -1,0 +1,81 @@
+{
+  "name": "ranged-centurion-flats",
+  "unit": "armwar",
+  "description": "Unopposed advance: 10 Centurions on Flats and Forests with only unarmed enemy structures and a constructor 4500 elmos west; they should march over and kill them.",
+  "map": "Flats and Forests v2.2",
+  "map_key": "flats",
+  "starts": [
+    [
+      10175,
+      10706
+    ],
+    [
+      2058,
+      10751
+    ]
+  ],
+  "side": "armada",
+  "camera": [
+    7000,
+    4000,
+    10700
+  ],
+  "photos": [
+    60,
+    180
+  ],
+  "groups": [
+    {
+      "unit": "armwar",
+      "count": 10,
+      "team": 0,
+      "position": [
+        8600,
+        10500
+      ],
+      "spacing": 110,
+      "columns": 5
+    },
+    {
+      "unit": "armsolar",
+      "count": 4,
+      "team": 1,
+      "position": [
+        4200,
+        10600
+      ],
+      "spacing": 200,
+      "columns": 4
+    },
+    {
+      "unit": "armmex",
+      "count": 2,
+      "team": 1,
+      "position": [
+        5200,
+        9800
+      ],
+      "spacing": 300,
+      "columns": 2
+    },
+    {
+      "unit": "armck",
+      "count": 1,
+      "team": 1,
+      "position": [
+        4000,
+        10900
+      ],
+      "spacing": 100
+    }
+  ],
+  "enemy_destination": [
+    4000,
+    10900
+  ],
+  "assertions": {
+    "min_kills": 3,
+    "min_shooters": 3,
+    "max_losses": 0
+  }
+}

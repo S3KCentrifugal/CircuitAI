@@ -36,6 +36,9 @@ private:
     void UpdateAssault(CCircuitUnit* unit,const springai::AIFloat3& pos,int frame);
     bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal,const std::unordered_set<int>* topDefs=nullptr,bool onlyTop=false,const std::unordered_set<int>* alsoDefs=nullptr) const;
     bool UnknownStaticBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to);
+    // Owner 2026-11-24: march_heavy_army. True when a heavy army (or a live commander's reach) covers `at`.
+    bool HeavyArmyAt(const springai::AIFloat3& at,const RangedPolicy& p,const char** why);
+    std::vector<int> armyProbe;
     // Owner 2026-11-24 (Centurion D-gunned by a commander that cloaked): commander_reach_margin hulls
     // remember each commander they saw for LOST_COMMANDER_SECONDS (60 s) after it leaves radar and LOS. Its last
     // position stays danger (its range + margin, growing with the time it has been unseen): escape, and no
