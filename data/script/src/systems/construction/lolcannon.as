@@ -1179,7 +1179,7 @@ namespace LolCannon {
     }
 
     // The gun's aim-from piece over its base (settings *AimHeight): where the engine measures reach from.
-    float AimHeight(CCircuitDef@ gun)
+    float AimHeight(const CCircuitDef@ gun)
     {
         if (gun is null) return 0.0f;
         const string n = gun.GetName();
