@@ -43,6 +43,13 @@ namespace LolCannon {
     // its storage strip, and hold the cannon's footprint and MinTurrets turrets.
     float SiteRangeMarginMin = 150.0f;
     float SiteRangeMarginMax = 650.0f;
+    // owner 2026-11-24: "range" above is the gun's height-aware reach from the candidate to the
+    // enemy start (aiBattle.ReachFrom: the engine's CWeapon::TestRange + CCannon::GetStaticRange2D
+    // from the gun's aim-from piece): a site on high ground sits further out, one below closer in.
+    // The rings run from SiteReachInner x range to SiteReachOuter x range round the start.
+    bool SiteHeightReach = true;
+    float SiteReachInner = 0.6f;
+    float SiteReachOuter = 1.35f;
     float SiteRangeStep = 125.0f;
     int SiteAngles = 64;            // candidates per ring
     int SiteProbes = 96;            // candidates whose footprint is actually tried, nearest our base first, out of the
@@ -221,6 +228,18 @@ namespace LolCannon {
     float RagnarokMuzzle = 133.0f;
     float CalamityMuzzle = 118.0f;
     float StarfallMuzzle = 120.0f;
+    // owner 2026-11-24: the engine measures a weapon's reach from its aim-from piece (the unit
+    // script's AimFromWeapon), not the muzzle: armvulc spindle 115.7, corbuzz spindle 118.4,
+    // legstarfall turretHeadingPivot 23.0 elmos over the base (s3o piece offsets). Fire and site
+    // reach use these; ReachMargin elmos are kept inside the computed reach.
+    float RagnarokAimHeight = 116.0f;
+    float CalamityAimHeight = 118.0f;
+    float StarfallAimHeight = 23.0f;
+    float ReachMargin = 24.0f;
+    // a roster target ordered this long with no shot while the gun has a shot's energy is struck
+    // off for NoFireSkipSeconds (Starfall reload 14 s + windup 5 s); 0: off
+    int NoFireSeconds = 45;
+    int NoFireSkipSeconds = 300;
     // dwell lines: base + perShield x shields; seconds for Ragnarok and Calamity,
     // volleys for the Starfall; "Afus" for advanced fusions, "Other" for every other
     // roster def. Measured headless (tools/playtest/run_lolcannon_shield.py, BAR\lolshield-runs):

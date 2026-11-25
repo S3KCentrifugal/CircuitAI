@@ -96,6 +96,13 @@ public:
 	// script's site search (LolCannon::ArcOk) uses; a blocked one falls `penalty` tiers and adds no
 	// metal to its area. penalty 0: off (the Starfall's high arc is not tested).
 	void SetTierArc(int penalty, float muzzle, float step);
+	// Owner 2026-11-24 (Starfall held a target 6020 away that its shells could not reach):
+	// roster targets count only within the engine's height-aware reach (CBattleAnalysis::ReachFrom)
+	// from the gun's aim-from piece, aimHeight above its base, less `margin` elmos; a gun on
+	// high ground reaches past its flat range, one below falls short. noFireSeconds > 0: a
+	// target ordered that long with no shot while the gun has the energy for one is struck
+	// off for skipSeconds (anything the reach model still gets wrong never stalls the gun).
+	void SetTierReach(float aimHeight, float margin, int noFireSeconds, int skipSeconds);
 	int GetTierAreaShields(int i) const { return ValidArea(i) ? tierAreaShields[i] : -1; }
 
 private:
@@ -302,6 +309,15 @@ private:
 	// Shields and chains on this scan's candidates: tiers raised, chain tiers lowered.
 	void ShieldScan(CCircuitUnit* unit, std::vector<tier::Candidate>& cands, const std::vector<const SEnemyData*>& datas);
 	int tierShotFrame = -1000000;     // the last shot counted
+	float tierAimHeight = 0.f;        // SetTierReach
+	float tierReachMargin = 0.f;
+	int tierNoFireFrames = 0;
+	int tierSkipFrames = 0;
+	bool tierReachSet = false;
+	int tierFireFrame = -1000000;     // the last fire event of the gun
+	int tierTargetSince = -1;         // the frame the target under fire was picked
+	float tierShotEnergy = -1.f;      // the main weapon's energy per shot; -1 not read yet
+	std::unordered_map<int, int> tierNoFire;   // enemy id -> frame its strike-off ends
 	int tierShotGap = -1;             // frames between two shots of the main weapon's salvos; -1 not yet known
 	// Debug strikes
 	int debugKind = -2;               // debug::NUKE, LOL, -1 neither; -2 not yet read

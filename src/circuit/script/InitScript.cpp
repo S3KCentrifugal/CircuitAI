@@ -1740,6 +1740,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float Depth(const AIFloat3& in) const", asMETHOD(CBattleAnalysis, Depth), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float HeightAbove(const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, HeightAbove), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float EffectiveRange(const CCircuitDef@, const AIFloat3& in, const AIFloat3& in) const", asMETHOD(CBattleAnalysis, EffectiveRange), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "float ReachFrom(const CCircuitDef@, const AIFloat3& in, float, const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, ReachFrom), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CBattleAnalysis", "float MaxReach(const CCircuitDef@, const AIFloat3& in, float) const", asMETHOD(CBattleAnalysis, MaxReach), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "int EnemyStaticCovering(const AIFloat3& in, float, float) const", asMETHOD(CBattleAnalysis, EnemyStaticCovering), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "string DescribeEnemy(int) const", asMETHOD(CBattleAnalysis, DescribeEnemy), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CBattleAnalysis", "float MainRange(const CCircuitDef@) const", asMETHOD(CBattleAnalysis, MainRange), asCALL_THISCALL); ASSERT(r >= 0);
@@ -2061,6 +2063,7 @@ void CInitScript::RegisterCSuperTask(asIScriptEngine* engine)
 	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierDwell(const CCircuitDef@, float, float)", asMETHOD(CSuperTask, SetTierDwell), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierChain(bool)", asMETHOD(CSuperTask, SetTierChain), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierArc(int, float, float)", asMETHOD(CSuperTask, SetTierArc), asCALL_THISCALL); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CSuperTask", "void SetTierReach(float, float, int, int)", asMETHOD(CSuperTask, SetTierReach), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierAreaShields(int) const", asMETHOD(CSuperTask, GetTierAreaShields), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "int GetTierBlastSerial() const", asMETHOD(CSuperTask, GetTierBlastSerial), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CSuperTask", "AIFloat3 GetTierBlastPos() const", asMETHOD(CSuperTask, GetTierBlastPos), asCALL_THISCALL); ASSERT(r >= 0);

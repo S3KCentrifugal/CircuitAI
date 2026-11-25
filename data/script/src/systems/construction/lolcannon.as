@@ -1178,6 +1178,24 @@ namespace LolCannon {
         return "blocked " + int(r) + " out";
     }
 
+    // The gun's aim-from piece over its base (settings *AimHeight): where the engine measures reach from.
+    float AimHeight(CCircuitDef@ gun)
+    {
+        if (gun is null) return 0.0f;
+        const string n = gun.GetName();
+        if (n == "legstarfall") return Global::LolCannon::StarfallAimHeight;
+        if (n == "corbuzz") return Global::LolCannon::CalamityAimHeight;
+        return Global::LolCannon::RagnarokAimHeight;
+    }
+
+    // owner 2026-11-24: the reach of `gun` stood at p towards ground point q, height-aware
+    // (higher ground reaches further, lower falls short); the flat range with SiteHeightReach off.
+    float ReachTo(CCircuitDef@ gun, const AIFloat3 &in p, const AIFloat3 &in q)
+    {
+        if (!Global::LolCannon::SiteHeightReach) return gun.GetMaxRange();
+        return aiBattle.ReachFrom(gun, p, AimHeight(gun), q, 0.0f) - Global::LolCannon::ReachMargin;
+    }
+
     // The 2-of-3 rule at candidate p: the enemy start and the top two roster targets in
     // range. Aim points out of reach are left out; a site with none judged passes.
     // At most 3 cached arcs; the target scan stops at the second target in range.
@@ -1194,7 +1212,8 @@ namespace LolCannon {
         AIFloat3 first;
         const float ar = Global::LolCannon::AreaRadius;
         for (uint i = 0; i < arcTargets.length() && found < 2; ++i) {
-            if (MapHelpers::SqDist(arcTargets[i], p) > range * range) continue;
+            const float reach = ReachTo(gun, p, arcTargets[i]);
+            if (MapHelpers::SqDist(arcTargets[i], p) > reach * reach) continue;
             if (found == 1 && MapHelpers::SqDist(arcTargets[i], first) < ar * ar) continue;
             if (found == 0) first = arcTargets[i];
             ++found;
@@ -1234,14 +1253,25 @@ namespace LolCannon {
         array<AIFloat3> best; array<float> bestD; array<int> bestF, bestS;
         // candidates kept: SiteProbes x 4 nearest home; SiteProbes of them may be tried
         const int probes = AiMax(1, Global::LolCannon::SiteProbes) * 4;
+        // owner 2026-11-24: with SiteHeightReach the rings span SiteReachInner..SiteReachOuter of the
+        // flat range and each candidate is kept only where its own height-aware reach to the start
+        // puts the start between reach - marginMax and reach - marginMin (higher ground: further out)
+        const bool heightReach = Global::LolCannon::SiteHeightReach;
+        const float ringRange = heightReach ? range * AiMax(1.0f, Global::LolCannon::SiteReachOuter) : range;
+        const float ringMarginMax = heightReach ? AiMax(marginMax, ringRange - range * AiMin(1.0f, Global::LolCannon::SiteReachInner) + marginMax) : marginMax;
+        int heightSkips = 0;
         for (uint s = 0; s < starts.length(); ++s) {
             for (int k = 0; ; ++k) {
-                const float r = LolCannonMath::RingRadius(range, marginMin, marginMax, Global::LolCannon::SiteRangeStep, k);
+                const float r = LolCannonMath::RingRadius(ringRange, marginMin, ringMarginMax, Global::LolCannon::SiteRangeStep, k);
                 if (r < 0.0f) break;
                 for (int a = 0; a < Global::LolCannon::SiteAngles; ++a) {
                     const float ang = float(a) * 6.2831853f / float(AiMax(1, Global::LolCannon::SiteAngles));
                     const AIFloat3 p(starts[s].x + cos(ang) * r, 0.0f, starts[s].z + sin(ang) * r);
                     if (p.x < margin || p.z < margin || p.x > w - margin || p.z > h - margin) continue;
+                    if (heightReach) {
+                        const float reach = ReachTo(gun, p, starts[s]);
+                        if (r > reach - marginMin || r < reach - marginMax) { ++heightSkips; continue; }
+                    }
                     const float d = MapHelpers::SqDist(p, home);
                     if (int(best.length()) >= probes && d >= bestD[best.length() - 1]) continue;
                     uint at = best.length();
@@ -1343,7 +1373,8 @@ namespace LolCannon {
                     + turretPos.length() + " turrets and " + storePos.length() + " " + st.GetName() + " beside it ("
                     + storesReserved + " storage slots reserved)"
                     + (layoutOn ? " (reserved)" : " (FRONT: cannon, turret block and storage strip held, orders unpinned)") + "; against the enemy spawn at (" + int(siteTarget.x) + ", "
-                    + int(siteTarget.z) + "), " + int(sqrt(MapHelpers::SqDist(site, siteTarget))) + " away: " + targetWhy + backWhy
+                    + int(siteTarget.z) + "), " + int(sqrt(MapHelpers::SqDist(site, siteTarget))) + " away, height-aware reach " + int(ReachTo(gun, site, siteTarget))
+                    + " (ground " + int(aiBattle.Height(site)) + " here, " + int(aiBattle.Height(siteTarget)) + " there; " + heightSkips + " ring spots out of reach skipped): " + targetWhy + backWhy
                     + (skipPorc > 0 ? "; " + skipPorc + " nearer candidate(s) under enemy porc (first: " + aiBattle.DescribeEnemy(firstPorc) + ")" : "")
                     + (skipBar > 0 ? "; " + skipBar + " nearer candidate(s) in an abandoned site's barred area" : "")
                     + (arcOn ? "; arc " + siteArc + (skipArc > 0 ? "; " + skipArc + " nearer candidate(s) terrain-blocked (first " + firstArc + ")" : "")
@@ -1361,7 +1392,7 @@ namespace LolCannon {
         if (!found && clr.length() > 0 && !LolCannonClear::Active()) PickClear(gun, nano, st, clr, clrF, clrS, clrD, starts, targetWhy + backWhy, 1.0e30f);
         if (!found)
             GenericHelpers::LogUtil("[LolCannon] no site for " + gun.GetName() + " (range " + int(range) + ") just inside reach of "
-                + starts.length() + " enemy start(s): " + best.length() + " candidates, " + scored + " scored, " + tried
+                + starts.length() + " enemy start(s): " + best.length() + " candidates (" + heightSkips + " ring spots out of height-aware reach), " + scored + " scored, " + tried
                 + " tried (cannon refused " + refusedGun + ", turrets short " + shortTurrets + ", best " + bestTurrets + "/"
                 + Global::LolCannon::MinTurrets + "); skipped: " + skipResource + " on metal/geo spots, " + skipLayout
                 + " on ally layouts, reservations or structures, " + skipFailed + " near a failed site, " + skipPorc + " under enemy porc, "
@@ -2428,6 +2459,8 @@ namespace LolCannon {
         // owner 2026-11-23: fire targets get the site search's arc test (ArcMuzzle < 0: Starfall, or ArcCheck off)
         const float arcMuzzle = ArcMuzzle(u.circuitDef);
         st.SetTierArc(arcMuzzle >= 0.0f ? AiMax(0, Global::LolCannon::ArcFireTierPenalty) : 0, AiMax(0.0f, arcMuzzle), Global::LolCannon::ArcStep);
+        // owner 2026-11-24: roster targets only within the height-aware reach, a target never held without a shot
+        st.SetTierReach(AimHeight(u.circuitDef), Global::LolCannon::ReachMargin, Global::LolCannon::NoFireSeconds, Global::LolCannon::NoFireSkipSeconds);
         if (Global::LolCannon::ShieldMax <= 0) return;
         // seconds become frames for Ragnarok and Calamity; Starfall volleys stay shots
         const float unit = star ? 1.0f : float(SECOND);

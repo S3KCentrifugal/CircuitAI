@@ -71,6 +71,15 @@ public:
 	// Owner 2026-11-15: the main weapon's height-aware 2-D reach between two heights
 	// (callers that already know the heights: assault micro, porc checks).
 	float ReachAt(const CCircuitDef* cdef, float fromY, float toY) const;
+	// Owner 2026-11-24 (Starfall shot past its reach): the engine's own test, CWeapon::TestRange,
+	// measures from the weapon's aim-from piece (aimFromPos) to the target's aim point. ReachFrom
+	// takes the ground under each end plus aimHeight (the aim-from piece above the shooter's base)
+	// and targetLift (the target's aim point above its ground): a gun built higher reaches further,
+	// one below reaches less. MaxReach: the furthest it can reach from that height at all
+	// (a target at sea level), a cheap bound before the exact test.
+	float ReachFrom(const CCircuitDef* cdef, const springai::AIFloat3& from, float aimHeight,
+			const springai::AIFloat3& to, float targetLift) const;
+	float MaxReach(const CCircuitDef* cdef, const springai::AIFloat3& from, float aimHeight) const;
 	const weapon_reach::Ballistics& MainBallistics(const CCircuitDef* cdef) const;
 	// Owner 2026-11-15: the id of a seen or ghost enemy armed structure (flat range
 	// at most maxRange) whose height-aware reach plus margin covers pos, else -1.

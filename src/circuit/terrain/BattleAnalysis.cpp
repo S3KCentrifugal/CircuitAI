@@ -260,6 +260,18 @@ float CBattleAnalysis::EffectiveRange(const CCircuitDef* cdef, const AIFloat3& f
 	return ReachAt(cdef, std::max(0.f, Height(from)), std::max(0.f, Height(to)));
 }
 
+float CBattleAnalysis::ReachFrom(const CCircuitDef* cdef, const AIFloat3& from, float aimHeight,
+		const AIFloat3& to, float targetLift) const
+{
+	return ReachAt(cdef, std::max(0.f, Height(from)) + aimHeight, std::max(0.f, Height(to)) + targetLift);
+}
+
+float CBattleAnalysis::MaxReach(const CCircuitDef* cdef, const AIFloat3& from, float aimHeight) const
+{
+	// reach grows as the target drops; nothing stands below sea level's surface
+	return ReachAt(cdef, std::max(0.f, Height(from)) + aimHeight, 0.f);
+}
+
 int CBattleAnalysis::EnemyStaticCovering(const AIFloat3& pos, float margin, float maxRange) const
 {
 	if (!std::isfinite(pos.x) || !std::isfinite(pos.z)) return -1;

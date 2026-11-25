@@ -1609,6 +1609,7 @@ void CSuperTask::OnLaunch(CCircuitUnit* unit, const char* how)
 		}
 		syncAnchorVolley = -1;
 	}
+	tierFireFrame = frame;
 	CountTierShot(unit, frame);
 	const bool nuke = IsNukeSilo(d), pulse = IsPulse(d);
 	if (!nuke && !pulse) return;
@@ -1733,6 +1734,38 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	{
 		targetFrame = frame - tierRetargetFrames;  // the dwell is up: the next area now
 	}
+	if ((tierNoFireFrames > 0) && (tierTargetId >= 0) && (tierTargetSince >= 0) && (tierFireFrame < tierTargetSince)
+		&& (frame - tierTargetSince >= tierNoFireFrames))
+	{
+		if (tierShotEnergy < 0.f) {
+			tierShotEnergy = 0.f;
+			auto mounts = unit->GetCircuitDef()->GetDef()->GetWeaponMounts();
+			float reload = -1.f;
+			for (springai::WeaponMount* mount : mounts) {
+				springai::WeaponDef* wd = mount->GetWeaponDef();
+				if (wd->GetReload() > reload) {
+					reload = wd->GetReload();
+					tierShotEnergy = wd->GetCost(circuit->GetEconomyManager()->GetEnergyRes());
+				}
+				delete wd;
+				delete mount;
+			}
+		}
+		// a gun short of the energy for a shot is waiting, not out of reach
+		if (circuit->GetEconomyManager()->GetEnergyCur() >= tierShotEnergy) {
+			const CEnemyInfo* gone = circuit->GetEnemyInfo(tierTargetId);
+			circuit->LOG("TIER: team=%i frame=%i %s(%i): no shot at %s(%i) in %i s on the order (energy %.0f of %.0f a shot): struck off %i s",
+					circuit->GetTeamId(), frame, unit->GetCircuitDef()->GetDef()->GetName(), unit->GetId(),
+					((gone != nullptr) && (gone->GetCircuitDef() != nullptr)) ? gone->GetCircuitDef()->GetDef()->GetName() : "?", tierTargetId,
+					(frame - tierTargetSince) / FRAMES_PER_SEC, circuit->GetEconomyManager()->GetEnergyCur(), tierShotEnergy,
+					tierSkipFrames / FRAMES_PER_SEC);
+			tierNoFire[tierTargetId] = frame + tierSkipFrames;
+			tierTargetSince = -1;
+			targetFrame = frame - tierRetargetFrames;
+		} else {
+			tierTargetSince = frame;   // the clock restarts once the energy is there
+		}
+	}
 	if (targetFrame + tierRetargetFrames > frame) {
 		return;
 	}
@@ -1745,7 +1778,12 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	std::vector<tier::Candidate> candidates;
 	std::vector<const SEnemyData*> candidateDatas;
 	CCircuitDef* cdef = unit->GetCircuitDef();
-	const float maxSqRange = SQUARE(cdef->GetMaxRange());
+	const CBattleAnalysis* battle = circuit->GetBattle();
+	const bool useReach = tierReachSet && (battle != nullptr);
+	// the flat range, or with the height-aware reach the furthest this gun reaches at all
+	const float boundRange = useReach ? std::max(cdef->GetMaxRange(), battle->MaxReach(cdef, position, tierAimHeight)) : cdef->GetMaxRange();
+	const float boundSqRange = SQUARE(boundRange);
+	const float maxSqRange = boundSqRange;
 	tierDeadNow.clear();
 	if (WatchBlasts(unit, maxSqRange)) {
 		tierRotation.topId = -1;  // a new likely kill: the rotation restarts at the top (TopChanged)
@@ -1754,7 +1792,6 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	tier::Candidate best{-1, 0, 0.f, 0.f};
 	const SEnemyData* bestData = nullptr;
 	const auto* enemies = circuit->GetEnemyManager();
-	const CBattleAnalysis* battle = circuit->GetBattle();
 	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
 		for (const SEnemyData& e : *pool) {
 			if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore() || (e.cdef == nullptr)) {
@@ -1777,22 +1814,31 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 				continue;
 			}
 			const float sqDist = position.SqDistance2D(e.pos);
-			if (sqDist >= maxSqRange) {
+			if (sqDist >= boundSqRange) {
 				continue;
 			}
-			// owner 2026-11-24: a Starfall picked a target 6000 off (2180, 4628) while its
-			// reach that way ended ~5790 out: the flat range holds on level ground only. A
-			// cannon's shell reaches less far uphill (engine CCannon::GetStaticRange2D), so
-			// past half the flat range the target is checked at its height.
-			if ((battle != nullptr) && (sqDist >= 0.25f * maxSqRange)) {
-				const float reach = battle->EffectiveRange(cdef, position, e.pos);
-				if (sqDist >= SQUARE(reach)) {
+			if (useReach) {
+				// owner 2026-11-24: a Starfall picked a target 6020 off (2152, 4600) while its reach
+				// that way ended ~5790 out, and held it 2 min 45 s without a shot. The engine's test
+				// (CWeapon::TestRange): from the aim-from piece to the target's aim point (a unit in
+				// sight: about half its height up; a ghost is struck at its ground), heightmod scaled,
+				// CCannon::GetStaticRange2D's boost factors: further downhill, shorter uphill.
+				const float lift = e.IsInRadarOrLOS() ? 0.5f * e.cdef->GetHeight() : 0.f;
+				const float reach = battle->ReachFrom(cdef, position, tierAimHeight, e.pos, lift) - tierReachMargin;
+				if (sqDist >= SQUARE(std::max(0.f, reach))) {
 					if ((it->second <= 2) && tierSkipLogged.insert(e.id).second) {
-						circuit->LOG("TIER: team=%i %s(%i): skips %s(%i) at (%.0f, %.0f): %.0f away, reach %.0f there (uphill)",
+						circuit->LOG("TIER: team=%i %s(%i): skips %s(%i) at (%.0f, %.0f): %.0f away, height-aware reach %.0f there (flat %.0f; ground %.0f here, %.0f there)",
 								circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
-								e.pos.x, e.pos.z, std::sqrt(sqDist), reach);
+								e.pos.x, e.pos.z, std::sqrt(sqDist), reach, cdef->GetMaxRange(), battle->Height(position), battle->Height(e.pos));
 					}
 					continue;
+				}
+			}
+			{
+				const auto nf = tierNoFire.find(e.id);
+				if (nf != tierNoFire.end()) {
+					if (frame < nf->second) continue;
+					tierNoFire.erase(nf);
 				}
 			}
 			tier::Candidate c{e.id, it->second, e.cost, sqDist, e.pos.x, e.pos.z};
@@ -1841,6 +1887,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 					circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), cdef->GetMaxRange());
 		}
 		tierTargetId = -1;
+		tierTargetSince = -1;
 		SetTarget(nullptr);
 		state = State::ROAM;
 		return;
@@ -1855,6 +1902,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 		return;  // still on it
 	}
 	if (isNew) {
+		tierTargetSince = frame;
 		circuit->LOG("TIER: team=%i frame=%i %s(%i): tier %i %s(%i) cost=%.0f at (%i,%i), %.0f away%s",
 				circuit->GetTeamId(), frame, cdef->GetDef()->GetName(), unit->GetId(), best.tier, bestData->cdef->GetDef()->GetName(), bestData->id,
 				bestData->cost, int(bestData->pos.x), int(bestData->pos.z), std::sqrt(best.sqDist), onUnit ? "" : " (last seen)");
@@ -1867,6 +1915,15 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	ExecuteAttack(unit);
 	tierOrderFrame = frame;
 	tierOrderOnUnit = onUnit;
+}
+
+void CSuperTask::SetTierReach(float aimHeight, float margin, int noFireSeconds, int skipSeconds)
+{
+	tierAimHeight = std::max(0.f, aimHeight);
+	tierReachMargin = std::max(0.f, margin);
+	tierNoFireFrames = std::max(0, noFireSeconds) * FRAMES_PER_SEC;
+	tierSkipFrames = std::max(0, skipSeconds) * FRAMES_PER_SEC;
+	tierReachSet = true;
 }
 
 void CSuperTask::SetTierRotation(int areas, int dwellFrames, int dwellShots, float radius)
