@@ -984,14 +984,14 @@ namespace StealthScout {
             const float dg = pos.distance2D(s.goal);
             // s1 11-23: parking 500-600 out at a route's end lost LOS (sight 494-550): park
             // within 120 of the post; a route ending short gets one direct leg, twice at most.
-            if (dg > 120.0f && s.task.IsAtEnd(u) && s.issuedEnd >= s.route.length() && s.closeTries < 2) {
+            if (dg > 80.0f && s.task.IsAtEnd(u) && s.issuedEnd >= s.route.length() && s.closeTries < 2) {
                 ++s.closeTries;
                 array<AIFloat3> leg = {s.goal};
                 s.task.SetRoute(leg);
                 s.route = leg; s.cursor = 0; s.issuedEnd = 1;
                 return;
             }
-            const bool arrived = dg <= 120.0f || (s.closeTries >= 2 && s.task.IsAtEnd(u) && dg <= Global::StealthScout::ArriveElmos);
+            const bool arrived = dg <= 80.0f || (s.closeTries >= 2 && s.task.IsAtEnd(u) && dg <= Global::StealthScout::ArriveElmos);
             if (arrived) {
                 Hold(s, pos);
                 s.parked = true; s.goneChecks = 0; s.parkedFrame = ai.frame; s.lastUseful = ai.frame; s.lastSpotCheck = ai.frame - SECOND * 3; s.losSince = -1;
