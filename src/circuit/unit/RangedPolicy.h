@@ -167,6 +167,13 @@ struct RangedPolicy {
     std::unordered_set<int> topTargetDefs;
     int assaultMinGroup = 3;
     float assaultMaxWait = 45.f;
+    // Owner 2026-11-24: ghost_heavy. Ghost images of these defs also take ghost_volleys_heavy
+    // (Lance: 3 per Sentinel/Warden/Cacophony ghost), besides the profile-wide heavy list.
+    std::unordered_set<int> ghostHeavyDefs;
+    // Owner 2026-11-24 (T1 artillery): screen_poke. A live porc_hazards structure that outranges our firing
+    // ring, with an allied combat unit between us and it, is no hazard while our main gun is loaded: the hull
+    // steps in for a shot and, once reloading, the normal escape takes it back out. Individual controller only.
+    bool screenPoke = false;
     // Owner 2026-10-28: permanent fire at will. The controller opens fire when
     // it takes the unit and never sets hold fire (no poke, cohort-hold or spam
     // gating); priority targets still steer the guns. Overrides fireAtWill.

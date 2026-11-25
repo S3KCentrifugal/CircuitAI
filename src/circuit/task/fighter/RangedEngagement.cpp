@@ -98,7 +98,7 @@ CRangedEngagement::CRangedEngagement(CCircuitAI* ai,IUnitTask* owner,CCircuitUni
     // firing range clears liveWeapon; treating that as ready made poke phases
     // alternate every decision while the gun was actually still reloading.
     // One wrapper per controller lifetime, one fresh callback per decision.
-    if(policy.coordinated && policy.pokeIn>0.f && !caps.weapons.empty()) {
+    if(((policy.coordinated && policy.pokeIn>0.f) || (policy.screenPoke && !policy.coordinated)) && !caps.weapons.empty()) {   // owner 2026-11-24: screen_poke reads the reload too
         pokeWeapon.reset(unit->GetUnit()->GetWeapon(caps.weapons.front().mount.get()));
         pokeReload=pokeWeapon->GetReloadFrame();
     }
@@ -499,16 +499,51 @@ void CRangedEngagement::UpdateAssault(CCircuitUnit* unit,const AIFloat3& pos,int
     if(go && !assaultGo) ai->LOG("RANGED: assault in unit=%d porc=%d waiting=%d",id,bestId,waiting);
     assaultGo=go;
 }
-bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal,const std::unordered_set<int>* topDefs,bool onlyTop) const
+// Owner 2026-11-24 (T1 artillery: Barrage, Shellshocker, Lance, Wolverine): screen_poke. The nearest live
+// (LOS or radar), identified porc_hazards structure that outranges our firing ring, within our range + 600,
+// with an allied combat unit between us and it (HasScreen), is exempt from coverage while the main gun is
+// loaded; reloading, it is coverage again and the escape step takes the hull back out. O(nearby contacts).
+void CRangedEngagement::UpdateScreenPoke(CCircuitUnit* unit,const AIFloat3& pos,int frame)
+{
+    pokePorc=-1;
+    if(assaultGo || !pokeWeapon || pokeReload>frame) return;
+    const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
+    float maxRange=0.f;
+    for(const auto& w:caps.weapons) maxRange=std::max(maxRange,w.range);
+    const float ring=maxRange*p.rangeFraction;
+    world.Nearby(pos,maxRange+600.f,pokeNearby);
+    const auto& contacts=world.Contacts();
+    float best=std::numeric_limits<float>::max();
+    for(int i:pokeNearby) {
+        const auto& c=contacts[i];
+        if(c.def==nullptr || c.mobile || c.ghost || !c.armed || c.def->IsAbleToFly()) continue;
+        if(p.porcHazardList && p.porcHazardDefs.count(c.def->GetId())==0) continue;
+        if(world.Hz(c,p.pressStatic)+StaticMargin(p)<ring) continue;   // we outrange it: the normal firing ring works
+        const float d2=pos.SqDistance2D(c.pos);
+        if(d2>=best || !world.HasScreen(id,pos,c.pos)) continue;
+        best=d2; pokePorc=c.id; pokePos=c.pos;
+    }
+    if(pokePorc>=0 && pokePorc!=pokeLogged) {
+        pokeLogged=pokePorc;
+        ai->LOG("RANGED: screen poke unit=%d porc=%d at=%.0f,%.0f dist=%.0f",id,pokePorc,pokePos.x,pokePos.z,std::sqrt(best));
+    } else if(pokePorc<0) pokeLogged=-1;
+}
+bool CRangedEngagement::GhostStructure(const AIFloat3& pos,AIFloat3& goal,const std::unordered_set<int>* topDefs,bool onlyTop,const std::unordered_set<int>* alsoDefs) const
 {
     float best=std::numeric_limits<float>::max();
+    const std::unordered_map<int,int>* doneLedger=(alsoDefs!=nullptr && !alsoDefs->empty())
+        ? &ai->GetMilitaryManager()->GetArtySnipeState(id,ai->GetLastFrame()).ghostDone : nullptr;
     for(const auto& kv:ai->GetEnemyManager()->GetEnemyUnits()) {
         const CEnemyUnit* e=kv.second;
         if(e==nullptr || e->IsHidden() || e->IsInRadarOrLOS() || e->IsBeingBuilt()) continue;
         const CCircuitDef* d=e->GetCircuitDef();
         if(d==nullptr || d->IsMobile() || d->IsAbleToFly()) continue;
-        if(onlyTop && (topDefs==nullptr || topDefs->count(d->GetId())==0)) continue;   // owner 2026-11-23: other artillery: top targets only
+        // owner 2026-11-23: other artillery: top targets only; owner 2026-11-24: plus the hull's ghost_heavy defs (Lance: Sentinel/Warden)
+        if(onlyTop && (topDefs==nullptr || topDefs->count(d->GetId())==0) && (alsoDefs==nullptr || alsoDefs->count(d->GetId())==0)) continue;
         if(e->GetData().losStatus & (SEnemyData::DEAD|SEnemyData::DYING)) continue;
+        // owner 2026-11-24 (Lance): a ghost_heavy hull leaves a ghost once its volleys for this dark period are spent
+        // (GhostFireStep ledger: 3 heavy / 1 other); it becomes an objective again when seen and lost again.
+        if(doneLedger!=nullptr) { auto it=doneLedger->find(e->GetId()); if(it!=doneLedger->end() && it->second==e->GetDarkSince()) continue; }
         const AIFloat3& p=e->GetPos();
         if(!std::isfinite(p.x) || !std::isfinite(p.z) || p.x<0.f || p.z<0.f) continue;
         float dist=pos.SqDistance2D(p);
@@ -549,7 +584,7 @@ bool CRangedEngagement::March(CCircuitUnit* unit,const AIFloat3& pos,const AIFlo
         const int now=ai->GetLastFrame();
         const auto& p=unit->GetCircuitDef()->GetRangedPolicy();
         ExactStaticScope exact(world,p);
-        PorcExemptScope exempt(world,assaultGo?assaultPorc:-1,assaultPos);   // owner 2026-11-23
+        PorcExemptScope exempt(world,ExemptPorc(),ExemptPos());   // owner 2026-11-23
         world.Refresh();
         const auto points=static_cast<const CQueryPathSingle*>(result)->GetPathInfo()->posPath;
         const AIFloat3 current=unit->GetPos(now);
@@ -752,7 +787,7 @@ bool CRangedEngagement::Move(CCircuitUnit* unit,const AIFloat3& dest,bool escape
         world.Refresh();
         // Owner 2026-11-23: the group's assault exemption holds for the path check too (arena: every move to
         // the firing site at 98% of the assaulted Persecutor was rejected here, ~900 times per unit).
-        PorcExemptScope exempt(world,assaultGo?assaultPorc:-1,assaultPos);
+        PorcExemptScope exempt(world,ExemptPorc(),ExemptPos());
         if(world.IsSustainedRush(id)) {
             const auto& plan=world.PlanCohort(unit);
             const auto current=unit->GetPos(ai->GetLastFrame());
@@ -1242,7 +1277,8 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     const auto pos=unit->GetPos(frame);
     if(caps.weapons.empty()) return;
     if(policy.porcHazardList && !policy.heavyPorcDefs.empty()) UpdateAssault(unit,pos,frame);
-    PorcExemptScope exempt(world,assaultGo?assaultPorc:-1,assaultPos);
+    if(policy.screenPoke && !policy.coordinated) UpdateScreenPoke(unit,pos,frame);
+    PorcExemptScope exempt(world,ExemptPorc(),ExemptPos());
     // Discard already traversed waypoints. Validating a route back to its old
     // start incorrectly rejects a successful escape as renewed exposure.
     while(pathCursor<path.size() && (pos.SqDistance2D(path[pathCursor])<4096.f
@@ -1741,6 +1777,10 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
     if(assaultGo && !assaultGhostTarget && assaultPorc>=0) {
         for(size_t i=0;i<contacts.size();++i) if(contacts[i].id==assaultPorc) { objective=int(i); break; }
     }
+    // Owner 2026-11-24: a screened, outranging porc with our gun loaded is the objective (step in for the shot).
+    if(!assaultGo && pokePorc>=0) {
+        for(size_t i=0;i<contacts.size();++i) if(contacts[i].id==pokePorc) { objective=int(i); break; }
+    }
     const bool ignoredOnly=objective<0 && ignoredObjective>=0;
     if(ignoredOnly) objective=ignoredObjective;
     if(report && unknownObjectives>0) ai->LOG("RANGED: unknown radar approach withheld unit=%d candidates=%d",id,unknownObjectives);
@@ -1753,7 +1793,7 @@ void CRangedEngagement::Update(CCircuitUnit* unit)
             AIFloat3 ghostPos;
             const bool assaultGhost=assaultGo && assaultGhostTarget;
             if (assaultGhost) ghostPos=assaultPos;
-            if (assaultGhost || GhostStructure(pos,ghostPos,&policy.topTargetDefs,policy.heavyPorcDefs.empty())) {
+            if (assaultGhost || GhostStructure(pos,ghostPos,&policy.topTargetDefs,policy.heavyPorcDefs.empty(),&policy.ghostHeavyDefs)) {
                 // Owner 2026-11-23: 98% of the real reach from here to the ground under the image:
                 // shorter uphill, longer from a hilltop (engine reach, same as firing sites).
                 ghostPos.y=ai->GetTerrainManager()->GetAreaData()->GetElevationAt(ghostPos.x,ghostPos.z);

@@ -622,6 +622,7 @@ void CFactoryManager::ReadConfig()
 			boolean("cloak_on_reload", policy.cloakOnReload);
 			boolean("allow_mobile", policy.allowMobile);
 			boolean("allow_static", policy.allowStatic);
+			boolean("screen_poke", policy.screenPoke);   // owner 2026-11-24
 			boolean("prefer_heavy", policy.preferHeavy);
 			boolean("prefer_screen", policy.preferScreen);
 			boolean("allow_radar", policy.allowRadar);
@@ -676,6 +677,15 @@ void CFactoryManager::ReadConfig()
 					else policy.heavyPorcDefs.insert(heavyDef->GetId());
 				}
 				policy.assaultMinGroup = std::max(1, std::min(20, settings.get("assault_min_group", policy.assaultMinGroup).asInt()));
+				// owner 2026-11-24: ghost_heavy (defs whose ghosts take ghost_volleys_heavy for this hull)
+				const auto& gh = settings["ghost_heavy"];
+				if (!gh.isNull() && !gh.isArray()) valid = false;
+				else for (const auto& name : gh) {
+					if (!name.isString()) { valid = false; continue; }
+					CCircuitDef* ghDef = circuit->GetCircuitDef(name.asCString());
+					if (ghDef == nullptr) circuit->LOG("CONFIG %s: %s ghost_heavy has unknown unit '%s'", cfgName.c_str(), defName.c_str(), name.asCString());
+					else policy.ghostHeavyDefs.insert(ghDef->GetId());
+				}
 				number("assault_max_wait", policy.assaultMaxWait, 0.f, 600.f);
 			}
 			{   // owner 2026-11-23: top_targets (own list, else ranged_defaults.top_targets): LRPC, tactical launchers,

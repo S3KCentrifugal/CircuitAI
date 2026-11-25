@@ -1356,7 +1356,8 @@ bool GhostFireStep(CCircuitAI* circuit, CCircuitUnit* unit, const AIFloat3& pos,
 			const CCircuitDef* gd = ge->GetCircuitDef();
 			// owner 2026-11-24: plus heavy static artillery, ranged_defaults.top_targets (LRPC, tactical launchers)
 			const bool heavyGhost = (gd != nullptr) && ((gsi.threats.count(gd->GetId()) > 0) || (gsi.directThreats.count(gd->GetId()) > 0)
-				|| gfm->IsTopTarget(gd));
+				|| gfm->IsTopTarget(gd)
+				|| ((volleyLimit > 0) && cdef->GetRangedPolicy().ghostHeavyDefs.count(gd->GetId()) > 0));   // owner 2026-11-24: ghost_heavy
 			const int need = volleyLimit > 0 ? ((heavyGhost && heavyVolleyLimit > 0) ? heavyVolleyLimit : volleyLimit)
 				: GhostNeedFor(gsi, gd, cdef);
 			circuit->LOG("ARTY: %s %i ghost volley %i/%i at %i", cdef->GetDef()->GetName(), unit->GetId(), n, need, track.target);

@@ -60,7 +60,19 @@ def main():
     p.add_argument('--los-off', type=int, default=90, help='ghost mode: game second global LOS goes off')
     p.add_argument('--speed', type=float, default=10)
     p.add_argument('--stage-only', action='store_true')
+    p.add_argument('--units', default='', help='comma-separated AI unit defs given at the gantry (default: the T3 artillery mix)')
+    p.add_argument('--porc', default='', help='host heavy porc as def:along:side;... (default: Bastion + Persecutor at 2300, +-350)')
+    p.add_argument('--bonus', default='50', help='handicap percent for the AI team')
+    p.add_argument('--bare', action='store_true', help='porc only: no Peewees/rez bots, no Catalyst/Bertha/silo')
     a = p.parse_args()
+    global UNITS, PORC, PORC_DEFS, MOBILES, OTHER_STATIC
+    if a.bare:
+        MOBILES, OTHER_STATIC = [], []
+    if a.units:
+        UNITS = [u.strip() for u in a.units.split(',') if u.strip()]
+    if a.porc:
+        PORC = [(d,) + tuple(int(c) for c in at(float(al), float(sd))) for d, al, sd in (x.split(':') for x in a.porc.split(';') if x)]
+        PORC_DEFS = sorted({r[0] for r in PORC})
     os.environ["BAR_PLAYTEST_LOW_PRIORITY"] = "1"
     os.environ["CIRCUIT_RANGED_TRACE"] = "1"
     if a.baseline:
@@ -81,7 +93,7 @@ def main():
                    '--map-file', str(ROOT / 'data/script/src/maps/full_metal_plate.as'),
                    '--role', 'FRONT', '--roles', 'FRONT', '--side', 'legion', '--isolated',
                    '--modoption', 'deathmode=neverend', '--modoption', 'allowunitcontrolwidgets=1',
-                   '--ai-option', 'profile=experimental_balanced',
+                   '--ai-option', 'profile=experimental_balanced', '--bonus', str(a.bonus),
                    '--mode', 'fast', '--speed', str(a.speed), '--minutes', str(minutes), '--headless', '--lean-render',
                    '--extra-widget', str(HERE / 'widgets/daedalus_arena_fixture.lua'), '--extra-widget', str(HERE / 'widgets/t3arty_arena_watch.lua')]
     subprocess.run(stage, cwd=ROOT, check=True)

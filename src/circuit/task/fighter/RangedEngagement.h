@@ -34,7 +34,7 @@ private:
     bool LegalPath(CCircuitUnit* unit,const std::vector<springai::AIFloat3>& route,bool escape);
     bool SafeMove(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to,float margin,bool escape);
     void UpdateAssault(CCircuitUnit* unit,const springai::AIFloat3& pos,int frame);
-    bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal,const std::unordered_set<int>* topDefs=nullptr,bool onlyTop=false) const;
+    bool GhostStructure(const springai::AIFloat3& pos,springai::AIFloat3& goal,const std::unordered_set<int>* topDefs=nullptr,bool onlyTop=false,const std::unordered_set<int>* alsoDefs=nullptr) const;
     bool UnknownStaticBlocks(CCircuitUnit* unit,const springai::AIFloat3& from,const springai::AIFloat3& to);
     // Owner 2026-11-24 (Centurion D-gunned by a commander that cloaked): commander_reach_margin hulls
     // remember each commander they saw for LOST_COMMANDER_SECONDS (60 s) after it leaves radar and LOS. Its last
@@ -107,6 +107,10 @@ private:
     int fullLogged=-1;   // owner 2026-11-24: last full-reach target logged
     int haltStreak=0; springai::AIFloat3 haltPos;   // owner 2026-11-23: no-freeze guard
     int assaultPorc=-1; bool assaultGo=false, assaultGhostTarget=false, assaultLogged=false; springai::AIFloat3 assaultPos;   // owner 2026-11-23: heavy porc assault
+    int pokePorc=-1, pokeLogged=-1; springai::AIFloat3 pokePos; std::vector<int> pokeNearby;   // owner 2026-11-24: screen_poke
+    int ExemptPorc() const { return assaultGo?assaultPorc:pokePorc; }
+    const springai::AIFloat3& ExemptPos() const { return assaultGo?assaultPos:pokePos; }
+    void UpdateScreenPoke(CCircuitUnit* unit,const springai::AIFloat3& pos,int frame);
     std::vector<springai::AIFloat3> unknownStill; int unknownStillFrame=-1;   // owner 2026-11-21: unknown_static_reach
     springai::AIFloat3 marchGoal;
     // Owner 2026-11-23 (Salt Reef): shun_seconds. Contacts left alone until a
