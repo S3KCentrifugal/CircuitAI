@@ -1754,6 +1754,7 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 	tier::Candidate best{-1, 0, 0.f, 0.f};
 	const SEnemyData* bestData = nullptr;
 	const auto* enemies = circuit->GetEnemyManager();
+	const CBattleAnalysis* battle = circuit->GetBattle();
 	for (const auto* pool : {&enemies->GetHostileDatas(), &enemies->GetPeaceDatas()}) {
 		for (const SEnemyData& e : *pool) {
 			if (e.IsFake() || e.IsDead() || e.IsDying() || e.IsIgnore() || (e.cdef == nullptr)) {
@@ -1778,6 +1779,21 @@ void CSuperTask::UpdateTiered(CCircuitUnit* unit)
 			const float sqDist = position.SqDistance2D(e.pos);
 			if (sqDist >= maxSqRange) {
 				continue;
+			}
+			// owner 2026-11-24: a Starfall picked a target 6000 off (2180, 4628) while its
+			// reach that way ended ~5790 out: the flat range holds on level ground only. A
+			// cannon's shell reaches less far uphill (engine CCannon::GetStaticRange2D), so
+			// past half the flat range the target is checked at its height.
+			if ((battle != nullptr) && (sqDist >= 0.25f * maxSqRange)) {
+				const float reach = battle->EffectiveRange(cdef, position, e.pos);
+				if (sqDist >= SQUARE(reach)) {
+					if ((it->second <= 2) && tierSkipLogged.insert(e.id).second) {
+						circuit->LOG("TIER: team=%i %s(%i): skips %s(%i) at (%.0f, %.0f): %.0f away, reach %.0f there (uphill)",
+								circuit->GetTeamId(), cdef->GetDef()->GetName(), unit->GetId(), e.cdef->GetDef()->GetName(), e.id,
+								e.pos.x, e.pos.z, std::sqrt(sqDist), reach);
+					}
+					continue;
+				}
 			}
 			tier::Candidate c{e.id, it->second, e.cost, sqDist, e.pos.x, e.pos.z};
 			if (likelyKilled) {

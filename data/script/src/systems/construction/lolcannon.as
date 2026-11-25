@@ -104,9 +104,9 @@ this program (owner, 2026-10-26):
                      (7 armuwadves / coruwadves, 9 legadvestore for the
                      Starfall) as a strip StorageCols (2) wide, then assist.
                      A storage slot that does not reserve, or whose orders
-                     keep failing, moves to the nearest free spot within
-                     StoreSearchRadius of the strip, off the turret block and
-                     off every other storage slot.
+                     keep failing, moves to the nearest free spot round the
+                     strip, ring by ring out to StoreSearchMaxRadius, off the
+                     turret block and off every other storage slot.
           Our own finished air constructors are claimed first, new ones as
           they come out; the rest are ordered from our air plants,
           CrewRecruitBatch every CrewOrderSeconds. With no plant that makes a
@@ -1656,7 +1656,11 @@ namespace LolCannon {
             // the 300 s timer). Not while building: there units leave fresh orders at once
             // (11-07 test) and native hands them on as before.
             bool first = false;
-            IUnitTask@ orphan = (phase == STORES) ? Unworked(tasks, what, first) : null;
+            // owner 2026-11-24 (cannon 1 left 7 of 9 storages for 7 minutes): storage
+            // orders are handed out while building too; with 7 standing and 2 in flight the
+            // strip counted full and nobody took the 2 their crew had dropped. The 45 s clock
+            // runs from the first hand-out, so a fresh order is never aborted for being re-asked.
+            IUnitTask@ orphan = (phase == STORES || type == Task::BuildType::STORE) ? Unworked(tasks, what, first) : null;
             if (first)
                 GenericHelpers::LogUtil("[LolCannon] " + u.circuitDef.GetName() + " " + u.id + " takes an unworked " + what + " order", 1);
             return orphan;
@@ -1702,7 +1706,7 @@ namespace LolCannon {
         int flying = 0;
         for (uint k = 0; k < storeTask.length(); ++k) if (storeTask[k] !is null && !storeTask[k].IsDead()) ++flying;
         return SlotWork(u, Store(), Task::BuildType::STORE, storePos, storeRes, storeTask, storeMiss, stripCentre, 2, "storage",
-            storesNearAll + flying >= int(storePos.length()), Global::LolCannon::StoreSearchRadius + 64.0f);
+            storesNearAll + flying >= int(storePos.length()), StoreReach());
     }
 
     // Our units of d within r of c: finished, and all (frames too).
@@ -1727,7 +1731,8 @@ namespace LolCannon {
         CountNear(Nano(), blockCentre, 260.0f, nanosNear, nanosNearAll);
         // the storages over a wider ring round the cannon: an unpinned order whose
         // spot was taken goes up wherever native finds room (c18e812e test: 1-6 extra)
-        CountNear(Store(), site, Global::LolCannon::StoreCountRadius, storesNear, storesNearAll);
+        const float storeR = (stripCentre.x < 0.0f) ? 0.0f : StoreReach() + sqrt(MapHelpers::SqDist(site, stripCentre));
+        CountNear(Store(), site, AiMax(Global::LolCannon::StoreCountRadius, storeR), storesNear, storesNearAll);
     }
 
     // Turret slots neither standing nor given up (three orders came to nothing);
@@ -1846,6 +1851,18 @@ namespace LolCannon {
         return false;
     }
 
+    // How far from the strip's centre the storage slots reach: StoreSearchRadius, or
+    // further when a slot moved out in the widening search (owner 2026-11-24); its
+    // frames and standing storages are looked for this far out.
+    float StoreReach()
+    {
+        float r2 = Global::LolCannon::StoreSearchRadius * Global::LolCannon::StoreSearchRadius;
+        if (stripCentre.x >= 0.0f)
+            for (uint k = 0; k < storePos.length(); ++k)
+                if (!storeDead[k]) r2 = AiMax(r2, MapHelpers::SqDist(storePos[k], stripCentre));
+        return sqrt(r2) + 64.0f;
+    }
+
     bool BadStoreSpot(const AIFloat3 &in q)
     {
         for (uint i = 0; i < badStoreSpots.length(); ++i)
@@ -1853,7 +1870,8 @@ namespace LolCannon {
         return false;
     }
 
-    // The nearest spot round the strip, ring by ring out to StoreSearchRadius, where
+    // The nearest spot round the strip, ring by ring further and further out to
+    // StoreSearchMaxRadius (owner 2026-11-24: never give a slot up short), where
     // a storage reserves (kept and pinned when `keep`); never within 24 of `avoid`,
     // never on the turret block (owner 2026-10-28), never on another storage slot's spot.
     bool FreeStoreSpot(CCircuitDef@ st, uint slot, const AIFloat3 &in avoid, bool keep, AIFloat3 &out at, int &out id)
@@ -1861,7 +1879,7 @@ namespace LolCannon {
         id = -1;
         at = avoid;
         const float step = AiMax(LolCannonMath::Pitch(Layout::Across(st, facing)), LolCannonMath::Pitch(Layout::Along(st, facing)));
-        const int rings = int(Global::LolCannon::StoreSearchRadius / step);
+        const int rings = int(AiMax(Global::LolCannon::StoreSearchRadius, Global::LolCannon::StoreSearchMaxRadius) / step);
         const AIFloat3 side = Layout::Side(facing), fwd = Layout::Fwd(facing);
         for (int r = 0; r <= rings; ++r)
             for (int i = -r; i <= r; ++i)
@@ -1915,12 +1933,13 @@ namespace LolCannon {
             if (!ok) {
                 storeDead[k] = true;
                 GenericHelpers::LogUtil("[LolCannon] storage " + (k + 1) + " of " + storePos.length() + " at (" + int(old.x) + ", " + int(old.z)
-                    + "): no free spot within " + int(Global::LolCannon::StoreSearchRadius) + " of the strip", 1);
+                    + "): no free spot within " + int(AiMax(Global::LolCannon::StoreSearchRadius, Global::LolCannon::StoreSearchMaxRadius)) + " of the strip", 1);
                 continue;
             }
             storePos[k] = at; storeRes[k] = id; storeMiss[k] = 0; @storeTask[k] = null;
             GenericHelpers::LogUtil("[LolCannon] storage " + (k + 1) + " of " + storePos.length() + " moved from (" + int(old.x) + ", " + int(old.z)
-                + ") to (" + int(at.x) + ", " + int(at.z) + ")" + (failing ? " after 3 failed orders" : ", its slot did not reserve"), 1);
+                + ") to (" + int(at.x) + ", " + int(at.z) + "), " + int(sqrt(MapHelpers::SqDist(at, stripCentre))) + " from the strip"
+                + (failing ? " after 3 failed orders" : ", its slot did not reserve"), 1);
         }
         if (switched) aiTerrainMgr.SetLayoutEnabled(false);
     }
@@ -2278,6 +2297,12 @@ namespace LolCannon {
                 @w = TurretWork(u);
                 if (w is null && coverPlaced) @w = ExtraWork(u);
                 if (w is null) @w = StoreWork(u);
+            } else if (kind == STORE) {
+                // owner 2026-11-24: the storage crew finish the strip first (cannon 1 stood at
+                // 7 of 9 and the last 2 waited 4 min behind the cover); the starter takes the cover
+                @w = StoreWork(u);
+                if (w is null && coverPlaced) @w = ExtraWork(u);
+                if (w is null) @w = TurretWork(u);
             } else {
                 if (coverPlaced) @w = ExtraWork(u);
                 if (w is null) @w = StoreWork(u);
@@ -2568,7 +2593,7 @@ namespace LolCannon {
         const int stores = AiMax(CountStanding(Store(), storePos, 32.0f), storesNear);
         const bool done = stores >= int(storePos.length());
         const bool stuck = !done && OpenStores() == 0
-            && aiBuilderMgr.FindUnfinishedNear(stripCentre, Global::LolCannon::StoreSearchRadius + 64.0f, Store()) is null;
+            && aiBuilderMgr.FindUnfinishedNear(stripCentre, StoreReach(), Store()) is null;
         const bool turretsDone = !turretsOpen && aiBuilderMgr.FindUnfinishedNear(blockCentre, 260.0f, Nano()) is null;
         if (turretsDone && crewCount[AIR] + crewCount[GROUND] > 0 && !(done || stuck) && !ExtrasOn())
             KeepOnly(STARTER, STORE, false, "turrets " + CountStanding(Nano(), turretPos, 24.0f) + " of " + turretPos.length() + " done");

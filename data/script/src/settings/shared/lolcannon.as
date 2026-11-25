@@ -167,6 +167,9 @@ namespace LolCannon {
     // a storage slot that does not reserve, or whose orders keep coming to nothing,
     // moves to the nearest free spot within this of the strip's centre
     float StoreSearchRadius = 400.0f;
+    // owner 2026-11-24: a slot with no free spot within StoreSearchRadius keeps
+    // searching in widening rings (nearest first) out to this before it is given up
+    float StoreSearchMaxRadius = 1600.0f;
     // our advanced storages within this of the cannon count toward its storages,
     // wherever they went up (an unpinned FRONT order goes where native finds room)
     float StoreCountRadius = 900.0f;
