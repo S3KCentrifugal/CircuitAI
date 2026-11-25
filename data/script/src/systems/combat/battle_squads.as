@@ -51,12 +51,16 @@ namespace BattleSquads {
             }
             CCircuitUnit@ m = ai.GetTeamUnit(aiMilitaryMgr.BattleSquadMember(squad));
             if (m is null) continue;
-            if (Global::BattleSquads::LaneSwitch && ai.frame >= nextCheck[i]) {
+            const bool dive = aiMilitaryMgr.BattleSquadDive(squad) == 1;
+            if (!dive && Global::BattleSquads::LaneSwitch && ai.frame >= nextCheck[i]) {
                 nextCheck[i] = ai.frame + AiMax(1, Global::BattleSquads::LaneCheckSeconds) * SECOND;
                 CheckLane(uint(i), m);
             }
             AIFloat3 goal;
-            if (lanes[i] >= 0) {
+            if (dive) {
+                // Owner 2026-11-25: a diving heavy squad heads through the front for the enemy's backline.
+                goal = Backline(m.GetPos(ai.frame), goals[i]);
+            } else if (lanes[i] >= 0) {
                 const AIFloat3 pos = m.GetPos(ai.frame);
                 goal = aiBattle.GetLanePoint(lanes[i], float(AiMin(SAMPLES, NearestSample(lanes[i], pos) + 2)) / float(SAMPLES));
             } else goal = Military::AiGroundObjective(m, goals[i]);
@@ -78,6 +82,17 @@ namespace BattleSquads {
         const float len = sqrt(best);
         const float step = AiMin(offset, len * 0.5f);
         return AIFloat3(from.x + (goal.x - from.x) / len * step, from.y, from.z + (goal.z - from.z) / len * step);
+    }
+
+    // The nearest enemy start: the backline a dive heads for (eco first). O(enemy starts).
+    AIFloat3 Backline(const AIFloat3 &in from, const AIFloat3 &in previous) {
+        const array<AIFloat3> starts = Lanes::EnemyStarts();
+        AIFloat3 goal = previous; float best = 1e30f;
+        for (uint i = 0; i < starts.length(); ++i) {
+            const float d = from.SqDistance2D(starts[i]);
+            if (d < best) { best = d; goal = starts[i]; }
+        }
+        return goal;
     }
 
     // The lane sample (0..SAMPLES) nearest `pos`. O(SAMPLES).

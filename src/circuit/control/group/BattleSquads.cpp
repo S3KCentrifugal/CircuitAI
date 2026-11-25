@@ -63,6 +63,7 @@ const Lever LEVERS[] = {
     {"home_radius", &BattleSquadTemplate::homeRadius, 100.f, 6000.f},
     {"ghost_margin", &BattleSquadTemplate::ghostMargin, 0.f, 500.f},
     {"ghost_max_range", &BattleSquadTemplate::ghostMaxRange, 0.f, 5000.f},
+    {"dive_chance", &BattleSquadTemplate::diveChance, 0.f, 1.f},
     {"period", &BattleSquadTemplate::period, 0.5f, 30.f},
     {"log", &BattleSquadTemplate::log, 0.f, 1.f},
 };
@@ -167,9 +168,12 @@ bool CBattleSquads::Launch(int squad)
     Squad& s = it->second;
     if (s.launched) return true;
     s.launched = true;
+    const float chance = templates[s.tmpl].diveChance;
+    s.dive = chance > 0.f && float(rand()) / float(RAND_MAX) < chance;
     s.nextFrame = 0;
     s.waitSince = -1;
-    ai->LOG("SQUAD: launch squad=%i label=%s members=%u frame=%i", s.id, s.label.c_str(), unsigned(s.members.size()), ai->GetLastFrame());
+    ai->LOG("SQUAD: launch squad=%i label=%s members=%u mode=%s frame=%i", s.id, s.label.c_str(), unsigned(s.members.size()),
+        s.dive ? "dive" : "battle", ai->GetLastFrame());
     return true;
 }
 
@@ -254,6 +258,12 @@ int CBattleSquads::OrderOf(int squad) const
 {
     const auto it = squads.find(squad);
     return it == squads.end() ? -1 : int(it->second.order);
+}
+
+int CBattleSquads::DiveOf(int squad) const
+{
+    const auto it = squads.find(squad);
+    return it == squads.end() ? -1 : int(it->second.dive);
 }
 
 float CBattleSquads::Value(int squad) const
@@ -534,7 +544,8 @@ void CBattleSquads::Decide(Squad& s, int frame)
         if (c.armed) { if (armedTarget < 0 || d < nearestArmed) { armedTarget = i; nearestArmed = d; } }
         else if (!c.mobile) { if (otherTarget < 0 || d < nearestOther) { otherTarget = i; nearestOther = d; } }
     }
-    const int targetIndex = armedTarget >= 0 ? armedTarget : otherTarget;
+    // A diving squad goes for the economy first and fights armed units only on its way.
+    const int targetIndex = s.dive ? otherTarget : (armedTarget >= 0 ? armedTarget : otherTarget);
     s.target = targetIndex >= 0 ? contacts[targetIndex].id : -1;
     s.own = own; s.hostile = hostile;
 
@@ -547,6 +558,8 @@ void CBattleSquads::Decide(Squad& s, int frame)
     squad_formation::Balance balance{own, hostile, hostile > 0.f};
     Order wanted = squad_formation::Decide(balance, s.order, t.advantageEnter, t.advantageExit, entryScale, fallBack);
     if (wanted == Order::ADVANCE && targetIndex >= 0) wanted = Order::ATTACK;  // an unarmed structure in reach
+    // A dive walks through: it attacks economy in reach and otherwise advances, whatever the balance.
+    if (s.dive && !s.homeward) wanted = targetIndex >= 0 ? Order::ATTACK : Order::ADVANCE;
     if (!s.homeward && s.order != Order::NONE) {
         const squad_formation::Hysteresis h{int(t.withdrawConfirm), int(t.withdrawHoldSeconds * FRAMES_PER_SEC), t.reenterFactor};
         const float ratio = hostile > 0.f ? own / hostile : 1e6f;
@@ -599,7 +612,7 @@ void CBattleSquads::Decide(Squad& s, int frame)
         if (ghost != s.ghostHeld && t.log > 0.f)
             ai->LOG("SQUAD: squad=%i %s ghost porc reach frame=%i", s.id, ghost ? "holds at" : "clear of", frame);
         s.ghostHeld = ghost;
-        if (!ghost) s.anchor = next;
+        if (!ghost || s.dive) s.anchor = next;   // a dive walks through porc reach
     }
     Place(s, t, target, frame);
 

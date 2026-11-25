@@ -43,7 +43,9 @@
 		"pace_step": 300, "pace_tolerance": 220, "wait_seconds": 20, "repath": 64, "withdraw_step": 500,
 		"withdraw_screen_delay": 2, "order_min_seconds": 4,
 		"momentum_prior": 600, "momentum_half_life": 120,
-		"break_size": 2, "size_max": 32, "merge_radius": 1500, "home_radius": 1200, "period": 1, "log": 1
+		"break_size": 2, "size_max": 32, "merge_radius": 1500, "home_radius": 1200, "period": 1, "log": 1,
+		// owner 2026-11-25: half the heavy squads dive through the front for the enemy backline, eco first
+		"dive_chance": 0.5
 	},
 	"t3_rush": {
 		"screen": ["armraz", "corshiva", "legeallterrainmech"],
@@ -69,7 +71,8 @@
 		"pace_step": 350, "pace_tolerance": 260, "wait_seconds": 25, "repath": 80, "withdraw_step": 600,
 		"withdraw_screen_delay": 0, "order_min_seconds": 5,
 		"momentum_prior": 2000, "momentum_half_life": 180,
-		"break_size": 2, "size_max": 10, "merge_radius": 2000, "home_radius": 1500, "period": 1, "log": 1
+		"break_size": 2, "size_max": 10, "merge_radius": 2000, "home_radius": 1500, "period": 1, "log": 1,
+		"dive_chance": 0.5
 	}
 },
 // Terrain restore (owner 2026-10-31, RestoreControl): builders pull craters

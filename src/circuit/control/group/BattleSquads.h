@@ -75,6 +75,10 @@ struct BattleSquadTemplate {
     // Ghost porc
     float ghostMargin = 50.f, ghostMaxRange = 1500.f;
     float period = 1.f, log = 1.f;
+    // Owner 2026-11-25: the chance a launched squad dives: it walks through the frontline toward
+    // the enemy backline (script sets that goal), attacks economy first, ignores the balance
+    // (no withdraw short of break-up) and the ghost hold. 0: never (the ordinary battle).
+    float diveChance = 0.f;
 };
 
 class CBattleSquads {
@@ -102,6 +106,8 @@ public:
     int AnyMember(int squad) const;
     // The order (battle_group::Order as int), -1 when the squad no longer exists.
     int OrderOf(int squad) const;
+    // Owner 2026-11-25: 1 diving, 0 ordinary battle, -1 gone.
+    int DiveOf(int squad) const;
     // Owner 2026-11-25: lane choice (script systems/combat/battle_squads.as). The squad's armed
     // metal x health at its last decision (-1: gone); the armed enemy metal x health within
     // `width` of a lane path (seen mobiles x1, seen and ghost structures x staticWeight: the
@@ -141,6 +147,7 @@ private:
         battle_group::Order order = battle_group::Order::NONE;
         int orderFrame = -1, nextFrame = 0, nextLog = 0, waitSince = -1, target = -1;
         bool ghostHeld = false;
+        bool dive = false;       // owner 2026-11-25: rolled at launch (dive_chance)
         trade::Ledger trades;
         float momentum = 0.f, own = 0.f, hostile = 0.f;
         int created = 0;

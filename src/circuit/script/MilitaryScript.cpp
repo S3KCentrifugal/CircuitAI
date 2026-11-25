@@ -134,6 +134,11 @@ static std::vector<AIFloat3> BattleSquadPath(const CScriptArray* array)
 	for (asUINT i = 0; i < array->GetSize(); ++i) path.push_back(*static_cast<const AIFloat3*>(array->At(i)));
 	return path;
 }
+static int CMilitaryManager_BattleSquadDive(CMilitaryManager* mgr, int squad)
+{
+	CBattleSquads* squads = mgr->GetBattleSquads();
+	return squads != nullptr ? squads->DiveOf(squad) : -1;
+}
 static float CMilitaryManager_BattleSquadValue(CMilitaryManager* mgr, int squad)
 {
 	CBattleSquads* squads = mgr->GetBattleSquads();
@@ -204,6 +209,7 @@ CMilitaryScript::CMilitaryScript(CScriptManager* scr, CMilitaryManager* mgr)
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadSize(int)", asFUNCTION(CMilitaryManager_BattleSquadSize), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadArmed(int)", asFUNCTION(CMilitaryManager_BattleSquadArmed), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadMember(int)", asFUNCTION(CMilitaryManager_BattleSquadMember), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
+	r = engine->RegisterObjectMethod("CMilitaryManager", "int BattleSquadDive(int)", asFUNCTION(CMilitaryManager_BattleSquadDive), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float BattleSquadValue(int)", asFUNCTION(CMilitaryManager_BattleSquadValue), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float BattleSquadPathEnemy(const array<AIFloat3>& in, float, float)", asFUNCTION(CMilitaryManager_BattleSquadPathEnemy), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CMilitaryManager", "float BattleSquadPathFriends(const array<AIFloat3>& in, float, int)", asFUNCTION(CMilitaryManager_BattleSquadPathFriends), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
