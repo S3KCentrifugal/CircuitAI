@@ -10,6 +10,7 @@
 #include "map/InfluenceMap.h"
 #include "map/MapManager.h"
 #include "module/MilitaryManager.h"
+#include "module/EconomyManager.h"
 #include "terrain/TerrainManager.h"
 #include "terrain/BattleAnalysis.h"
 #include "unit/enemy/EnemyManager.h"
