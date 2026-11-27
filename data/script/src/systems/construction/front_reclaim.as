@@ -8,10 +8,20 @@
 // SUPPORT used this reclaim from 2026-10-16 until 2026-10-26, when SUPPORT went back to
 // Cent's smrt-test code, which does not call it; only FRONT's settings are read now.
 // FRONT eco ladder (owner, 2026-10-16; Front::EcoLadder, systems/construction/front_eco_ladder.as):
-// T1 converters come down too once the first fusion stands (owner, 2026-10-17), and the fusions once the second
-// advanced fusion is framed, one at a time, when the bank has room for the refund (BAR pays it at
-// completion; metal past storage is lost) and energy income without the fusion covers the pull by
-// Front::EcoLadderFusionReclaimMargin (always once the second advanced fusion stands).
+// the fusions come down once the second advanced fusion is framed, one at a time, when the bank has
+// room for the refund (BAR pays it at completion; metal past storage is lost) and energy income
+// without the fusion covers the pull by Front::EcoLadderFusionReclaimMargin (always once the second
+// advanced fusion stands).
+// Owner (2026-11-27, Glitters: AI 14's wind and T1 converter blocks boxed AI 13's T3 units in; the
+// reclaim and the ladder had been off since 2026-11-08): the first finished fusion (any faction's
+// fusion or advanced fusion of ours, geothermals not counted) opens the reclaim on its own, eco
+// ladder on or off: winds, solars, advanced solars and T1 converters. The energy test also passes
+// while the energy bank is at Front::ReclaimBankFill or more (the engine's pull counts the builds in
+// progress and sat above income for whole minutes). T1 converters make no energy, so only "no
+// energy stall" applies to them. Order: structures on an ally's (or our own) T2 lab / gantry path
+// first (systems/team/ally_paths.as), then those round our factories, then the nearest to the worker.
+// Front::NoT1EcoAfterFusion: while a fusion stands nobody orders those four defs (native caps 0,
+// Global::energyAllowed); they reopen when every fusion is gone.
 #include "../../helpers/math/production_math.as"
 #include "front_eco_ladder.as"
 namespace FrontReclaim {
@@ -45,32 +55,86 @@ namespace FrontReclaim {
         CCircuitDef@ d = ai.GetCircuitDef(name);
         return d is null ? 0 : AiMax(0, d.count - aiBuilderMgr.GetUnfinishedCount(d));
     }
+    // Finished reactors of any faction (a rezzed one counts); geothermals do not
+    int FinishedReactors()
+    {
+        int n = 0;
+        for (uint i = 0; i < FrontEcoLadder::FusionLike.length(); ++i) n += Count(FrontEcoLadder::FusionLike[i]);
+        for (uint i = 0; i < FrontEcoLadder::AdvFusionLike.length(); ++i) n += Count(FrontEcoLadder::AdvFusionLike[i]);
+        return n;
+    }
+    bool FirstFusionStands() { return FinishedReactors() > 0; }
+    bool AdvFusionStands()
+    {
+        for (uint i = 0; i < FrontEcoLadder::AdvFusionLike.length(); ++i) if (Count(FrontEcoLadder::AdvFusionLike[i]) > 0) return true;
+        return false;
+    }
+    bool BankFull()
+    {
+        const float storage = aiEconomyMgr.energy.storage;
+        return storage > 0.0f && aiEconomyMgr.energy.current >= storage * Global::RoleSettings::Front::ReclaimBankFill;
+    }
     // 0 = not allowed, 1 = winds and solars, 2 = advanced solars too
     int Level()
     {
-        if (aiEconomyMgr.isEnergyStalling) return 0;
+        if (aiEconomyMgr.isEnergyStalling || !FirstFusionStands()) return 0;
         const string side = Global::AISettings::Side;
-        const bool afus = Count(UnitHelpers::GetAdvFusionNameForSide(side)) > 0;
-        if (!afus && Count(UnitHelpers::GetFusionNameForSide(side)) < 1) return 0;
+        const bool afus = AdvFusionStands();
+        const bool bank = BankFull();
         const float wind = AiMax(0.0f, AiMin(25.0f, (ai.GetWindMin() + ai.GetWindMax()) * 0.5f));
         const float t1 = Count(UnitHelpers::GetWindNameForSide(side)) * wind + Count(UnitHelpers::GetSolarNameForSide(side)) * 20.0f;
         const float adv = Count(UnitHelpers::GetAdvSolarNameForSide(side)) * 75.0f;
         const float income = aiEconomyMgr.energy.income;
         const float pull = aiEconomyMgr.energy.pull;
-        if (!ProductionMath::LowTierEnergyReclaim(afus, income, t1, pull, T1Margin())) return 0;
-        return ProductionMath::LowTierEnergyReclaim(afus, income - t1, adv, pull, AdvSolarMargin()) ? 2 : 1;
+        if (!bank && !ProductionMath::LowTierEnergyReclaim(afus, income, t1, pull, T1Margin())) return 0;
+        return (bank || ProductionMath::LowTierEnergyReclaim(afus, income - t1, adv, pull, AdvSolarMargin())) ? 2 : 1;
     }
-    // Global::energyAllowed for SUPPORT while the reclaim is on: no wind or solar while they are
-    // coming down, no advanced solar once those are too (energy defs only; everything else allowed).
+    // The four defs whose era ends with the first fusion
+    bool IsT1Eco(const string &in name)
+    {
+        const string side = Global::AISettings::Side;
+        return name == UnitHelpers::GetWindNameForSide(side) || name == UnitHelpers::GetSolarNameForSide(side)
+            || name == UnitHelpers::GetAdvSolarNameForSide(side) || name == UnitHelpers::GetEnergyConverterNameForSide(side);
+    }
+    bool T1EcoClosed()
+    {
+        return Global::RoleSettings::Front::NoT1EcoAfterFusion && Global::AISettings::Role == AiRole::FRONT && FirstFusionStands();
+    }
+    // Global::energyAllowed for FRONT (registered in Front_Init): no wind, solar, advanced solar or T1
+    // converter while a fusion stands (energy defs only; everything else allowed).
     bool EnergyAllowed(const string &in name)
     {
-        if (!Enabled()) return true;
+        return !(IsT1Eco(name) && T1EcoClosed());
+    }
+    // Native caps (Front_IncomeLimits, after the map limits): maxThisUnit 0 for the four defs while a
+    // fusion stands, so native energy, the converter fill-in, the energy and converter seats and the
+    // build chain order none; the def's own cap comes back when every fusion is gone.
+    dictionary capOriginal;
+    bool capsLogged = false;
+    void ApplyCaps()
+    {
+        const bool closed = T1EcoClosed();
         const string side = Global::AISettings::Side;
-        const bool t1 = name == UnitHelpers::GetWindNameForSide(side) || name == UnitHelpers::GetSolarNameForSide(side);
-        const bool adv = name == UnitHelpers::GetAdvSolarNameForSide(side);
-        if (!t1 && !adv) return true;
-        const int level = Level();
-        return !(t1 && level >= 1) && !(adv && level == 2);
+        array<string> names = { UnitHelpers::GetWindNameForSide(side), UnitHelpers::GetSolarNameForSide(side),
+            UnitHelpers::GetAdvSolarNameForSide(side), UnitHelpers::GetEnergyConverterNameForSide(side) };
+        for (uint i = 0; i < names.length(); ++i) {
+            CCircuitDef@ d = ai.GetCircuitDef(names[i]);
+            if (d is null) continue;
+            int was;
+            const bool saved = capOriginal.get(names[i], was);
+            if (closed) {
+                if (!saved) capOriginal.set(names[i], d.maxThisUnit);
+                d.maxThisUnit = 0;
+            } else if (saved) {
+                d.maxThisUnit = was;
+                capOriginal.delete(names[i]);
+            }
+        }
+        if (closed != capsLogged) {
+            capsLogged = closed;
+            GenericHelpers::LogUtil("[FRONT][Reclaim] T1 eco " + (closed ? "closed: a fusion stands, no more winds, solars, advanced solars or T1 converters"
+                : "reopened: no fusion stands") + " | E +" + int(aiEconomyMgr.energy.income), 1);
+        }
     }
     // A fusion at a time; its refund must fit the bank unless the storage never could hold it and
     // the ladder has built its metal storages
@@ -108,7 +172,7 @@ namespace FrontReclaim {
         Tick();
         if (targets.length() >= uint(Concurrent())) return null;
         const int level = Level();
-        const bool t1Conv = !IsSupport() && FrontEcoLadder::ReclaimT1Converters() && !aiEconomyMgr.isEnergyStalling;
+        const bool t1Conv = !IsSupport() && FirstFusionStands() && !aiEconomyMgr.isEnergyStalling;
         const bool fusions = FusionsAllowed();
         if (level == 0 && !t1Conv && !fusions) return null;
         const string side = Global::AISettings::Side;
@@ -123,12 +187,14 @@ namespace FrontReclaim {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u !is null && u.circuitDef !is null && IsFactoryName(u.circuitDef.GetName())) labs.insertLast(u.GetPos(ai.frame));
         }
+        // T2 constructors take only the structures on a factory path; the rest is T1 constructors' work
+        const bool t2Worker = Team::IsT2Constructor(worker.circuitDef);
         const AIFloat3 wp = worker.GetPos(ai.frame);
         const float nearLab = NearFactoryRadius();
         const float reach = EnergyRadius();
         CCircuitUnit@ best = null;
         float bestScore = 1e30f;
-        bool bestNearLab = false;
+        int bestRank = 3;   // 0 on a factory path, 1 round a factory, 2 elsewhere
         for (uint i = 0; i < ids.length(); ++i) {
             CCircuitUnit@ u = ai.GetTeamUnit(ids[i]);
             if (u is null || u.circuitDef is null || u.GetBuildProgress() < 1.0f) continue;
@@ -139,24 +205,31 @@ namespace FrontReclaim {
             const AIFloat3 p = u.GetPos(ai.frame);
             const float toWorker = MapHelpers::SqDist(wp, p);
             if (toWorker > reach * reach) continue;
-            float toLab = 1e30f;
-            for (uint l = 0; l < labs.length(); ++l) toLab = AiMin(toLab, MapHelpers::SqDist(labs[l], p));
-            const bool near = toLab <= nearLab * nearLab;
-            // structures round the factories first (they box units in), then the nearest to the worker
-            const float score = near ? toLab : toWorker;
-            if (best !is null && bestNearLab && !near) continue;
-            if (best is null || (near && !bestNearLab) || score < bestScore) { @best = u; bestScore = score; bestNearLab = near; }
+            const float half = float(AiMax(u.circuitDef.GetFootprintX(), u.circuitDef.GetFootprintZ())) * SQUARE_SIZE;
+            int rank = 2;
+            float score = toWorker;
+            if (n != fusion && Team::AllyPaths::OnPath(p, half)) rank = 0;
+            else {
+                float toLab = 1e30f;
+                for (uint l = 0; l < labs.length(); ++l) toLab = AiMin(toLab, MapHelpers::SqDist(labs[l], p));
+                if (toLab <= nearLab * nearLab) { rank = 1; score = toLab; }
+            }
+            if (t2Worker && rank != 0) continue;
+            // structures on a factory path first, then round the factories (they box units in), then the nearest
+            if (rank < bestRank || (rank == bestRank && score < bestScore)) { @best = u; bestScore = score; bestRank = rank; }
         }
         if (best is null || !aiTerrainMgr.CanReachAt(worker, best.GetPos(ai.frame), worker.circuitDef.GetBuildDistance())) return null;
-        IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::NORMAL, best, 120 * SECOND));
+        IUnitTask@ task = aiBuilderMgr.Enqueue(TaskB::Reclaim(Task::Priority::HIGH, best, 120 * SECOND));
         if (task is null) return null;
         targets.insertLast(best.id);
         tasks.insertLast(task);
         const string bestName = best.circuitDef.GetName();
         Lifecycle::Retire(best, Tag() + (bestName == fusion ? " fusion replaced by advanced fusions"
-            : bestName == converter ? " T1 converter replaced by T2 converters" : " low-tier energy replaced by a fusion"));
-        GenericHelpers::LogUtil("[" + Tag() + "][Reclaim] " + bestName + " id=" + best.id + (bestNearLab ? " beside a factory" : "")
+            : bestName == converter ? " T1 converter retired past the first fusion" : " low-tier energy replaced by a fusion"));
+        GenericHelpers::LogUtil("[" + Tag() + "][Reclaim] " + bestName + " id=" + best.id
+            + (bestRank == 0 ? " on a factory path" : bestRank == 1 ? " beside a factory" : "")
             + " by " + worker.circuitDef.GetName() + " " + worker.id + " | E +" + int(aiEconomyMgr.energy.income) + " pull " + int(aiEconomyMgr.energy.pull)
+            + " bank " + int(aiEconomyMgr.energy.current) + "/" + int(aiEconomyMgr.energy.storage)
             + (level == 2 ? " (advanced solars too)" : ""), 1);
         return task;
     }

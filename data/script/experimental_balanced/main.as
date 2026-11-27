@@ -99,7 +99,15 @@ namespace Main {
         Global::RoleSettings::Tech::NukeRushAfusSiloMetalIncome = 50.0f;
         Global::RoleSettings::Tech::NukeRushAfusSiloEnergyIncome = 2000.0f;
         Global::Military::NoTelchines = true;
-        Global::RoleSettings::Front::ReclaimT1EnergyAfterFusion = false; // owner 2026-11-08: FRONT eco scaling is smrt-test's as it is (ours off)
+        // owner 2026-11-27 (Glitters, AI 14's T1 eco boxed AI 13's T3 in): once the first fusion stands FRONT
+        // reclaims its winds, solars, advanced solars and T1 converters (those on an ally's factory path first)
+        // and orders no more; the eco ladder stays off (was off 2026-11-08: smrt-test's eco scaling)
+        Global::RoleSettings::Front::ReclaimT1EnergyAfterFusion = true;
+        Global::RoleSettings::Front::NoT1EcoAfterFusion = true;
+        Global::RoleSettings::Front::ReclaimT1EnergyMargin = 1.0f;
+        Global::RoleSettings::Front::ReclaimAdvSolarMargin = 1.0f;
+        Global::RoleSettings::Front::ReclaimEnergyConcurrent = 6;
+        Global::RoleSettings::Front::AllyPaths = true;
         Global::RoleSettings::Front::EcoLadder = false;          // owner 2026-11-08: our FRONT eco ladder off, smrt-test's eco scaling
         Global::RoleSettings::Front::MexUpgradeFirst = false;    // owner 2026-11-08: our FRONT mex-upgrade pull off
         Global::RoleSettings::Front::DirectGantry = true;        // owner 2026-11-09: T2 constructors order the gantry at 125 M / 5000 E for 10 s (native picker never chose one on smrt-test's eco)
@@ -260,6 +268,7 @@ namespace Main {
         FrontWaveEscort::Update();   // T2 tank wave escorts follow their wave (no-op without a wave)
         FrontArtySquad::Update();   // T2 artillery squads follow their lead (no-op without a squad)
         PorcFrontLine::Tick();  // owner 2026-11-18: our porc front line for site clearing (systems/world/porc_front_line.as)
+        Team::AllyPaths::Tick(); // owner 2026-11-27: publish our T2 lab / gantry exit paths to the allies (systems/team/ally_paths.as)
         T3Unstick::Tick();      // free T3 units penned in by our T1 porc, eco and construction turrets
         AirSightAA::Update();   // owner 2026-11-24: builders that see enemy air drop one AA turret (systems/construction/air_sight_aa.as)
 
