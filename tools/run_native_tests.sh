@@ -42,6 +42,7 @@ tests=(movement_destination_test factory_corridor_test factory_district_geometry
 tests+=(task_lifetime_test escort_strike_test debug_strike_test)
 tests+=(job_queue_test double_buffer_test)
 tests+=(owned_definition_index_test)
+tests+=(clearing_corridor_test)
 extra_sources() {
 	case "$1" in
 		lane_solver_test|terrain_route_test) echo "src/circuit/terrain/LaneSolver.cpp" ;;
@@ -122,12 +123,14 @@ fi
 commands=()
 if [ "$ONLY" != as ]; then
 	"$PY" "$REPO/tools/knowledge/extract_reservation_lifecycle.py" --out "$OUT/reservation_lifecycle_bodies.inc" || exit 1
+	"$PY" "$REPO/tools/knowledge/extract_clearing_corridor.py" --out "$OUT/clearing_corridor_body.inc" || exit 1
 	tests+=(reservation_lifecycle_test)
 	tests+=(multi_queue_test)
 	for t in "${tests[@]}"; do
 		extra=""
 		[ "$t" = multi_queue_test ] && extra=" -I$SRC/tests/stubs"
 		[ "$t" = reservation_lifecycle_test ] && extra=" -I$BIN"
+		[ "$t" = clearing_corridor_test ] && extra=" -I$BIN"
 		for e in $(extra_sources "$t"); do extra="$extra $SRC/$e"; done
 		commands+=("$CXXBIN -std=c++20 -O1 -Wall -Wextra $LINK -I$SRC/src -I$SRC/src/circuit -I$SRC/src/lib $SRC/tests/$t.cpp$extra -o $BIN/$t$EXT")
 	done

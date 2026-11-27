@@ -265,6 +265,8 @@ public:
 	// D-343 (SEA): as ReserveZone, but a rectangle touching a teammate's
 	// reservation is shrunk until it touches none instead of being refused.
 	// The zone never covers allied ground (INV-088).
+    int ReserveClearingZone(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong);
+    int ReserveClearingBuilding(CCircuitDef* def, const springai::AIFloat3& pos, int facing, int zone);
 	int ReserveZoneAroundAllies(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong);
     // Read-only world-space bounds; upper corner is exclusive, -1 if absent.
     springai::AIFloat3 GetZoneCorner(int id, bool upper) const;
@@ -680,7 +682,8 @@ private:
     void IndexReservation(int id);
     void EraseReservation(int id);
     bool CanActivateZone(int id) const;
-    std::set<int> activeLayoutZones; // derived from named ints on load; no strings on slot queries
+    std::set<int> activeLayoutZones;
+    std::set<int> clearingZones; // derived from named ints on load; no strings on slot queries
 public:
 	// D-101: the unserved slots of cdef's sets released; how many
 	int ReleaseSetSlots(CCircuitDef* cdef);
@@ -697,7 +700,7 @@ private:
 	int factoryFront = -1;                            // D-104: the facing the labs face (Layout::LabFacing)
 	void RemarkZoneCells(int2 c1, int2 c2);
 	int ReserveZoneMasked(const springai::AIFloat3& centre, int facing, float halfAcross, float halfAlong,
-		bool corridor, SBlockingMap::SM blockingMask, bool allyHoles = false);
+		bool corridor, SBlockingMap::SM blockingMask, bool allyHoles = false, bool clearing = false);
 	void OnStructureGone(CCircuitDef* cdef, const springai::AIFloat3& pos);
 	int ReserveBuildingEx(CCircuitDef* cdef, const springai::AIFloat3& pos, int facing, int ttlFrames, int group,
 			bool armed, bool anyReach, bool tenant, int zone, bool quiet, bool exitsPreflighted = false);

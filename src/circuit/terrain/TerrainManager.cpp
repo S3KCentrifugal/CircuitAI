@@ -1317,8 +1317,9 @@ void CTerrainManager::ShareZone(int id)
     if (it == zones.end()) return;
     const auto& z = it->second;
     if (GetLayoutInt("native.activeZone." + std::to_string(id), 0) != 0) activeLayoutZones.insert(id);
+    if (GetLayoutInt("native.clearingZone." + std::to_string(id), 0) != 0) clearingZones.insert(id);
     localReservations.PutZone(id, {z.c1.x, z.c1.y, z.c2.x, z.c2.y});
-    if (IsAllyLayoutRectBlocked(z.c1, z.c2)) circuit->LOG("[INVARIANT] INV-088: zone %i overlaps an allied plan", id);
+    if (GetLayoutInt("native.clearingZone." + std::to_string(id), 0) == 0 && IsAllyLayoutRectBlocked(z.c1, z.c2)) circuit->LOG("[INVARIANT] INV-088: zone %i overlaps an allied plan", id);
     circuit->GetAllyTeam()->GetLayoutReservations().Put(circuit->GetTeamId(),
         activeLayoutZones.count(id) != 0
             ? allied_layout::Reservations::COMMITTED_ZONE : allied_layout::Reservations::ZONE,
@@ -1357,6 +1358,13 @@ bool CTerrainManager::ReserveBuildSite(int& claim, CCircuitDef* def, const AIFlo
     }
     int2 a, b;
     if (!ReservationCells(def, Pos2BuildPos(def, pos, facing), facing, a, b)) return false;
+    // A clearing lease also excludes this team's ordinary tasks. The project
+    // releases it synchronously into exact slots before dispatching builders.
+    for (int id : clearingZones) {
+        const auto it = zones.find(id);
+        if (it != zones.end() && allied_layout::Rect{a.x,a.y,b.x,b.y}.Overlaps(
+            {it->second.c1.x,it->second.c1.y,it->second.c2.x,it->second.c2.y})) return false;
+    }
     if (FactoryCorridorBlocked(a,b) || !EnsureFactoryCorridor(def,pos,facing)) return false;
     auto& shared = circuit->GetAllyTeam()->GetLayoutReservations();
     // ClaimTask performs admission itself; do not query the same cells twice.
@@ -3818,6 +3826,24 @@ int CTerrainManager::ReserveZone(const AIFloat3& centre, int facing, float halfA
 	return ReserveZoneMasked(centre,facing,halfAcross,halfAlong,corridor,static_cast<SBlockingMap::SM>(SBlockingMap::StructMask::ALL));
 }
 
+int CTerrainManager::ReserveClearingZone(const AIFloat3& centre, int facing, float halfAcross, float halfAlong)
+{
+    return ReserveZoneMasked(centre, facing, halfAcross, halfAlong, false,
+        static_cast<SBlockingMap::SM>(SBlockingMap::StructMask::ALL), false, true);
+}
+
+int CTerrainManager::ReserveClearingBuilding(CCircuitDef* def, const AIFloat3& position, int facing, int zone)
+{
+    const auto it = zones.find(zone);
+    if (it == zones.end() || GetLayoutInt("native.clearingZone." + std::to_string(zone), 0) == 0
+        || def == nullptr || facing < 0 || facing > 3) return -1;
+    const auto pos = Pos2BuildPos(def, position, facing);
+    int2 a, b;
+    if (!ReservationCells(def, pos, facing, a, b) || a.x < it->second.c1.x || a.y < it->second.c1.y
+        || b.x > it->second.c2.x || b.y > it->second.c2.y || !IsEngineBuildable(def, pos, facing)) return -1;
+    return ReserveBuildingEx(def, pos, facing, 0, 0, true, false, false, zone, true);
+}
+
 int CTerrainManager::ReserveZoneAroundAllies(const AIFloat3& centre, int facing, float halfAcross, float halfAlong)
 {
 	return ReserveZoneMasked(centre, facing, halfAcross, halfAlong, false,
@@ -3825,7 +3851,7 @@ int CTerrainManager::ReserveZoneAroundAllies(const AIFloat3& centre, int facing,
 }
 
 int CTerrainManager::ReserveZoneMasked(const AIFloat3& centre, int facing, float halfAcross, float halfAlong,
-	bool corridor, SBlockingMap::SM blockingMask, bool allyHoles)
+	bool corridor, SBlockingMap::SM blockingMask, bool allyHoles, bool clearing)
 {
 	SSlowCall slow("ReserveZone", circuit);
 	if (!layoutEnabled) {
@@ -3863,7 +3889,15 @@ int CTerrainManager::ReserveZoneMasked(const AIFloat3& centre, int facing, float
 		}
 		if ((c1.x >= c2.x) || (c1.y >= c2.y)) return 0;
 	}
-	if (IsAllyLayoutRectBlocked(c1, c2) || FactoryCorridorBlocked(c1,c2)) return 0;
+	if (clearing ? !circuit->GetAllyTeam()->GetLayoutReservations().CanClear({c1.x,c1.y,c2.x,c2.y})
+                 : IsAllyLayoutRectBlocked(c1, c2)) return 0;
+    // A later district from this owner must not take the clearing rectangle.
+    for (int lease : clearingZones) {
+        const auto it = zones.find(lease);
+        if (it != zones.end() && allied_layout::Rect{c1.x,c1.y,c2.x,c2.y}.Overlaps(
+            {it->second.c1.x,it->second.c1.y,it->second.c2.x,it->second.c2.y})) return 0;
+    }
+    if (FactoryCorridorBlocked(c1,c2)) return 0;
     // Keep immutable resource sites as holes, even when their surrounding
     // envelope is shared with allies. IsAllyLayoutBlocked admits only the
     // matching resource building on the whole protected plot; IsSlotFree and
@@ -3885,11 +3919,15 @@ int CTerrainManager::ReserveZoneMasked(const AIFloat3& centre, int facing, float
 	const int total = (c2.x - c1.x) * (c2.y - c1.y);
 	circuit->LOG("RESERVE: %s %i at (%.0f, %.0f) facing %i, %ix%i cells: %i of %i held",
 			corridor ? "corridor" : "zone", id, centre.x, centre.z, facing, c2.x - c1.x, c2.y - c1.y, cells, total);
-	if (cells == 0) {
+	if (cells == 0 && !clearing) {
 		--nextZoneId;
 		return 0;
 	}
 	zones[id] = SZone{id, c1, c2, corridor, cells};
+    if (clearing) {
+        layoutInts["native.clearingZone." + std::to_string(id)] = 1;
+        layoutInts["native.activeZone." + std::to_string(id)] = 1;
+    }
 	ShareZone(id);
 	return id;
 }
@@ -3931,9 +3969,9 @@ void CTerrainManager::ReleaseZone(int id)
 		}
 	}
 	for (int rid : ids) {
-		circuit->GetAllyTeam()->GetLayoutReservations().Erase(circuit->GetTeamId(), allied_layout::Reservations::SLOT, rid);
-		localReservations.EraseSlot(rid);
-		EraseReservation(rid);
+		// Scoped slots can occupy former structure holes with no zone underlay.
+        // Release normally so those exact cells do not remain RESERVED forever.
+        ReleaseReservation(rid);
 	}
 	const SZone& zn = it->second;
 	for (int z = zn.c1.y; z < zn.c2.y; ++z) {
@@ -3952,6 +3990,8 @@ void CTerrainManager::ReleaseZone(int id)
 	localReservations.EraseZone(it->first);
     layoutInts.erase("native.activeZone." + std::to_string(id));
     activeLayoutZones.erase(id);
+    clearingZones.erase(id);
+    layoutInts.erase("native.clearingZone." + std::to_string(id));
 	zones.erase(it);
 }
 
@@ -5407,6 +5447,7 @@ void CTerrainManager::LoadLayout(std::istream& is)
 	scopedSlots.clear();
     groupSlots.clear();
     activeLayoutZones.clear();
+    clearingZones.clear();
     lostSlots.clear();
     refilledSlots.clear();
 	localReservations.Clear();

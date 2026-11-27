@@ -280,7 +280,32 @@ static void test_priority_mutations_match_rectangles() {
         }
     }
 }
+void test_clearing_lease_admission() {
+    Reservations r; const Rect site{10,10,30,30};
+    r.Put(1, Reservations::STRUCTURE, 1, site);
+    r.Put(2, Reservations::STRUCTURE, 2, site);
+    Check(r.CanClear(site), "standing structures may be reclaimed");
+    for (auto kind : {Reservations::SLOT, Reservations::ZONE, Reservations::EXIT,
+                      Reservations::TASK, Reservations::COMMITTED_SLOT, Reservations::COMMITTED_ZONE}) {
+        for (int owner : {1,2}) {
+            r.Put(owner, kind, 5, site);
+            Check(!r.CanClear(site), "clearing must not steal existing own/allied plans");
+            r.Erase(owner, kind, 5);
+        }
+    }
+    r.SetPriority(1,2); r.SetPriority(2,0);
+    r.Put(1, Reservations::COMMITTED_ZONE, 7, site);
+    Check(r.OverlapsOther(2, site), "clearing lease blocks FRONT");
+    r.SetPriority(2,2);
+    Check(r.OverlapsOther(2, site), "clearing lease blocks TECH");
+    int task=0;
+    Check(!r.ClaimTask(2,task,site), "new allied construction rejected during clearing");
+    r.Erase(1,Reservations::ZONE,7);
+    r.RemoveKind(1,Reservations::STRUCTURE); r.RemoveKind(2,Reservations::STRUCTURE);
+    Check(r.ClaimTask(2,task,site), "cancelled clearing releases ground");
+}
 int main() {
+    test_clearing_lease_admission();
     {
         Reservations r;
         r.SetPriority(1,2);

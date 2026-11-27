@@ -233,6 +233,14 @@ public:
     bool OverlapsAnyOther(int owner, const Rect& rect) const {
         return tiers[0].OverlapsOther(owner, rect);
     }
+    // Planning-time admission: reclaim may overlap standing structures, never
+    // an existing build or district (including the requesting owner's plans).
+    bool CanClear(const Rect& rect) const {
+        if (!rect.Valid()) return false;
+        for (const auto& entry : entries)
+            if (std::get<1>(entry.first) != STRUCTURE && entry.second.Overlaps(rect)) return false;
+        return true;
+    }
     size_t Size() const { return entries.size(); }
     // D-343: visit the rectangles of other owners' entries of one kind that
     // overlap a window. O(entries); used only by bounded, planning-time naval

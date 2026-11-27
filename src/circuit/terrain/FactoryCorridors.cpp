@@ -252,6 +252,12 @@ void CFactoryCorridors::PaintWindow(const allied_layout::Rect& window, int defId
 	// obstacles and Blocked() protects the road from later packing. Allied
 	// envelopes remain protected unless they already contain an exit.
 	for (const auto& [id, z] : terrain.zones) if (z.corridor) paint({z.c1.x, z.c1.y, z.c2.x, z.c2.y}, reused);
+    // A clearing envelope is committed project space, not unused district
+    // ground. Own factory roads must leave it free before the gun slot exists.
+    for (int id : terrain.clearingZones) {
+        const auto it = terrain.zones.find(id);
+        if (it != terrain.zones.end()) paint({it->second.c1.x,it->second.c1.y,it->second.c2.x,it->second.c2.y}, blocked);
+    }
 	const int team = terrain.circuit->GetTeamId();
 	auto& allies = terrain.circuit->GetAllyTeam()->GetLayoutReservations();
 	allies.ForEachOther(team, allied_layout::Reservations::ZONE, window, [&](const auto& r) { paint(r, allyZones); });

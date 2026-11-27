@@ -24,7 +24,7 @@ Now LolCannon::Plan() (lolcannon.as) keeps up to ClearProbes candidates that
 were refused only for what stands on them (the cannon footprint not free, the
 ground score below SiteMinScore while the ground itself is flat enough, the
 cannon not reserving, or turrets short), nearest home first. When no free site
-is found, or the first free-looking one stands ClearPreferElmos (500) further
+is found (TECH), or the first free-looking one stands ClearPreferElmos (500) further
 from home than the nearest kept one, LolCannon::PickClear takes the first of
 them that
 
@@ -108,10 +108,10 @@ namespace LolCannonClear {
 
     // ------------------------------------------------------------------ the rules
 
-    float Half(const CCircuitDef@ d)   // half the footprint, elmos (as T3Unstick::HalfSize)
+    float Half(const CCircuitDef@ d)   // footprint cells are 16 elmos; return half in elmos
     {
         if (d is null) return 0.0f;
-        return float(AiMax(d.GetFootprintX(), d.GetFootprintZ())) * SQUARE_SIZE * 0.5f;
+        return float(AiMax(d.GetFootprintX(), d.GetFootprintZ())) * SQUARE_SIZE;
     }
     bool IsFactory(const string &in n)
     {
@@ -234,6 +234,22 @@ namespace LolCannonClear {
     AIFloat3 target(-1.0f, 0.0f, -1.0f);
     AIFloat3 rectCentre;
     float rectHX = 0.0f, rectHZ = 0.0f;
+    // One lease owns the whole clearing rectangle; the scoped slot holds the
+    // gun as soon as its footprint is free. Never dispatch builds until handoff.
+    int clearingZone = 0, earlyGun = -1, nextReserve = 0;
+    const CCircuitDef@ clearingGun = null;
+    void ReleaseProtection()
+    {
+        if (clearingZone > 0) aiTerrainMgr.ReleaseZone(clearingZone);
+        clearingZone = 0; earlyGun = -1; @clearingGun = null;
+    }
+    void TryReserveEarly()
+    {
+        if (clearingZone <= 0 || earlyGun >= 0 || clearingGun is null || ai.frame < nextReserve) return;
+        nextReserve = ai.frame + 2 * SECOND;
+        earlyGun = aiTerrainMgr.ReserveClearingBuilding(clearingGun, site, facing, clearingZone);
+        if (earlyGun >= 0) Log("cannon footprint reserved early at " + At(site) + " (" + earlyGun + "), clearing lease " + clearingZone);
+    }
     int roundStart = -1;
     int lastPull = -100000;
     int nextLog = 0;
@@ -264,6 +280,7 @@ namespace LolCannonClear {
     // A cannon finished, or the program ended: the next cannon gets its own rounds and failures
     void NewCannon()
     {
+        ReleaseProtection();
         roundsThisCannon = 0;
         failed.resize(0);
     }
@@ -406,11 +423,20 @@ namespace LolCannonClear {
 
     // Start a round on p: our blockers reclaimed, the allies asked. False: nothing could be ordered or asked.
     bool Start(const AIFloat3 &in p, int f, int s, const AIFloat3 &in tgt, const AIFloat3 &in c, float hx, float hz,
-        const array<int> &in hit, const string &in why)
+        const array<int> &in hit, const string &in why, const CCircuitDef@ gun)
     {
         Release(false);
+        ReleaseProtection();
         site = p; facing = f; startIndex = s; target = tgt;
         rectCentre = c; rectHX = hx; rectHZ = hz;
+        if (Global::AISettings::Role == AiRole::TECH) {
+            // Admission precedes Enqueue: callbacks can assign new construction.
+            clearingZone = aiTerrainMgr.ReserveClearingZone(c, 0, hx, hz);
+            if (clearingZone <= 0) { Log("site " + At(site) + ": clearing lease refused; existing plans kept"); return false; }
+            @clearingGun = gun;
+            nextReserve = ai.frame;
+            TryReserveEarly();
+        }
         const int timeout = Global::LolCannon::ClearRoundSeconds * SECOND;
         string list = "";
         float metal = 0.0f;
@@ -442,6 +468,7 @@ namespace LolCannonClear {
         allyKey = "lc." + ai.teamId + "." + nRounds;
         const bool asked = Team::AllyClear::Hold(allyKey, rectCentre, rectHX, rectHZ);
         if (blockers.length() == 0 && !asked) {
+            ReleaseProtection();
             failed.insertLast(site);
             Log("site " + At(site) + ": nothing could be ordered and no allied SMRTBARb to ask; dropped");
             return false;
@@ -491,6 +518,7 @@ namespace LolCannonClear {
     void Tick(int crew)
     {
         if (!active) return;
+        TryReserveEarly();
         if (ai.frame - lastPull >= 10 * SECOND) {
             lastPull = ai.frame;
             for (uint i = 0; i < blockers.length(); ++i)
@@ -532,6 +560,7 @@ namespace LolCannonClear {
     // LolCannon tried the cleared site: it holds now, or not (dropped for this cannon)
     void Result(bool ok)
     {
+        ReleaseProtection();
         if (ok) { ++nCleared; Log("site " + At(site) + " reserved after clearing | picks " + nPicks + ", rounds " + nRounds
             + ", cleared " + nCleared + ", still blocked " + nBlocked + ", blockers reclaimed " + nReclaimed); return; }
         ++nBlocked;

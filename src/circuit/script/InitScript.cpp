@@ -359,6 +359,11 @@ static CScriptArray* CCircuitAI_GetTeamIds(CCircuitAI* circuit)
 	return arr;
 }
 
+static int CTerrainManager_ReserveClearingBuilding(CTerrainManager* mgr, const CCircuitDef* def, const AIFloat3& pos, int facing, int zone)
+{
+    return mgr->ReserveClearingBuilding(const_cast<CCircuitDef*>(def), pos, facing, zone);
+}
+
 static int CTerrainManager_ReserveBuilding(CTerrainManager* terrainMgr, const CCircuitDef* cdef, const AIFloat3& pos, int facing, int ttlFrames)
 {
 	return terrainMgr->ReserveBuilding(const_cast<CCircuitDef*>(cdef), pos, facing, ttlFrames, 0);
@@ -1647,6 +1652,8 @@ void CInitScript::RegisterMgr()
 	r = engine->RegisterObjectMethod("CTerrainManager", "int GetLayoutInt(const string& in, int fallback = 0) const", asMETHOD(CTerrainManager, GetLayoutInt), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetLayoutGroupCenter(const string& in) const", asMETHOD(CTerrainManager, GetLayoutGroupCenter), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveZone(const AIFloat3& in centre, int facing, float halfAcross, float halfAlong, bool corridor)", asMETHOD(CTerrainManager, ReserveZone), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveClearingZone(const AIFloat3& in, int, float, float)", asMETHOD(CTerrainManager, ReserveClearingZone), asCALL_THISCALL); ASSERT(r >= 0);
+    r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveClearingBuilding(const CCircuitDef@, const AIFloat3& in, int, int)", asFUNCTION(CTerrainManager_ReserveClearingBuilding), asCALL_CDECL_OBJFIRST); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "int ReserveZoneAroundAllies(const AIFloat3& in centre, int facing, float halfAcross, float halfAlong)", asMETHOD(CTerrainManager, ReserveZoneAroundAllies), asCALL_THISCALL); ASSERT(r >= 0);
 	r = engine->RegisterObjectMethod("CTerrainManager", "void ReleaseZone(int)", asMETHOD(CTerrainManager, ReleaseZone), asCALL_THISCALL); ASSERT(r >= 0);
     r = engine->RegisterObjectMethod("CTerrainManager", "AIFloat3 GetZoneCorner(int, bool) const", asMETHOD(CTerrainManager, GetZoneCorner), asCALL_THISCALL); ASSERT(r >= 0);

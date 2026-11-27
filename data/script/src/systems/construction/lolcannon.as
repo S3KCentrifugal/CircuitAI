@@ -1332,7 +1332,7 @@ namespace LolCannon {
             }
             // a better (nearer) site behind the front: a blocked candidate ClearPreferElmos nearer home than
             // this free-looking one is cleared instead, when one is clearable
-            if (!clearTried && clr.length() > 0 && sqrt(bestD[i]) > sqrt(clrD[0]) + Global::LolCannon::ClearPreferElmos) {
+            if (IsFront() && !clearTried && clr.length() > 0 && sqrt(bestD[i]) > sqrt(clrD[0]) + Global::LolCannon::ClearPreferElmos) {
                 clearTried = true;
                 const float within = sqrt(bestD[i]) - Global::LolCannon::ClearPreferElmos;
                 if (PickClear(gun, nano, st, clr, clrF, clrS, clrD, starts, targetWhy + backWhy, within * within)) {
@@ -1455,7 +1455,7 @@ namespace LolCannon {
             if (n == 0) {
                 // nothing of ours there: an allied SMRTBARb's building, or a reservation, or the ground. Ask the
                 // allies once per cannon, and only where no ally layout reservation sits (reclaim cannot clear one)
-                if (!allies || allyOnlyAsked || !aiTerrainMgr.IsAlliedSpaceFree(gun, p, f)) { ++allyOnly; continue; }
+                if (!allies || allyOnlyAsked || (IsFront() && !aiTerrainMgr.IsAlliedSpaceFree(gun, p, f))) { ++allyOnly; continue; }
                 allyOnlyAsked = true;
             }
             ++LolCannonClear::nPicks;
@@ -1466,7 +1466,7 @@ namespace LolCannon {
                 + (i > 0 ? "; nearer: " + front + " in front, " + kept + " with a kept structure"
                 + (LolCannonClear::pFirstKept.length() > 0 ? " (" + LolCannonClear::pFirstKept + ")" : "") + ", " + many + " too many, "
                 + ground + " ground, " + allyOnly + " none of ours" : "");
-            if (LolCannonClear::Start(p, f, candS[i], starts[candS[i]], p, hx, hz, hit, pick)) return true;
+            if (LolCannonClear::Start(p, f, candS[i], starts[candS[i]], p, hx, hz, hit, pick, gun)) return true;
         }
         LolCannonClear::Log("no clearable site among " + cand.length() + " blocked candidates" + (maxSqD < 1.0e29f ? " within "
             + int(sqrt(maxSqD)) + " of home (a free one further out)" : "") + ": " + front + " in front of the front line, "
@@ -1537,6 +1537,10 @@ namespace LolCannon {
         const int porc = PorcOver(LolCannonClear::site);
         if (porc < 0 && LolCannonClear::Busy()) return;
         LolCannonClear::End(porc >= 0 ? "enemy porc reaches it: " + aiBattle.DescribeEnemy(porc) : "blockers gone or time up");
+        // End aborts reclaim tasks while the lease still protects against idle
+        // builder callbacks. Transfer to exact gun/support slots synchronously;
+        // no task dispatch or simulation frame occurs between these calls.
+        LolCannonClear::ReleaseProtection();
         const bool ok = porc < 0 && TryCleared();
         LolCannonClear::Result(ok);
         if (ok) { Begin(false); return; }
