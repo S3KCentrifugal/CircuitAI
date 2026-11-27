@@ -1,0 +1,62 @@
+{
+  "stop_minute": 12,
+  "expect": [
+    {
+      "key": "loaded",
+      "pattern": "\\[RangedArena\\].* loaded",
+      "scope": "any",
+      "by_minute": 1
+    },
+    {
+      "key": "fortify",
+      "pattern": "\\[CommanderGroup\\] geo_fortify unit=\\d+ def=legrampart",
+      "scope": "any",
+      "by_minute": 8
+    },
+    {
+      "key": "retired",
+      "pattern": "\\[CommanderGroup\\] job_end queue=geo done=1 team=0 def=legrampart",
+      "scope": "any",
+      "by_minute": 11,
+      "after_key": "fortify"
+    },
+    {
+      "key": "finished",
+      "pattern": "\\[RangedArena\\].*finished id=\\d+ team=0 unit=legrampart",
+      "scope": "any",
+      "by_minute": 11
+    }
+  ],
+  "forbid": [
+    {
+      "key": "script",
+      "pattern": ": ERR\\s+:|SCRIPT CRASH|Lib exception",
+      "scope": "any"
+    },
+    {
+      "key": "fixture",
+      "pattern": "\\[RangedArena\\].*ERROR|Error in.*ranged_arena",
+      "scope": "any"
+    },
+    {
+      "key": "crash",
+      "pattern": "Access violation|has crashed|Fatal:",
+      "scope": "any"
+    },
+    {
+      "key": "geo expansion adoption",
+      "pattern": "\\[CommanderGroup\\] job_start def=legrampart",
+      "scope": "any"
+    },
+    {
+      "key": "stale geo orphan",
+      "pattern": "\\[CommanderGroup\\] orphan_project_rejected def=legrampart",
+      "scope": "any"
+    },
+    {
+      "key": "invariant",
+      "pattern": "\\[INVARIANT\\]",
+      "scope": "any"
+    }
+  ]
+}
