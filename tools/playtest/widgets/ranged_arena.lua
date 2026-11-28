@@ -298,7 +298,7 @@ function widget:UnitDestroyed(id,def,team,attacker,attackerDef,attackerTeam)
     if tracked[id] then log("death id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost);tracked[id]=nil end
 end
 function widget:UnitFinished(id,def,team)
-    if (cfg.production or cfg.natural or cfg.commander_front_work or cfg.expansion_mex_observation) and tracked[id] then
+    if (cfg.production or cfg.builders or cfg.natural or cfg.commander_front_work or cfg.expansion_mex_observation) and tracked[id] then
         log("finished id="..id.." team="..team.." unit="..UnitDefs[def].name.." cost="..UnitDefs[def].metalCost)
         if cfg.observe_factory_assist and tracked[id].parent then
             log("construction_completed unit="..tracked[id].parent.." target="..id.." team="..team.." def="..UnitDefs[def].name)

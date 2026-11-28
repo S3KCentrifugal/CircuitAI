@@ -4,6 +4,18 @@ from test_lane_ui_memory import ROOT, LuaRuntime
 
 
 class ArenaObserverTests(unittest.TestCase):
+    def test_mobile_builder_completion_is_observed_with_factories_frozen(self):
+        lua=self.observer()
+        lua.execute('''
+            cfg.natural=false; cfg.builders=true; cfg.production=false
+            UnitDefs[3]={name="legrampart",metalCost=2600}
+            widget:UnitCreated(3,3,0,1)
+            widget:UnitFinished(3,3,0)
+        ''')
+        lines=list(lua.globals().lines.values())
+        self.assertTrue(any('child id=3 parent=1 unit=legrampart' in line for line in lines))
+        self.assertTrue(any('finished id=3 team=0 unit=legrampart' in line for line in lines))
+
     def test_factory_facing_requires_forward_orientation_at_forward_site(self):
         for facing,z,failed in ((0,3912,False),(2,3912,True),(0,2112,True)):
             with self.subTest(facing=facing,z=z):

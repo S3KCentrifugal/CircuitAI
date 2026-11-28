@@ -246,6 +246,21 @@ namespace Front {
             float ReclaimNearFactoryRadius = 900.0f;
             float ReclaimEnergyRadius = 3000.0f;   // from the worker
             int ReclaimEnergyConcurrent = 3;
+            // Owner (2026-11-27): the bank also passes the test: energy at ReclaimBankFill of storage or more
+            float ReclaimBankFill = 0.5f;
+            // Owner (2026-11-27): once a fusion stands no wind, solar, advanced solar or T1 converter is
+            // ordered by anyone (native caps 0 and Global::energyAllowed); they reopen if every fusion is gone
+            bool NoT1EcoAfterFusion = false;
+            // Ally factory paths (owner, 2026-11-27; systems/team/ally_paths.as): every T2 lab and gantry's exit
+            // lane and route, shared with the allies; FRONT eco blocks stay off them, and FRONT reclaims the T1 eco
+            // standing on one first. AllyPathBlockPad: extra clearance round a planned block.
+            bool AllyPaths = false;
+            float AllyPathExitLength = 1600.0f;
+            float AllyPathRouteLength = 3000.0f;
+            float AllyPathHalfWidth = 160.0f;
+            float AllyPathGantryHalfWidth = 224.0f;
+            float AllyPathScanSeconds = 10.0f;
+            float AllyPathBlockPad = 32.0f;
             // Owner (2026-10-16, 2026-10-17): FRONT's eco climbs to a gantry. Three fusions (winds, solars,
             // advanced solars and T1 converters reclaimed once the first stands), one advanced fusion, a
             // second (the fusions reclaimed as it builds), then the gantry, its EcoLadderGantryNanos turrets

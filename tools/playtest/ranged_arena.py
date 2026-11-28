@@ -158,9 +158,11 @@ def prepare(args):
     # appear, so D-494's first-factory check (INV-267) cannot judge the arena.
     # Only that check is skipped; every other invariant stays forbidden.
     first_factory_skipped = not (case.get('builders') or case.get('commander_front_work') or case.get('production'))
-    if case.get('tech_base_response_fixture'):
+    if not first_factory_skipped:
         path=staged/'script/src/systems/construction/front_layout.as'
         source=path.read_text(); start=source.index('{',source.index('void CheckFirstFactory()'))+1
+        # Team 0's builders may act, but opposing fixture builders above
+        # always wait and cannot satisfy a first-factory production promise.
         path.write_text(source[:start]+'\n if(ai.teamId!=0) return; // enemy builders are frozen in this supplied fixture\n'+source[start:])
     if first_factory_skipped:
         path = staged/'script/src/systems/construction/front_layout.as'
@@ -615,6 +617,8 @@ def prepare(args):
         pins['diagnostics']['CIRCUIT_COMMANDER_TRACE']='1'
     if first_factory_skipped:
         pins['overrides'] += ['FRONT first-factory check (INV-267) skipped: no builder or factory can act (KI-785)']
+    else:
+        pins['overrides'] += ['enemy FRONT first-factory check skipped: enemy fixture builders cannot act; team 0 check retained']
     if case.get('production'):
         pins['overrides'] += ['team 0 factories and static assistants active; mobile builders '+('active' if case.get('builders') else 'frozen')]
     if case.get('commander_repair_only'):

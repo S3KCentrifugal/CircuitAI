@@ -66,6 +66,8 @@ namespace RoleFront {
         FrontAgitatorCounter::Reset();
         FrontPorcClusterCounter::Reset();
         FrontLongAA::Reset();
+        // owner 2026-11-27: no wind / solar / advanced solar / T1 converter while a fusion stands, whoever orders it
+        if (Global::RoleSettings::Front::NoT1EcoAfterFusion) @Global::energyAllowed = @FrontReclaim::EnergyAllowed;
         GenericHelpers::LogUtil("Front role initialization logic executed", 2);
 
         // Apply FRONT role settings
@@ -736,6 +738,10 @@ namespace RoleFront {
         // Owner (2026-10-19): after losing the base, retake the mexes first (Front::Recovery)
         IUnitTask@ recovery=FrontRecovery::Work(builder);
         if (recovery !is null) return recovery;
+        // Owner (2026-10-16, 2026-11-27): after the first fusion, winds, solars, advanced solars and T1 converters
+        // come down, those on an ally's factory path first, then those round our factories (front_reclaim.as)
+        IUnitTask@ reclaim=FrontReclaim::Work(builder);
+        if (reclaim !is null) return reclaim;
         // Owner (2026-10-25): a T2 lab's turrets from the moment it is framed (front_factory_nanos.as)
         IUnitTask@ labNano=FrontFactoryNanos::Work(builder);
         if (labNano !is null) return labNano;
@@ -755,9 +761,6 @@ namespace RoleFront {
         // energy task. Overriding an already-created task would leak work.
         IUnitTask@ geothermal=FrontGeothermal::Work(builder);
         if (geothermal !is null) return geothermal;
-        // Owner (2026-10-16): after a fusion, winds and solars come down, those round the factories first
-        IUnitTask@ reclaim=FrontReclaim::Work(builder);
-        if (reclaim !is null) return reclaim;
         // Owner (2026-10-16): fusion, second fusion, advanced fusion, second advanced fusion, gantry
         // Owner (2026-10-31): an overflowing energy bank goes into T2 converter blocks (mexes first)
         IUnitTask@ overflow=FrontOverflow::Work(builder);
@@ -1027,6 +1030,7 @@ namespace RoleFront {
         dictionary mapLimits = Global::Map::Config.UnitLimits;
         UnitHelpers::ApplyUnitLimits(mapLimits);
         FrontEnergy::Update(true); // map caps must not reopen an unaffordable AFUS
+        FrontReclaim::ApplyCaps(); // owner 2026-11-27: after the map caps: no T1 eco while a fusion stands
     }
 
     void Front_IncomeLabLimits(float metalIncome) {

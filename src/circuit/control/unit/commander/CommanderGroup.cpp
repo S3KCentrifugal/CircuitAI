@@ -320,7 +320,9 @@ IUnitTask* CCommanderController::JoinExpansionJob(CCircuitUnit* unit,bool nearby
     return nullptr;
 }
 IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
-    if(task && task==junoJob) return task; // the probe Juno has its own slot, never the group job
+    // Dedicated queues retain their own jobs; assistance must not alias them
+    // into expansionJobs (the Entrenched Plains geo completion crash).
+    if(task && (task==junoJob || task==geoJob || task==tacticalJob)) return task;
     // D-476: a job already in the queue (a second worker found the same task)
     // is not tracked twice; with no free slot the task runs untracked.
     if(task && !IsExpansionJob(task)) {
@@ -342,15 +344,30 @@ IUnitTask* CCommanderController::TrackGroupJob(IUnitTask* task,bool earnsNano) {
     return task;
 }
 void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
+    if(!task) return;
+    // Snapshot queue-specific completion state, then retire every borrowed
+    // alias while the manager still owns task. Never return after clearing
+    // only one queue: a shared worker may have exposed this task elsewhere.
+    // Fixed expansion slots, no allocation or additional per-frame work.
+    const bool wasJuno=task==junoJob, wasGeo=task==geoJob, wasTactical=task==tacticalJob;
+    if(wasJuno) junoJob=nullptr;
+    if(wasGeo) geoJob=nullptr;
+    if(wasTactical) tacticalJob=nullptr;
+    if(task==t1Job) t1Job=nullptr;
+    ExpansionJob finished{};
+    bool wasExpansion=false;
+    for(auto& job:expansionJobs) if(job.task==task) {
+        if(!wasExpansion) finished=job;
+        wasExpansion=true;
+        job=ExpansionJob{};
+    }
     // Every completed/cancelled builder task, not just groupJob, can be the
     // remembered solar/repair/hold job. Clear before task memory is released.
     // O(C) in controlled commanders/decoys at retirement, no per-frame scan.
     for(auto& entry:states) { entry.value->work.Retire(task); entry.value->work.RetireOrigin(task); }  // D-493
     for(auto& job:frontSolarReclaims) if(job.task==task) job.task=nullptr;  // owner 2026-11-20 front solar reclaim
-    if(task==junoJob) {
-        junoJob=nullptr;
+    if(wasJuno) {
         ai->LOG("[CommanderGroup] juno_probe_end team=%i done=%i",ai->GetTeamId(),int(done));
-        return;
     }
     // D-481: a guard item ends; a cancelled one is ordered again (GEO_GUARD_RETRIES).
     for(auto& g:geoGuards) for(std::size_t k=0;k<g.tasks.size();++k) if(g.tasks[k]==task) {
@@ -363,17 +380,18 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
     // The vent was front line when the swap ordered it; the commander may have
     // walked on since, so the recorded site decides, not the current window.
     // D-488: and any guard geo finished on a forward vent (ForwardGeo's own orders).
-    if(done && task!=geoJob && role.frontDuty) if(auto* geoBuild=dynamic_cast<IBuilderTask*>(task);
+    if(done && !wasGeo && role.frontDuty) if(auto* geoBuild=dynamic_cast<IBuilderTask*>(task);
         geoBuild && geoBuild->GetBuildType()==BT::GEO && geoBuild->GetBuildDef()) {
         const AIFloat3 at=geoBuild->GetBuildPos();
         const auto site=std::find_if(frontGeoSites.begin(),frontGeoSites.end(),
             [&at](const FrontGeoSite& p){return p.pos.SqDistance2D(at)<SQUARE(FRONT_GEO_SITE_RADIUS);});
         const bool forward=ai->GetEconomyManager()->IsGeoForward(ai->GetEconomyManager()->GeoSpotAt(at));
-        if(site!=frontGeoSites.end()) frontGeoSites.erase(site);
-        if(site!=frontGeoSites.end() || forward) PlanGeoGuard(geoBuild->GetBuildDef(),at);
+        const bool recorded=site!=frontGeoSites.end();
+        if(recorded) frontGeoSites.erase(site);
+        if(recorded || forward) PlanGeoGuard(geoBuild->GetBuildDef(),at);
     }
     // D-484: a swapped order that ended unbuilt counts against its vent.
-    if(!done && task!=geoJob) if(auto* geoBuild=dynamic_cast<IBuilderTask*>(task); geoBuild && geoBuild->GetBuildType()==BT::GEO) {
+    if(!done && !wasGeo) if(auto* geoBuild=dynamic_cast<IBuilderTask*>(task); geoBuild && geoBuild->GetBuildType()==BT::GEO) {
         const AIFloat3 at=geoBuild->GetBuildPos();
         for(auto& site:frontGeoSites) if(site.pos.SqDistance2D(at)<SQUARE(FRONT_GEO_SITE_RADIUS)) {
             if(++site.fails==FRONT_GEO_FAILS)
@@ -381,13 +399,11 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
             break;
         }
     }
-    if(task==geoJob) {  // D-481
-        geoJob=nullptr;
+    if(wasGeo) {  // D-481
         auto* build=dynamic_cast<IBuilderTask*>(task);
         auto* def=build?build->GetBuildDef():nullptr;
         ai->LOG("[CommanderGroup] job_end queue=geo done=%i team=%i def=%s",int(done),ai->GetTeamId(),def?def->GetDef()->GetName():"none");
         if(done && def) PlanGeoGuard(def,build->GetBuildPos());
-        return;
     }
     // Owner 2026-11-19: a block's own launcher order that finished marks the block's launcher standing, wherever
     // the builder moved the site (headless v2: up to 530 elmos off the order site, so the area search missed it
@@ -404,21 +420,16 @@ void CCommanderController::TaskFinished(IUnitTask* task,bool done) {
                 b.launcherSite.x,b.launcherSite.z,b.group);
         }
     }
-    if(task==tacticalJob) {  // D-475: the tactical queue's slot is free again
-        tacticalJob=nullptr;
-        if(task==t1Job) t1Job=nullptr;  // D-495
+    if(wasTactical) {  // D-475: the tactical queue's slot is free again
         const auto* build=dynamic_cast<IBuilderTask*>(task);
         const auto* def=build?build->GetBuildDef():nullptr;
         ai->LOG("[CommanderGroup] job_end queue=tactical done=%i team=%i def=%s",int(done),ai->GetTeamId(),
             def?def->GetDef()->GetName():"repair");
-        return;
     }
-    ExpansionJob* slot=nullptr;
-    for(auto& job:expansionJobs) if(job.task==task) {slot=&job;break;}
-    if(!slot) return;
-    const ExpansionJob finished=*slot;
-    *slot=ExpansionJob{}; // manager still owns task during this callback
+    if(!wasExpansion) return;
     defenseNext=defenseOfferNext=defenseDecisionNext=0;
+    // Accidental aliases of dedicated jobs never earn expansion nano debt.
+    if(wasJuno || wasGeo || wasTactical) return;
     const auto* finishedBuild=dynamic_cast<IBuilderTask*>(task);
     const auto* finishedDef=finishedBuild?finishedBuild->GetBuildDef():nullptr;
     ai->LOG("[CommanderGroup] job_end done=%i nano=%i team=%i def=%s committed=%i",int(done),int(finished.nano),
@@ -666,7 +677,7 @@ IUnitTask* CCommanderController::GroupLocalMaintenance(CCircuitUnit* unit,CCircu
         auto* build=dynamic_cast<IBuilderTask*>(project);
         // D-475: the tactical job is the other queue's; adopting it as the
         // expansion job held the one expansion slot for a whole launcher (b05).
-        if(build && build->GetBuildDef() && project!=tacticalJob && project!=junoJob && !IsTacticalDef(build->GetBuildDef())
+        if(build && build->GetBuildDef() && project!=tacticalJob && project!=junoJob && project!=geoJob && !IsTacticalDef(build->GetBuildDef())
             && !project->IsExternalControlled()
             && !project->IsEnemyReclaim() && GroupProjectAllowed(unit,project) && project->CanAssignTo(unit))
         {

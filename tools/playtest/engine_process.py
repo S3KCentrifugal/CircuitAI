@@ -39,6 +39,11 @@ class EngineProcess:
             raise ctypes.WinError(error)
         self.pid = pid
         try:
+            # The watcher may have stopped the engine while another launcher
+            # still holds its kernel object. OpenProcess can then succeed even
+            # though querying its image fails with ERROR_GEN_FAILURE (31).
+            if not self.alive():
+                raise ProcessLookupError(pid)
             times = [wintypes.FILETIME() for _ in range(4)]
             if not self.api.GetProcessTimes(self.handle, *(ctypes.byref(t) for t in times)):
                 raise ctypes.WinError(ctypes.get_last_error())
@@ -46,7 +51,10 @@ class EngineProcess:
             image = ctypes.create_unicode_buffer(32768)
             size = wintypes.DWORD(len(image))
             if not self.api.QueryFullProcessImageNameW(self.handle, 0, image, ctypes.byref(size)):
-                raise ctypes.WinError(ctypes.get_last_error())
+                error = ctypes.get_last_error()
+                if not self.alive():
+                    raise ProcessLookupError(pid)
+                raise ctypes.WinError(error)
             self.exe = canonical(image.value)
         except BaseException:
             self.close()

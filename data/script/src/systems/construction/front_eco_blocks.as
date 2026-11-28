@@ -67,7 +67,10 @@ namespace FrontEcoBlocks {
             for (int z = 0; z <= ring; ++z) for (int x = -ring; x <= ring; ++x) {
                 if (AiMax(Abs(x), z) != ring) continue;   // ring perimeter only
                 const AIFloat3 centre = anchor + side * (float(x) * across) - fwd * (float(z) * along);
+                // owner 2026-11-27: never over a T2 lab / gantry path, ours or an ally's (systems/team/ally_paths.as)
                 if (MapHelpers::SqDist(centre, start) > radius * radius
+                    || Team::AllyPaths::OnPath(centre, sqrt(across * across + along * along) * 0.5f
+                        + Global::RoleSettings::Front::AllyPathBlockPad)
                     || !aiTerrainMgr.CanReserveArea(centre, facing, across * 0.5f, along * 0.5f)
                     || !aiTerrainMgr.CanReachAtSafe(worker, centre, reach + across)) continue;
                 const int group = aiTerrainMgr.ReserveGrid(def, centre + fwd * (along * 0.5f), facing, cols, rows, 0);
@@ -91,6 +94,16 @@ namespace FrontEcoBlocks {
     // full. Pinned so the structure goes exactly on the slot.
     IUnitTask@ Order(int kind, CCircuitUnit@ worker, CCircuitDef@ def, Task::BuildType type, int cols, int rows) {
         Load();
+        // owner 2026-11-27: a factory path laid across the open block after it was reserved: stop filling it (its reservations stay: a slot may be pinned to a running order)
+        if (Open(kind)) {
+            const float size = float(AiMax(def.GetFootprintX(), def.GetFootprintZ())) * SQUARE_SIZE * 2.0f;
+            const float half = sqrt(float(cols * cols + rows * rows)) * size * 0.5f;
+            if (Team::AllyPaths::OnPath(centres[kind], half + Global::RoleSettings::Front::AllyPathBlockPad)) {
+                GenericHelpers::LogUtil("[FrontEco] " + NAMES[kind] + " block group=" + groups[kind] + " at " + int(centres[kind].x)
+                    + "," + int(centres[kind].z) + " dropped: a T2 lab / gantry path crosses it", 1);
+                groups[kind] = -1; Save(kind);
+            }
+        }
         if (!Open(kind) && !Reserve(kind, worker, def, cols, rows)) return null;
         const int slot = aiTerrainMgr.NextSlotAny(groups[kind], centres[kind]);
         if (slot < 0) return null;

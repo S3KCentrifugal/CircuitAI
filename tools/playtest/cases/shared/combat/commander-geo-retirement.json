@@ -1,0 +1,148 @@
+{
+  "name": "commander-geo-retirement",
+  "unit": "legcom",
+  "side": "legion",
+  "role": "FRONT",
+  "description": "Entrenched Plains Legion Rampart task retirement: two T2 workers near the vent from the live crash; completion must survive subsequent controller updates without expansion adoption. Factories are frozen and the separate defence planner is disabled through its existing test API, retaining real mobile-builder and geo policy while excluding unrelated combat/defence work.",
+  "commander_overrides": {
+    "front_push_screen": 0,
+    "commander_group_tactical_t2": 0,
+    "commander_group_artillery_t2_income": 0,
+    "commander_group_artillery_t1_income": 0,
+    "commander_group_combat_distance": 3000
+  },
+  "map": "Entrenched_Plains_V2",
+  "map_key": "entrenched",
+  "starts": [
+    [
+      7200,
+      2500
+    ],
+    [
+      4400,
+      2500
+    ]
+  ],
+  "camera": [
+    6700,
+    3200,
+    2500
+  ],
+  "photos": [],
+  "min_spawn_spacing": 38,
+  "command_breakdown": true,
+  "commander_observation": true,
+  "hold_friendly": false,
+  "groups": [
+    {
+      "unit": "leglab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        7400,
+        2200
+      ],
+      "after_seconds": 12
+    },
+    {
+      "unit": "legnanotc",
+      "team": 0,
+      "count": 1,
+      "position": [
+        7600,
+        2200
+      ],
+      "after_seconds": 20
+    },
+    {
+      "unit": "legck",
+      "team": 0,
+      "count": 3,
+      "spacing": 70,
+      "columns": 3,
+      "position": [
+        7300,
+        2350
+      ],
+      "after_seconds": 24
+    },
+    {
+      "unit": "legalab",
+      "team": 0,
+      "count": 1,
+      "position": [
+        7700,
+        2000
+      ],
+      "after_seconds": 25
+    },
+    {
+      "unit": "legfus",
+      "team": 0,
+      "count": 2,
+      "spacing": 160,
+      "columns": 2,
+      "position": [
+        7000,
+        2100
+      ],
+      "after_seconds": 28
+    },
+    {
+      "unit": "legack",
+      "team": 0,
+      "count": 2,
+      "spacing": 100,
+      "columns": 2,
+      "position": [
+        7300,
+        2600
+      ],
+      "after_seconds": 30
+    }
+  ],
+  "assertions": {
+    "min_shooters": 0,
+    "min_damage": 0,
+    "min_kills": 0,
+    "max_losses": 0
+  },
+  "checks": "commander-geo-retirement",
+  "commander_initial": true,
+  "start_metal": 100000,
+  "commander_trace": true,
+  "coverage_probe": false,
+  "coverage_min_advance": 1500,
+  "builders": true,
+  "production": false,
+  "start_energy": 1000000,
+  "storage_scenario": "geo-retirement",
+  "commander_group_observation": {
+    "nano": "legnanotc",
+    "defence": "legapopupdef",
+    "radar": "legarad",
+    "jammer": "legajam"
+  },
+  "modoptions": {
+    "multiplier_metalextraction": 10,
+    "experimentallegionfaction": 1
+  },
+  "front_spacing_observation": false,
+  "commander_radar_package_check": false,
+  "commander_policy": {
+    "commander_group_income": 0,
+    "commander_group_t2_metal": 0,
+    "commander_group_t2_energy": 0,
+    "commander_group_second_t2_metal": 0,
+    "commander_group_second_t2_energy": 0,
+    "commander_group_third_t2_metal": 100000,
+    "commander_group_third_t2_energy": 100000
+  },
+  "defense_overrides": [
+    {
+      "slot": -1,
+      "key": "enabled",
+      "value": 0
+    }
+  ]
+}

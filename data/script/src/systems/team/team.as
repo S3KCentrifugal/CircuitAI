@@ -10,6 +10,7 @@
 #include "commander_energy.as"
 #include "pinpointer_pool.as"
 #include "ally_clear.as"
+#include "ally_paths.as"
 #include "nuke_recon.as"
 #include "lolcannon_recon.as"
 #include "../combat/front_radar.as"
@@ -71,6 +72,7 @@ namespace Team {
         if (AirEmergencyDefense::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-12: AIR base emergency -> nearest FRONTs
         if (CatalystTrade::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-13: Legion FRONT asks a Cortex FRONT for a T2 constructor
         if (MobileAntiNuke::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-24: FRONT without the lab asks for a mobile antinuke
+        if (AllyPaths::HandleMessage(msg, fromTeamId)) return;   // owner, 2026-11-27: allied T2 lab / gantry exit paths
         if (Roster::HandleMessage(msg, fromTeamId)) return;
         if (EngineeringLanes::Handle(msg, fromTeamId)) return;
         if (CoverageLanes::HandleMessage(msg, fromTeamId)) return;   // D-357: a FRONT ally's corridor claim
