@@ -147,7 +147,8 @@ namespace FrontTankMass {
             GenericHelpers::LogUtil("[FRONT][TankMass] " + tier + " first roll at " + (nextRoll[t] / SECOND) + " s", 1);
             return null;
         }
-        if (ai.frame < nextRoll[t]) return null;
+        const bool only = t == 1 && Global::BattleSquads::SquadsOnly;   // test mode: T2 rolls never wait or miss
+        if (!only && ai.frame < nextRoll[t]) return null;
         // Owner (2026-10-20): an artillery squad still gathering at this plant: roll once it departs
         if (t == 1 && FrontArtySquad::Gathering(u.id)) return null;
         // The opener's tanks or the last mass still gather: roll once they are released
@@ -163,7 +164,8 @@ namespace FrontTankMass {
         bool bigHit = false;
         if (chance < 1.0f || squadChance > 0.0f || big > 0.0f) {
             // AiDice's rare -1 endpoint counts as a miss (KI-628, as FrontOpener::ChooseTank)
-            const array<float> weights = {AiMax(0.0f, 1.0f - chance - squadChance - big), chance, squadChance, big};
+            array<float> weights = {AiMax(0.0f, 1.0f - chance - squadChance - big), chance, squadChance, big};
+            if (only) weights = array<float> = {0.0f, 0.5f, 0.5f, 0.0f};   // tank wave or artillery squad, 50-50
             const int pick = AiDice(weights);
             bigHit = pick == 3;
             if (pick == 2) {

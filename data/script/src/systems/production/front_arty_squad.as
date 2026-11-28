@@ -198,9 +198,11 @@ namespace FrontArtySquad {
             GenericHelpers::LogUtil("[FRONT][ArtySquad] T2 bot lab " + u.id + " stands: first bot squad roll at " + (nextBotRoll / SECOND) + " s", 1);
             return null;
         }
-        if (ai.frame < nextBotRoll || BotGathering()) return null;   // one bot squad gathers at a time
+        if (BotGathering()) return null;   // one bot squad gathers at a time
+        const bool only = Global::BattleSquads::SquadsOnly;   // test mode: the next squad at once, never a miss
+        if (!only && ai.frame < nextBotRoll) return null;
         nextBotRoll = ai.frame + interval;
-        const float chance = AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadChance);
+        const float chance = only ? 1.0f : AiMin(1.0f, Global::RoleSettings::Front::T2BotSquadChance);
         // AiDice's rare -1 endpoint counts as a miss (KI-628)
         const array<float> hit = {AiMax(0.0f, 1.0f - chance), chance};
         if (chance < 1.0f && AiDice(hit) != 1) {

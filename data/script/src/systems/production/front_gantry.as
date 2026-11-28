@@ -114,6 +114,7 @@ namespace FrontGantry {
         // owner 2026-11-16: a heavy wave roll's units back to back, outside the rotation
         IUnitTask@ wave = HeavyWave::Produce(g, side);
         if (wave !is null) return wave;
+        if (Global::BattleSquads::SquadsOnly) return aiFactoryMgr.Enqueue(TaskS::Wait(false, 2 * SECOND));   // test mode: squads only
         IUnitTask@ task = Factory::EnqueueGantryBatchFrom(g, Order(g, side), 1, Task::Priority::HIGH);
         if (task is null) return null;
         if (orderRotated && Factory::lastGantryBatchIndex >= 0)

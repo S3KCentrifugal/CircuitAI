@@ -160,10 +160,11 @@ namespace HeavyWave {
     }
 
     void Roll(CCircuitUnit@ g, const string &in side) {
-        nextRoll = ai.frame + AiMax(1, Global::HeavyWave::RollIntervalSeconds) * SECOND;
+        const bool only = Global::BattleSquads::SquadsOnly;   // test mode: every gantry ask rolls, chance 1
+        nextRoll = ai.frame + (only ? SECOND : AiMax(1, Global::HeavyWave::RollIntervalSeconds) * SECOND);
         ++rolls;
         const int n = AiMax(1, late ? Global::HeavyWave::LateWaveSize : Global::HeavyWave::WaveSize);
-        const float chance = Global::HeavyWave::RollChance;
+        const float chance = only ? 1.0f : Global::HeavyWave::RollChance;
         bool hit = chance >= 1.0f;
         if (!hit && chance > 0.0f) {
             const array<float> weights = {1.0f - chance, chance};
@@ -199,6 +200,7 @@ namespace HeavyWave {
         if (!UnitHelpers::IsGantryLab(g.circuitDef.GetName()) || g.GetBuildProgress() < 1.0f) return null;
         UpdateLate();
         if (active && gather is null && admitted == 0 && ai.frame >= deadline) Close("deadline with no unit out");
+        if (Global::BattleSquads::SquadsOnly && nextRoll < 0) nextRoll = ai.frame;   // test mode: no 3-heavy arming
         if (!active && nextRoll >= 0 && ai.frame >= nextRoll) Roll(g, side);
         if (!active || g.id != gantryId || ordered >= size) return null;
         array<string> one = {unitName};

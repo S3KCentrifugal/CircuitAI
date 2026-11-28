@@ -555,6 +555,10 @@ namespace RoleFront {
             if (massT2 !is null) return massT2;
         }
 
+        // Test mode (Global::BattleSquads::SquadsOnly): a T2 lab between squads waits
+        if (Global::BattleSquads::SquadsOnly && (UnitHelpers::IsT2BotLab(factoryName) || UnitHelpers::IsT2VehicleLab(factoryName)))
+            return aiFactoryMgr.Enqueue(TaskS::Wait(false, 2 * SECOND));
+
         IUnitTask@ siege = LandSiege::Produce(u);
         if (siege !is null) return siege;
 

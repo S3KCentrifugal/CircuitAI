@@ -19,5 +19,12 @@ namespace BattleSquads {
     float LaneFriendBonus = 1.25f;
     int LaneHoldSeconds = 120;
     float LaneSwitchBack = 1.0f;
+    // Test mode (owner 2026-11-27, headless only): T2 labs and gantries make nothing but battle
+    // squads. A T2 bot lab starts its next squad as soon as the last one left (no interval, no
+    // miss), a T2 vehicle plant rolls tank wave or artillery squad 50-50 with no miss, every gantry
+    // ask after the first rolls a heavy wave (chance 1, no 3-heavy arming, 1 s apart), and between
+    // squads those factories wait instead of building other units. T1 labs, constructors and the
+    // TECH t3rush opening are unchanged. Off in every live profile.
+    bool SquadsOnly = false;
 }
 }
